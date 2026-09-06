@@ -1,0 +1,20 @@
+# Material/sensory registers Stage 2 (llm_pipeline.py) draws its physical
+# vocabulary from. Each generation gets assigned one register that hasn't
+# been used recently, so the series moves between genuinely different
+# regions of image-space instead of just avoiding recent words.
+#
+# Edit this list freely — add a register whenever you notice one producing
+# good results, remove one that never lands. Order doesn't matter.
+
+registers = [
+  "domestic interior",
+  "geological",
+  "textile and fiber",
+  "architectural",
+  "bodily and anatomical",
+  "botanical",
+  "mechanical",
+  "aquatic",
+  "atmospheric",
+  "ritual object",
+]

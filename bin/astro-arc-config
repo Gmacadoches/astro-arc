@@ -1,0 +1,144 @@
+#!/bin/bash
+
+# Owns reads/writes of Astro-Arc's user config at
+# ~/.local/state/omarchy/settings/astro-arc.json. Mirrors the
+# omarchy-weather-location convention: a small script is the only writer,
+# the Quickshell panel reads it back via a watched FileView.
+#
+#   (no args)                             print the current config as JSON
+#                                          (defaults filled in for anything unset)
+#   --set-birth <YYYY-MM-DD> <HH:MM|unknown>
+#                                          set birth date, and either a 24h
+#                                          birth time or the literal "unknown"
+#   --set-location <name> [lat,lon]       store a location; coordinates are
+#                                          optional but required for house/
+#                                          ascendant precision later
+#   --clear-location                      unset the location
+#   --set-frequency <daily|weekly|monthly>
+#   --set-image-backend <local|openai>    which generator astro-arc-generate uses
+#   --set-openai-model <model> <quality>  IMAGE model id + quality tier ("" if n/a)
+#   --set-stage1-model <model>            chat model for Stage 1 (llm_pipeline.py's
+#                                          chart -> psychological reading)
+#   --set-stage2-model <model>            chat model for Stage 2 (llm_pipeline.py's
+#                                          reading -> image prompt + concept tags)
+#   --set-background-size <auto|WxH>      target background resolution; "auto"
+#                                          detects the focused monitor at
+#                                          generation time (see
+#                                          astro-arc-detect-resolution)
+#   --set-art-style <key>                 which pipeline/styles.toml preset
+#                                          Stage 2's prompt is suffixed with
+#
+# Stage 1 and Stage 2 are separately configurable — and use separately
+# stored API keys, see astro-arc-apikey — since they're different tasks
+# that may call for different models/accounts. Neither is the same
+# setting as the image-rendering model above: that one picks which OpenAI
+# image model paints the final picture; these two pick which chat model
+# does the interpretation and the prompt-writing that precede it.
+#
+# The OpenAI API keys themselves are NEVER stored here or anywhere in this
+# file — see astro-arc-apikey, which stores them only via secret-tool
+# (libsecret), one per stage.
+
+set -euo pipefail
+
+CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"daily","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist"}'
+COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
+TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
+DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+SIZE_PATTERN='^[0-9]{2,5}x[0-9]{2,5}$'
+
+read_config() {
+  if [[ -f $CONFIG_FILE ]]; then
+    jq -s '.[0] * .[1]' <(echo "$DEFAULTS") "$CONFIG_FILE" 2>/dev/null || echo "$DEFAULTS"
+  else
+    echo "$DEFAULTS"
+  fi
+}
+
+write_config() {
+  mkdir -p "$(dirname "$CONFIG_FILE")"
+  echo "$1" >"$CONFIG_FILE"
+}
+
+case "${1:-}" in
+"")
+  read_config
+  ;;
+--set-birth)
+  [[ -n ${2:-} && -n ${3:-} ]] || { echo "Usage: astro-arc-config --set-birth <YYYY-MM-DD> <HH:MM|unknown>" >&2; exit 1; }
+  [[ $2 =~ $DATE_PATTERN ]] || { echo "Invalid date: $2 (expected YYYY-MM-DD)" >&2; exit 1; }
+  date -d "$2" >/dev/null 2>&1 || { echo "Invalid date: $2 (not a real calendar date)" >&2; exit 1; }
+  current=$(read_config)
+  if [[ $3 == "unknown" ]]; then
+    updated=$(jq --arg d "$2" '.birthDate=$d | .birthTime="" | .birthTimeUnknown=true' <<<"$current")
+  else
+    [[ $3 =~ $TIME_PATTERN ]] || { echo "Invalid time: $3 (expected HH:MM, 24h, or \"unknown\")" >&2; exit 1; }
+    updated=$(jq --arg d "$2" --arg t "$3" '.birthDate=$d | .birthTime=$t | .birthTimeUnknown=false' <<<"$current")
+  fi
+  write_config "$updated"
+  ;;
+--set-location)
+  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-location <name> [lat,lon]" >&2; exit 1; }
+  current=$(read_config)
+  if [[ -n ${3:-} ]]; then
+    [[ $3 =~ $COORDS_PATTERN ]] || { echo "Invalid coordinates: $3 (expected lat,lon)" >&2; exit 1; }
+    lat=${3%,*}; lon=${3#*,}
+    updated=$(jq --arg n "$2" --argjson lat "$lat" --argjson lon "$lon" '.locationName=$n | .latitude=$lat | .longitude=$lon' <<<"$current")
+  else
+    updated=$(jq --arg n "$2" '.locationName=$n | .latitude=null | .longitude=null' <<<"$current")
+  fi
+  write_config "$updated"
+  ;;
+--clear-location)
+  current=$(read_config)
+  updated=$(jq '.locationName="" | .latitude=null | .longitude=null' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-frequency)
+  [[ ${2:-} =~ ^(daily|weekly|monthly)$ ]] || { echo "Usage: astro-arc-config --set-frequency <daily|weekly|monthly>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg f "$2" '.frequency=$f' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-image-backend)
+  [[ ${2:-} =~ ^(local|openai)$ ]] || { echo "Usage: astro-arc-config --set-image-backend <local|openai>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg b "$2" '.imageBackend=$b' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-openai-model)
+  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-openai-model <model> [quality]" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg m "$2" --arg q "${3:-}" '.openaiModel=$m | .openaiQuality=$q' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-stage1-model)
+  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-stage1-model <model>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg m "$2" '.stage1Model=$m' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-stage2-model)
+  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-stage2-model <model>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg m "$2" '.stage2Model=$m' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-background-size)
+  [[ ${2:-} == "auto" || ${2:-} =~ $SIZE_PATTERN ]] || { echo "Usage: astro-arc-config --set-background-size <auto|WIDTHxHEIGHT>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg s "$2" '.backgroundSize=$s' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-art-style)
+  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-art-style <key>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg s "$2" '.artStyle=$s' <<<"$current")
+  write_config "$updated"
+  ;;
+*)
+  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <daily|weekly|monthly>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>]" >&2
+  exit 1
+  ;;
+esac

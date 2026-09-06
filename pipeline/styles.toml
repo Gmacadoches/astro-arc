@@ -1,0 +1,29 @@
+# Art-style presets for Stage 2's prompt suffix. Each generation appends
+# whichever preset is selected in the widget's Style dropdown to Stage 2's
+# imagery, the same way the old fixed style.toml suffix always did — only
+# now there's more than one to pick from.
+#
+# These five are the directions explored during Phase 3's style review
+# (see the review log); "symbolist" is the one that stuck and stayed the
+# default. Add more presets here freely — each needs a "label" (shown in
+# the dropdown) and a "suffix" (appended verbatim to every Stage 2 prompt).
+
+[symbolist]
+label = "Symbolist / Visionary"
+suffix = "painterly, visionary symbolist painting in the tradition of Odilon Redon, Remedios Varo, Leonora Carrington, and Hilma af Klint's illuminated visions — strange, hand-painted, not digital or photographic"
+
+[engraving]
+label = "Antique Engraving"
+suffix = "antique astronomical engraving, fine linework, star atlas illustration, sepia and ink tones, detailed etching"
+
+[artdeco]
+label = "Art Deco"
+suffix = "art deco poster design, bold geometric shapes, metallic gold and emerald, symmetrical, elegant linework"
+
+[cosmic]
+label = "Cosmic / Nebula"
+suffix = "ethereal cosmic art, nebula and starfield, dreamlike aurora colors, soft glowing light, painterly, otherworldly"
+
+[surreal]
+label = "Surreal Painting"
+suffix = "surreal dreamlike oil painting, soft brushwork, twilight color palette, fine art illustration"

@@ -1,0 +1,10 @@
+# Explicit blocklist for imagery that keeps recurring despite the
+# concept-tag anti-repetition history in history.json — meaning the model
+# has a strong attractor toward it that tag-avoidance alone isn't breaking.
+#
+# Leave this empty until you actually observe repetition across several
+# generations. Do not pre-seed it with guesses: a blocklist populated from
+# prediction rather than observation gives false confidence and decays as
+# the model finds synonyms for whatever you guessed instead of it.
+
+terms = []

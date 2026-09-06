@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Manages Astro-Arc's OpenAI API keys, stored ONLY via secret-tool
+# (libsecret / the Secret Service API) — never in a plaintext file, never
+# inside this plugin's own install/repo directory.
+#
+# Three independent keys/slots, since the pipeline can reasonably use
+# different accounts (or just different models) for each stage:
+#   stage1   Stage 1 interpretation (llm_pipeline.py's chart -> reading)
+#   stage2   Stage 2 image-prompt writing (llm_pipeline.py's reading -> prompt)
+#   image    the actual OpenAI image-rendering call (openai_image_gen.py)
+#
+# This script never handles the key itself for --set: the caller (Panel.qml)
+# pipes the raw key straight into `secret-tool store`'s stdin — see the
+# comment on the Process that invokes it. This script only ever touches a
+# key for the read paths below, and only to compute a masked reference or
+# hand it to a single subprocess call; it is never echoed, printed in full,
+# or written anywhere.
+#
+#   status <slot>    print {"present":true,"masked":"sk-...ab12"} or {"present":false}
+#   clear <slot>      remove the stored key for that slot
+#   lookup <slot>     print the raw key to stdout — for other scripts' internal
+#                     use only (e.g. openai_image_gen.py via subprocess); never
+#                     call this and let the output land in a shell variable,
+#                     a log, or a terminal a person is watching.
+
+set -euo pipefail
+
+SERVICE="astro-arc"
+
+account_for_slot() {
+  case "$1" in
+    stage1) echo "openai-api-key-stage1" ;;
+    stage2) echo "openai-api-key-stage2" ;;
+    image) echo "openai-api-key" ;;  # kept as the original name for continuity
+    *) echo "Unknown slot: $1 (expected stage1, stage2, or image)" >&2; exit 1 ;;
+  esac
+}
+
+require_secret_tool() {
+  command -v secret-tool >/dev/null 2>&1 || {
+    echo "secret-tool not found. Install libsecret's secret-tool (e.g. \`omarchy pkg add libsecret\`) — Astro-Arc refuses to fall back to plaintext key storage." >&2
+    exit 1
+  }
+}
+
+action="${1:-}"
+slot="${2:-}"
+[[ -n $slot ]] || { echo "Usage: astro-arc-apikey <status|clear|lookup> <stage1|stage2|image>" >&2; exit 1; }
+account=$(account_for_slot "$slot")
+
+case "$action" in
+status)
+  require_secret_tool
+  # A key only ever exists transiently in this local var, long enough to
+  # slice out a masked reference; it is not written or printed in full.
+  key=$(secret-tool lookup service "$SERVICE" account "$account" 2>/dev/null || true)
+  if [[ -n $key ]]; then
+    tail4=${key: -4}
+    jq -n --arg masked "sk-...${tail4}" '{present: true, masked: $masked}'
+  else
+    jq -n '{present: false}'
+  fi
+  unset key
+  ;;
+clear)
+  require_secret_tool
+  secret-tool clear service "$SERVICE" account "$account"
+  ;;
+lookup)
+  require_secret_tool
+  secret-tool lookup service "$SERVICE" account "$account"
+  ;;
+*)
+  echo "Usage: astro-arc-apikey <status|clear|lookup> <stage1|stage2|image>" >&2
+  exit 1
+  ;;
+esac
