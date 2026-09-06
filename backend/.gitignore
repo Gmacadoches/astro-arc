@@ -1,0 +1,21 @@
+# Astro-Arc backend never stores credentials in this directory (API keys
+# live only in the system keyring via secret-tool — see astro-arc-apikey).
+# Unlike the plugin repo's .gitignore, this directory legitimately has
+# scripts named *apikey*/*secret* (astro-arc-apikey, astro-arc-check-
+# secrets), so filename-substring patterns aren't safe here — the real
+# gate is content-based: run astro-arc-check-secrets before every commit.
+*.key
+*.env
+.env.*
+credentials*
+*.pem
+
+# Generated/downloaded, not source — recreated automatically on first run.
+venv/
+models/
+logs/
+__pycache__/
+*.pyc
+
+# Runtime state and config belong under ~/.local/state, not here — this
+# repo is bin/ (scripts) and pipeline/ (hand-edited tuning tables) only.

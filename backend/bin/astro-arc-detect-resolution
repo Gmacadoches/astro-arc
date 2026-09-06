@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Prints "WIDTHxHEIGHT" for the currently focused monitor, in physical
+# pixels. Used by the widget's "Auto-detect" button and by astro-arc-generate
+# itself when backgroundSize is "auto".
+
+set -euo pipefail
+
+command -v hyprctl >/dev/null 2>&1 || { echo "hyprctl not found" >&2; exit 1; }
+
+hyprctl monitors -j | jq -r '
+  (map(select(.focused == true)) + .) [0]
+  | "\(.width)x\(.height)"
+'

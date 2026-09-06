@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# Orchestrates one full Astro-Arc generation cycle:
+#   astro_engine.py -> llm_pipeline.py (Stage 1 interpret, Stage 2 image
+#     prompt) -> (image_gen.py | openai_image_gen.py) -> palette_extract.py
+#     -> Omarchy theme -> omarchy-theme-set -> build_review.py
+#
+# llm_pipeline.py replaced the old lookup-table symbol_map.py: both its
+# stages are themselves OpenAI chat calls, so an API key is required now
+# regardless of which backend below actually renders the image — the
+# local/free choice only applies to the image render, not the prompt.
+#
+# Backend is whichever the widget's settings picked (config.imageBackend):
+# "local" (free, the pinned sd-turbo checkpoint) or "openai" (the widget's
+# model/quality picker) — either way needs a key stored via astro-arc-apikey.
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PY="$HOME/.local/share/omarchy/astro-arc/venv/bin/python3"
+CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
+STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
+HISTORY_DIR="$STATE_DIR/history"
+LAST_RUN_FILE="$STATE_DIR/last-run.json"
+THEME_DIR="$HOME/.config/omarchy/themes/astro-arc"
+PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
+COSTS_FILE="$PIPELINE_STATE_DIR/costs.json"
+COSTS_MAX=200
+
+mkdir -p "$STATE_DIR" "$HISTORY_DIR" "$THEME_DIR/backgrounds" "$PIPELINE_STATE_DIR"
+
+frequency=$(jq -r '.frequency // "daily"' "$CONFIG_FILE" 2>/dev/null || echo "daily")
+image_backend=$(jq -r '.imageBackend // "local"' "$CONFIG_FILE" 2>/dev/null || echo "local")
+openai_model=$(jq -r '.openaiModel // "gpt-image-1-mini"' "$CONFIG_FILE" 2>/dev/null || echo "gpt-image-1-mini")
+openai_quality=$(jq -r '.openaiQuality // "medium"' "$CONFIG_FILE" 2>/dev/null || echo "medium")
+background_size=$(jq -r '.backgroundSize // "auto"' "$CONFIG_FILE" 2>/dev/null || echo "auto")
+
+case "$frequency" in
+  weekly) period_key=$(date +%G-W%V) ;;
+  monthly) period_key=$(date +%Y-%m) ;;
+  *) frequency="daily"; period_key=$(date +%Y-%m-%d) ;;
+esac
+
+# "auto" resolves fresh every run, so a monitor change (new laptop screen,
+# a plugged-in external display) is picked up next generation with no
+# setting to remember to update.
+if [[ $background_size == auto ]]; then
+  background_size=$("$BIN_DIR/astro-arc-detect-resolution" 2>/dev/null || echo "1920x1080")
+fi
+bg_width=${background_size%x*}
+bg_height=${background_size#*x}
+
+reading_file="$STATE_DIR/reading-$period_key.json"
+bg_file="$HISTORY_DIR/$period_key.png"
+pipeline_meta_file="$STATE_DIR/pipeline-meta-$period_key.json"
+image_cost_file="$STATE_DIR/image-cost-$period_key.json"
+
+"$VENV_PY" "$BIN_DIR/astro_engine.py" >"$reading_file"
+if jq -e '.error' "$reading_file" >/dev/null 2>&1; then
+  echo "Astro-Arc: $(jq -r '.error' "$reading_file")" >&2
+  exit 1
+fi
+
+prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
+
+if [[ $image_backend == openai ]]; then
+  "$VENV_PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
+    --model "$openai_model" --quality "$openai_quality" \
+    --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
+else
+  "$VENV_PY" "$BIN_DIR/image_gen.py" "$prompt" "$bg_file" --steps 8 \
+    --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
+fi
+
+cp -f "$bg_file" "$THEME_DIR/backgrounds/background.png"
+"$VENV_PY" "$BIN_DIR/palette_extract.py" "$bg_file" "$THEME_DIR/colors.toml"
+
+omarchy-theme-set astro-arc >/dev/null 2>&1
+
+# Cost log: real token-based cost for the two chat calls (from
+# llm_pipeline.py's metadata) plus the image call (from the backend's
+# --cost-out) — the full cost of all 3 API calls for this generation, per
+# the widget's usage counter. Any field can be null: cached calls (no cost
+# incurred) and unrecognized models (cost_estimate.py won't guess) both
+# report null rather than a fabricated number.
+generated_at="$(date -Iseconds)"
+stage1_cost=$(jq -r '.stage1Cost // "null"' "$pipeline_meta_file")
+stage2_cost=$(jq -r '.stage2Cost // "null"' "$pipeline_meta_file")
+signature_cost=$(jq -r '.signatureCost // "null"' "$pipeline_meta_file")
+image_cost=$(jq -r '.cost // "null"' "$image_cost_file" 2>/dev/null || echo "null")
+image_cost_source=$(jq -r '.costSource // "unknown"' "$image_cost_file" 2>/dev/null || echo "unknown")
+
+cost_entry=$(jq -n \
+  --arg timestamp "$generated_at" --arg periodKey "$period_key" --arg frequency "$frequency" \
+  --arg backend "$image_backend" --arg imageCostSource "$image_cost_source" \
+  --argjson stage1Cost "$stage1_cost" --argjson stage2Cost "$stage2_cost" \
+  --argjson signatureCost "$signature_cost" --argjson imageCost "$image_cost" \
+  '{
+    timestamp: $timestamp, periodKey: $periodKey, frequency: $frequency, imageBackend: $backend,
+    stage1Cost: $stage1Cost, stage2Cost: $stage2Cost, signatureCost: $signatureCost,
+    imageCost: $imageCost, imageCostSource: $imageCostSource,
+    totalCost: ([$stage1Cost, $stage2Cost, $signatureCost, $imageCost] | map(select(. != null)) | add)
+  }')
+
+if [[ -f $COSTS_FILE ]]; then
+  jq --argjson entry "$cost_entry" '[$entry] + . | .[0:'"$COSTS_MAX"']' "$COSTS_FILE" >"$COSTS_FILE.tmp" && mv "$COSTS_FILE.tmp" "$COSTS_FILE"
+else
+  jq -n --argjson entry "$cost_entry" '[$entry]' >"$COSTS_FILE"
+fi
+
+# last-run.json carries the Stage 1 reading + Stage 2 metadata alongside
+# the usual run info — so the user can see *why* an image came out the way
+# it did, and it's what the review log pulls from to caption past runs.
+jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg frequency "$frequency" \
+  --arg backend "$image_backend" --arg prompt "$prompt" --arg backgroundSize "$background_size" \
+  --slurpfile meta "$pipeline_meta_file" --argjson cost "$cost_entry" \
+  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
+
+# Log this as a browsable iteration — every real run, not just manual
+# style-comparison batches, so reverting to an earlier reading/prompt/
+# register later on means finding it in this list rather than trying to
+# remember it.
+review_label="${frequency^} · $(date '+%b %-d, %-I:%M %p') ($image_backend)"
+"$VENV_PY" "$BIN_DIR/build_review.py" \
+  --reading "$reading_file" --meta "$pipeline_meta_file" --image "$bg_file" \
+  --label "$review_label" --cost-json "$cost_entry" >/dev/null \
+  || echo "Astro-Arc: warning — could not log this iteration to the review history" >&2
+
+echo "Astro-Arc: generated $frequency theme for period $period_key via $image_backend at $background_size"
