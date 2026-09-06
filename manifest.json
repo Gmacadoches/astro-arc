@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "garrett.astro-arc",
+  "name": "Astro-Arc",
+  "version": "0.1.0",
+  "author": "garrett",
+  "description": "Astrological theme generator: turns your natal chart and current transits into a full Omarchy theme on a daily/weekly/monthly cadence",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "barWidget": {
+    "displayName": "Astro-Arc",
+    "description": "Astrological theme generator",
+    "category": "Info",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

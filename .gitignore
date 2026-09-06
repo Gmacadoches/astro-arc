@@ -1,0 +1,22 @@
+# Astro-Arc never stores credentials, generated state, or caches inside
+# this plugin directory in the first place (the API key lives only in the
+# system keyring via secret-tool; config/state/models live under
+# ~/.local/state and ~/.local/share, not here) — this file is defense in
+# depth against that ever changing by accident, so nothing here can end up
+# packaged into a published git repo.
+*.key
+*api-key*
+*apikey*
+*secret*
+*.env
+.env.*
+config.json
+astro-arc.json
+last-run.json
+reading-*.json
+reviews/
+history/
+models/
+venv/
+__pycache__/
+*.pyc
