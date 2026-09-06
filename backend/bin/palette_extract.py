@@ -11,10 +11,54 @@ colors, but doesn't need k-means clustering to prove that out.
 Usage: palette_extract.py <image_path> <colors_toml_output_path>
 """
 
+import colorsys
 import sys
 from pathlib import Path
 
 from PIL import Image
+
+# GNOME/Nautilus (the file manager) doesn't read colors.toml at all — Omarchy's
+# omarchy-theme-set-gnome reads a sibling icons.theme file naming one of these
+# fixed Yaru icon-color variants, falling back to a hardcoded "Yaru-blue" when
+# that file is absent. Every official Omarchy theme ships one; this project's
+# generated theme didn't, which is why the file manager never re-themed.
+#
+# Hues below are sampled directly from each variant's own folder icon
+# (48x48/places/folder.png, most-saturated pixel), not guessed from the name —
+# see the astro-arc project's CHANGELOG for the sampling method. Matching by
+# nearest hue on a circle, rather than fixed ranges, means no boundary case is
+# ever left unhandled.
+YARU_ACCENT_HUES = {
+    "wartybrown": 29.0,
+    "yellow": 37.6,
+    "olive": 85.3,
+    "sage": 130.6,
+    "prussiangreen": 179.1,
+    "blue": 210.0,
+    "purple": 254.5,
+    "magenta": 298.7,
+    "red": 349.7,
+}
+# Below this saturation the extracted accent is too close to grey for any hue
+# match to mean anything (an artifact of the accent-selection heuristic below
+# picking the "most saturated" of an otherwise muted palette) — the plain,
+# uncolored base icon set reads better than a arbitrary near-grey hue guess.
+YARU_MIN_SATURATION = 0.12
+
+
+def nearest_yaru_variant(rgb):
+    r, g, b = (c / 255 for c in rgb)
+    h, s, _v = colorsys.rgb_to_hsv(r, g, b)
+    if s < YARU_MIN_SATURATION:
+        return "Yaru"
+    hue_deg = h * 360
+
+    def circular_distance(a, b):
+        d = abs(a - b) % 360
+        return min(d, 360 - d)
+
+    name = min(YARU_ACCENT_HUES, key=lambda n: circular_distance(hue_deg, YARU_ACCENT_HUES[n]))
+    return f"Yaru-{name}"
 
 TEMPLATE = """mode = "{mode}"
 
@@ -100,7 +144,7 @@ def build_colors_toml(image_path):
     background = darkest if dark_theme else lightest
     foreground = lightest if dark_theme else darkest
 
-    return TEMPLATE.format(
+    toml_text = TEMPLATE.format(
         mode=mode,
         accent=_hex(accent),
         background=_hex(background),
@@ -109,6 +153,7 @@ def build_colors_toml(image_path):
         lighter_background=_hex(_scale(background, 1.35)),
         foreground=_hex(foreground),
     )
+    return toml_text, accent
 
 
 def main():
@@ -116,9 +161,16 @@ def main():
         print("Usage: palette_extract.py <image_path> <colors_toml_output_path>", file=sys.stderr)
         sys.exit(1)
     image_path, output_path = sys.argv[1], sys.argv[2]
-    toml_text = build_colors_toml(image_path)
-    Path(output_path).write_text(toml_text)
+    toml_text, accent = build_colors_toml(image_path)
+    output_path = Path(output_path)
+    output_path.write_text(toml_text)
     print(f"Wrote {output_path}", file=sys.stderr)
+
+    # Sibling file, same convention every official Omarchy theme uses — see
+    # nearest_yaru_variant's docstring/comment above for why this exists.
+    icons_path = output_path.parent / "icons.theme"
+    icons_path.write_text(nearest_yaru_variant(accent) + "\n")
+    print(f"Wrote {icons_path}", file=sys.stderr)
 
 
 if __name__ == "__main__":

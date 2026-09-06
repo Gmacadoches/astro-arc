@@ -2,8 +2,9 @@
 
 # Orchestrates one full Astro-Arc generation cycle:
 #   astro_engine.py -> llm_pipeline.py (Stage 1 interpret, Stage 2 image
-#     prompt) -> (image_gen.py | openai_image_gen.py) -> palette_extract.py
-#     -> Omarchy theme -> omarchy-theme-set -> build_review.py
+#     prompt) -> (image_gen.py | openai_image_gen.py) -> theming (aether, or
+#     palette_extract.py as its default/fallback) -> Omarchy theme ->
+#     omarchy-theme-set -> build_review.py
 #
 # llm_pipeline.py replaced the old lookup-table symbol_map.py: both its
 # stages are themselves OpenAI chat calls, so an API key is required now
@@ -13,6 +14,11 @@
 # Backend is whichever the widget's settings picked (config.imageBackend):
 # "local" (free, the pinned sd-turbo checkpoint) or "openai" (the widget's
 # model/quality picker) — either way needs a key stored via astro-arc-apikey.
+#
+# Theme generator is config.themeGenerator: "built-in" (palette_extract.py,
+# default, no external dependency) or "aether" (Omarchy's own theme
+# generator, richer output, falls back to built-in automatically on any
+# failure — see the theming block below for exactly what that excludes/why).
 
 set -euo pipefail
 
@@ -72,8 +78,69 @@ else
     --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
 fi
 
+# Clean slate every run, not just an overwrite: whichever theme generator
+# ran last time (built-in or aether) may have left files the other one
+# doesn't produce (e.g. aether's mako.ini, or a stale alacritty.toml that
+# would otherwise permanently block a fresh one — omarchy-theme-set-
+# templates only generates a config if the theme doesn't already have one).
+# THEME_DIR only ever holds generator output plus backgrounds/, so this is
+# always safe to clear.
+find "$THEME_DIR" -mindepth 1 -maxdepth 1 ! -name backgrounds -exec rm -rf {} +
+mkdir -p "$THEME_DIR/backgrounds"
 cp -f "$bg_file" "$THEME_DIR/backgrounds/background.png"
-"$VENV_PY" "$BIN_DIR/palette_extract.py" "$bg_file" "$THEME_DIR/colors.toml"
+
+theme_generator=$(jq -r '.themeGenerator // "built-in"' "$CONFIG_FILE" 2>/dev/null || echo "built-in")
+
+# Theming: derive colors.toml + icons.theme from the rendered image.
+# icons.theme is the file GNOME/Nautilus's icon color actually comes from
+# (see palette_extract.py's comment) — without it, omarchy-theme-set-gnome
+# silently falls back to a hardcoded "Yaru-blue" forever, which is why the
+# file manager never looked like it was re-theming.
+#
+# "aether" shells out to Omarchy's own richer theme generator (also
+# produces icons.theme, plus Zed/VS Code/terminal/mako/waybar configs the
+# built-in extractor doesn't). Any failure — aether missing, non-zero
+# exit, no colors.toml produced — logs a warning and falls straight
+# through to the built-in extractor below, so a broken or absent aether
+# install never blocks a generation.
+used_aether=0
+if [[ $theme_generator == aether ]]; then
+  if command -v aether >/dev/null 2>&1; then
+    aether_scratch=$(mktemp -d)
+    if aether --generate "$bg_file" --no-apply --output "$aether_scratch" >/dev/null 2>&1 \
+      && [[ -f $aether_scratch/colors.toml ]]; then
+      # Copy everything aether produced except:
+      #   backgrounds/       — astro-arc already placed the one background
+      #                        file above; a second file here would make
+      #                        omarchy-theme-set's background picker cycle
+      #                        between two instead of always using the latest.
+      #   vscode.json / vscode-extension/ — names a "local.theme-aether" VS
+      #                        Code extension that --no-apply never actually
+      #                        installs, which would leave VS Code pointed at
+      #                        a theme that doesn't exist. Renaming aether's
+      #                        own generated theme JSON to vscode-theme.json
+      #                        instead lets omarchy-theme-set-vscode's
+      #                        existing self-installing fallback handle it —
+      #                        same schema Omarchy's own template output uses.
+      find "$aether_scratch" -mindepth 1 -maxdepth 1 \
+        ! -name backgrounds ! -name vscode.json ! -name vscode-extension \
+        -exec cp -rf {} "$THEME_DIR/" \;
+      if [[ -f $aether_scratch/vscode-extension/themes/aether-color-theme.json ]]; then
+        cp -f "$aether_scratch/vscode-extension/themes/aether-color-theme.json" "$THEME_DIR/vscode-theme.json"
+      fi
+      used_aether=1
+    else
+      echo "Astro-Arc: aether theme generation failed — falling back to built-in" >&2
+    fi
+    rm -rf "$aether_scratch"
+  else
+    echo "Astro-Arc: theme generator set to aether, but aether is not installed — falling back to built-in" >&2
+  fi
+fi
+
+if [[ $used_aether == 0 ]]; then
+  "$VENV_PY" "$BIN_DIR/palette_extract.py" "$bg_file" "$THEME_DIR/colors.toml"
+fi
 
 omarchy-theme-set astro-arc >/dev/null 2>&1
 
@@ -111,10 +178,12 @@ fi
 # last-run.json carries the Stage 1 reading + Stage 2 metadata alongside
 # the usual run info — so the user can see *why* an image came out the way
 # it did, and it's what the review log pulls from to caption past runs.
+theme_generator_used=$([[ $used_aether == 1 ]] && echo "aether" || echo "built-in")
 jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg frequency "$frequency" \
   --arg backend "$image_backend" --arg prompt "$prompt" --arg backgroundSize "$background_size" \
+  --arg themeGenerator "$theme_generator" --arg themeGeneratorUsed "$theme_generator_used" \
   --slurpfile meta "$pipeline_meta_file" --argjson cost "$cost_entry" \
-  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
+  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
 
 # Log this as a browsable iteration — every real run, not just manual
 # style-comparison batches, so reverting to an earlier reading/prompt/

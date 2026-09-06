@@ -576,6 +576,22 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
+  // ---- Theme generator: "built-in" (palette_extract.py, default) or
+  // "aether" (shells out to Omarchy's own theme generator for a richer
+  // theme — see palette_extract.py's icons.theme comment for why the
+  // built-in one alone left the file manager's icon color never changing).
+  // astro-arc-generate falls back to built-in automatically if aether is
+  // missing or fails, so picking it here never risks a broken generation.
+  function commitThemeGenerator(value) {
+    themeGeneratorWriteProc.command = [root.configBin, "--set-theme-generator", value]
+    themeGeneratorWriteProc.running = true
+  }
+
+  Process {
+    id: themeGeneratorWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
   // ---- API usage: a running total from astro-arc-generate's costs.json
   // (real token-based cost for every generation's 3 API calls — see
   // cost_estimate.py), plus a best-effort "available funds" check that's
@@ -1090,6 +1106,46 @@ Panel {
               PanelSeparator { foreground: root.bar.foreground }
               PanelSectionHeader { text: "API KEY"; foreground: root.bar.foreground }
               ApiKeySection { slot: "image" }
+            }
+
+            PanelSeparator { foreground: root.bar.foreground }
+            PanelSectionHeader { text: "THEME"; foreground: root.bar.foreground }
+
+            // ---- Theme generator: which tool turns the rendered image
+            // into colors.toml/icons.theme/etc. "Built-in" is
+            // palette_extract.py (default, no external dependency);
+            // "Aether" shells out to Omarchy's own richer generator and
+            // silently falls back to built-in if it's missing or fails —
+            // see astro-arc-generate's theming block. --------------------
+            Item {
+              width: parent.width
+              height: Math.max(themeGeneratorLabel.implicitHeight, themeGeneratorDropdown.implicitHeight)
+
+              Text {
+                id: themeGeneratorLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.labelColW
+                text: "Generator"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              Dropdown {
+                id: themeGeneratorDropdown
+                anchors.left: themeGeneratorLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                showLabel: false
+                value: root.configState.themeGenerator
+                options: Model.THEME_GENERATOR_CHOICES.map(function(c) {
+                  return { value: c.key, label: c.label }
+                })
+                foreground: root.bar.foreground
+                onChanged: function(value) { root.commitThemeGenerator(value) }
+              }
             }
 
             PanelSeparator { foreground: root.bar.foreground }

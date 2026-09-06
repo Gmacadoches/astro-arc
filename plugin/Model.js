@@ -17,8 +17,19 @@ var DEFAULT_CONFIG = {
   stage1Model: "gpt-4o-mini",
   stage2Model: "gpt-4o-mini",
   backgroundSize: "auto",
-  artStyle: "symbolist"
+  artStyle: "symbolist",
+  themeGenerator: "built-in"
 }
+
+// "aether" shells out to Omarchy's own theme generator for a richer theme
+// (it's what fixes the file-manager icon color, among other things — see
+// palette_extract.py's icons.theme comment) and silently falls back to
+// "built-in" if aether is missing or fails, so picking it never risks a
+// broken generation.
+var THEME_GENERATOR_CHOICES = [
+  { key: "built-in", label: "Built-in" },
+  { key: "aether", label: "Aether (Omarchy)" }
+]
 
 // Kept in sync by hand with pipeline/styles.toml — same reasoning as
 // OPENAI_MODEL_CHOICES below: QML can't read TOML directly, and this list
@@ -75,7 +86,8 @@ function parseConfig(raw) {
       stage1Model: typeof data.stage1Model === "string" && data.stage1Model !== "" ? data.stage1Model : "gpt-4o-mini",
       stage2Model: typeof data.stage2Model === "string" && data.stage2Model !== "" ? data.stage2Model : "gpt-4o-mini",
       backgroundSize: data.backgroundSize === "auto" || (typeof data.backgroundSize === "string" && SIZE_PATTERN.test(data.backgroundSize)) ? data.backgroundSize : "auto",
-      artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist"
+      artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist",
+      themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in"
     }
   } catch (e) {
     return Object.assign({}, DEFAULT_CONFIG)
@@ -266,6 +278,7 @@ if (typeof module !== "undefined") {
     DEFAULT_CONFIG: DEFAULT_CONFIG,
     OPENAI_MODEL_CHOICES: OPENAI_MODEL_CHOICES,
     ART_STYLE_CHOICES: ART_STYLE_CHOICES,
+    THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     openaiModelDropdownValue: openaiModelDropdownValue,
     formatDateDigits: formatDateDigits,
     formatTimeDigits: formatTimeDigits,
