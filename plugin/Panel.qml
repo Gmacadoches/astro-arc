@@ -1526,6 +1526,36 @@ Panel {
             font.pixelSize: Style.font.caption
           }
 
+          // ---- Distillation: the one-line psychological core of the last
+          // reading, with its narrative-position badge above it — same two
+          // fields the review-history HTML shows as a badge over an
+          // italicized quote (build_review.py's .badge/.distillation). -----
+          Column {
+            width: parent.width
+            spacing: Style.space(2)
+            visible: !!root.lastRun && root.lastRun.distillation !== ""
+
+            Text {
+              visible: root.lastRun ? root.lastRun.narrativePosition !== "" : false
+              text: root.lastRun ? root.lastRun.narrativePosition : ""
+              color: Color.accent
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              font.bold: true
+              font.capitalization: Font.AllUppercase
+            }
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: root.lastRun ? "“" + root.lastRun.distillation + "”" : ""
+              font.family: root.bar.fontFamily
+              font.italic: true
+              font.pixelSize: Style.font.bodySmall
+              color: root.bar.foreground
+            }
+          }
+
           // ---- Style review log: browse every past comparison batch,
           // not just whichever one happens to still be open in a browser
           // tab. build_review.py appends to this index every time a batch

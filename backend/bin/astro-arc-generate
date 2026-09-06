@@ -119,11 +119,37 @@ jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg freq
 # Log this as a browsable iteration — every real run, not just manual
 # style-comparison batches, so reverting to an earlier reading/prompt/
 # register later on means finding it in this list rather than trying to
-# remember it.
+# remember it. build_review.py prints the review's index.html path on
+# success — captured (not discarded) so the notification below can open it.
 review_label="${frequency^} · $(date '+%b %-d, %-I:%M %p') ($image_backend)"
-"$VENV_PY" "$BIN_DIR/build_review.py" \
+review_path=""
+if review_path=$("$VENV_PY" "$BIN_DIR/build_review.py" \
   --reading "$reading_file" --meta "$pipeline_meta_file" --image "$bg_file" \
-  --label "$review_label" --cost-json "$cost_entry" >/dev/null \
-  || echo "Astro-Arc: warning — could not log this iteration to the review history" >&2
+  --label "$review_label" --cost-json "$cost_entry"); then
+  :
+else
+  echo "Astro-Arc: warning — could not log this iteration to the review history" >&2
+  review_path=""
+fi
+
+# Surface the distillation — the one-line psychological core of this run's
+# reading, same text the widget shows under its narrative-position badge
+# (see Panel.qml/Model.js parseLastRun) and the review page shows under its
+# "Threshold"-style badge — as a toast, so a real generation is noticed
+# even when the panel isn't open. Click opens the full review; the toast
+# itself expires after 15s regardless (omarchy-notification-send -t is
+# milliseconds). Never let a notification failure fail the generation.
+distillation=$(jq -r '.distillation // empty' "$pipeline_meta_file" 2>/dev/null)
+if [[ -n $distillation ]] && command -v omarchy-notification-send >/dev/null 2>&1; then
+  notify_args=(
+    --app-name astro-arc -g "✦" -u normal -t 15000
+    "$distillation" "Click for deeper insight"
+  )
+  if [[ -n $review_path ]]; then
+    notify_args+=(--exec xdg-open "$review_path")
+  fi
+  omarchy-notification-send "${notify_args[@]}" \
+    || echo "Astro-Arc: warning — could not send the generation notification" >&2
+fi
 
 echo "Astro-Arc: generated $frequency theme for period $period_key via $image_backend at $background_size"

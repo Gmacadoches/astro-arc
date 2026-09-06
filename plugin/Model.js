@@ -152,7 +152,13 @@ function parseLastRun(raw) {
     return {
       periodKey: String(data.periodKey || ""),
       generatedAt: String(data.generatedAt || ""),
-      frequency: String(data.frequency || "")
+      frequency: String(data.frequency || ""),
+      // The one-line distillation of this run's psychological reading, and
+      // its narrative-position badge (opening/peak/release/threshold/...) —
+      // same two fields the review-history HTML shows as a badge over an
+      // italicized quote (build_review.py's .badge/.distillation).
+      distillation: String(data.distillation || ""),
+      narrativePosition: String(data.narrativePosition || "")
     }
   } catch (e) {
     return null
