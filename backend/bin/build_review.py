@@ -156,6 +156,19 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   .meta-block {{ margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }}
   .meta-row {{ display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: baseline; }}
   .meta-row .label {{ font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); width: 100%; }}
+  /* Avoided (last 14): collapsed by default — a full anti-repetition
+     list is exactly the kind of clutter nobody needs open by default,
+     but should still be there to check. <details>/<summary> gives real
+     collapse behavior with no JS; the marker is restyled from the
+     browser's default triangle to a +/- box next to the label. */
+  .avoided-details summary {{ cursor: pointer; list-style: none; display: flex; align-items: center; gap: 8px; }}
+  .avoided-details summary::-webkit-details-marker {{ display: none; }}
+  .avoided-details summary .toggle-icon {{ display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border: 1px solid var(--border); border-radius: 4px; color: var(--accent); font-size: 12px; line-height: 1; flex-shrink: 0; }}
+  .avoided-details summary .toggle-icon .minus {{ display: none; }}
+  .avoided-details[open] summary .toggle-icon .plus {{ display: none; }}
+  .avoided-details[open] summary .toggle-icon .minus {{ display: inline; }}
+  .avoided-details summary .label {{ width: auto; }}
+  .avoided-details .meta-row {{ margin-top: 8px; }}
   .signature {{ font-size: 12.5px; color: var(--ink-dim); font-style: italic; }}
   .prompt-box {{ background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; line-height: 1.6; color: var(--ink); margin-top: 20px; }}
   .prompt-label {{ font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }}
@@ -191,7 +204,10 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
         <div class="meta-row"><span class="label">Art style</span><span class="chip">{art_style}</span></div>
         <div class="meta-row"><span class="label">Register</span><span class="chip">{register}</span></div>
         <div class="meta-row"><span class="label">Concept tags</span>{concept_tag_chips}</div>
-        <div class="meta-row"><span class="label">Avoided (last 14)</span>{avoided_chips}</div>
+        <details class="avoided-details">
+          <summary><span class="toggle-icon"><span class="plus">+</span><span class="minus">&minus;</span></span><span class="label">Avoided (last 14)</span></summary>
+          <div class="meta-row">{avoided_chips}</div>
+        </details>
         <p class="signature">{visual_signature}</p>
       </div>
     </div>
