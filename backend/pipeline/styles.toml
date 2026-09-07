@@ -28,9 +28,16 @@ suffix = "ethereal cosmic art, nebula and starfield, dreamlike aurora colors, so
 label = "Surreal Painting"
 suffix = "surreal dreamlike oil painting, soft brushwork, twilight color palette, fine art illustration"
 
+# Rewritten 2026-09-07 from actual research (see CHANGELOG.md), not general
+# impression — the original suffix wrongly called for "watercolor" character
+# rendering. Ghibli characters are flat cel-shaded (solid base color, one
+# hard-edged darker shadow tone, crisp clean outlines) — backgrounds are the
+# painted half, in opaque poster paint/gouache (not watercolor), wet-into-wet
+# for soft skies/clouds then sharp detail added as it dries. Keep that
+# character/background technique split if this is revised again.
 [ghibli]
 label = "Studio Ghibli"
-suffix = "Studio Ghibli-style hand-painted animation cel, soft watercolor backgrounds, warm pastel lighting, whimsical nostalgic atmosphere, lush painterly nature, in the visual tradition of Hayao Miyazaki"
+suffix = "Studio Ghibli feature-film animation style: characters rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended or watercolor-textured, with clean crisp outlines, large expressive almond eyes, simple minimal features, and human-like proportions rather than typical anime stylization. Backgrounds are hand-painted in opaque gouache/poster color, soft wet-into-wet skies and clouds with sharp painted detail on foreground elements, tonal layering for depth. Warm naturalistic light, in the tradition of Miyazaki's films and background painter Kazuo Oga"
 
 [cyberpunk]
 label = "Cyberpunk"
