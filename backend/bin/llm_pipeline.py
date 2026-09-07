@@ -432,7 +432,7 @@ You are given a fixed visual signature for this whole series (a palette range, q
 You are also given one material register to draw the image's physical vocabulary from (still in service of the meaning above, not instead of it), and a list of concepts/symbols to avoid because they were used recently — avoid that entire territory, not just the exact words. If a blocklist of specific terms is given, never use those exact words or close synonyms of them.
 
 Respond with a JSON object with exactly these keys:
-{"prompt": "the image-generation prompt, 25 to 50 words, describing only the imagery itself — no style or artist references, those are added separately", "conceptTags": ["2 to 3 short tags naming this image's register at an abstract level, e.g. water/submersion, figure amid a vast unknown, crowd with one marked apart, architectural interior, descent/threshold, geological/weight"]}"""
+{"prompt": "the image-generation prompt, 25 to 50 words, describing only the imagery itself — no style or artist references, those are added separately", "conceptTags": ["2 to 3 short tags naming this image's register at an abstract level, e.g. water/submersion, figure amid a vast unknown, crowd with one marked apart, architectural interior, descent/threshold, geological/weight"], "hasPeople": "true if the prompt describes any human figure, pair, or crowd — however incidental — false if it's purely objects/places/materials with no person in it"}"""
 
 
 def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
@@ -456,7 +456,14 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
     if not result.get("prompt"):
         raise PipelineError(f"Stage 2 response missing 'prompt': {result!r}")
     concept_tags = result.get("conceptTags") or []
-    return result["prompt"].strip(), concept_tags, chat_call_cost(stage2_model, usage)
+    # hasPeople should come back as a real JSON boolean under json_object
+    # mode, but coerce defensively in case a model ever emits "true"/"false"
+    # as a string instead.
+    has_people = result.get("hasPeople")
+    if isinstance(has_people, str):
+        has_people = has_people.strip().lower() == "true"
+    has_people = bool(has_people)
+    return result["prompt"].strip(), concept_tags, has_people, chat_call_cost(stage2_model, usage)
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +486,7 @@ def build(reading, config):
     avoid = avoid_concepts(history)
     style_label, style_guidance = load_style_info(style_key)
 
-    image_prompt, concept_tags, stage2_cost = stage2_image_prompt(
+    image_prompt, concept_tags, has_people, stage2_cost = stage2_image_prompt(
         stage1, visual_signature, register, avoid, cliches, stage2_model,
         style_label, style_guidance,
     )
@@ -504,6 +511,7 @@ def build(reading, config):
         "visualSignature": visual_signature,
         "register": register,
         "conceptTags": concept_tags,
+        "hasPeople": has_people,
         "avoidedConcepts": avoid,
         "artStyle": style_key,
         "imagePrompt": image_prompt,

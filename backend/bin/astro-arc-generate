@@ -71,9 +71,22 @@ fi
 
 prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
 
+# Bump to "high" quality whenever Stage 2 actually put a person in the
+# image — medium-quality gpt-image-1-mini renders visibly distort faces/
+# hands in busy or even single-figure scenes (confirmed via a same-prompt
+# medium-vs-high comparison), and there's no anatomy to distort in a
+# people-free object/place image, so this only spends more on the
+# generations that actually need it. No-op for gpt-image-2 (always
+# renders at its own "auto" quality regardless of this flag) and for the
+# local backend (image_gen.py has no quality tiers, only --steps).
+openai_quality_used="$openai_quality"
+if [[ $(jq -r '.hasPeople // false' "$pipeline_meta_file" 2>/dev/null) == true ]]; then
+  openai_quality_used="high"
+fi
+
 if [[ $image_backend == openai ]]; then
   "$VENV_PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
-    --model "$openai_model" --quality "$openai_quality" \
+    --model "$openai_model" --quality "$openai_quality_used" \
     --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
 else
   "$VENV_PY" "$BIN_DIR/image_gen.py" "$prompt" "$bg_file" --steps 8 \
@@ -184,8 +197,9 @@ theme_generator_used=$([[ $used_aether == 1 ]] && echo "aether" || echo "built-i
 jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg frequency "$frequency" \
   --arg backend "$image_backend" --arg prompt "$prompt" --arg backgroundSize "$background_size" \
   --arg themeGenerator "$theme_generator" --arg themeGeneratorUsed "$theme_generator_used" \
+  --arg imageQuality "$openai_quality" --arg imageQualityUsed "$openai_quality_used" \
   --slurpfile meta "$pipeline_meta_file" --argjson cost "$cost_entry" \
-  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
+  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, imageQuality: $imageQuality, imageQualityUsed: $imageQualityUsed, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
 
 # Log this as a browsable "Themes Generated" iteration — every real run,
 # not just manual style-comparison batches, so reverting to an earlier
