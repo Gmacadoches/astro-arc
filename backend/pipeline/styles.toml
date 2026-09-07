@@ -6,27 +6,39 @@
 # These five are the directions explored during Phase 3's style review
 # (see the review log); "symbolist" is the one that stuck and stayed the
 # default. Add more presets here freely — each needs a "label" (shown in
-# the dropdown) and a "suffix" (appended verbatim to every Stage 2 prompt).
+# the dropdown), a "suffix" (appended verbatim to every Stage 2 prompt),
+# and a "guidance" (below) — a one-line description of what kind of
+# imagery this style can actually depict, fed to Stage 2 itself so it
+# doesn't invent imagery the style has no vocabulary for (e.g. a
+# grounded/representational style being asked to render "a body made of
+# pure sound-wave energy" — added 2026-09-07, see CHANGELOG.md; every
+# preset needs one, not just the representational ones, since it's what
+# tells Stage 2 abstraction is *allowed* for the visionary styles too).
 
 [symbolist]
 label = "Symbolist / Visionary"
 suffix = "painterly, visionary symbolist painting in the tradition of Odilon Redon, Remedios Varo, Leonora Carrington, and Hilma af Klint's illuminated visions — strange, hand-painted, not digital or photographic"
+guidance = "A visionary/allegorical tradition — abstract, symbolic, or dreamlike forms (bodies dissolving into pattern, pure allegorical shapes) are natural here, alongside concrete objects and figures."
 
 [engraving]
 label = "Antique Engraving"
 suffix = "antique astronomical engraving, fine linework, star atlas illustration, sepia and ink tones, detailed etching"
+guidance = "An illustrative, diagrammatic tradition — depicts discrete objects, figures, and symbolic diagrams in fine engraved linework. Avoid glowing/immaterial energy forms that can't be rendered as etched line art."
 
 [artdeco]
 label = "Art Deco"
 suffix = "art deco poster design, bold geometric shapes, metallic gold and emerald, symmetrical, elegant linework"
+guidance = "A bold geometric poster tradition — real people, animals, and objects stylized into clean geometric shapes. Comfortable with abstraction reduced to hard-edged geometry, not soft/organic abstraction."
 
 [cosmic]
 label = "Cosmic / Nebula"
 suffix = "ethereal cosmic art, nebula and starfield, dreamlike aurora colors, soft glowing light, painterly, otherworldly"
+guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae, and dreamlike or symbolic forms are all welcome here, alongside concrete subjects."
 
 [surreal]
 label = "Surreal Painting"
 suffix = "surreal dreamlike oil painting, soft brushwork, twilight color palette, fine art illustration"
+guidance = "A surrealist tradition — comfortable with dreamlike distortion and symbolic juxtaposition, but the subject should still read as a recognizable object, figure, or place, even when arranged impossibly."
 
 # Rewritten 2026-09-07 from actual research (see CHANGELOG.md), not general
 # impression — the original suffix wrongly called for "watercolor" character
@@ -48,10 +60,12 @@ suffix = "surreal dreamlike oil painting, soft brushwork, twilight color palette
 [ghibli]
 label = "Studio Ghibli"
 suffix = "Studio Ghibli feature-film animation style. Backgrounds and objects are hand-painted in opaque gouache/poster color, soft wet-into-wet skies and clouds with sharp painted detail on foreground elements, tonal layering for depth, warm naturalistic light, in the tradition of Miyazaki's films and background painter Kazuo Oga. Do not add a person, character, or figure unless one is already described above — most Ghibli frames are empty rooms, landscapes, or objects with no one in them. Only if a person is explicitly part of the scene described above: render them in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended or watercolor-textured, with clean crisp outlines, large expressive almond eyes, simple minimal features, and human-like proportions rather than typical anime stylization"
+guidance = "A grounded, representational tradition — real people, animals, nature, and architecture only, never abstract energy-beings, geometric abstraction, or immaterial forms. Symbolic meaning should come from how a concrete scene is composed (a tree with a glowing hollow, a room holding one significant object), not from making the subject itself immaterial."
 
 [cyberpunk]
 label = "Cyberpunk"
 suffix = "cyberpunk digital art, neon-lit rain-slicked streets, holographic signage, chrome and glass megastructures, moody blue and magenta lighting, high-tech-low-life atmosphere in the tradition of Blade Runner and Ghost in the Shell"
+guidance = "A grounded science-fiction tradition — real people, streets, machinery, and architecture in a neon-lit future. Avoid abstract energy-beings or pure geometric abstraction; ground the symbolism in a concrete piece of tech, signage, or urban space instead."
 
 # "Dystopian Future WWII Fusion" — interpreted as dieselpunk/retrofuturism:
 # WWII-era military iconography and machinery fused with a bleak sci-fi
@@ -60,3 +74,4 @@ suffix = "cyberpunk digital art, neon-lit rain-slicked streets, holographic sign
 [dystopianwwii]
 label = "Dystopian Future WWII Fusion"
 suffix = "dystopian retrofuturism, WWII-era military iconography and machinery fused with a bleak futuristic wasteland, rusted war machines, gas masks, brutalist concrete architecture, muted propaganda-poster palette, ashen overcast light, gritty dieselpunk atmosphere"
+guidance = "A grounded military/wasteland tradition — real people, machinery, and architecture. Avoid abstract energy-beings or pure geometric abstraction; ground the symbolism in a concrete piece of hardware, ruin, or figure instead."

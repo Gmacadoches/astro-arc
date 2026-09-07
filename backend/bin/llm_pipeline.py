@@ -163,6 +163,20 @@ def load_style_suffix(style_key):
     return preset.get("suffix", "") if preset else ""
 
 
+def load_style_info(style_key):
+    """(label, guidance) for the configured style — guidance tells Stage 2
+    what kind of imagery this style can actually depict (see styles.toml's
+    header comment), so it doesn't invent imagery outside the style's own
+    visual vocabulary. Same fallback-to-symbolist behavior as
+    load_style_suffix(); guidance is optional per-preset, defaults to ""
+    for an older preset that hasn't been given one yet."""
+    styles = load_styles()
+    preset = styles.get(style_key) or styles.get("symbolist")
+    if not preset:
+        return "", ""
+    return preset.get("label", ""), preset.get("guidance", "")
+
+
 # ---------------------------------------------------------------------------
 # Rolling history (concept-level anti-repetition + register rotation)
 # ---------------------------------------------------------------------------
@@ -411,6 +425,7 @@ Rules:
 - One image, one idea. A single legible visual situation, not a collage of symbols. If you find yourself describing more than three distinct elements, cut it down.
 - The relationship carries the meaning. What matters is how things — or people — sit in relation to each other: what's above, behind, inside, turned away from what, who is watching whom.
 - Emotional register over subject matter, and let the image pull toward something. The light, scale, and spatial pressure of the image should match the feeling of the reading before any symbol does — and even within real difficulty, the image should carry a sense of movement, threshold, or meaning being made, not tension staged for its own sake.
+- You are also told which rendering style this image will be painted in, and what kind of imagery that style can actually depict. Keep your invented imagery within that style's own visual vocabulary — a grounded, representational style cannot credibly render an abstract being made of pure energy or geometry; a visionary/symbolist style can. Find a concrete equivalent within the style's vocabulary that still carries the same psychological meaning.
 
 You are given a fixed visual signature for this whole series (a palette range, quality of light, and compositional habit) — honor it, so this reads as the same hand as every other image in the series regardless of subject.
 
@@ -420,13 +435,16 @@ Respond with a JSON object with exactly these keys:
 {"prompt": "the image-generation prompt, 25 to 50 words, describing only the imagery itself — no style or artist references, those are added separately", "conceptTags": ["2 to 3 short tags naming this image's register at an abstract level, e.g. water/submersion, figure amid a vast unknown, crowd with one marked apart, architectural interior, descent/threshold, geological/weight"]}"""
 
 
-def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model):
+def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
+                         style_label=None, style_guidance=None):
     user_lines = [
         f"Reading: {stage1_result['reading']}",
         f"Distillation: {stage1_result['distillation']}",
         f"Narrative position: {stage1_result['narrativePosition']}",
         f"Visual signature for this series: {visual_signature}",
     ]
+    if style_label and style_guidance:
+        user_lines.append(f"Rendering style for this image: {style_label} — {style_guidance}")
     if register:
         user_lines.append(f"Material register to draw from: {register}")
     if avoid_tags:
@@ -459,9 +477,11 @@ def build(reading, config):
     cliches = load_cliches()
     register = pick_register(history, registers)
     avoid = avoid_concepts(history)
+    style_label, style_guidance = load_style_info(style_key)
 
     image_prompt, concept_tags, stage2_cost = stage2_image_prompt(
-        stage1, visual_signature, register, avoid, cliches, stage2_model
+        stage1, visual_signature, register, avoid, cliches, stage2_model,
+        style_label, style_guidance,
     )
 
     style_suffix = load_style_suffix(style_key)
