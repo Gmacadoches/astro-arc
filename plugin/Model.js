@@ -49,7 +49,9 @@ var ART_STYLE_CHOICES = [
   { key: "artdeco", label: "Art Deco" },
   { key: "cosmic", label: "Cosmic / Nebula" },
   { key: "surreal", label: "Surreal Painting" },
-  { key: "ghibli", label: "Studio Ghibli" }
+  { key: "ghibli", label: "Studio Ghibli" },
+  { key: "cyberpunk", label: "Cyberpunk" },
+  { key: "dystopianwwii", label: "Dystopian Future WWII Fusion" }
 ]
 
 var SIZE_PATTERN = /^[0-9]{2,5}x[0-9]{2,5}$/
