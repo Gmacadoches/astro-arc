@@ -35,9 +35,19 @@ suffix = "surreal dreamlike oil painting, soft brushwork, twilight color palette
 # painted half, in opaque poster paint/gouache (not watercolor), wet-into-wet
 # for soft skies/clouds then sharp detail added as it dries. Keep that
 # character/background technique split if this is revised again.
+#
+# Revised again same day: the first version described character rendering
+# unconditionally, which the image model read as an instruction to include
+# a person — confirmed via a 3-sample test, it invented an unrequested
+# figure in a purely architectural Stage 2 prompt 2 of 3 times. The
+# character clause is now explicitly gated behind "only if a person is
+# already part of the scene" and leads with the background description
+# instead (which applies to every image, figure or not). Re-tested 0 of 3
+# on the same architectural prompt, and confirmed it still renders figures
+# correctly when a base prompt actually calls for them.
 [ghibli]
 label = "Studio Ghibli"
-suffix = "Studio Ghibli feature-film animation style: characters rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended or watercolor-textured, with clean crisp outlines, large expressive almond eyes, simple minimal features, and human-like proportions rather than typical anime stylization. Backgrounds are hand-painted in opaque gouache/poster color, soft wet-into-wet skies and clouds with sharp painted detail on foreground elements, tonal layering for depth. Warm naturalistic light, in the tradition of Miyazaki's films and background painter Kazuo Oga"
+suffix = "Studio Ghibli feature-film animation style. Backgrounds and objects are hand-painted in opaque gouache/poster color, soft wet-into-wet skies and clouds with sharp painted detail on foreground elements, tonal layering for depth, warm naturalistic light, in the tradition of Miyazaki's films and background painter Kazuo Oga. Do not add a person, character, or figure unless one is already described above — most Ghibli frames are empty rooms, landscapes, or objects with no one in them. Only if a person is explicitly part of the scene described above: render them in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended or watercolor-textured, with clean crisp outlines, large expressive almond eyes, simple minimal features, and human-like proportions rather than typical anime stylization"
 
 [cyberpunk]
 label = "Cyberpunk"
