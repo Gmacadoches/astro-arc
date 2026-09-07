@@ -8,10 +8,20 @@
 #   backend/bin      -> ~/.local/share/omarchy/astro-arc/bin
 #   backend/pipeline -> ~/.local/share/omarchy/astro-arc/pipeline
 #
+# Also generates (not symlinks — it needs $HOME baked in, which a desktop
+# entry's Exec= can't itself expand) ~/.local/share/applications/astro-
+# arc-save-theme-handler.desktop from backend/astro-arc-save-theme-
+# handler.desktop.tpl, and registers it as the astroarc:// URI handler —
+# what a review page's Save Theme button actually opens, since a static
+# HTML page has no server of its own to run a script from. Same mechanism
+# Aether's own aether:// links use on this system (see
+# /usr/share/applications/li.oever.aether.url-handler.desktop).
+#
 # Safe to re-run any time (idempotent) — an existing correct symlink is
 # left alone; anything else in the way (a real file/dir, or a symlink
 # pointing somewhere else) is moved aside to a timestamped backup, never
-# deleted outright.
+# deleted outright. The desktop file is plain regeneration/re-registration
+# — nothing there to preserve.
 #
 # What this script deliberately does NOT do (see CONTEXT.md instead):
 #   - create the Python venv or install its dependencies
@@ -56,6 +66,20 @@ mkdir -p "$BACKEND_ROOT"
 link "$REPO_DIR/plugin" "$PLUGIN_TARGET"
 link "$REPO_DIR/backend/bin" "$BIN_TARGET"
 link "$REPO_DIR/backend/pipeline" "$PIPELINE_TARGET"
+
+DESKTOP_DIR="$HOME/.local/share/applications"
+DESKTOP_FILE="$DESKTOP_DIR/astro-arc-save-theme-handler.desktop"
+mkdir -p "$DESKTOP_DIR"
+sed "s|__ASTRO_ARC_BIN__|$BIN_TARGET|g" "$REPO_DIR/backend/astro-arc-save-theme-handler.desktop.tpl" >"$DESKTOP_FILE"
+echo "WROTE   $DESKTOP_FILE"
+
+if command -v update-desktop-database >/dev/null 2>&1; then
+  update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+fi
+if command -v xdg-mime >/dev/null 2>&1; then
+  xdg-mime default astro-arc-save-theme-handler.desktop x-scheme-handler/astroarc 2>/dev/null || true
+  echo "REGISTERED astroarc:// -> astro-arc-save-theme-handler.desktop"
+fi
 
 cat <<'EOF'
 

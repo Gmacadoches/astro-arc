@@ -32,37 +32,103 @@ import argparse
 import base64
 import datetime
 import json
+import re
 import shutil
+import tomllib
 import uuid
 from pathlib import Path
 
 REVIEWS_DIR = Path.home() / ".local/state/omarchy/astro-arc/reviews"
 INDEX_FILE = REVIEWS_DIR / "index.json"
+STYLES_FILE = Path.home() / ".local/share/omarchy/astro-arc/pipeline/styles.toml"
+
+# Same fixed palette this page always used, kept as the fallback for a
+# review built before --theme-dir existed (no snapshot to read a real
+# palette from).
+FALLBACK_THEME_VARS = {
+    "bg": "#f6f4ef", "surface": "#ffffff", "surface2": "#efece2",
+    "ink": "#1c1e2a", "inkDim": "#5d5f72", "accent": "#9c7a2e",
+    "border": "#ded9c8", "good": "#3f7a5c",
+}
 
 
 def _dir_size(path):
     return sum(f.stat().st_size for f in Path(path).rglob("*") if f.is_file())
 
+
+def _theme_css_vars(theme_dir):
+    """Maps this generation's actual colors.toml onto the page's own CSS
+    custom properties, so the review page visually wears the theme it
+    produced — implicit in its background/text/borders/accent, not a
+    swatch list — instead of a fixed palette that never changed no matter
+    what the generation actually looked like."""
+    if theme_dir:
+        colors_path = Path(theme_dir) / "colors.toml"
+        if colors_path.is_file():
+            try:
+                with colors_path.open("rb") as f:
+                    c = tomllib.load(f)
+                bg = c.get("background", "#14161f")
+                return {
+                    "bg": bg,
+                    "surface": c.get("lighter_background", bg),
+                    "surface2": c.get("dark_background", bg),
+                    "ink": c.get("foreground", "#e8e6df"),
+                    "inkDim": c.get("muted", c.get("dark_foreground", "#9a9bb0")),
+                    "accent": c.get("accent", "#c9a24b"),
+                    "border": c.get("selection", c.get("dark_background", bg)),
+                    "good": c.get("green", "#7fc9a3"),
+                }
+            except (tomllib.TOMLDecodeError, OSError):
+                pass
+    return dict(FALLBACK_THEME_VARS)
+
+
+def _style_label(style_key):
+    """Resolves a style key (e.g. "ghibli") to its pipeline/styles.toml
+    label (e.g. "Studio Ghibli") for display — falls back to the raw key
+    if styles.toml can't be read or doesn't have it, rather than hiding
+    the art style entirely."""
+    if not style_key:
+        return None
+    try:
+        with STYLES_FILE.open("rb") as f:
+            styles = tomllib.load(f)
+        preset = styles.get(style_key)
+        if preset:
+            return preset.get("label", style_key)
+    except (tomllib.TOMLDecodeError, OSError):
+        pass
+    return style_key
+
+
+def _humanize_concept_tag(tag):
+    """"nature/rootedness" -> "Nature Rootedness" — mirrors Model.js's
+    humanizeConceptTag exactly, so the Save Theme button's suggested name
+    (computed here, in the static HTML) matches what the widget's own
+    Save Selected Theme prompt would have suggested for the same entry."""
+    words = [w for w in re.split(r"[/_-]+", str(tag or "")) if w]
+    return " ".join(w[:1].upper() + w[1:] for w in words)
+
+
+def _suggest_theme_name(concept_tags):
+    tags = [t for t in (concept_tags or []) if isinstance(t, str) and t.strip()]
+    if not tags:
+        return ""
+    return " ".join(_humanize_concept_tag(t) for t in tags[:2])
+
 PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
 <title>Astro-Arc Iteration — {escaped_label}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+  /* This generation's actual colors.toml, not a fixed palette — the page
+     wears the theme it produced regardless of the viewer's own light/dark
+     preference, since that's what's actually being shown here. */
   :root {{
-    --bg: #f6f4ef; --surface: #ffffff; --surface-2: #efece2; --ink: #1c1e2a;
-    --ink-dim: #5d5f72; --accent: #9c7a2e; --accent-soft: #e8dcb8; --border: #ded9c8;
-    --good: #3f7a5c;
-  }}
-  @media (prefers-color-scheme: dark) {{
-    :root:not([data-theme="light"]) {{
-      --bg: #14161f; --surface: #1c1f2c; --surface-2: #242838; --ink: #e8e6df;
-      --ink-dim: #9a9bb0; --accent: #c9a24b; --accent-soft: #3a3320; --border: #333752;
-      --good: #7fc9a3;
-    }}
-  }}
-  :root[data-theme="dark"] {{
-    --bg: #14161f; --surface: #1c1f2c; --surface-2: #242838; --ink: #e8e6df;
-    --ink-dim: #9a9bb0; --accent: #c9a24b; --accent-soft: #3a3320; --border: #333752;
-    --good: #7fc9a3;
+    --bg: {theme_bg}; --surface: {theme_surface}; --surface-2: {theme_surface2};
+    --ink: {theme_ink}; --ink-dim: {theme_ink_dim}; --accent: {theme_accent};
+    --accent-soft: color-mix(in srgb, {theme_accent} 22%, {theme_bg});
+    --border: {theme_border}; --good: {theme_good};
   }}
   * {{ box-sizing: border-box; }}
   body {{ background: var(--bg); color: var(--ink); font-family: 'Work Sans', system-ui, sans-serif; line-height: 1.55; padding: clamp(20px, 4vw, 56px); margin: 0; }}
@@ -76,6 +142,10 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   .chip.tag {{ color: var(--accent); }}
   .fact-row {{ display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: baseline; }}
   .fact-row .label {{ font-size: 11.5px; color: var(--ink-dim); width: 70px; flex-shrink: 0; }}
+  .save-theme-row {{ display: flex; align-items: center; gap: 12px; margin-top: 4px; }}
+  .save-theme-btn {{ font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.02em; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 16px; cursor: pointer; }}
+  .save-theme-btn:hover {{ background: var(--accent); color: var(--bg); }}
+  .save-theme-status {{ font-size: 12px; color: var(--ink-dim); }}
   .layout {{ display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }}
   @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
   .layout img {{ width: 100%; border-radius: 14px; border: 1px solid var(--border); cursor: zoom-in; display: block; }}
@@ -103,6 +173,10 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
     <h1>{escaped_label}</h1>
     <div class="fact-row"><span class="label">Natal</span>{natal_chips}</div>
     <div class="fact-row"><span class="label">This arc</span>{arc_chips}</div>
+    <div class="save-theme-row">
+      <button class="save-theme-btn" onclick="saveTheme()">Save Theme</button>
+      <span class="save-theme-status" id="save-theme-status"></span>
+    </div>
   </header>
 
   <div class="layout">
@@ -114,6 +188,7 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
       <p class="reading-text">{reading_text}</p>
 
       <div class="meta-block">
+        <div class="meta-row"><span class="label">Art style</span><span class="chip">{art_style}</span></div>
         <div class="meta-row"><span class="label">Register</span><span class="chip">{register}</span></div>
         <div class="meta-row"><span class="label">Concept tags</span>{concept_tag_chips}</div>
         <div class="meta-row"><span class="label">Avoided (last 14)</span>{avoided_chips}</div>
@@ -148,6 +223,26 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   }});
   lightbox.addEventListener("click", () => lightbox.classList.remove("open"));
   document.addEventListener("keydown", (e) => {{ if (e.key === "Escape") lightbox.classList.remove("open"); }});
+
+  // Save Theme: prompts for a name (native browser dialog, pre-filled
+  // with a suggestion from this generation's own concept tags — same
+  // suggestion the widget's own Save Selected Theme prompt would make),
+  // then navigates to a custom astroarc:// link. That's registered on
+  // this machine (by install.sh) to astro-arc-save-theme-handler, which
+  // actually runs astro-arc-save-theme and reports the result as a
+  // desktop notification — this static page has no server of its own to
+  // report back into, so the notification is the real confirmation, not
+  // the status line below (which can only ever say the link was opened).
+  // The browser will ask permission to open the link the first time;
+  // that's normal for any custom URI scheme, not a bug.
+  function saveTheme() {{
+    const suggested = {suggested_name_json};
+    const name = prompt("Save this theme as:", suggested);
+    if (!name) return;
+    const id = {review_id_json};
+    document.getElementById("save-theme-status").textContent = "Opening Astro-Arc…";
+    window.location.href = "astroarc://save-theme?id=" + encodeURIComponent(id) + "&name=" + encodeURIComponent(name);
+  }}
 </script>
 </body></html>
 """
@@ -209,6 +304,12 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
 
     concept_tags = meta.get("conceptTags") or []
     avoided = meta.get("avoidedConcepts") or []
+    theme_vars = _theme_css_vars(theme_dir)
+
+    # Computed before the HTML so the Save Theme button can embed them —
+    # review_id has to exist before the page that names it in a save link.
+    created_at = datetime.datetime.now()
+    review_id = f"{created_at.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
     html = PAGE_TEMPLATE.format(
         escaped_label=_esc(label),
@@ -218,6 +319,7 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         narrative_position=_esc(meta.get("narrativePosition", "")),
         distillation=_esc(meta.get("distillation", "")),
         reading_text=_esc(meta.get("reading", "")),
+        art_style=_esc(_style_label(meta.get("artStyle")) or "unknown"),
         register=_esc(meta.get("register") or "none"),
         concept_tag_chips="".join(_chip(t, "tag") for t in concept_tags) or '<span class="chip">none</span>',
         avoided_chips="".join(_chip(t) for t in avoided) or '<span class="chip">none yet</span>',
@@ -231,10 +333,13 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         image_cost_source=_esc(cost.get("imageCostSource") or "unknown"),
         total_cost=_fmt_cost(cost.get("totalCost")),
         footer_text=_esc(footer_text or "Generated by Astro-Arc's two-stage LLM pipeline (llm_pipeline.py)."),
+        theme_bg=theme_vars["bg"], theme_surface=theme_vars["surface"], theme_surface2=theme_vars["surface2"],
+        theme_ink=theme_vars["ink"], theme_ink_dim=theme_vars["inkDim"], theme_accent=theme_vars["accent"],
+        theme_border=theme_vars["border"], theme_good=theme_vars["good"],
+        suggested_name_json=json.dumps(_suggest_theme_name(concept_tags)),
+        review_id_json=json.dumps(review_id),
     )
 
-    created_at = datetime.datetime.now()
-    review_id = f"{created_at.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
     out_dir = REVIEWS_DIR / review_id
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "index.html"
