@@ -6,11 +6,33 @@ astrology chart and current transits, on a daily/weekly/monthly cadence you
 pick. A two-stage LLM pipeline turns the chart into a psychological reading
 and then into a single dream-logic image prompt; the rendered image's
 palette gets applied as a live Omarchy theme via `omarchy-theme-set`. Every
-real generation is logged to a browsable local HTML review history.
+real generation is logged to a browsable local HTML review page — and any
+one of them can be exported as its own permanent, independently selectable
+Omarchy theme, from the widget or from the review page itself.
 
 See [`CONTEXT.md`](CONTEXT.md) for the full architecture, every script's
 role, conventions, and current implementation status — this file only
 covers getting it installed and running.
+
+## Features
+
+- **8 art-style presets** (`pipeline/styles.toml`) Stage 2's prompt gets
+  suffixed with — Symbolist/Visionary, Antique Engraving, Art Deco,
+  Cosmic/Nebula, Surreal Painting, Studio Ghibli, Cyberpunk, and
+  Dystopian Future WWII Fusion. Add more freely; no code change needed.
+- **Two theme generators** — the built-in extractor (dependency-free), or
+  Aether (Omarchy's own theme generator, richer output) if it's
+  installed; falls back to built-in automatically on any failure.
+- **"Themes Generated" history** — every real generation, browsable from
+  the widget, each with its own on-disk size. Auto-pruned past a
+  configurable retention window (default 30 days) with a real-data-based
+  disk-space estimate — never a guessed number.
+- **Save a theme permanently** — export any past generation as its own
+  Omarchy theme (outside the live theme's overwrite cycle and the
+  retention window's pruning) from the widget's Save Selected Theme
+  button, or straight from that generation's own review page.
+- **A desktop notification on every real generation** — the psychological
+  distillation as the headline, click to open the full review.
 
 ## Requirements
 
@@ -18,8 +40,10 @@ covers getting it installed and running.
   plugin; it won't run standalone.
 - **Python 3.11+** (uses stdlib `tomllib`; developed against 3.14).
 - **System tools**: `jq`, `secret-tool` (from `libsecret`), `hyprctl`
-  (ships with Hyprland) — all three are already part of a standard
-  Omarchy install.
+  (ships with Hyprland), `xdg-mime`/`update-desktop-database` (registers
+  the review page's Save Theme button as a URI handler; install.sh skips
+  this gracefully if either is missing) — all are already part of a
+  standard Omarchy install.
 - **An OpenAI API key** — required regardless of image backend, since
   Stage 1 (interpretation) and Stage 2 (image prompt) are both chat calls.
   The "local" image backend only makes the *image render* free; get one at
@@ -36,7 +60,11 @@ cd ~/Projects/astro-arc
 This symlinks `plugin/` and `backend/{bin,pipeline}` into the paths Omarchy
 expects (`~/.config/omarchy/plugins/astro-arc` and
 `~/.local/share/omarchy/astro-arc/{bin,pipeline}`) — editing a file in the
-repo takes effect immediately, no reinstall step. Safe to re-run any time.
+repo takes effect immediately, no reinstall step. It also generates and
+registers `~/.local/share/applications/astro-arc-save-theme-handler.desktop`
+(the `astroarc://` URI handler a review page's Save Theme button opens —
+this one file is generated, not symlinked, since a desktop entry's `Exec=`
+needs your real home directory path baked in). Safe to re-run any time.
 Anything real already at a target path is backed up, never deleted.
 
 ### Python environment
@@ -99,12 +127,15 @@ and keys look right, then hit Regenerate.
 
 ```
 astro-arc/
-├── install.sh              symlink installer, see above
+├── install.sh              symlink installer + astroarc:// handler setup
 ├── CONTEXT.md               full architecture + conventions
 ├── CHANGELOG.md              dated history of what changed and why
 ├── plugin/                  Quickshell plugin (QML UI + manifest)
 │   ├── BarWidget.qml, Panel.qml, Model.js, manifest.json
 └── backend/                  everything the pipeline runs on
     ├── bin/                   astro-arc-generate and all pipeline scripts
-    └── pipeline/               registers.toml / cliches.toml / styles.toml
+    ├── pipeline/               registers.toml / cliches.toml / styles.toml
+    └── astro-arc-save-theme-handler.desktop.tpl
+                                template for the Save Theme button's
+                                registered astroarc:// URI handler
 ```
