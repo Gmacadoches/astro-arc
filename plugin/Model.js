@@ -18,8 +18,15 @@ var DEFAULT_CONFIG = {
   stage2Model: "gpt-4o-mini",
   backgroundSize: "auto",
   artStyle: "symbolist",
-  themeGenerator: "built-in"
+  themeGenerator: "built-in",
+  historyRetentionDays: 30
 }
+
+// How many days one "Themes Generated" entry represents, by frequency —
+// used only to estimate how many entries a retention window will hold
+// (real generations may skip a period; this is a projection, not a count
+// of what's actually on disk).
+var FREQUENCY_INTERVAL_DAYS = { daily: 1, weekly: 7, monthly: 30 }
 
 // "aether" shells out to Omarchy's own theme generator for a richer theme
 // (it's what fixes the file-manager icon color, among other things — see
@@ -87,7 +94,9 @@ function parseConfig(raw) {
       stage2Model: typeof data.stage2Model === "string" && data.stage2Model !== "" ? data.stage2Model : "gpt-4o-mini",
       backgroundSize: data.backgroundSize === "auto" || (typeof data.backgroundSize === "string" && SIZE_PATTERN.test(data.backgroundSize)) ? data.backgroundSize : "auto",
       artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist",
-      themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in"
+      themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
+      historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
+        ? data.historyRetentionDays : 30
     }
   } catch (e) {
     return Object.assign({}, DEFAULT_CONFIG)
@@ -105,18 +114,25 @@ function parseApiKeyStatus(raw) {
   }
 }
 
-// build_review.py's index.json: newest-first array of past review builds.
+// build_review.py's index.json: newest-first array of past review builds
+// ("Themes Generated" in the widget). sizeBytes/periodKey/hasThemeSnapshot
+// are absent on entries built before that feature existed — null/false,
+// not a guessed number, so a mixed-age list never shows a fabricated size.
 function parseReviewsIndex(raw) {
   try {
     var data = JSON.parse(String(raw || "[]"))
     if (!Array.isArray(data)) return []
     return data.filter(function(r) { return r && r.id && r.path }).map(function(r) {
+      var size = Number.isInteger(r.sizeBytes) ? r.sizeBytes : parseInt(r.sizeBytes, 10)
       return {
         id: String(r.id),
         label: String(r.label || "Untitled"),
         createdAt: String(r.createdAt || ""),
         path: String(r.path),
-        cardCount: parseInt(r.cardCount, 10) || 0
+        cardCount: parseInt(r.cardCount, 10) || 0,
+        periodKey: typeof r.periodKey === "string" ? r.periodKey : null,
+        hasThemeSnapshot: !!r.hasThemeSnapshot,
+        sizeBytes: isNaN(size) ? null : size
       }
     })
   } catch (e) {
@@ -146,6 +162,33 @@ function sumCosts(rawCostsArray) {
     else unknownCount++
   }
   return { total: total, unknownCount: unknownCount, generationCount: generationCount }
+}
+
+// "512 KB" / "4.3 MB" — one decimal above 1 MB, whole numbers below (a
+// decimal KB reads as false precision for a handful of small files).
+function formatBytes(bytes) {
+  if (typeof bytes !== "number" || isNaN(bytes) || bytes < 0) return "unknown"
+  if (bytes < 1024) return bytes + " B"
+  var kb = bytes / 1024
+  if (kb < 1024) return Math.round(kb) + " KB"
+  return (kb / 1024).toFixed(1) + " MB"
+}
+
+// Real average size of every "Themes Generated" entry that actually has a
+// recorded sizeBytes (pre-feature entries don't), times how many entries
+// the retention window is projected to hold at the configured frequency —
+// never a guessed number when there's no size history yet to average, per
+// this project's cost-estimate convention: null/"unknown" beats a
+// fabricated figure. Returns { estimatedBytes, knownCount } — knownCount
+// lets the caller show "estimate" vs. "no data yet" language.
+function estimateHistorySpace(reviewsIndex, retentionDays, frequency) {
+  var known = (reviewsIndex || []).filter(function(r) { return typeof r.sizeBytes === "number" })
+  if (known.length === 0) return { estimatedBytes: null, knownCount: 0 }
+
+  var avgBytes = known.reduce(function(sum, r) { return sum + r.sizeBytes }, 0) / known.length
+  var intervalDays = FREQUENCY_INTERVAL_DAYS[frequency] || 1
+  var projectedEntries = Math.max(1, Math.round((retentionDays || 30) / intervalDays))
+  return { estimatedBytes: avgBytes * projectedEntries, knownCount: known.length }
 }
 
 function parseFundsCheck(raw) {
@@ -248,6 +291,11 @@ function isValidBackgroundSize(value) {
   return value === "auto" || SIZE_PATTERN.test(String(value || ""))
 }
 
+function isValidHistoryRetentionDays(value) {
+  var n = parseInt(value, 10)
+  return String(n) === String(value).trim() && n >= 1 && n <= 3650
+}
+
 function isValidCoordinate(lat, lon) {
   var la = parseFloat(lat)
   var lo = parseFloat(lon)
@@ -291,10 +339,13 @@ if (typeof module !== "undefined") {
     isValidDate: isValidDate,
     isValidTime: isValidTime,
     isValidBackgroundSize: isValidBackgroundSize,
+    isValidHistoryRetentionDays: isValidHistoryRetentionDays,
     isValidCoordinate: isValidCoordinate,
     frequencyLabel: frequencyLabel,
     formatGeneratedAt: formatGeneratedAt,
     sumCosts: sumCosts,
-    parseFundsCheck: parseFundsCheck
+    parseFundsCheck: parseFundsCheck,
+    formatBytes: formatBytes,
+    estimateHistorySpace: estimateHistorySpace
   }
 }

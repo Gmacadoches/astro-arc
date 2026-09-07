@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# Deletes "Themes Generated" entries (reviews/<id>/ — HTML page + theme
+# snapshot — and the matching history/<periodKey>.png) either past a given
+# age, or all of them. Never touches anything under
+# ~/.config/omarchy/themes/ — a theme astro-arc-save-theme exported is a
+# separate, permanent copy this script has no path to.
+#
+# Usage:
+#   astro-arc-prune-history --older-than-days <N>   (called automatically
+#                                                     by astro-arc-generate
+#                                                     every run, using the
+#                                                     configured
+#                                                     historyRetentionDays)
+#   astro-arc-prune-history --all                    (the widget's Clear
+#                                                      History button)
+#
+# Prints "<deletedCount> <bytesFreed>" on success — real numbers, not an
+# estimate, same "never fabricate" convention as cost_estimate.py.
+
+set -euo pipefail
+
+STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
+REVIEWS_DIR="$STATE_DIR/reviews"
+INDEX_FILE="$REVIEWS_DIR/index.json"
+HISTORY_DIR="$STATE_DIR/history"
+
+mode="${1:-}"
+case "$mode" in
+  --older-than-days)
+    days="${2:-}"
+    [[ $days =~ ^[0-9]+$ ]] || { echo "Usage: astro-arc-prune-history --older-than-days <N>" >&2; exit 1; }
+    cutoff_epoch=$(date -d "-${days} days" +%s)
+    ;;
+  --all)
+    cutoff_epoch=""
+    ;;
+  *)
+    echo "Usage: astro-arc-prune-history (--older-than-days <N> | --all)" >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! -f $INDEX_FILE ]]; then
+  echo "0 0"
+  exit 0
+fi
+
+# jq's own fromdateiso8601 is too strict for this file's real createdAt
+# values (fractional seconds, no timezone — Python's
+# datetime.now().isoformat()) — it flatly rejects them. `date -d` handles
+# both forms, so age is decided per-entry in bash instead. An entry whose
+# createdAt fails to parse is kept, not dropped — a parsing quirk should
+# never be the reason real data gets deleted.
+drop_ids_list=""
+if [[ -n $cutoff_epoch ]]; then
+  while IFS=$'\t' read -r id created_at; do
+    [[ -n $id ]] || continue
+    entry_epoch=$(date -d "$created_at" +%s 2>/dev/null) || continue
+    (( entry_epoch < cutoff_epoch )) && drop_ids_list+="$id"$'\n'
+  done < <(jq -r '.[] | [.id, .createdAt] | @tsv' "$INDEX_FILE")
+else
+  drop_ids_list=$(jq -r '.[].id' "$INDEX_FILE")
+fi
+
+drop_ids_json=$(jq -R -s 'split("\n") | map(select(length > 0))' <<<"$drop_ids_list")
+keep=$(jq --argjson dropIds "$drop_ids_json" '[.[] | select((.id as $i | $dropIds | index($i)) | not)]' "$INDEX_FILE")
+drop=$(jq --argjson dropIds "$drop_ids_json" '[.[] | select(.id as $i | $dropIds | index($i))]' "$INDEX_FILE")
+
+deleted_count=$(jq 'length' <<<"$drop")
+if [[ $deleted_count -eq 0 ]]; then
+  echo "0 0"
+  exit 0
+fi
+
+bytes_freed=$(jq '[.[].sizeBytes // 0] | add' <<<"$drop")
+
+# history/<periodKey>.png is one file per period, overwritten by whichever
+# generation for that period ran most recently — so two reviews can share
+# a periodKey (a same-day regeneration). Only delete it if no kept entry
+# still claims that periodKey; otherwise it's the kept entry's own current
+# image, not the dropped entry's.
+kept_period_keys=$(jq -r '[.[].periodKey // empty] | unique | .[]' <<<"$keep")
+
+while IFS=$'\t' read -r id period_key; do
+  [[ -n $id ]] || continue
+  rm -rf "${REVIEWS_DIR:?}/$id"
+  if [[ -n $period_key && $period_key != null ]] && ! grep -qxF "$period_key" <<<"$kept_period_keys"; then
+    rm -f "$HISTORY_DIR/$period_key.png"
+  fi
+done < <(jq -r '.[] | [.id, (.periodKey // "")] | @tsv' <<<"$drop")
+
+echo "$keep" >"$INDEX_FILE"
+echo "$deleted_count $bytes_freed"

@@ -4,7 +4,9 @@
 #   astro_engine.py -> llm_pipeline.py (Stage 1 interpret, Stage 2 image
 #     prompt) -> (image_gen.py | openai_image_gen.py) -> theming (aether, or
 #     palette_extract.py as its default/fallback) -> Omarchy theme ->
-#     omarchy-theme-set -> build_review.py
+#     omarchy-theme-set -> build_review.py (logs it + snapshots the theme
+#     dir for astro-arc-save-theme) -> astro-arc-prune-history (deletes
+#     entries past config.historyRetentionDays, default 30)
 #
 # llm_pipeline.py replaced the old lookup-table symbol_map.py: both its
 # stages are themselves OpenAI chat calls, so an API key is required now
@@ -185,21 +187,34 @@ jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg freq
   --slurpfile meta "$pipeline_meta_file" --argjson cost "$cost_entry" \
   '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
 
-# Log this as a browsable iteration — every real run, not just manual
-# style-comparison batches, so reverting to an earlier reading/prompt/
-# register later on means finding it in this list rather than trying to
-# remember it. build_review.py prints the review's index.html path on
-# success — captured (not discarded) so the notification below can open it.
+# Log this as a browsable "Themes Generated" iteration — every real run,
+# not just manual style-comparison batches, so reverting to an earlier
+# reading/prompt/register later on means finding it in this list rather
+# than trying to remember it. Also snapshots the live theme dir (--theme-dir)
+# so astro-arc-save-theme has a complete standalone theme to export later,
+# and records --period-key so pruning can find the matching history/*.png.
+# build_review.py prints the review's index.html path on success —
+# captured (not discarded) so the notification below can open it.
 review_label="${frequency^} · $(date '+%b %-d, %-I:%M %p') ($image_backend)"
 review_path=""
 if review_path=$("$VENV_PY" "$BIN_DIR/build_review.py" \
   --reading "$reading_file" --meta "$pipeline_meta_file" --image "$bg_file" \
-  --label "$review_label" --cost-json "$cost_entry"); then
+  --label "$review_label" --cost-json "$cost_entry" \
+  --theme-dir "$THEME_DIR" --period-key "$period_key"); then
   :
 else
   echo "Astro-Arc: warning — could not log this iteration to the review history" >&2
   review_path=""
 fi
+
+# Prune "Themes Generated" entries (and their matching history/*.png) past
+# the configured retention window — every run self-maintains, no separate
+# cron needed. Never touches a theme astro-arc-save-theme exported; that's
+# a permanent copy outside this whole system. Best-effort: a failure here
+# must never fail the generation that already succeeded.
+history_retention_days=$(jq -r '.historyRetentionDays // 30' "$CONFIG_FILE" 2>/dev/null || echo 30)
+"$BIN_DIR/astro-arc-prune-history" --older-than-days "$history_retention_days" >/dev/null 2>&1 \
+  || echo "Astro-Arc: warning — history pruning failed" >&2
 
 # Surface the distillation — the one-line psychological core of this run's
 # reading, same text the widget shows under its narrative-position badge

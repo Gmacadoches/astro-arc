@@ -6,9 +6,15 @@ logs it so every iteration stays browsable from the widget instead of only
 the most recent one being visible.
 
 Every build is saved under
-~/.local/state/omarchy/astro-arc/reviews/<id>/index.html and registered in
-~/.local/state/omarchy/astro-arc/reviews/index.json (newest first), which
-Panel.qml reads to populate its review-history picker.
+~/.local/state/omarchy/astro-arc/reviews/<id>/index.html, plus a full
+theme-dir snapshot at reviews/<id>/theme/ (colors.toml, icons.theme,
+backgrounds/, ...) when --theme-dir is given, and registered in
+~/.local/state/omarchy/astro-arc/reviews/index.json (newest first) —
+including each entry's real on-disk size — which Panel.qml reads to
+populate its "Themes Generated" picker. astro-arc-save-theme copies a
+review's theme/ snapshot out to a new permanent Omarchy theme; astro-arc-
+prune-history deletes entries (and their matching history/<periodKey>.png)
+past the configured retention window.
 
 This is called automatically from astro-arc-generate after every real run
 — it is not a manual dev-only tool. (An earlier version of this file was
@@ -26,11 +32,16 @@ import argparse
 import base64
 import datetime
 import json
+import shutil
 import uuid
 from pathlib import Path
 
 REVIEWS_DIR = Path.home() / ".local/state/omarchy/astro-arc/reviews"
 INDEX_FILE = REVIEWS_DIR / "index.json"
+
+
+def _dir_size(path):
+    return sum(f.stat().st_size for f in Path(path).rglob("*") if f.is_file())
 
 PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
 <title>Astro-Arc Iteration — {escaped_label}</title>
@@ -189,7 +200,8 @@ def _fmt_cost(value):
     return f"${value:.4f}" if value >= 0.0001 else f"${value:.6f}"
 
 
-def build(reading_path, meta_path, image_path, label, cost=None, footer_text=None):
+def build(reading_path, meta_path, image_path, label, cost=None, footer_text=None,
+          theme_dir=None, period_key=None):
     reading = json.loads(Path(reading_path).read_text())
     meta = json.loads(Path(meta_path).read_text())
     natal_chips, arc_chips = natal_and_arc_chips(reading)
@@ -228,6 +240,17 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
     out_path = out_dir / "index.html"
     out_path.write_text(html)
 
+    # Snapshot the live theme dir (colors.toml, icons.theme, backgrounds/,
+    # and anything else that generation's theme generator produced) so a
+    # later "Save Selected Theme" has a complete, standalone Omarchy theme
+    # to copy out — not just the HTML record. Astro-Arc's own theme dir is
+    # wiped clean (except backgrounds/) at the start of every run, so
+    # whatever's there when this runs is exactly and only that run's output.
+    theme_snapshot_dir = None
+    if theme_dir and Path(theme_dir).is_dir():
+        theme_snapshot_dir = out_dir / "theme"
+        shutil.copytree(theme_dir, theme_snapshot_dir)
+
     index = json.loads(INDEX_FILE.read_text()) if INDEX_FILE.exists() else []
     index.insert(0, {
         "id": review_id,
@@ -235,6 +258,12 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         "createdAt": created_at.isoformat(),
         "path": str(out_path),
         "cardCount": 1,
+        "periodKey": period_key,
+        "hasThemeSnapshot": theme_snapshot_dir is not None,
+        # Real directory size, not an estimate — includes the theme
+        # snapshot above (the image itself lives only as base64 inside
+        # index.html, never duplicated on disk).
+        "sizeBytes": _dir_size(out_dir),
     })
     INDEX_FILE.write_text(json.dumps(index, indent=2))
 
@@ -249,10 +278,13 @@ def main():
     parser.add_argument("--label", required=True)
     parser.add_argument("--cost-json", help="inline JSON: {stage1Cost, stage2Cost, signatureCost, imageCost, imageCostSource, totalCost}")
     parser.add_argument("--footer")
+    parser.add_argument("--theme-dir", help="the live theme dir to snapshot (colors.toml, icons.theme, backgrounds/, ...) for later Save Selected Theme")
+    parser.add_argument("--period-key", help="this generation's periodKey, so pruning can also remove the matching history/<periodKey>.png")
     args = parser.parse_args()
 
     cost = json.loads(args.cost_json) if args.cost_json else None
-    out_path = build(args.reading, args.meta, args.image, args.label, cost, args.footer)
+    out_path = build(args.reading, args.meta, args.image, args.label, cost, args.footer,
+                      theme_dir=args.theme_dir, period_key=args.period_key)
     print(out_path)
 
 

@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Exports one "Themes Generated" entry's theme snapshot
+# (reviews/<id>/theme/, written by build_review.py) into a new, permanent
+# Omarchy theme under ~/.config/omarchy/themes/ — so it becomes its own
+# selectable theme via Omarchy's own theme picker/omarchy-theme-set,
+# completely independent of astro-arc's live theme (which gets wiped and
+# regenerated every run) and of the N-day history retention window that
+# prunes old "Themes Generated" entries. This is the only way a specific
+# generation survives both.
+#
+# Usage: astro-arc-save-theme <review-id>
+#   Prints the new theme's name on success (nothing else to stdout), so a
+#   caller (Panel.qml) can show it back to the user.
+
+set -euo pipefail
+
+STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
+INDEX_FILE="$STATE_DIR/reviews/index.json"
+THEMES_DIR="$HOME/.config/omarchy/themes"
+
+review_id="${1:-}"
+if [[ -z $review_id ]]; then
+  echo "Usage: astro-arc-save-theme <review-id>" >&2
+  exit 1
+fi
+
+[[ -f $INDEX_FILE ]] || { echo "astro-arc-save-theme: no reviews/index.json found" >&2; exit 1; }
+
+review_path=$(jq -r --arg id "$review_id" '.[] | select(.id == $id) | .path' "$INDEX_FILE")
+if [[ -z $review_path ]]; then
+  echo "astro-arc-save-theme: no review with id '$review_id'" >&2
+  exit 1
+fi
+
+theme_snapshot_dir="$(dirname "$review_path")/theme"
+if [[ ! -f $theme_snapshot_dir/colors.toml ]]; then
+  echo "astro-arc-save-theme: '$review_id' has no theme snapshot to save (generated before this feature existed)" >&2
+  exit 1
+fi
+
+# review_id is already unique (timestamp + hash suffix from build_review.py),
+# so it doubles as a collision-free, sortable theme name.
+theme_name="astro-arc-saved-$review_id"
+target_dir="$THEMES_DIR/$theme_name"
+
+if [[ -e $target_dir ]]; then
+  echo "astro-arc-save-theme: '$theme_name' already exists — already saved" >&2
+  exit 1
+fi
+
+mkdir -p "$target_dir"
+cp -r "$theme_snapshot_dir/." "$target_dir/"
+
+echo "$theme_name"

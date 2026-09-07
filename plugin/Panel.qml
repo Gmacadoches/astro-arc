@@ -592,6 +592,28 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
+  // ---- History retention: how many days of "Themes Generated" entries
+  // astro-arc-generate keeps before astro-arc-prune-history deletes them,
+  // every run. Never affects a theme already exported via Save Selected
+  // Theme — that's a separate, permanent copy this retention window has
+  // no path to. -----------------------------------------------------------
+  property string historyRetentionError: ""
+
+  function commitHistoryRetentionDays(value) {
+    if (!Model.isValidHistoryRetentionDays(value)) {
+      historyRetentionError = "Enter a whole number of days, 1-3650"
+      return
+    }
+    historyRetentionError = ""
+    historyRetentionWriteProc.command = [root.configBin, "--set-history-retention-days", String(parseInt(value, 10))]
+    historyRetentionWriteProc.running = true
+  }
+
+  Process {
+    id: historyRetentionWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
   // ---- API usage: a running total from astro-arc-generate's costs.json
   // (real token-based cost for every generation's 3 API calls — see
   // cost_estimate.py), plus a best-effort "available funds" check that's
@@ -628,7 +650,10 @@ Panel {
     }
   }
 
-  // ---- Style review history (Phase 3 testing log) ------------------------
+  // ---- Themes Generated: every real generation, browsable and — since
+  // astro-arc-generate now snapshots the live theme dir into each entry —
+  // exportable as a standalone theme (astro-arc-save-theme) before the
+  // configured retention window prunes it (astro-arc-prune-history). -----
   property var reviewsIndex: []
   property string selectedReviewId: ""
 
@@ -639,8 +664,13 @@ Panel {
     onFileChanged: reload()
     onLoaded: {
       root.reviewsIndex = Model.parseReviewsIndex(text())
-      if (root.selectedReviewId === "" && root.reviewsIndex.length > 0)
-        root.selectedReviewId = root.reviewsIndex[0].id
+      // Auto-pruning can now remove the currently-selected entry out from
+      // under the user — re-picking the newest survivor (or clearing to
+      // "" when none are left) beats leaving selectedReviewId pointing at
+      // deleted data, which is a case the original "only fill in when
+      // empty" logic never had to consider.
+      var stillExists = root.reviewsIndex.some(function(r) { return r.id === root.selectedReviewId })
+      if (!stillExists) root.selectedReviewId = root.reviewsIndex.length > 0 ? root.reviewsIndex[0].id : ""
     }
     onLoadFailed: root.reviewsIndex = []
   }
@@ -661,6 +691,85 @@ Panel {
 
   function openLatestReview() {
     if (reviewsIndex.length > 0) openReview(reviewsIndex[0].path)
+  }
+
+  // ---- Save Selected Theme: exports the selected entry's theme snapshot
+  // to a new, permanent Omarchy theme (astro-arc-save-theme) — outside
+  // both the live astro-arc theme (overwritten every generation) and the
+  // retention window (pruned by age), so it's the only way a specific
+  // generation survives either. ------------------------------------------
+  property string themeActionStatus: ""
+  property bool themeActionStatusIsError: false
+  property string _saveThemeStdout: ""
+  property string _saveThemeStderr: ""
+  readonly property string saveThemeBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-save-theme"
+  readonly property string pruneHistoryBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-prune-history"
+
+  function saveSelectedTheme() {
+    if (!root.selectedReviewId || saveThemeProc.running) return
+    root.themeActionStatus = ""
+    root._saveThemeStdout = ""
+    root._saveThemeStderr = ""
+    saveThemeProc.command = [root.saveThemeBin, root.selectedReviewId]
+    saveThemeProc.running = true
+  }
+
+  Process {
+    id: saveThemeProc
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._saveThemeStdout = String(text || "").trim() }
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._saveThemeStderr = String(text || "").trim() }
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.themeActionStatus = "Saved as “" + root._saveThemeStdout + "” — pick it from Omarchy's own theme switcher any time."
+        root.themeActionStatusIsError = false
+      } else {
+        root.themeActionStatus = root._saveThemeStderr || "Save failed."
+        root.themeActionStatusIsError = true
+      }
+    }
+  }
+
+  // ---- Clear History: deletes every "Themes Generated" entry right now
+  // (astro-arc-prune-history --all), regardless of age. Two-click confirm
+  // — arms on the first click, reverts on its own after 4s if not
+  // confirmed — since this is real, unrecoverable deletion and the
+  // existing "Remove" (API key) button has no equivalent safeguard to
+  // mirror. Never touches a theme astro-arc-save-theme already exported;
+  // that's a permanent copy outside this whole system. ---------------------
+  property bool clearHistoryArmed: false
+
+  function clearHistoryClicked() {
+    if (clearHistoryProc.running) return
+    if (root.clearHistoryArmed) {
+      root.clearHistoryArmed = false
+      clearHistoryArmTimer.stop()
+      root.themeActionStatus = ""
+      clearHistoryProc.running = true
+    } else {
+      root.clearHistoryArmed = true
+      clearHistoryArmTimer.restart()
+    }
+  }
+
+  Timer {
+    id: clearHistoryArmTimer
+    interval: 4000
+    onTriggered: root.clearHistoryArmed = false
+  }
+
+  Process {
+    id: clearHistoryProc
+    command: [root.pruneHistoryBin, "--all"]
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.reviewsIndexFile.reload()
+        root.themeActionStatus = "Themes Generated history cleared."
+        root.themeActionStatusIsError = false
+      } else {
+        root.themeActionStatus = "Clear failed."
+        root.themeActionStatusIsError = true
+      }
+    }
   }
 
   // Shared label-column width so every label-left/control-right row lines
@@ -1148,6 +1257,82 @@ Panel {
               }
             }
 
+            // ---- History retention: days of "Themes Generated" entries
+            // to keep (astro-arc-prune-history runs automatically every
+            // generation with this value). Estimate is real-data-based —
+            // the average size of entries that actually have a recorded
+            // sizeBytes, times how many the window is projected to hold at
+            // the current frequency — never a guessed number before
+            // there's any size history to average (see
+            // Model.estimateHistorySpace). --------------------------------
+            Item {
+              width: parent.width
+              height: Math.max(historyRetentionLabel.implicitHeight, historyRetentionField.implicitHeight)
+
+              Text {
+                id: historyRetentionLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.labelColW
+                text: "History"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              TextField {
+                id: historyRetentionField
+                anchors.left: historyRetentionLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: historyRetentionDaysLabel.left
+                anchors.rightMargin: Style.space(6)
+                anchors.verticalCenter: parent.verticalCenter
+                placeholderText: "30"
+                foreground: root.bar.foreground
+                font.family: root.bar.fontFamily
+                onEditingFinished: root.commitHistoryRetentionDays(text)
+                Component.onCompleted: text = String(root.configState.historyRetentionDays)
+                Connections {
+                  target: root
+                  function onConfigStateChanged() {
+                    if (!historyRetentionField.activeFocus) historyRetentionField.text = String(root.configState.historyRetentionDays)
+                  }
+                }
+              }
+
+              Text {
+                id: historyRetentionDaysLabel
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "days"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+            }
+
+            Text {
+              visible: root.historyRetentionError !== ""
+              width: parent.width
+              text: root.historyRetentionError
+              color: root.bar.urgent || "#f38ba8"
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              readonly property var estimate: Model.estimateHistorySpace(root.reviewsIndex, root.configState.historyRetentionDays, root.configState.frequency)
+              text: estimate.estimatedBytes !== null
+                ? "Est. space for " + root.configState.historyRetentionDays + " days: ~" + Model.formatBytes(estimate.estimatedBytes)
+                  + " (based on " + estimate.knownCount + " saved generation" + (estimate.knownCount === 1 ? "" : "s") + ")"
+                : "Est. space: not enough history yet to estimate"
+              color: Qt.darker(root.bar.foreground, 1.5)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
             PanelSeparator { foreground: root.bar.foreground }
             PanelSectionHeader { text: "API USAGE"; foreground: root.bar.foreground }
 
@@ -1612,17 +1797,22 @@ Panel {
             }
           }
 
-          // ---- Style review log: browse every past comparison batch,
-          // not just whichever one happens to still be open in a browser
-          // tab. build_review.py appends to this index every time a batch
-          // of test renders is compared, so reverting to an earlier style/
-          // prompt direction just means finding it in this list. ----------
+          // ---- Themes Generated: browse every real generation (was
+          // "Reviews" — renamed since every entry is a real iteration now,
+          // not just the Phase 3 style-comparison batches this started as).
+          // Each carries its own on-disk size; Save Selected Theme exports
+          // one as a permanent Omarchy theme (astro-arc-save-theme); Clear
+          // History deletes all of them right now regardless of age
+          // (astro-arc-prune-history --all) — the automatic age-based
+          // pruning runs on its own every generation, see the THEME
+          // settings section's History retention field. -------------------
           Column {
             width: parent.width
             spacing: Style.space(6)
             visible: root.reviewsIndex.length > 0
 
             PanelSeparator { foreground: root.bar.foreground }
+            PanelSectionHeader { text: "THEMES GENERATED"; foreground: root.bar.foreground }
 
             Item {
               width: parent.width
@@ -1633,7 +1823,7 @@ Panel {
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 width: root.labelColW
-                text: "Reviews"
+                text: "History"
                 color: Qt.darker(root.bar.foreground, 1.3)
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.bodySmall
@@ -1652,8 +1842,10 @@ Panel {
                   // cardCount was meaningful when a review could bundle
                   // several style variants for one reading (the Phase 3
                   // exploration batches); every review since is one real
-                  // generation, so it's redundant noise now.
-                  return { value: r.id, label: r.label }
+                  // generation, so it's redundant noise now. Size is null
+                  // (omitted) on an entry built before that field existed.
+                  var sizeSuffix = r.sizeBytes !== null ? " · " + Model.formatBytes(r.sizeBytes) : ""
+                  return { value: r.id, label: r.label + sizeSuffix }
                 })
                 foreground: root.bar.foreground
                 onChanged: function(value) { root.selectedReviewId = value }
@@ -1669,6 +1861,44 @@ Panel {
                 foreground: root.bar.foreground
                 onClicked: root.openSelectedReview()
               }
+            }
+
+            Item {
+              width: parent.width
+              height: Math.max(saveThemeBtn.implicitHeight, clearHistoryBtn.implicitHeight)
+
+              Button {
+                id: saveThemeBtn
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Save Selected Theme"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== ""
+                onClicked: root.saveSelectedTheme()
+              }
+
+              Button {
+                id: clearHistoryBtn
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.clearHistoryArmed ? "Confirm Clear?" : "Clear History"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.clearHistoryArmed ? (root.bar.urgent || "#f38ba8") : root.bar.foreground
+                onClicked: root.clearHistoryClicked()
+              }
+            }
+
+            Text {
+              visible: root.themeActionStatus !== ""
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: root.themeActionStatus
+              color: root.themeActionStatusIsError ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
             }
           }
           }
