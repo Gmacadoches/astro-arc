@@ -9,7 +9,13 @@
 # prunes old "Themes Generated" entries. This is the only way a specific
 # generation survives both.
 #
-# Usage: astro-arc-save-theme <review-id>
+# Usage: astro-arc-save-theme <review-id> [theme-name]
+#   theme-name (optional): the widget prompts for one, pre-filled with a
+#   suggestion built from that review's concept tags — see Model.js's
+#   suggestThemeName. Sanitized the same way omarchy-theme-set itself
+#   normalizes a theme name (lowercase, spaces -> dashes); falls back to
+#   the old auto-name (astro-arc-saved-<review-id>) if omitted or if
+#   sanitizing leaves nothing usable.
 #   Prints the new theme's name on success (nothing else to stdout), so a
 #   caller (Panel.qml) can show it back to the user.
 
@@ -20,8 +26,9 @@ INDEX_FILE="$STATE_DIR/reviews/index.json"
 THEMES_DIR="$HOME/.config/omarchy/themes"
 
 review_id="${1:-}"
+requested_name="${2:-}"
 if [[ -z $review_id ]]; then
-  echo "Usage: astro-arc-save-theme <review-id>" >&2
+  echo "Usage: astro-arc-save-theme <review-id> [theme-name]" >&2
   exit 1
 fi
 
@@ -39,13 +46,21 @@ if [[ ! -f $theme_snapshot_dir/colors.toml ]]; then
   exit 1
 fi
 
-# review_id is already unique (timestamp + hash suffix from build_review.py),
-# so it doubles as a collision-free, sortable theme name.
-theme_name="astro-arc-saved-$review_id"
+if [[ -n $requested_name ]]; then
+  theme_name=$(tr '[:upper:]' '[:lower:]' <<<"$requested_name" | tr ' ' '-' | sed -E 's/[^a-z0-9-]//g; s/-+/-/g; s/^-+//; s/-+$//')
+  if [[ -z $theme_name || $theme_name == .* ]]; then
+    echo "astro-arc-save-theme: '$requested_name' isn't a usable theme name — try letters, numbers, spaces, or dashes" >&2
+    exit 1
+  fi
+else
+  # review_id is already unique (timestamp + hash suffix from
+  # build_review.py), so it doubles as a collision-free, sortable name.
+  theme_name="astro-arc-saved-$review_id"
+fi
 target_dir="$THEMES_DIR/$theme_name"
 
 if [[ -e $target_dir ]]; then
-  echo "astro-arc-save-theme: '$theme_name' already exists — already saved" >&2
+  echo "astro-arc-save-theme: a theme named '$theme_name' already exists — pick a different name" >&2
   exit 1
 fi
 

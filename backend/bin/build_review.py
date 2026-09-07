@@ -264,6 +264,9 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         # snapshot above (the image itself lives only as base64 inside
         # index.html, never duplicated on disk).
         "sizeBytes": _dir_size(out_dir),
+        # Carried through so Save Selected Theme can suggest a name from
+        # this run's actual concept tags instead of a hash-looking id.
+        "conceptTags": concept_tags,
     })
     INDEX_FILE.write_text(json.dumps(index, indent=2))
 

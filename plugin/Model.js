@@ -132,12 +132,38 @@ function parseReviewsIndex(raw) {
         cardCount: parseInt(r.cardCount, 10) || 0,
         periodKey: typeof r.periodKey === "string" ? r.periodKey : null,
         hasThemeSnapshot: !!r.hasThemeSnapshot,
-        sizeBytes: isNaN(size) ? null : size
+        sizeBytes: isNaN(size) ? null : size,
+        conceptTags: Array.isArray(r.conceptTags) ? r.conceptTags.filter(function(t) { return typeof t === "string" }) : []
       }
     })
   } catch (e) {
     return []
   }
+}
+
+// "nature/rootedness" -> "Nature Rootedness" — splits on the register/
+// specific "/" convention concept tags use (see llm_pipeline.py's
+// Conventions note in CONTEXT.md) and on -/_, then title-cases each word.
+function humanizeConceptTag(tag) {
+  return String(tag || "")
+    .split("/").join(" ")
+    .replace(/[-_]+/g, " ")
+    .split(" ")
+    .filter(function(w) { return w.length > 0 })
+    .map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1) })
+    .join(" ")
+}
+
+// Save Selected Theme's name-prompt default: up to 2 of that generation's
+// own concept tags, humanized — real content from the reading that
+// produced it, not a hash-looking id. "" (never a placeholder guess) when
+// the entry has no concept tags to draw from (built before this field
+// existed, or Stage 2 returned none) — the caller falls back to its own
+// placeholder text in that case.
+function suggestThemeName(conceptTags) {
+  var tags = (conceptTags || []).filter(function(t) { return typeof t === "string" && t.trim() !== "" })
+  if (tags.length === 0) return ""
+  return tags.slice(0, 2).map(humanizeConceptTag).join(" ")
 }
 
 // astro-arc-generate's running costs.json (newest first): sums whatever
@@ -346,6 +372,7 @@ if (typeof module !== "undefined") {
     sumCosts: sumCosts,
     parseFundsCheck: parseFundsCheck,
     formatBytes: formatBytes,
-    estimateHistorySpace: estimateHistorySpace
+    estimateHistorySpace: estimateHistorySpace,
+    suggestThemeName: suggestThemeName
   }
 }

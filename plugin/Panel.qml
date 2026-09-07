@@ -697,20 +697,50 @@ Panel {
   // to a new, permanent Omarchy theme (astro-arc-save-theme) — outside
   // both the live astro-arc theme (overwritten every generation) and the
   // retention window (pruned by age), so it's the only way a specific
-  // generation survives either. ------------------------------------------
+  // generation survives either. Prompts for a name first (pre-filled with
+  // a suggestion from that generation's own concept tags via
+  // Model.suggestThemeName) instead of silently auto-naming it
+  // astro-arc-saved-<hash-looking-review-id>. -----------------------------
   property string themeActionStatus: ""
   property bool themeActionStatusIsError: false
+  property bool themeNamePromptOpen: false
+  property string themeNameDraft: ""
   property string _saveThemeStdout: ""
   property string _saveThemeStderr: ""
   readonly property string saveThemeBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-save-theme"
   readonly property string pruneHistoryBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-prune-history"
 
-  function saveSelectedTheme() {
+  function reviewForId(id) {
+    for (var i = 0; i < root.reviewsIndex.length; i++)
+      if (root.reviewsIndex[i].id === id) return root.reviewsIndex[i]
+    return null
+  }
+
+  function openSaveThemePrompt() {
+    if (!root.selectedReviewId) return
+    var review = root.reviewForId(root.selectedReviewId)
+    root.themeNameDraft = review ? Model.suggestThemeName(review.conceptTags) : ""
+    root.themeActionStatus = ""
+    root.themeNamePromptOpen = true
+  }
+
+  function cancelSaveThemePrompt() {
+    root.themeNamePromptOpen = false
+    root.themeActionStatus = ""
+  }
+
+  function confirmSaveTheme() {
     if (!root.selectedReviewId || saveThemeProc.running) return
+    var name = root.themeNameDraft.trim()
+    if (name === "") {
+      root.themeActionStatus = "Enter a name for the theme."
+      root.themeActionStatusIsError = true
+      return
+    }
     root.themeActionStatus = ""
     root._saveThemeStdout = ""
     root._saveThemeStderr = ""
-    saveThemeProc.command = [root.saveThemeBin, root.selectedReviewId]
+    saveThemeProc.command = [root.saveThemeBin, root.selectedReviewId, name]
     saveThemeProc.running = true
   }
 
@@ -720,6 +750,7 @@ Panel {
     stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._saveThemeStderr = String(text || "").trim() }
     onExited: function(exitCode) {
       if (exitCode === 0) {
+        root.themeNamePromptOpen = false
         root.themeActionStatus = "Saved as “" + root._saveThemeStdout + "” — pick it from Omarchy's own theme switcher any time."
         root.themeActionStatusIsError = false
       } else {
@@ -972,6 +1003,17 @@ Panel {
                 color: root.bar.foreground
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.display
+
+                // Was purely decorative — a "‹" that looks exactly like a
+                // back button but did nothing when clicked. Same action as
+                // the trailing ✕ below; only live while it's actually
+                // showing the back chevron, not over the ✦/✵ status icon.
+                MouseArea {
+                  anchors.fill: parent
+                  enabled: root.showSettings
+                  cursorShape: root.showSettings ? Qt.PointingHandCursor : Qt.ArrowCursor
+                  onClicked: root.toggleSettings()
+                }
               }
             }
             trailingControl: Component {
@@ -1207,15 +1249,12 @@ Panel {
               }
             }
 
-            Column {
-              width: parent.width
-              spacing: Style.space(8)
-              visible: root.configState.imageBackend === "openai"
-
-              PanelSeparator { foreground: root.bar.foreground }
-              PanelSectionHeader { text: "API KEY"; foreground: root.bar.foreground }
-              ApiKeySection { slot: "image" }
-            }
+            // No separator/header here (unlike a section boundary) — this
+            // is the OpenAI image model's own API key, same key slot the
+            // model dropdown right above it configures, not a distinct
+            // section. Stage 1/Stage 2's ApiKeySections directly follow
+            // their model fields the same way, with nothing between them.
+            ApiKeySection { slot: "image"; visible: root.configState.imageBackend === "openai" }
 
             PanelSeparator { foreground: root.bar.foreground }
             PanelSectionHeader { text: "THEME"; foreground: root.bar.foreground }
@@ -1866,6 +1905,7 @@ Panel {
             Item {
               width: parent.width
               height: Math.max(saveThemeBtn.implicitHeight, clearHistoryBtn.implicitHeight)
+              visible: !root.themeNamePromptOpen
 
               Button {
                 id: saveThemeBtn
@@ -1876,7 +1916,7 @@ Panel {
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 enabled: root.selectedReviewId !== ""
-                onClicked: root.saveSelectedTheme()
+                onClicked: root.openSaveThemePrompt()
               }
 
               Button {
@@ -1888,6 +1928,63 @@ Panel {
                 fontSize: Style.font.caption
                 foreground: root.clearHistoryArmed ? (root.bar.urgent || "#f38ba8") : root.bar.foreground
                 onClicked: root.clearHistoryClicked()
+              }
+            }
+
+            // ---- Name prompt: shown in place of the row above once Save
+            // Selected Theme is clicked. Pre-filled with
+            // Model.suggestThemeName's guess from that generation's own
+            // concept tags — editable before it's actually saved. ----------
+            Column {
+              width: parent.width
+              spacing: Style.space(6)
+              visible: root.themeNamePromptOpen
+
+              Text {
+                text: "Theme name"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              TextField {
+                id: themeNameField
+                width: parent.width
+                placeholderText: "e.g. Geological Rootedness"
+                foreground: root.bar.foreground
+                font.family: root.bar.fontFamily
+                text: root.themeNameDraft
+                onTextChanged: root.themeNameDraft = text
+                Keys.onReturnPressed: root.confirmSaveTheme()
+                Keys.onEnterPressed: root.confirmSaveTheme()
+                Component.onCompleted: forceActiveFocus()
+              }
+
+              Item {
+                width: parent.width
+                height: Math.max(confirmSaveThemeBtn.implicitHeight, cancelSaveThemeBtn.implicitHeight)
+
+                Button {
+                  id: cancelSaveThemeBtn
+                  anchors.left: parent.left
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Cancel"
+                  bordered: true
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  onClicked: root.cancelSaveThemePrompt()
+                }
+
+                Button {
+                  id: confirmSaveThemeBtn
+                  anchors.right: parent.right
+                  anchors.verticalCenter: parent.verticalCenter
+                  text: "Save"
+                  bordered: true
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  onClicked: root.confirmSaveTheme()
+                }
               }
             }
 
