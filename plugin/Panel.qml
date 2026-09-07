@@ -616,13 +616,14 @@ Panel {
 
   // ---- API usage: a running total from astro-arc-generate's costs.json
   // (real token-based cost for every generation's 3 API calls — see
-  // cost_estimate.py), plus a best-effort "available funds" check that's
-  // expected to fail with a regular project key (that needs an Admin API
-  // key's api.usage.read scope, confirmed empirically against OpenAI's
-  // org endpoints — this isn't a bug, it's what OpenAI actually allows).
+  // cost_estimate.py). Used to carry a "Check funds" button too
+  // (openai_image_gen.py --check-funds) — removed, since it was expected
+  // to fail with a regular project key (needs an Admin API key's
+  // api.usage.read scope) and, in practice, always did. The cost summary
+  // here is the real, always-available substitute; check_available_funds
+  // stays in openai_image_gen.py itself for now, just not wired to the UI
+  // — see Conventions.
   property var costsSummary: ({ total: 0, unknownCount: 0, generationCount: 0 })
-  property var fundsCheck: null
-  property bool fundsChecking: false
 
   property FileView costsFile: FileView {
     path: root.home + "/.local/state/omarchy/astro-arc/pipeline/costs.json"
@@ -631,23 +632,6 @@ Panel {
     onFileChanged: reload()
     onLoaded: root.costsSummary = Model.sumCosts(text())
     onLoadFailed: root.costsSummary = { total: 0, unknownCount: 0, generationCount: 0 }
-  }
-
-  function checkFunds() {
-    fundsChecking = true
-    fundsCheckProc.running = true
-  }
-
-  Process {
-    id: fundsCheckProc
-    command: [root.venvPython, root.openaiImageGenBin, "--check-funds", "image"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        root.fundsChecking = false
-        root.fundsCheck = Model.parseFundsCheck(text)
-      }
-    }
   }
 
   // ---- Themes Generated: every real generation, browsable and — since
@@ -1409,45 +1393,6 @@ Panel {
               }
             }
 
-            // ---- Available funds: best-effort, expected to fail with a
-            // regular project key — see checkFunds()'s comment. -------------
-            Item {
-              width: parent.width
-              height: Math.max(fundsLabel.implicitHeight, checkFundsBtn.implicitHeight)
-
-              Text {
-                id: fundsLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Funds"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Button {
-                id: checkFundsBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.fundsChecking ? "Checking…" : "Check"
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: !root.fundsChecking
-                onClicked: root.checkFunds()
-              }
-            }
-
-            Text {
-              visible: root.fundsCheck !== null
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: root.fundsCheck ? root.fundsCheck.message : ""
-              color: root.fundsCheck && root.fundsCheck.available ? "#a6e3a1" : Qt.darker(root.bar.foreground, 1.5)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
           }
 
           // ================== MAIN VIEW ==================

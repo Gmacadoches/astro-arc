@@ -41,13 +41,15 @@ var THEME_GENERATOR_CHOICES = [
 // Kept in sync by hand with pipeline/styles.toml — same reasoning as
 // OPENAI_MODEL_CHOICES below: QML can't read TOML directly, and this list
 // changes rarely enough that hand-sync is simpler than a live bridge.
-// These five are the directions explored during Phase 3's style review.
+// The first five are the directions explored during Phase 3's style
+// review; add more here (and in styles.toml) freely.
 var ART_STYLE_CHOICES = [
   { key: "symbolist", label: "Symbolist / Visionary" },
   { key: "engraving", label: "Antique Engraving" },
   { key: "artdeco", label: "Art Deco" },
   { key: "cosmic", label: "Cosmic / Nebula" },
-  { key: "surreal", label: "Surreal Painting" }
+  { key: "surreal", label: "Surreal Painting" },
+  { key: "ghibli", label: "Studio Ghibli" }
 ]
 
 var SIZE_PATTERN = /^[0-9]{2,5}x[0-9]{2,5}$/
@@ -217,14 +219,6 @@ function estimateHistorySpace(reviewsIndex, retentionDays, frequency) {
   return { estimatedBytes: avgBytes * projectedEntries, knownCount: known.length }
 }
 
-function parseFundsCheck(raw) {
-  try {
-    var data = JSON.parse(String(raw || "{}"))
-    return { available: !!data.available, message: typeof data.message === "string" ? data.message : "" }
-  } catch (e) {
-    return { available: false, message: "Funds check failed." }
-  }
-}
 
 function parseLastRun(raw) {
   try {
@@ -370,7 +364,6 @@ if (typeof module !== "undefined") {
     frequencyLabel: frequencyLabel,
     formatGeneratedAt: formatGeneratedAt,
     sumCosts: sumCosts,
-    parseFundsCheck: parseFundsCheck,
     formatBytes: formatBytes,
     estimateHistorySpace: estimateHistorySpace,
     suggestThemeName: suggestThemeName

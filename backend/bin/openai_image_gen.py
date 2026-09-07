@@ -144,33 +144,6 @@ def validate_key(slot="image"):
         return False, f"Validation call failed: {message}"
 
 
-def check_available_funds(slot="image"):
-    """Best-effort — organization cost/usage data requires an Admin API
-    key (org-level, created separately in OpenAI's org settings) with the
-    api.usage.read scope; a regular project key (the kind stored for
-    stage1/stage2/image) gets a 403 here, confirmed empirically against
-    /v1/organization/costs, /v1/organization/usage/completions, and the
-    old /v1/dashboard/billing/credit_grants (which explicitly refuses any
-    secret key, browser-session only). Returns (available, message); if
-    available, message carries a short human-readable summary — the exact
-    response shape for a successful admin-key call hasn't been observed,
-    so this doesn't try to parse a precise dollar figure out of it."""
-    try:
-        result = _request("/organization/costs", slot=slot)
-        return True, f"Organization costs API responded: {json.dumps(result)[:200]}"
-    except ApiKeyError as exc:
-        return False, str(exc)
-    except RuntimeError as exc:
-        message = str(exc)
-        if "api.usage.read" in message or "403" in message:
-            return False, (
-                "Not available with this key. Available funds requires an Admin API key "
-                "(created in your OpenAI organization's Admin Keys settings, separate from "
-                "a regular project key) with the api.usage.read scope."
-            )
-        return False, f"Funds check failed: {message}"
-
-
 def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", target_width=1024, target_height=1024):
     import base64
     import io
@@ -243,10 +216,5 @@ if __name__ == "__main__":
         sys.exit(0 if ok else 1)
     if len(sys.argv) > 1 and sys.argv[1] == "--model-choices":
         print(json.dumps(MODEL_CHOICES))
-        sys.exit(0)
-    if len(sys.argv) > 1 and sys.argv[1] == "--check-funds":
-        slot = sys.argv[2] if len(sys.argv) > 2 else "image"
-        available, message = check_available_funds(slot)
-        print(json.dumps({"available": available, "message": message}))
         sys.exit(0)
     main()
