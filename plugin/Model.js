@@ -41,17 +41,15 @@ var THEME_GENERATOR_CHOICES = [
 // Kept in sync by hand with pipeline/styles.toml — same reasoning as
 // OPENAI_MODEL_CHOICES below: QML can't read TOML directly, and this list
 // changes rarely enough that hand-sync is simpler than a live bridge.
-// The first five are the directions explored during Phase 3's style
-// review; add more here (and in styles.toml) freely.
+// Curated down to these 5 on 2026-09-07 — see styles.toml's own header
+// comment and CHANGELOG.md for which were cut and why. Add more here
+// (and in styles.toml) freely.
 var ART_STYLE_CHOICES = [
   { key: "symbolist", label: "Symbolist / Visionary" },
   { key: "engraving", label: "Antique Engraving" },
-  { key: "artdeco", label: "Art Deco" },
   { key: "cosmic", label: "Cosmic / Nebula" },
-  { key: "surreal", label: "Surreal Painting" },
   { key: "ghibli", label: "Studio Ghibli" },
-  { key: "cyberpunk", label: "Cyberpunk" },
-  { key: "dystopianwwii", label: "Dystopian Future WWII Fusion" }
+  { key: "cyberpunk", label: "Cyberpunk" }
 ]
 
 var SIZE_PATTERN = /^[0-9]{2,5}x[0-9]{2,5}$/
