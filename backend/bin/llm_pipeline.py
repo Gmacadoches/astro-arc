@@ -154,13 +154,51 @@ def load_styles():
         return tomllib.load(f)
 
 
-def load_style_suffix(style_key):
+def load_style_suffix(style_key, has_people=False):
     """Falls back to 'symbolist' (the one Phase 3 settled on) if the
     configured key doesn't match anything in styles.toml — a stale/typo'd
-    key should degrade to the known-good default, not an empty suffix."""
+    key should degrade to the known-good default, not an empty suffix.
+
+    Two coexisting schemas (added 2026-09-08 for ghibli's split — see
+    CHANGELOG.md): a preset either defines a bare `suffix` (applied to
+    every generation regardless of content — the original shape, still
+    exactly how every other preset works, unchanged and unmigrated here)
+    or `suffix_base` (always applied) + optional `suffix_figures`
+    (appended only when has_people is true). The point of the split is
+    that a style's figure-rendering instructions stop being dead text on
+    every generation that has no figure in it — previously ~88% of
+    ghibli's real output.
+
+    No separator is inserted between `suffix_base` and `suffix_figures` —
+    straight concatenation — so each preset's `suffix_figures` must carry
+    whatever leading punctuation actually joins correctly onto its own
+    `suffix_base`'s ending. ghibli's `suffix_base` is a comma-joined
+    descriptive list ending with no trailing period (matching this
+    project's older bare-`suffix` presets' style), so its
+    `suffix_figures` leads with a comma and continues the list. This is
+    NOT a universal convention: an earlier interim version of ghibli's
+    `suffix_base` was full-sentence prose ending in a period, and a
+    leading comma on `suffix_figures` against *that* produced a real bug
+    caught while implementing this ("...Kazuo Oga., figures..." — a
+    period directly followed by a comma). Check the actual ending every
+    time a preset is written or migrated to this schema; don't assume.
+
+    has_people defaults to False so any existing call site that hasn't
+    been updated to pass it still gets suffix_base alone, never a
+    surprise figure-rendering clause.
+    """
     styles = load_styles()
     preset = styles.get(style_key) or styles.get("symbolist")
-    return preset.get("suffix", "") if preset else ""
+    if not preset:
+        return ""
+
+    if "suffix_base" in preset:
+        suffix = preset.get("suffix_base", "")
+        if has_people and preset.get("suffix_figures"):
+            suffix += preset["suffix_figures"]
+        return suffix
+
+    return preset.get("suffix", "")
 
 
 def load_style_info(style_key):
@@ -314,9 +352,32 @@ def describe_arc(arc):
 # Stage 0: the natal-derived visual signature, generated once and cached
 # ---------------------------------------------------------------------------
 
-SIGNATURE_SYSTEM = """You are establishing a persistent visual identity for a series of paintings depicting one person's psychological life over time, based on their natal astrological chart. Given their natal placements, invent a fixed visual signature for the series: a palette range (described in words, not hex codes), a recurring quality of light, and a compositional habit or tendency. This signature is reused across every painting in the series regardless of subject matter, so it must be abstract enough to apply broadly but specific enough to feel like a consistent hand. Keep it in the painterly, visionary/symbolist tradition (Redon, af Klint, Carrington) — not digital or photographic.
+# Style-neutral on purpose (fixed 2026-09-08, see CHANGELOG.md/CONTEXT.md):
+# an earlier version of this prompt named a tradition and specific artists
+# ("painterly, visionary/symbolist tradition (Redon, af Klint, Carrington)"),
+# which meant every generation carried symbolist-flavored steering language
+# regardless of which art style the user actually selected — it fought
+# ghibli/cyberpunk/etc.'s own guidance, and content-invention consistently
+# lost to it (see the `ghibli` "architectural" register failure, which read
+# as symbolist rather than Ghibli). This signature's only job is palette/
+# light/contrast/composition continuity across a series — that job needs no
+# named tradition, and naming one hijacks style selection instead.
+SIGNATURE_SYSTEM = """You are establishing a persistent visual identity for a series of paintings depicting one person's psychological life over time, based on their natal astrological chart. Given their natal placements, invent a fixed visual signature for the series: a dominant palette, a quality and direction of light, a contrast level, and a compositional tendency. This signature is reused across every painting in the series regardless of subject matter *and* regardless of which rendering style is applied to it — so describe only style-neutral visual qualities, never an art movement, tradition, or artist by name, so it can be painted in any style without fighting that style's own visual world.
 
-Respond with a JSON object: {"signature": "2 to 3 sentences describing the palette, light, and compositional habit"}"""
+Cover all four:
+- Palette: which colors dominate and in what balance.
+- Light: warm or cool, and its quality/direction (soft and diffuse, hard and directional, low and raking, etc).
+- Contrast: high-contrast/dramatic vs. low-contrast/gentle.
+- Composition: centered vs. off-balance, crowded vs. sparse, a near or distant vantage point.
+
+Respond with a JSON object: {"signature": "2 to 3 sentences covering the palette, light, contrast, and compositional habit — no art movement, tradition, or artist names"}"""
+
+# Bumped whenever SIGNATURE_SYSTEM's actual content changes in a way that
+# should invalidate every previously-cached signature (not just this one
+# rewrite) — natalHash alone only catches a birth-data edit, not a prompt
+# rewrite, so without this a fixed prompt would silently keep serving the
+# old cached (tradition-naming) signature forever on any existing install.
+SIGNATURE_SCHEMA_VERSION = 2
 
 
 def _natal_hash(config):
@@ -330,6 +391,11 @@ def get_visual_signature(natal, config, stage2_model):
     *doesn't* change cycle to cycle. Returns (signature, cost) — cost is
     None on a cache hit, since no call was actually made.
 
+    Also invalidated by SIGNATURE_SCHEMA_VERSION (see above) — a cache
+    written under an older prompt version is treated as a miss even if the
+    birth data hasn't changed, so a SIGNATURE_SYSTEM rewrite takes effect
+    on every install's next generation, not just a fresh one.
+
     Uses Stage 2's model/key, not Stage 1's: this call is explicitly about
     inventing painterly/visual language (palette, light, composition),
     which is exactly what Stage 1's system prompt forbids its model from
@@ -339,7 +405,8 @@ def get_visual_signature(natal, config, stage2_model):
     if SIGNATURE_FILE.exists():
         try:
             cached = json.loads(SIGNATURE_FILE.read_text())
-            if cached.get("natalHash") == natal_hash and cached.get("signature"):
+            if (cached.get("natalHash") == natal_hash and cached.get("signature")
+                    and cached.get("schemaVersion") == SIGNATURE_SCHEMA_VERSION):
                 return cached["signature"], None
         except (json.JSONDecodeError, OSError):
             pass
@@ -352,6 +419,7 @@ def get_visual_signature(natal, config, stage2_model):
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     SIGNATURE_FILE.write_text(json.dumps({
         "natalHash": natal_hash,
+        "schemaVersion": SIGNATURE_SCHEMA_VERSION,
         "signature": signature,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }, indent=2))
@@ -425,7 +493,7 @@ Rules:
 - One image, one idea. A single legible visual situation, not a collage of symbols. If you find yourself describing more than three distinct elements, cut it down.
 - The relationship carries the meaning. What matters is how things — or people — sit in relation to each other: what's above, behind, inside, turned away from what, who is watching whom.
 - Emotional register over subject matter, and let the image pull toward something. The light, scale, and spatial pressure of the image should match the feeling of the reading before any symbol does — and even within real difficulty, the image should carry a sense of movement, threshold, or meaning being made, not tension staged for its own sake.
-- You are also told which rendering style this image will be painted in, and what kind of imagery that style can actually depict. Keep your invented imagery within that style's own visual vocabulary — a grounded, representational style cannot credibly render an abstract being made of pure energy or geometry; a visionary/symbolist style can. Find a concrete equivalent within the style's vocabulary that still carries the same psychological meaning.
+- You are also told which rendering style this image will be painted in, along with a description of what that style can depict. Treat that description as a source of invention, not just a limit on it: some styles are entire authored worlds with their own recurring subjects, textures, and moods, not just a technique you could apply to any subject — when the description names that kind of world, reach into it and invent imagery that belongs there, rather than inventing something style-neutral and hoping the rendering technique alone will make it read as that style. Where the description is more purely a boundary (what the style cannot render), it still applies as one: keep invented imagery within that style's own visual vocabulary — a grounded, representational style cannot credibly render an abstract being made of pure energy or geometry; a visionary/symbolist style can. Either way, find or invent a concrete equivalent within the style's vocabulary that still carries the same psychological meaning. The register below still names the actual subject — the style's world describes the texture, mood, and recurring qualities that subject is rendered with, not a replacement for it. A style whose world leans domestic or pastoral does not mean every register becomes a cottage kitchen: "geological" invented within that world is still fundamentally stone/earth/mineral (weathered, perhaps reclaimed by moss or vegetation, but still the subject); "mechanical" is still fundamentally a mechanism. If you notice yourself reaching for the same handful of style-world subjects regardless of which register you were given, that's a sign the register is being overridden rather than honored — don't let that happen.
 
 You are given a fixed visual signature for this whole series (a palette range, quality of light, and compositional habit) — honor it, so this reads as the same hand as every other image in the series regardless of subject.
 
@@ -491,7 +559,12 @@ def build(reading, config):
         style_label, style_guidance,
     )
 
-    style_suffix = load_style_suffix(style_key)
+    # has_people is already known by this point (stage2_image_prompt above
+    # returned it) — no call-ordering change needed, just threading the
+    # value through so a suffix_base/suffix_figures preset (see
+    # load_style_suffix) only pays for figure-rendering instructions on a
+    # generation that actually has a figure in it.
+    style_suffix = load_style_suffix(style_key, has_people)
     final_prompt = f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
 
     entry = {

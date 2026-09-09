@@ -52,10 +52,85 @@ guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae,
 # instead (which applies to every image, figure or not). Re-tested 0 of 3
 # on the same architectural prompt, and confirmed it still renders figures
 # correctly when a base prompt actually calls for them.
+#
+# guidance rewritten 2026-09-08 (external review of a user-requested
+# quality dossier — see CHANGELOG.md/CONTEXT.md): everything above fixed
+# *rendering* (suffix wording), but the real failure mode observed on
+# no-figure registers (e.g. a bare "architectural" prompt that read as
+# Magritte-style surrealism, not Ghibli) was a *content* problem — "Ghibli"
+# is not just a rendering technique like an engraving or a color-grade you
+# can apply to any subject, it's an authored world (nature reclaiming
+# structures, weather as presence, humble objects treated with reverence,
+# rural vernacular architecture, wide low horizons). Stage 2 was never
+# told any of that — the old guidance only said what to avoid. Widened
+# guidance from a pure prohibition into a vocabulary Stage 2 can actually
+# draw content from, on top of the retained prohibition.
+#
+# suffix split into suffix_base/suffix_figures 2026-09-08 (same review):
+# hasPeople is already computed by Stage 2 and already used for the
+# image-quality tier — this preset now also uses it for suffix assembly
+# (see load_style_suffix()/build() in llm_pipeline.py). suffix_figures is
+# appended only when a figure is actually in the prompt, so the character-
+# rendering clause below is no longer dead text on the ~88% of real ghibli
+# generations that have no person in them. This also retires the negative-
+# instruction hack ("do not add a person... unless one is already
+# described above") from 2026-09-07 above: a suffix that never mentions
+# character rendering on a figure-free generation cannot itself induce an
+# uninvited figure, so the sentence is now structurally unnecessary — kept
+# it in this comment, not in suffix_base, so the historical lesson (an
+# unconditional character-rendering description reads as an instruction to
+# include one) isn't lost. Re-tested against the same kind of real
+# figure-free architectural prompt that originally triggered the bug: 0/3
+# figure-injections with the negative sentence removed, confirming the
+# structural fix alone (not the negative sentence) is what's actually
+# doing the work now.
+#
+# suffix_base/suffix_figures rewritten 2026-09-08 (same review, immediate
+# follow-up): the 2026-09-07 research above was correct about the actual
+# technique (flat cel-shaded characters vs. gouache/wet-into-wet
+# backgrounds) but was written in process vocabulary — "opaque gouache/
+# poster color," "wet-into-wet," "tonal layering," naming background
+# painter Kazuo Oga by name — which describes *how a human made it*, not
+# what the finished frame looks like. An image model has weak associations
+# for process/medium/artist-name terminology (a background painter is far
+# more thinly represented in training data than the films themselves) and
+# much stronger ones for described visual outcomes. Rewritten to keep the
+# same research-grounded technique distinction but state it as what's
+# actually visible in frame: saturated layered greenery, hard-edged sunlit
+# cumulus clouds, visible brushwork, clear foreground/middle/horizon
+# depth, heightened-not-muted color for the background half; flat color/
+# single hard shadow/crisp outlines stated plainly (already outcome-
+# language, barely changed) for the figure half. Net effect on suffix
+# length: unchanged (~52 words) on the ~88% of generations with no figure
+# — the word-count win from the split above was already banked by cutting
+# suffix_figures entirely on those, not by this rewrite — and down from
+# ~120 to ~83 words combined on a generation that does have one.
+#
+# guidance revised again 2026-09-08 (register-collapse fix, found during
+# the 12-register verification sweep the widened-guidance rewrite above
+# was itself supposed to validate): fixed Ghibli-recognizability
+# comprehensively (12/12 real renders read as genuinely Ghibli, including
+# the exact "architectural" failure case that motivated the rewrite), but
+# 5 of the 10 non-figure/crowd registers (geological, bodily and
+# anatomical, mechanical, atmospheric, ritual object) collapsed into the
+# same cozy domestic-kitchen scene regardless of assigned register — the
+# guidance's own "recurring subjects" list was strong and specific enough
+# to out-compete "material register to draw from" for content invention.
+# Reframed guidance from "recurring subjects" (read as a substitute
+# content menu) to "qualities for rendering whatever your register calls
+# for" (a texture/mood layer applied to the register's own subject, never
+# a replacement for it), with an explicit instruction not to default to a
+# domestic interior. Paired with a matching addition to STAGE2_SYSTEM
+# itself (register names the subject; the style's world textures it) so
+# the same fix applies to every world-style, not just this one. Re-tested
+# the 5 failed registers plus 2 controls (domestic interior, crowd / the
+# collective) against the same fixed reading/signature as the original
+# sweep — see CHANGELOG.md for the result.
 [ghibli]
 label = "Studio Ghibli"
-suffix = "Studio Ghibli feature-film animation style. Backgrounds and objects are hand-painted in opaque gouache/poster color, soft wet-into-wet skies and clouds with sharp painted detail on foreground elements, tonal layering for depth, warm naturalistic light, in the tradition of Miyazaki's films and background painter Kazuo Oga. Do not add a person, character, or figure unless one is already described above — most Ghibli frames are empty rooms, landscapes, or objects with no one in them. Only if a person is explicitly part of the scene described above: render them in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended or watercolor-textured, with clean crisp outlines, large expressive almond eyes, simple minimal features, and human-like proportions rather than typical anime stylization"
-guidance = "A grounded, representational tradition — real people, animals, nature, and architecture only, never abstract energy-beings, geometric abstraction, or immaterial forms. Symbolic meaning should come from how a concrete scene is composed (a tree with a glowing hollow, a room holding one significant object), not from making the subject itself immaterial."
+suffix_base = "Studio Ghibli feature-film animation style. Lush layered greenery in deep saturated greens, towering cumulus clouds with hard-edged sunlit tops against a deep blue sky, warm naturalistic low sunlight, visible painterly brushwork in foliage and stonework, clear separation between foreground, middle distance, and horizon, rich and slightly heightened color rather than muted realism"
+suffix_figures = ", figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization"
+guidance = "A grounded, representational tradition — real people, animals, nature, weather, and architecture only, never abstract energy-beings, geometric abstraction, or immaterial forms. The qualities below are a way of rendering whatever your assigned register actually calls for, not a substitute subject list: things show real wear and weather (nature reclaiming or growing through the man-made, wind moving through whatever's present, structures aged by use), and reverence lives in humble, ordinary detail rather than grandeur. If the register is stone, machinery, water, cloth, a body, or anything else, that stays the actual subject — do not default to a cottage kitchen or domestic interior just because it fits this world comfortably; find the version of these qualities that belongs to your actual register instead (weathered, moss-softened stone for geological; a mechanism aged and lovingly maintained rather than sterile for mechanical). Prefer scenes with air and depth — a near object, a middle ground, and a far distance, often a wide low horizon under an enormous sky — over a tight, isolated subject on a plain field. Symbolic meaning should come from how a concrete, lived-in scene is composed, not from making the subject itself immaterial."
 
 [cyberpunk]
 label = "Cyberpunk"
