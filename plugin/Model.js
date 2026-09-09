@@ -324,6 +324,42 @@ function isValidCoordinate(lat, lon) {
   return !isNaN(la) && !isNaN(lo) && la >= -90 && la <= 90 && lo >= -180 && lo <= 180
 }
 
+function pad2(n) {
+  return (n < 10 ? "0" : "") + n
+}
+
+// ISO 8601 week-numbering date's "%G-W%V" — same key astro_engine.py's
+// `date +%G-W%V` derives for a weekly period. ISO weeks start Monday, and
+// the year is whichever one owns that week's Thursday, so late-December/
+// early-January dates can belong to a week numbered under the other
+// calendar year (e.g. 2027-01-01 is still ISO week 2026-W53).
+function isoWeekKey(date) {
+  var d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  var dayNum = (d.getDay() + 6) % 7 // Mon=0 ... Sun=6
+  d.setDate(d.getDate() - dayNum + 3) // Thursday of this ISO week
+  var isoYear = d.getFullYear()
+  var jan4 = new Date(isoYear, 0, 4)
+  var jan4DayNum = (jan4.getDay() + 6) % 7
+  var week1Monday = new Date(jan4)
+  week1Monday.setDate(jan4.getDate() - jan4DayNum)
+  var week = Math.floor(Math.round((d - week1Monday) / 86400000) / 7) + 1
+  return isoYear + "-W" + pad2(week)
+}
+
+// The period key "now" resolves to for a given frequency, on the *local*
+// calendar — mirrors astro-arc-generate's `date +%Y-%m-%d` / `+%G-W%V` /
+// `+%Y-%m`, which also run in local time. This is what makes "daily" mean
+// "the calendar date changed", not "24 hours since the last run": comparing
+// this against lastRun.periodKey is a plain string check with no elapsed-
+// time math at all, so 11pm on one date and 1am the next both resolve to
+// their own date's key regardless of how few hours separate them.
+function currentPeriodKey(frequency, now) {
+  var d = now || new Date()
+  if (frequency === "weekly") return isoWeekKey(d)
+  if (frequency === "monthly") return d.getFullYear() + "-" + pad2(d.getMonth() + 1)
+  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
+}
+
 function frequencyLabel(value) {
   switch (value) {
     case "weekly": return "Weekly"
@@ -363,6 +399,7 @@ if (typeof module !== "undefined") {
     isValidBackgroundSize: isValidBackgroundSize,
     isValidHistoryRetentionDays: isValidHistoryRetentionDays,
     isValidCoordinate: isValidCoordinate,
+    currentPeriodKey: currentPeriodKey,
     frequencyLabel: frequencyLabel,
     formatGeneratedAt: formatGeneratedAt,
     sumCosts: sumCosts,

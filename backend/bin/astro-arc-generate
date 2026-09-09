@@ -21,6 +21,20 @@
 # default, no external dependency) or "aether" (Omarchy's own theme
 # generator, richer output, falls back to built-in automatically on any
 # failure — see the theming block below for exactly what that excludes/why).
+#
+# --if-due: skip the whole run (exit 0) if the current period already has a
+# generation — used by the systemd user timer (astro-arc-generate.timer)
+# and the bar widget's own polling Timer (Panel.qml's checkAutoGenerate),
+# so either scheduler can fire on a plain interval without needing its own
+# copy of the "is this actually due" logic, and without risking a wasted
+# paid image render on a period that's already generated. Plain manual runs
+# (the widget's Regenerate button) never pass this — a manual click always
+# means "regenerate right now", period match or not.
+if_due=0
+if [[ "${1:-}" == "--if-due" ]]; then
+  if_due=1
+  shift
+fi
 
 set -euo pipefail
 
@@ -34,8 +48,21 @@ THEME_DIR="$HOME/.config/omarchy/themes/astro-arc"
 PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
 COSTS_FILE="$PIPELINE_STATE_DIR/costs.json"
 COSTS_MAX=200
+LOCK_FILE="$STATE_DIR/generate.lock"
 
 mkdir -p "$STATE_DIR" "$HISTORY_DIR" "$THEME_DIR/backgrounds" "$PIPELINE_STATE_DIR"
+
+# Two independent schedulers (the systemd timer and the widget's own poll)
+# plus a possible manual click all shell out to this same script — this
+# non-blocking lock is what keeps two of them from ever rendering (and
+# paying for) two images at once. Whichever loses just skips this run
+# entirely rather than queuing: it'll get the next tick a few minutes
+# later, and by then the winner will have already made it not-due anyway.
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Astro-Arc: another generation is already running — skipping" >&2
+  exit 0
+fi
 
 frequency=$(jq -r '.frequency // "daily"' "$CONFIG_FILE" 2>/dev/null || echo "daily")
 image_backend=$(jq -r '.imageBackend // "local"' "$CONFIG_FILE" 2>/dev/null || echo "local")
@@ -48,6 +75,14 @@ case "$frequency" in
   monthly) period_key=$(date +%Y-%m) ;;
   *) frequency="daily"; period_key=$(date +%Y-%m-%d) ;;
 esac
+
+if [[ $if_due == 1 ]]; then
+  last_period_key=$(jq -r '.periodKey // empty' "$LAST_RUN_FILE" 2>/dev/null || true)
+  if [[ -n $last_period_key && $last_period_key == "$period_key" ]]; then
+    echo "Astro-Arc: $frequency period $period_key already generated — nothing to do"
+    exit 0
+  fi
+fi
 
 # "auto" resolves fresh every run, so a monitor change (new laptop screen,
 # a plugged-in external display) is picked up next generation with no
