@@ -126,11 +126,30 @@ guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae,
 # the 5 failed registers plus 2 controls (domestic interior, crowd / the
 # collective) against the same fixed reading/signature as the original
 # sweep — see CHANGELOG.md for the result.
+# guidance extended again 2026-09-09 (symbolic-depth work — see
+# CHANGELOG.md and TASK-symbolic-depth.md): the pipeline now requires every
+# image to carry an "intrusion", an object belonging to a different world
+# from the rest of the scene, present and unexplained. The concern was that
+# ghibli is the worst-case style for that — its world is pastoral warmth
+# and reverence for humble detail, which sands a strange object down into
+# charm — and that the fix would be to switch styles.
+#
+# That concern turns out to be wrong about Ghibli specifically, and the
+# correction belongs in guidance rather than in a style change: this world
+# is *full* of the genuinely strange treated as utterly ordinary. A castle
+# walking on chicken legs, a bathhouse staffed by gods, a cat that is also
+# a bus, an abandoned sky-city, a rusting biplane in a flower field. What
+# makes those read as Ghibli rather than as generic fantasy is that they
+# are heavy, weathered, physically solid and mundanely lit, and that the
+# characters are not astonished by them. That is exactly the register an
+# intrusion needs, so the guidance now names it — without it, Stage 2 reads
+# the rest of this world description as "keep everything homely" and quietly
+# drops the intrusion or turns it into something twee.
 [ghibli]
 label = "Studio Ghibli"
 suffix_base = "Studio Ghibli feature-film animation style. Lush layered greenery in deep saturated greens, towering cumulus clouds with hard-edged sunlit tops against a deep blue sky, warm naturalistic low sunlight, visible painterly brushwork in foliage and stonework, clear separation between foreground, middle distance, and horizon, rich and slightly heightened color rather than muted realism"
 suffix_figures = ", figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization"
-guidance = "A grounded, representational tradition — real people, animals, nature, weather, and architecture only, never abstract energy-beings, geometric abstraction, or immaterial forms. The qualities below are a way of rendering whatever your assigned register actually calls for, not a substitute subject list: things show real wear and weather (nature reclaiming or growing through the man-made, wind moving through whatever's present, structures aged by use), and reverence lives in humble, ordinary detail rather than grandeur. If the register is stone, machinery, water, cloth, a body, or anything else, that stays the actual subject — do not default to a cottage kitchen or domestic interior just because it fits this world comfortably; find the version of these qualities that belongs to your actual register instead (weathered, moss-softened stone for geological; a mechanism aged and lovingly maintained rather than sterile for mechanical). Prefer scenes with air and depth — a near object, a middle ground, and a far distance, often a wide low horizon under an enormous sky — over a tight, isolated subject on a plain field. Symbolic meaning should come from how a concrete, lived-in scene is composed, not from making the subject itself immaterial."
+guidance = "A grounded, representational tradition — real people, animals, nature, weather, and architecture only, never abstract energy-beings, geometric abstraction, or immaterial forms. The qualities below are a way of rendering whatever your assigned register actually calls for, not a substitute subject list: things show real wear and weather (nature reclaiming or growing through the man-made, wind moving through whatever's present, structures aged by use), and reverence lives in humble, ordinary detail rather than grandeur. If the register is stone, machinery, water, cloth, a body, or anything else, that stays the actual subject — do not default to a cottage kitchen or domestic interior just because it fits this world comfortably; find the version of these qualities that belongs to your actual register instead (weathered, moss-softened stone for geological; a mechanism aged and lovingly maintained rather than sterile for mechanical). Prefer scenes with air and depth — a near object, a middle ground, and a far distance, often a wide low horizon under an enormous sky — over a tight, isolated subject on a plain field. Symbolic meaning should come from how a concrete, lived-in scene is composed, not from making the subject itself immaterial. Crucially, this world is entirely at home with the genuinely strange treated as completely ordinary: enormous unexplained machinery rusting in a meadow, a creature the size of a house asleep among ordinary trees, a derelict flying city, a shrine crowded with objects nobody living remembers the use of. Such things are always rendered heavy, weathered, physically solid and lit exactly like everything around them — never glowing, translucent or ethereal — and nobody in the frame is astonished by them. Use that register for anything in the scene that does not belong: keep it matter-of-fact and unremarked rather than softening it into something charming or explaining it away. Scenes here are not obliged to be warm or pleasant — this world also holds real dread, decay, blight, abandonment, and weather that means harm, rendered with the same solidity."
 
 [cyberpunk]
 label = "Cyberpunk"

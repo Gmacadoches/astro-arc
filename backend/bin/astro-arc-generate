@@ -114,9 +114,46 @@ prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_f
 # generations that actually need it. No-op for gpt-image-2 (always
 # renders at its own "auto" quality regardless of this flag) and for the
 # local backend (image_gen.py has no quality tiers, only --steps).
+#
+# Gated on a real cost ceiling since 2026-09-09. Two things changed that
+# made an unconditional bump too expensive: denser scenes put a person in
+# frame far more often (5 of 12 in the verification sweep, against the ~1
+# in 8 this bump was originally sized for), and at the real render size
+# (1536x1024 for a 1600x900 background, 1.5x the area of the 1024x1024 the
+# published rates assume) "high" bills ~$0.050 rather than the ~$0.033 the
+# rate table's per-1024² figure implies. A people generation therefore
+# lands near $0.064 all-in, over the $0.05/run ceiling this install is
+# configured for.
+#
+# So the bump now has to fit the budget: project chat cost (already known
+# and already spent by this point) plus the high-quality render, and only
+# bump if the total stays under maxCostPerRun. Falling back to the
+# configured tier trades a possible face/hand distortion for staying inside
+# the budget — the 2026-09-07 comparison that motivated this bump is still
+# valid, this is a deliberate cost decision on top of it, and
+# `imageQualityUsed` in last-run.json still records what actually happened.
+# Raise maxCostPerRun (or set it to 0 to disable the ceiling entirely) to
+# get unconditional high quality back.
 openai_quality_used="$openai_quality"
 if [[ $(jq -r '.hasPeople // false' "$pipeline_meta_file" 2>/dev/null) == true ]]; then
-  openai_quality_used="high"
+  if [[ $image_backend == openai ]]; then
+    max_cost_per_run=$(jq -r '.maxCostPerRun // 0.05' "$CONFIG_FILE" 2>/dev/null || echo "0.05")
+    chat_cost_so_far=$(jq -r '[.stage1Cost, .stage15Cost, .stage2Cost, .signatureCost] | map(select(. != null)) | add // 0' "$pipeline_meta_file" 2>/dev/null || echo 0)
+    high_estimate=$("$VENV_PY" "$BIN_DIR/openai_image_gen.py" --estimate-cost \
+      "$openai_model" high "$bg_width" "$bg_height" 2>/dev/null || echo "null")
+    if [[ $high_estimate == null ]]; then
+      # Unknown rate for this model — don't guess, and don't let an unknown
+      # silently block the quality fix either. Bump, same as before.
+      openai_quality_used="high"
+    elif awk -v c="$chat_cost_so_far" -v i="$high_estimate" -v m="$max_cost_per_run" \
+           'BEGIN { exit !(m <= 0 || c + i <= m) }'; then
+      openai_quality_used="high"
+    else
+      echo "Astro-Arc: person in frame, but high-quality render (~\$$high_estimate + \$$chat_cost_so_far chat) would exceed the \$$max_cost_per_run/run ceiling — staying at $openai_quality" >&2
+    fi
+  else
+    openai_quality_used="high"
+  fi
 fi
 
 if [[ $image_backend == openai ]]; then
@@ -202,6 +239,7 @@ omarchy-theme-set astro-arc >/dev/null 2>&1
 # report null rather than a fabricated number.
 generated_at="$(date -Iseconds)"
 stage1_cost=$(jq -r '.stage1Cost // "null"' "$pipeline_meta_file")
+stage15_cost=$(jq -r '.stage15Cost // "null"' "$pipeline_meta_file")
 stage2_cost=$(jq -r '.stage2Cost // "null"' "$pipeline_meta_file")
 signature_cost=$(jq -r '.signatureCost // "null"' "$pipeline_meta_file")
 image_cost=$(jq -r '.cost // "null"' "$image_cost_file" 2>/dev/null || echo "null")
@@ -210,13 +248,14 @@ image_cost_source=$(jq -r '.costSource // "unknown"' "$image_cost_file" 2>/dev/n
 cost_entry=$(jq -n \
   --arg timestamp "$generated_at" --arg periodKey "$period_key" --arg frequency "$frequency" \
   --arg backend "$image_backend" --arg imageCostSource "$image_cost_source" \
-  --argjson stage1Cost "$stage1_cost" --argjson stage2Cost "$stage2_cost" \
+  --argjson stage1Cost "$stage1_cost" --argjson stage15Cost "$stage15_cost" \
+  --argjson stage2Cost "$stage2_cost" \
   --argjson signatureCost "$signature_cost" --argjson imageCost "$image_cost" \
   '{
     timestamp: $timestamp, periodKey: $periodKey, frequency: $frequency, imageBackend: $backend,
-    stage1Cost: $stage1Cost, stage2Cost: $stage2Cost, signatureCost: $signatureCost,
+    stage1Cost: $stage1Cost, stage15Cost: $stage15Cost, stage2Cost: $stage2Cost, signatureCost: $signatureCost,
     imageCost: $imageCost, imageCostSource: $imageCostSource,
-    totalCost: ([$stage1Cost, $stage2Cost, $signatureCost, $imageCost] | map(select(. != null)) | add)
+    totalCost: ([$stage1Cost, $stage15Cost, $stage2Cost, $signatureCost, $imageCost] | map(select(. != null)) | add)
   }')
 
 if [[ -f $COSTS_FILE ]]; then

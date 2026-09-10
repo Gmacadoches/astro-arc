@@ -60,6 +60,33 @@ MODEL_COSTS = {
     },
 }
 
+def estimate_cost(model, quality, target_width=1024, target_height=1024):
+    """Projected $ for one render at the size it will actually be made at.
+
+    MODEL_COSTS above is per 1024x1024, but nothing here renders at
+    1024x1024 — a 1600x900 background renders at 1536x1024 (see
+    OPENAI_IMAGE_SIZES / closest_supported_size), which is 1.5x the area and
+    costs very close to 1.5x as much. Scaling the documented token counts by
+    the real render area matches measured billing closely: for
+    gpt-image-1-mini at 1536x1024 this predicts $0.0127 medium / $0.0500
+    high against $0.0131 / $0.0504 actually billed across a 12-render sweep
+    on 2026-09-09.
+
+    Used by astro-arc-generate's cost ceiling (`maxCostPerRun`) to decide
+    *before* spending whether the hasPeople quality bump fits the budget.
+    Still an estimate built on an estimate — see PRICE_ESTIMATE_ASSUMPTION —
+    so it returns None rather than a fabricated number for a model/quality
+    it doesn't know.
+    """
+    quality_key = "auto" if model == "gpt-image-2" else quality
+    base = MODEL_COSTS.get(model, {}).get(quality_key)
+    if base is None:
+        return None
+    render_size = closest_supported_size(target_width, target_height, OPENAI_IMAGE_SIZES)
+    w, h = (int(x) for x in render_size.split("x"))
+    return round(base * (w * h) / (1024 * 1024), 6)
+
+
 PRICE_ESTIMATE_ASSUMPTION = (
     "Estimated from gpt-image-1's published per-quality token counts "
     "applied to this model's own token rate — OpenAI hasn't published "
@@ -209,6 +236,13 @@ def main():
 
 
 if __name__ == "__main__":
+    # astro-arc-generate's cost ceiling asks for this before rendering —
+    # keeps the rate table in one place instead of duplicating it in bash.
+    if len(sys.argv) > 1 and sys.argv[1] == "--estimate-cost":
+        _, _, _model, _quality, _w, _h = sys.argv[:6]
+        _est = estimate_cost(_model, _quality, int(_w), int(_h))
+        print("null" if _est is None else _est)
+        sys.exit(0)
     if len(sys.argv) > 1 and sys.argv[1] == "--validate":
         slot = sys.argv[2] if len(sys.argv) > 2 else "image"
         ok, message = validate_key(slot)

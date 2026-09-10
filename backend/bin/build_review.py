@@ -202,7 +202,10 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
 
       <div class="meta-block">
         <div class="meta-row"><span class="label">Art style</span><span class="chip">{art_style}</span></div>
-        <div class="meta-row"><span class="label">Register</span><span class="chip">{register}</span></div>
+        <div class="meta-row"><span class="label">Register</span><span class="chip">{register}</span>{secondary_register_chip}</div>
+        <div class="meta-row"><span class="label">Constellation</span><span class="chip">{constellation}</span></div>
+        <div class="meta-row"><span class="label">Objects</span>{amplification_chips}</div>
+        <div class="meta-row"><span class="label">Intrusion</span><span class="chip">{intrusion}</span></div>
         <div class="meta-row"><span class="label">Concept tags</span>{concept_tag_chips}</div>
         <details class="avoided-details">
           <summary><span class="toggle-icon"><span class="plus">+</span><span class="minus">&minus;</span></span><span class="label">Avoided (last 14)</span></summary>
@@ -221,6 +224,7 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   <div class="cost-panel">
     <div class="prompt-label">Cost of this generation (all 3 API calls)</div>
     <div class="cost-row"><span>Stage 1 (interpretation)</span><span>{stage1_cost}</span></div>
+    <div class="cost-row"><span>Stage 1.5 (amplification)</span><span>{stage15_cost}</span></div>
     <div class="cost-row"><span>Stage 2 (image prompt)</span><span>{stage2_cost}</span></div>
     <div class="cost-row"><span>Visual signature{signature_note}</span><span>{signature_cost}</span></div>
     <div class="cost-row"><span>Image render ({image_cost_source})</span><span>{image_cost}</span></div>
@@ -337,11 +341,20 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         reading_text=_esc(meta.get("reading", "")),
         art_style=_esc(_style_label(meta.get("artStyle")) or "unknown"),
         register=_esc(meta.get("register") or "none"),
+        # Stage 1.5 metadata (added 2026-09-09). Every field degrades to a
+        # placeholder rather than a KeyError so this page still renders for
+        # any review logged before the amplification stage existed.
+        secondary_register_chip=(_chip(meta["secondaryRegister"]) if meta.get("secondaryRegister") else ""),
+        constellation=_esc(meta.get("constellation") or "—"),
+        amplification_chips=("".join(_chip(o, "tag") for o in (meta.get("amplificationObjects") or []))
+                             or '<span class="chip">—</span>'),
+        intrusion=_esc(meta.get("intrusion") or "—"),
         concept_tag_chips="".join(_chip(t, "tag") for t in concept_tags) or '<span class="chip">none</span>',
         avoided_chips="".join(_chip(t) for t in avoided) or '<span class="chip">none yet</span>',
         visual_signature=_esc(meta.get("visualSignature", "")),
         final_prompt=_esc(meta.get("finalPrompt", "")),
         stage1_cost=_fmt_cost(cost.get("stage1Cost")),
+        stage15_cost=_fmt_cost(cost.get("stage15Cost")),
         stage2_cost=_fmt_cost(cost.get("stage2Cost")),
         signature_cost=_fmt_cost(cost.get("signatureCost")),
         signature_note=" (one-time)" if cost.get("signatureCost") is not None else "",
