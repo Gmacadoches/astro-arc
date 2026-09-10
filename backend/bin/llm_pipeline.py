@@ -676,6 +676,7 @@ STAGE2_SYSTEM = """You are composing a single dense image to communicate a speci
 
 WHAT THE IMAGE MUST CONTAIN
 
+- Length. The prompt is 90 to 130 words and must never exceed 140. Count them before you answer. Density comes from what you name, not from how long the sentences are.
 - Density. Six to ten discrete, nameable things, distributed across three depths: something close to the viewer, a situation in the middle distance, and a far distance that keeps going. A sparse image with one subject on a plain field is the failure this instruction exists to prevent. Do not "simplify for legibility" — an image the eye can finish in one second is the thing being fixed.
 - Use most of the amplification objects you were given. Put them in the scene as real physical things, at different depths and different scales. You may add a small number of connective things the scene needs to hold together, but the given objects are the substance.
 - THE INTRUSION IS MANDATORY. Place the intrusion object in the scene as a solid, physically present, matter-of-fact thing — the same weight, wear, dirt and lighting as everything else. It must NOT glow, float, shimmer, be translucent, be described as magical or otherworldly, or be visually marked out as special in any way. Nothing in the scene reacts to it. No one looks at it. It is simply there, belonging to another world entirely, and completely unexplained. That unremarked wrongness is where the whole psychological charge of the image comes from. An intrusion that has been made to fit the scene has been destroyed.
@@ -693,6 +694,8 @@ PEOPLE
 
 - Let the primary register decide whether people belong. If it is "figures in relation" or "crowd / the collective," lean fully into human presence. If it is a material or place register, let the material carry the image — the objects and place are the protagonists — unless the reading's content makes a person unmistakably necessary.
 - When people do appear, make them participants in something larger, not a two-person drama. Two figures visibly in conflict, or one distressed while another looks on, explains the tension in literal human terms instead of embodying it — a failure. When the register is specifically the collective, let the many carry cultural or social material, with one figure marked out from the rest.
+- FIGURE HIERARCHY IS MANDATORY WHENEVER PEOPLE APPEAR. At most **two** people may have a face turned toward the viewer, and at least one of those must be close to the camera and large in frame. Everyone else is turned away, seen from behind, in profile, bent to a task, occluded by an object, or far enough back to be a silhouette. Never describe a row, line, cluster, or group of people all facing the viewer at the same distance — an image with several equally-sized mid-distance faces is a guaranteed failure, because each face ends up too small to render correctly and the whole group comes out distorted. Say explicitly, in the prompt, who is near and facing, and that the others are turned away or distant.
+- People are not a way to reach the density requirement. A crowd counts as ONE element no matter how many bodies are in it. Reach the six-to-ten count with objects, structures and materials, never by multiplying faces.
 
 STYLE
 
