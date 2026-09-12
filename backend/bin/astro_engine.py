@@ -15,6 +15,7 @@ Panel.qml writes to) and prints one JSON object to stdout.
 
 import datetime
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -216,10 +217,175 @@ def find_dominant_transit(transit_bodies, natal_bodies, transit_names, houses):
     return best
 
 
-def derive_arc(frequency, now_utc, natal, transits_now):
+# ---- Texture: the four axes the image's SHAPE is driven by ---------------
+#
+# Added 2026-09-12. Everything above describes *what* the sky is doing; this
+# describes how today should FEEL to compose, and it exists because the pipeline
+# had exactly one image shape. Every generation got the same mandates — six to ten
+# objects across three depths, two colliding registers, one unexplained intrusion
+# — so every image carried the same implicit meaning (chaos, tension between many
+# unrelated things) no matter what the chart said. The astrology modulated
+# vocabulary and never shape. These axes are what the shape becomes a function of.
+#
+# Four INDEPENDENT axes, deliberately not one "tension" scalar. A single scalar was
+# built and measured first: it is bimodal (the quantiles jump from 0.491 at p50 to
+# 0.750 at p60, so it collapses into the hard/soft binary it contains) and it ranks
+# a nearly-absent conjunction (orb 6.68 of an 8 allowance) ABOVE an essentially
+# exact sextile (orb 0.16). Worse, one scalar makes "is today hard" and "how much
+# is happening" the same question, so the system can only say anxious-and-crowded
+# or serene-and-empty — which replaces one constant implicit meaning with a
+# one-dimensional one.
+#
+# Measured over 365 days against this install's natal chart: 63 of the available
+# cells actually get used, the most common holds 5.5% of days, and consecutive days
+# land in the same cell only 8% of the time. The previous behavior was one cell,
+# 100% of days.
+#
+# Only the Moon is sampled by default, and that is deliberate: the requirement is
+# that DAILY variation dominate. The all-bodies aspect count was measured at 21-29
+# hits with multi-week plateaus — that is a season, not a day. Moon-only gives 1-6
+# with real day-to-day movement.
+#
+# Deliberately NOT used as daily knobs, all measured:
+#   - retrograde: find_dominant_transit is called with ["moon"] and records the
+#     *transiting* body's flag; the Moon is never retrograde, so it is always
+#     False. "Is anything retrograde" is true on 318 of 365 days.
+#   - element/modality balance: computed on natal bodies only, so fixed for life.
+#     The transiting version is degenerate (dominant element is fire on 236 of
+#     365 days, because it counts ten bodies including the clustered outers).
+
+HARD_ASPECTS = {"conjunction", "square", "opposition"}
+
+# Thresholds are QUANTILES of the real measured distribution, not even splits.
+# This matters more than it looks: find_dominant_transit selects by *minimum* orb,
+# so closeness is strongly skewed high (mean 0.76). Naive terciles at 0.33/0.67
+# would put ~80% of days in "high" and rebuild the very constant this replaces.
+# These cuts give 20% / 66% / 14% — most days normal, a fifth an excursion each way.
+#
+# They are calibrated to THIS natal chart. A chart with a stellium yields fewer
+# aspect hits and wider orbs, so "high" might never fire. To recalibrate for a
+# different chart, sweep compute_bodies over 365 days (0.35s) and take the
+# quantiles of normalized closeness.
+INTENSITY_CUTS = (0.46, 0.92)
+
+# Exposure gets even terciles rather than excursion cuts, because unlike intensity
+# there is no "normal" illumination to excurse from — all three states are equally
+# ordinary and the axis is most informative when each is equally reachable.
+# Measured terciles of illuminated fraction over 365 days: 0.244 / 0.738, giving
+# 120 / 125 / 120 days. Naive cuts at 0.34/0.67 were tried first and gave
+# 146/81/138 (40/22/38%) — illuminated fraction is cosine-shaped, so it clusters
+# near dark and near full and thins out the middle.
+EXPOSURE_CUTS = (0.24, 0.74)
+
+
+def normalized_closeness(aspect_name, orb):
+    """How exact an aspect is, 0..1, comparable ACROSS aspect types.
+
+    Raw orb is not comparable: ASPECTS allows 8 degrees for conjunction and
+    opposition, 6 for square and trine, but only 4 for sextile — so a 3-degree
+    sextile is nearly out of orb while a 3-degree opposition is still tight.
+
+    Note this is additive and is NOT used by find_dominant_transit, which keeps
+    selecting on raw orb. Changing that selection would change which aspect is
+    called dominant, and therefore change Stage 1's input, for every chart.
+    """
+    max_orb = ASPECTS[aspect_name][1]
+    return round(1.0 - (orb / max_orb), 4)
+
+
+def _band(value, cuts):
+    low, high = cuts
+    if value < low:
+        return "lo"
+    return "mid" if value < high else "hi"
+
+
+def compute_texture(transit_bodies, natal_bodies, moon_phase_angle, transit_names=("moon",)):
+    """The four axes, plus the full hit list find_dominant_transit throws away.
+
+    Returns None only if there is nothing to measure at all. A day with no aspect
+    in orb (1 day in 365) is a DEFINED cell — soft at minimum intensity — not an
+    exception branch, because an exception branch is how a neutral day ends up
+    looking like a crash.
+    """
+    hits = []
+    for t_name in transit_names:
+        t_entry = transit_bodies.get(t_name)
+        if not t_entry:
+            continue
+        for n_name, n_entry in natal_bodies.items():
+            hit = best_aspect(angle_diff(t_entry["longitude"], n_entry["longitude"]))
+            if not hit:
+                continue
+            hits.append({
+                "transitingBody": t_name,
+                "natalBody": n_name,
+                "aspect": hit["aspect"],
+                "orb": hit["orb"],
+                "closeness": normalized_closeness(hit["aspect"], hit["orb"]),
+                "family": "hard" if hit["aspect"] in HARD_ASPECTS else "soft",
+            })
+
+    # Tightest by NORMALIZED closeness, which is not necessarily the same hit
+    # find_dominant_transit picks by raw orb — that is the point of normalizing.
+    tightest = max(hits, key=lambda h: h["closeness"]) if hits else None
+
+    if tightest is None:
+        polarity, intensity = "none", 0.0
+    else:
+        polarity, intensity = tightest["family"], tightest["closeness"]
+
+    # Illuminated fraction of the Moon. Genuinely independent of the aspect axes:
+    # natal positions are fixed, so this depends only on the transiting Sun.
+    # Measured near-uniform over a year (116 dark / 124 half / 125 full), which is
+    # what makes "calm but dark" and "intense but bright" reachable at all —
+    # combinations a single tension scalar cannot express.
+    exposure = (1.0 - math.cos(math.radians(moon_phase_angle))) / 2.0
+
+    return {
+        "polarity": polarity,
+        "intensity": round(intensity, 4),
+        "intensityBand": _band(intensity, INTENSITY_CUTS) if tightest else "lo",
+        "multiplicity": len(hits),
+        "exposure": round(exposure, 4),
+        "exposureBand": _band(exposure, EXPOSURE_CUTS),
+        "tightest": tightest,
+        "hits": sorted(hits, key=lambda h: -h["closeness"]),
+    }
+
+
+def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
+    """`now_local` is what period keys are derived from — the user's civil day,
+    not the UTC day.
+
+    These two used to be the same value, and that was a real bug: the period key
+    is the cache key for Stage 1/Stage 1.5 (llm_pipeline.py keys
+    READINGS_DIR/AMPLIFICATIONS_DIR on it), while astro-arc-generate named its
+    output files from `date +%Y-%m-%d` — the *local* date. After ~18:00 local the
+    two disagree, so an evening run wrote its reading into tomorrow's cache slot
+    and the next day's run was served yesterday evening's astrology. That really
+    happened: pipeline-meta-2026-09-10.json and -2026-09-11.json share a
+    byte-identical reading, amplification and intrusion, and the only thing that
+    differed between those two days' images was the register/style roulette.
+
+    Local is the right choice rather than UTC because this generates a desktop
+    background: "today" means the user's day. Note it is the *system* local zone,
+    not the birth-location zone TimezoneFinder derives in main() — someone born
+    in Tokyo and living in Denver gets Denver days.
+
+    Positions are still computed from `now_utc`; only the key is civil-local.
+    """
+    if now_local is None:
+        now_local = now_utc.astimezone()
     natal_bodies = natal["planets"]
     transit_bodies = transits_now["planets"]
     houses = natal.get("houses")
+
+    # Hoisted above the frequency split because every branch now carries a
+    # texture block, and exposure needs the phase angle.
+    phase_name, phase_angle = moon_phase_name(
+        transit_bodies["sun"]["longitude"], transit_bodies["moon"]["longitude"]
+    )
 
     if frequency == "weekly":
         dominant = find_dominant_transit(
@@ -227,8 +393,17 @@ def derive_arc(frequency, now_utc, natal, transits_now):
         )
         return {
             "frequency": "weekly",
-            "periodKey": now_utc.strftime("%G-W%V"),
+            "periodKey": now_local.strftime("%G-W%V"),
             "dominantTransit": dominant,
+            # Sampled over the same body set this frequency's dominant transit
+            # uses. Note multiplicity saturates here (all-bodies hit counts were
+            # measured at 21-29 with multi-week plateaus), so on the weekly and
+            # monthly paths treat multiplicity as a season, not a variable — only
+            # the daily path gives it real day-to-day movement.
+            "texture": compute_texture(
+                transit_bodies, natal_bodies, phase_angle,
+                transit_names=[n for n, _ in BODIES],
+            ),
         }
 
     if frequency == "monthly":
@@ -239,23 +414,30 @@ def derive_arc(frequency, now_utc, natal, transits_now):
         )
         return {
             "frequency": "monthly",
-            "periodKey": now_utc.strftime("%Y-%m"),
+            "periodKey": now_local.strftime("%Y-%m"),
             "transitingSun": {"sign": sun["sign"], "house": house},
             "dominantOuterTransit": dominant_outer,
+            # Outers only, matching dominantOuterTransit. See the weekly note on
+            # multiplicity saturation.
+            "texture": compute_texture(
+                transit_bodies, natal_bodies, phase_angle,
+                transit_names=sorted(OUTER_BODIES),
+            ),
         }
 
     # daily (default)
     moon = transit_bodies["moon"]
-    sun = transit_bodies["sun"]
-    phase_name, phase_angle = moon_phase_name(sun["longitude"], moon["longitude"])
     dominant = find_dominant_transit(transit_bodies, natal_bodies, ["moon"], houses)
     return {
         "frequency": "daily",
-        "periodKey": now_utc.strftime("%Y-%m-%d"),
+        "periodKey": now_local.strftime("%Y-%m-%d"),
         "moonSign": moon["sign"],
         "moonPhase": phase_name,
         "moonPhaseAngle": phase_angle,
         "dominantMoonTransit": dominant,
+        # Moon-only on purpose — the daily layer has to dominate. See
+        # compute_texture's header.
+        "texture": compute_texture(transit_bodies, natal_bodies, phase_angle),
     }
 
 
@@ -283,6 +465,9 @@ def main():
     birth_utc = birth_local.astimezone(datetime.timezone.utc)
 
     now_utc = datetime.datetime.now(datetime.timezone.utc)
+    # The system-local civil clock, which is what the period key is keyed on —
+    # see derive_arc()'s docstring for why that is not the same as now_utc.
+    now_local = now_utc.astimezone()
 
     natal_jd = julian_day_ut(birth_utc)
     natal_planets = compute_bodies(natal_jd)
@@ -302,7 +487,7 @@ def main():
     transits_now = {"planets": compute_bodies(transit_jd)}
 
     frequency = config.get("frequency", "daily")
-    arc = derive_arc(frequency, now_utc, natal, transits_now)
+    arc = derive_arc(frequency, now_utc, natal, transits_now, now_local)
 
     result = {
         "generatedAt": now_utc.isoformat(),

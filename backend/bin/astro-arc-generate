@@ -104,6 +104,27 @@ if jq -e '.error' "$reading_file" >/dev/null 2>&1; then
   exit 1
 fi
 
+# The engine is the authority on the period key, and it is also what Stage 1 /
+# Stage 1.5 cache under (llm_pipeline.py reads reading.arc.periodKey). This script
+# computes the same key independently above with `date`, so the two must agree.
+#
+# They used not to: the engine keyed on the UTC date while this script keyed on the
+# local date, so after ~18:00 local an evening run wrote its reading into
+# *tomorrow's* cache slot and the next day's run was served yesterday evening's
+# astrology. That really happened — pipeline-meta-2026-09-10.json and
+# -2026-09-11.json still hold a byte-identical reading, amplification and
+# intrusion, and the only difference between those two days' images was the
+# register/style roulette. The engine now keys on local civil date too
+# (derive_arc's docstring has the full story), so both sides agree by construction.
+#
+# This guard catches the one remaining way they can diverge: the clock crossing
+# midnight between the `date` call above and the engine's own. Warn rather than
+# fail — the generation is still valid, it just belongs to the other day.
+engine_period_key=$(jq -r '.arc.periodKey // empty' "$reading_file" 2>/dev/null || true)
+if [[ -n $engine_period_key && $engine_period_key != "$period_key" ]]; then
+  echo "Astro-Arc: period key drift — this script says $period_key, the engine says $engine_period_key (clock crossed a period boundary mid-run). Cache and filenames will disagree for this run." >&2
+fi
+
 prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
 
 # Bump to "high" quality whenever Stage 2 actually put a person in the
