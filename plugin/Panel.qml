@@ -2246,9 +2246,6 @@ Panel {
       z: -1
     }
 
-    Keys.onEscapePressed: root.advancedOpen = false
-    focus: root.advancedOpen
-
     Rectangle {
       id: advancedCard
       anchors.centerIn: parent
@@ -2258,6 +2255,15 @@ Panel {
       color: root.bar ? root.bar.background : "#11111b"
       border.color: Qt.darker(root.bar ? root.bar.foreground : "#cdd6f4", 2.4)
       border.width: 1
+
+      // Escape-to-close lives here, not on the PanelWindow. PanelWindow has no
+      // `focus` property at all — assigning one aborts creation of the window
+      // AND of its parent, which is what stopped the whole widget from opening.
+      // Keys is an attached property of Item, so it needs an Item to attach to;
+      // the card is one, and the window's Exclusive keyboardFocus is what routes
+      // Wayland key events here in the first place.
+      focus: root.advancedOpen
+      Keys.onEscapePressed: root.advancedOpen = false
 
       MouseArea { anchors.fill: parent }
 
