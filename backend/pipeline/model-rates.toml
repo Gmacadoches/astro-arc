@@ -106,6 +106,24 @@
 "chatgpt-image-latest"   = ["low", "medium", "high", "auto"]
 
 [hierarchy]
+# Reordered 2026-09-12 from MEASURED results, not version numbers. The previous
+# order put gpt-image-1.5 above gpt-image-2.5-*, which made Ultra both pricier
+# and worse than Maximum. Rendering one fixed prompt across six model/tier
+# combinations (verification/bakeoff-tiers) gave, for the SAME scene:
+#
+#   gpt-image-2.5-sunburst low     158 tok   $0.0057   best of the set
+#   gpt-image-1-mini       medium 1568 tok   $0.0129   crude, flat
+#   gpt-image-2            auto    601 tok   $0.0190   beautiful, ignored "dim room"
+#   gpt-image-2.5-sunburst high   1372 tok   $0.0421   merged two objects into one
+#   gpt-image-1.5          high   6701 tok   $0.2154   flat, dithered, ignored "dim room"
+#   gpt-image-1.5          auto   6735 tok   $0.2165   auto buys NOTHING on 1.5
+#
+# Two things that order does not show. `auto` is not a cost saving on every
+# model: on gpt-image-1.5 it spends the same as `high`, while on 2.5 it lands
+# between low and high and varies per prompt (343 and 601 tokens on two runs of
+# the same model). And more tokens is not more quality — 2.5 at `low` followed
+# the prompt more faithfully than 2.5 at `high`, which merged the divination cup
+# and the bronze liver into a single vessel.
 image = [
   "gpt-image-2.5-sunburst",
   "gpt-image-2.5-flare",
@@ -139,45 +157,50 @@ chat = [
 # picking blind from it cannot go badly wrong. Everything else stays one click
 # away. Edit freely; this is a taste judgement, not a fact.
 [shortlist]
-chat = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-5-mini", "gpt-5.4"]
-image = ["gpt-image-1-mini", "gpt-image-1", "gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-flare"]
+chat = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-5.4", "gpt-6-astra"]
+image = ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2", "gpt-image-1-mini", "gpt-image-1.5"]
 
 # Named quality tiers, in the spirit of a game's graphics presets: one choice
 # that sets every model at once, with the individual pickers still free to
 # override (which shows the preset as "Custom"). Both chat stages get the same
 # model deliberately — Stage 1's reading is the raw material everything
-# downstream is built from, so starving it to save a fraction of a cent would
-# cap what Stage 2 has to work with.
+# downstream is built from.
 #
-# Tiers are CURATED, not computed: most models have no measured render yet, so
-# there is nothing to sort them by. Retune these freely — that is the point of
-# them living in a hand-edited file.
+# REBUILT 2026-09-12 from the bakeoff above, and the honest summary is this:
+# above roughly $0.05 a run, nothing in the test got measurably better. The one
+# change that mattered was using a CURRENT image model; gpt-image-2.5 at its
+# cheapest tier beat gpt-image-1.5 at its most expensive by a wide margin at
+# 1/38th the price. The upper tiers therefore exist to spend more on the chat
+# side, where the effect is real but small (both gpt-5.4 and gpt-6-astra wrote
+# prompts of 74-76 words of comparable quality), not because the image improves.
+# If you want the best value, High is the honest recommendation and Low is a
+# genuinely good image.
 [presets.low]
 label = "Low"
 chat = "gpt-4o-mini"
-image = "gpt-image-1-mini"
+image = "gpt-image-2.5-sunburst"
 quality = "low"
 
 [presets.medium]
 label = "Medium"
 chat = "gpt-4.1-mini"
-image = "gpt-image-1-mini"
-quality = "medium"
+image = "gpt-image-2.5-sunburst"
+quality = "low"
 
 [presets.high]
 label = "High"
 chat = "gpt-4.1"
-image = "gpt-image-1-mini"
-quality = "high"
+image = "gpt-image-2.5-sunburst"
+quality = "auto"
 
 [presets.ultra]
 label = "Ultra"
 chat = "gpt-5.4"
-image = "gpt-image-1.5"
+image = "gpt-image-2.5-sunburst"
 quality = "high"
 
 [presets.maximum]
 label = "Maximum"
 chat = "gpt-6-astra"
-image = "gpt-image-2.5-sunburst"
-quality = "auto"
+image = "gpt-image-2.5-flare"
+quality = "high"
