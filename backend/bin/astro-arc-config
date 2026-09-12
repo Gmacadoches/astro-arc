@@ -27,6 +27,17 @@
 #                                          astro-arc-detect-resolution)
 #   --set-art-style <key>                 which pipeline/styles.toml preset
 #                                          Stage 2's prompt is suffixed with
+#   --set-provider <openai>                 which AI provider everything else is
+#                                          scoped to — the key you paste, which
+#                                          models are offered, what they cost.
+#                                          Only "openai" today; the setting
+#                                          exists so adding a second provider is
+#                                          a data change rather than a redesign.
+#                                          Supersedes imageBackend, which is kept
+#                                          only so an existing config that says
+#                                          "local" still reaches the local
+#                                          Stable Diffusion path (no longer
+#                                          offered in the UI).
 #   --set-models <stage1> <stage2> <image-model> <image-quality>
 #                                          all four model settings in ONE write.
 #                                          Used by the widget's quality-preset
@@ -88,7 +99,7 @@
 set -euo pipefail
 
 CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"daily","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerImage":0}'
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"daily","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerImage":0,"provider":"openai"}'
 COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
 TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
 DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
@@ -181,6 +192,12 @@ case "${1:-}" in
   [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-art-style <key>" >&2; exit 1; }
   current=$(read_config)
   updated=$(jq --arg s "$2" '.artStyle=$s' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-provider)
+  [[ ${2:-} =~ ^(openai)$ ]] || { echo "Usage: astro-arc-config --set-provider <openai>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg p "$2" '.provider=$p' <<<"$current")
   write_config "$updated"
   ;;
 --set-models)

@@ -21,7 +21,8 @@ var DEFAULT_CONFIG = {
   themeGenerator: "built-in",
   historyRetentionDays: 30,
   pipelineMode: "legacy",
-  maxCostPerImage: 0
+  maxCostPerImage: 0,
+  provider: "openai"
 }
 
 // Mirrors astro-arc-config's --set-pipeline-mode. "legacy" pins the composition
@@ -45,6 +46,15 @@ var FREQUENCY_INTERVAL_DAYS = { daily: 1, weekly: 7, monthly: 30 }
 // palette_extract.py's icons.theme comment) and silently falls back to
 // "built-in" if aether is missing or fails, so picking it never risks a
 // broken generation.
+// The global provider. Everything else in the panel is scoped to it: which key
+// you paste, which models are offered, what they cost. Only OpenAI today — the
+// list exists so adding a second provider is a data change rather than a
+// redesign of the settings tab. (Supersedes the old imageBackend picker, which
+// offered local Stable Diffusion; that path still works if set by hand.)
+var PROVIDER_CHOICES = [
+  { key: "openai", label: "OpenAI" }
+]
+
 var THEME_GENERATOR_CHOICES = [
   { key: "built-in", label: "Built-in" },
   { key: "aether", label: "Aether (Omarchy)" }
@@ -219,7 +229,11 @@ function parseConfig(raw) {
       pipelineMode: data.pipelineMode === "coherent" ? "coherent" : "legacy",
       // 0 (or anything unparseable) means no ceiling, matching maxCostPerRun.
       maxCostPerImage: typeof data.maxCostPerImage === "number" && data.maxCostPerImage >= 0
-        ? data.maxCostPerImage : 0
+        ? data.maxCostPerImage : 0,
+      // Falls back to the legacy imageBackend so an existing config keeps
+      // working, including one that still says "local".
+      provider: typeof data.provider === "string" && data.provider !== ""
+        ? data.provider : (typeof data.imageBackend === "string" && data.imageBackend !== "" ? data.imageBackend : "openai")
     }
   } catch (e) {
     return Object.assign({}, DEFAULT_CONFIG)
@@ -505,6 +519,7 @@ if (typeof module !== "undefined") {
     ART_STYLE_CHOICES: ART_STYLE_CHOICES,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PIPELINE_MODE_CHOICES: PIPELINE_MODE_CHOICES,
+    PROVIDER_CHOICES: PROVIDER_CHOICES,
     chatModelLabel: chatModelLabel,
     imageModelLabel: imageModelLabel,
     formatUsd: formatUsd,

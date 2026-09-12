@@ -17,6 +17,11 @@
 # hand it to a single subprocess call; it is never echoed, printed in full,
 # or written anywhere.
 #
+#   store-all         read ONE key on stdin and store it to all three slots at
+#                     once, for the widget's simple view (which shows a single
+#                     key). The key is fanned out with tee into three concurrent
+#                     `secret-tool store` processes, so it still never lands in a
+#                     shell variable — the rule above holds for this path too.
 #   status <slot>    print {"present":true,"masked":"sk-...ab12"} or {"present":false}
 #   clear <slot>      remove the stored key for that slot
 #   lookup <slot>     print the raw key to stdout — for other scripts' internal
@@ -45,8 +50,26 @@ require_secret_tool() {
 }
 
 action="${1:-}"
+
+# store-all takes no slot: it writes every slot. Handled before the slot check
+# below, which the other three actions all require.
+if [[ $action == store-all ]]; then
+  require_secret_tool
+  label="Astro-Arc API Key"
+  # tee fans the same stdin into three stores. The key streams through pipes and
+  # is never assigned to a variable, which is the same guarantee the per-slot
+  # path gives (see the header). `wait` is what makes the exit status meaningful:
+  # without it this returns as soon as the last store in the pipeline exits,
+  # while the two in process substitutions may still be running.
+  tee >(secret-tool store --label="$label (stage1)" service "$SERVICE" account "$(account_for_slot stage1)") \
+      >(secret-tool store --label="$label (stage2)" service "$SERVICE" account "$(account_for_slot stage2)") \
+    | secret-tool store --label="$label (image)" service "$SERVICE" account "$(account_for_slot image)"
+  wait
+  exit 0
+fi
+
 slot="${2:-}"
-[[ -n $slot ]] || { echo "Usage: astro-arc-apikey <status|clear|lookup> <stage1|stage2|image>" >&2; exit 1; }
+[[ -n $slot ]] || { echo "Usage: astro-arc-apikey <status|clear|lookup> <stage1|stage2|image> | store-all" >&2; exit 1; }
 account=$(account_for_slot "$slot")
 
 case "$action" in

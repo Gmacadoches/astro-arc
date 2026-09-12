@@ -65,7 +65,13 @@ if ! flock -n 9; then
 fi
 
 frequency=$(jq -r '.frequency // "daily"' "$CONFIG_FILE" 2>/dev/null || echo "daily")
-image_backend=$(jq -r '.imageBackend // "local"' "$CONFIG_FILE" 2>/dev/null || echo "local")
+# `provider` is the global setting now (see astro-arc-config --set-provider);
+# `imageBackend` is the legacy key it supersedes. Reading provider first and
+# falling back keeps an existing config working, including one that still says
+# "local" — that path is no longer offered in the UI but is still honored if it
+# is set by hand, since removing a working free backend from under someone by
+# changing a dropdown would be a surprise.
+image_backend=$(jq -r '.provider // .imageBackend // "openai"' "$CONFIG_FILE" 2>/dev/null || echo "openai")
 openai_model=$(jq -r '.openaiModel // "gpt-image-1-mini"' "$CONFIG_FILE" 2>/dev/null || echo "gpt-image-1-mini")
 openai_quality=$(jq -r '.openaiQuality // "medium"' "$CONFIG_FILE" 2>/dev/null || echo "medium")
 background_size=$(jq -r '.backgroundSize // "auto"' "$CONFIG_FILE" 2>/dev/null || echo "auto")

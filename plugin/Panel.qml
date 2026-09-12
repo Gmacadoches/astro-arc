@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
@@ -477,8 +478,24 @@ Panel {
     // reproducing both the hang and this fix in an isolated standalone
     // Quickshell process outside the real panel.
     apiKeyStoreProc.stdinEnabled = true
-    apiKeyStoreProc.command = ["secret-tool", "store", "--label=Astro-Arc OpenAI API Key (" + slot + ")", "service", "astro-arc", "account", root.accountForSlot(slot)]
+    // The simple view shows ONE key and writes it to every slot; the advanced
+    // window is where slots get split. `store-all` fans stdin into three stores
+    // with tee, so the key still never lands in a shell variable — the same
+    // guarantee the per-slot path gives. See astro-arc-apikey's header.
+    apiKeyStoreProc.command = root.storeAllSlots
+      ? [root.apiKeyBin, "store-all"]
+      : ["secret-tool", "store", "--label=Astro-Arc OpenAI API Key (" + slot + ")", "service", "astro-arc", "account", root.accountForSlot(slot)]
     apiKeyStoreProc.running = true
+  }
+
+  // Set for the duration of one save. Not a per-slot property because the store
+  // Process is shared across slots and a save is a single deliberate click.
+  property bool storeAllSlots: false
+
+  function saveApiKeyEverywhere() {
+    root.storeAllSlots = true
+    // Any slot's draft would do — the simple view only ever fills this one.
+    root.saveApiKey("image")
   }
 
   Process {
@@ -498,9 +515,21 @@ Panel {
     }
     onExited: function(exitCode) {
       var slot = root.activeKeySlot
+      var wasAll = root.storeAllSlots
+      root.storeAllSlots = false
       root.setApiKeyField(slot, "saving", false)
       root.setApiKeyField(slot, "replacing", false)
-      root.refreshApiKeyStatus(slot)
+      if (wasAll) {
+        // Every slot changed, so every slot's masked reference is now stale.
+        var slots = ["stage1", "stage2", "image"]
+        for (var i = 0; i < slots.length; i++) {
+          root.setApiKeyField(slots[i], "saving", false)
+          root.setApiKeyField(slots[i], "replacing", false)
+          root.refreshApiKeyStatus(slots[i])
+        }
+      } else {
+        root.refreshApiKeyStatus(slot)
+      }
       if (exitCode === 0) root.validateApiKey(slot)
     }
   }
@@ -597,6 +626,23 @@ Panel {
   // size regardless of what either image backend natively renders at
   // (see image_fit.py's fit_cover). --------------------------------------
   property string backgroundSizeError: ""
+  // ---- Provider: the one global setting. -----------------------------
+  function commitProvider(value) {
+    providerWriteProc.command = [root.configBin, "--set-provider", value]
+    providerWriteProc.running = true
+  }
+
+  Process {
+    id: providerWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
+  // ---- The popout. The panel itself stays rudimentary — provider, one key,
+  // one quality preset — and everything that makes this configurable rather
+  // than merely usable lives here: every model the key can reach, the two chat
+  // stages split apart, a separate key per slot, and the cost ceiling.
+  property bool advancedOpen: false
+
   // ---- Quality preset: one control that sets all four model settings, in
   // the spirit of a game's graphics presets. The individual pickers below stay
   // fully live; touching any of them makes the settings match no tier, and
@@ -1026,6 +1072,10 @@ Panel {
   component ApiKeySection: Column {
     id: section
     required property string slot
+    // When true this row represents the ONE key the simple view shows, and
+    // saving writes it to every slot. `slot` still names which slot's status is
+    // displayed, since in that mode all three hold the same key anyway.
+    property bool storeAll: false
     readonly property var keyState: root.apiKeyState[slot]
 
     width: parent.width
@@ -1100,7 +1150,7 @@ Panel {
             else if (section.slot === "stage2") root.stage2Draft = text
             else root.imageDraft = text
           }
-          Keys.onReturnPressed: root.saveApiKey(section.slot)
+          Keys.onReturnPressed: section.storeAll ? root.saveApiKeyEverywhere() : root.saveApiKey(section.slot)
         }
 
         Button {
@@ -1110,7 +1160,7 @@ Panel {
           fontSize: Style.font.caption
           foreground: root.bar.foreground
           enabled: !section.keyState.saving && root.draftFor(section.slot).length > 0
-          onClicked: root.saveApiKey(section.slot)
+          onClicked: section.storeAll ? root.saveApiKeyEverywhere() : root.saveApiKey(section.slot)
         }
       }
 
@@ -1238,7 +1288,63 @@ Panel {
             spacing: Style.space(10)
             visible: root.showSettings
 
-            // ---- Quality preset -------------------------------------
+            // ---- Provider: the global setting everything else is scoped
+            // to. The key you paste, which models are offered, what they cost
+            // — all of it follows from this. Only OpenAI today; the control
+            // exists so a second provider is a data change, not a redesign.
+            // (This replaced a "Backend" picker that lived under IMAGE
+            // GENERATION and offered local Stable Diffusion. Local is no longer
+            // offered here, but a config that still says "local" is honored —
+            // see astro-arc-generate.)
+            Item {
+              width: parent.width
+              height: Math.max(providerLabel.implicitHeight, providerDropdown.implicitHeight, advancedBtn.implicitHeight)
+
+              Text {
+                id: providerLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.labelColW
+                text: "Provider"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              Dropdown {
+                id: providerDropdown
+                anchors.left: providerLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: advancedBtn.left
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                showLabel: false
+                value: root.configState.provider
+                options: Model.PROVIDER_CHOICES.map(function(c) {
+                  return { value: c.key, label: c.label }
+                })
+                foreground: root.bar.foreground
+                onChanged: function(value) { root.commitProvider(value) }
+              }
+
+              Button {
+                id: advancedBtn
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Popout"
+                foreground: root.bar.foreground
+                onClicked: root.advancedOpen = true
+              }
+            }
+
+            // One key, written to all three slots. The per-stage split lives in
+            // the popout; showing three key rows here made the common case —
+            // one account, one key — look like a three-step setup.
+            ApiKeySection { slot: "image"; storeAll: true }
+
+            PanelSeparator { foreground: root.bar.foreground }
+
+            // ---- Quality: one control for every model choice. ---------
             PanelSectionHeader { text: "QUALITY"; foreground: root.bar.foreground }
 
             Item {
@@ -1268,10 +1374,10 @@ Panel {
                   var opts = (root.modelCatalog.presets || []).map(function(p) {
                     return { value: p.key, label: Model.presetLabel(p) }
                   })
-                  // "Custom" is only ever a readout, never something you pick —
-                  // you reach it by changing a picker below. Listed so the
-                  // dropdown can display the state it is actually in.
-                  opts.push({ value: "custom", label: "Custom" })
+                  // "Custom" is a readout, not a choice — you reach it by
+                  // changing something in the popout. Listed so the dropdown can
+                  // display the state it is actually in.
+                  opts.push({ value: "custom", label: "Custom (set in Popout)" })
                   return opts
                 }
                 foreground: root.bar.foreground
@@ -1279,178 +1385,54 @@ Panel {
               }
             }
 
-            Text {
+            // What the preset actually resolved to. Read-only on purpose: this
+            // is the answer to "what is it using?", and changing it is what the
+            // popout is for.
+            Column {
               width: parent.width
-              wrapMode: Text.WordWrap
-              text: {
-                var c = root.configState
-                return "Currently: " + c.stage1Model + " · " + c.openaiModel + " / " + c.openaiQuality
-              }
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            // Costs marked (est) are published rates applied to token counts
-            // measured from real runs — for a tier nobody has run yet, the
-            // render's token count is borrowed from the one tier OpenAI
-            // publishes counts for. (actual) means this exact combination has
-            // been measured here.
-            Item {
-              width: parent.width
-              height: showAllToggle.implicitHeight
-
-              Button {
-                id: showAllToggle
-                anchors.left: parent.left
-                text: root.showAllModels
-                  ? "Show fewer models"
-                  : "Show all " + ((root.modelCatalog.chat || []).length + (root.modelCatalog.image || []).length) + " models"
-                foreground: root.bar.foreground
-                onClicked: root.showAllModels = !root.showAllModels
-              }
-            }
-
-            // ---- Stage 1: interpretation (chart -> psychological reading)
-            PanelSectionHeader { text: "STAGE 1 · INTERPRETATION"; foreground: root.bar.foreground }
-
-            Item {
-              width: parent.width
-              height: Math.max(stage1ModelLabel.implicitHeight, stage1ModelDropdown.implicitHeight)
+              spacing: Style.space(2)
 
               Text {
-                id: stage1ModelLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Model"
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "Chat models: " + (root.configState.stage1Model === root.configState.stage2Model
+                  ? root.configState.stage1Model
+                  : root.configState.stage1Model + " (interpretation) · " + root.configState.stage2Model + " (image prompt)")
                 color: Qt.darker(root.bar.foreground, 1.3)
                 font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
+                font.pixelSize: Style.font.caption
               }
 
-              // Was a freeform TextField, on the reasoning that "OpenAI's
-              // chat-model catalog changes often enough that a hardcoded list
-              // would just as likely be stale as helpful." That was right about
-              // hardcoding and is now moot: this list is DISCOVERED from
-              // GET /v1/models and cached, so it cannot go stale the way a
-              // hand-written one does. The freeform box meanwhile showed no
-              // rates, validated nothing, and gave no way to find out what was
-              // even available — this key can reach 46 chat models.
-              Dropdown {
-                id: stage1ModelDropdown
-                anchors.left: stage1ModelLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: root.configState.stage1Model
-                options: {
-                  var opts = Model.visibleRows(root.modelCatalog.chat || [], root.showAllModels).map(function(r) {
-                    return { value: r.model, label: Model.chatModelLabel(r) }
-                  })
-                  // Keep whatever is configured selectable even before the
-                  // catalog loads, or if the model has since been retired —
-                  // otherwise this would show a different model than the one
-                  // the pipeline is actually going to run.
-                  var present = opts.some(function(o) { return o.value === root.configState.stage1Model })
-                  if (!present && root.configState.stage1Model)
-                    opts.unshift({ value: root.configState.stage1Model, label: root.configState.stage1Model + "  · not in catalog" })
-                  return opts
+              Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: "Image model: " + root.configState.openaiModel + " · " + root.configState.openaiQuality
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: {
+                  var e = root.monthlyCostEstimate
+                  if (!e) return "Est. monthly: not enough cost history yet to estimate"
+                  return "Est. monthly: " + Model.formatUsd(e.perMonth) + " at " + root.configState.frequency
+                    + " (" + Model.formatUsd(e.perRun) + "/run, mean of last " + e.sampleSize + ")"
                 }
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitStage1Model(value) }
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.caption
               }
             }
-
-            ApiKeySection { slot: "stage1" }
 
             PanelSeparator { foreground: root.bar.foreground }
 
-            // ---- Stage 2: image prompt (reading -> imagery + concept tags)
-            PanelSectionHeader { text: "STAGE 2 · IMAGE PROMPT"; foreground: root.bar.foreground }
-
-            Item {
-              width: parent.width
-              height: Math.max(stage2ModelLabel.implicitHeight, stage2ModelDropdown.implicitHeight)
-
-              Text {
-                id: stage2ModelLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Model"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Dropdown {
-                id: stage2ModelDropdown
-                anchors.left: stage2ModelLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: root.configState.stage2Model
-                options: {
-                  var opts = Model.visibleRows(root.modelCatalog.chat || [], root.showAllModels).map(function(r) {
-                    return { value: r.model, label: Model.chatModelLabel(r) }
-                  })
-                  // Keep whatever is configured selectable even before the
-                  // catalog loads, or if the model has since been retired —
-                  // otherwise this would show a different model than the one
-                  // the pipeline is actually going to run.
-                  var present = opts.some(function(o) { return o.value === root.configState.stage2Model })
-                  if (!present && root.configState.stage2Model)
-                    opts.unshift({ value: root.configState.stage2Model, label: root.configState.stage2Model + "  · not in catalog" })
-                  return opts
-                }
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitStage2Model(value) }
-              }
-            }
-
-            ApiKeySection { slot: "stage2" }
-
-            PanelSeparator { foreground: root.bar.foreground }
-
-            // ---- Image generation: the actual picture-rendering call,
-            // independent of the two chat stages above -------------------
-            PanelSectionHeader { text: "IMAGE GENERATION"; foreground: root.bar.foreground }
-
-            Item {
-              width: parent.width
-              height: Math.max(backendLabel.implicitHeight, backendDropdown.implicitHeight)
-
-              Text {
-                id: backendLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Backend"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Dropdown {
-                id: backendDropdown
-                anchors.left: backendLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                width: Style.space(140)
-                showLabel: false
-                value: root.configState.imageBackend
-                options: [
-                  { value: "local", label: "Local (free)" },
-                  { value: "openai", label: "OpenAI API" }
-                ]
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitImageBackend(value) }
-              }
-            }
-
+            // ---- Background size: which resolution the render is fitted to.
+            // Kept here rather than in the popout because it is about your
+            // monitor, not about models.
+            PanelSectionHeader { text: "BACKGROUND"; foreground: root.bar.foreground }
             // ---- Background size: applies to whichever backend renders
             // the image — image_fit.py crops/scales either backend's
             // native output to this exact size afterward. -----------------
@@ -1510,187 +1492,6 @@ Panel {
               font.pixelSize: Style.font.caption
             }
 
-            Item {
-              width: parent.width
-              visible: root.configState.imageBackend === "openai"
-              height: Math.max(modelLabel.implicitHeight, modelDropdown.implicitHeight)
-
-              Text {
-                id: modelLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Model"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Dropdown {
-                id: modelDropdown
-                anchors.left: modelLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
-                // Was Model.OPENAI_MODEL_CHOICES, four rows hand-copied from
-                // openai_image_gen.py. That list offered 2 image models while
-                // this key can reach 10, so gpt-image-1.5 and both gpt-image-2.5
-                // variants were simply unreachable. Rows now come from the
-                // catalog, and each carries a MEASURED per-image cost once that
-                // combination has actually been rendered — never a projection.
-                options: {
-                  var rows = Model.imageRowsWithinCeiling(
-                    Model.visibleRows(root.modelCatalog.image || [], root.showAllModels),
-                    root.configState.maxCostPerImage)
-                  var opts = rows.map(function(r) {
-                    return { value: Model.openaiModelDropdownValue(r.model, r.quality), label: Model.imageModelLabel(r) }
-                  })
-                  // The configured pick stays selectable even when the ceiling
-                  // would exclude it or the catalog hasn't loaded — the warning
-                  // below says it's over budget rather than the dropdown
-                  // silently disagreeing with what will actually run.
-                  var current = Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
-                  if (current && !opts.some(function(o) { return o.value === current }))
-                    opts.unshift({ value: current, label: root.configState.openaiModel + " — " + root.configState.openaiQuality + "  · over ceiling" })
-                  return opts
-                }
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitOpenaiModel(value) }
-              }
-            }
-
-            // ---- Refresh + provenance. GET /v1/models is free and takes
-            // about a second; the cache is re-read on every panel open and
-            // only re-fetched when it has gone stale (24h), so this button is
-            // for when you know something changed and don't want to wait.
-            Item {
-              width: parent.width
-              height: Math.max(modelRefreshStatus.implicitHeight, modelRefreshBtn.implicitHeight)
-
-              Text {
-                id: modelRefreshStatus
-                anchors.left: parent.left
-                anchors.right: modelRefreshBtn.left
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                wrapMode: Text.WordWrap
-                text: {
-                  if (root.modelCatalogLoading) return "Refreshing model list…"
-                  if (root.modelCatalogError !== "") return root.modelCatalogError
-                  if (!root.modelCatalog.everFetched) return "Model list not fetched yet"
-                  var n = (root.modelCatalog.image || []).length + (root.modelCatalog.chat || []).length
-                  return n + " models available" + (root.modelCatalog.stale ? " · list is over a day old" : "")
-                }
-                color: root.modelCatalogError !== "" ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-
-              Button {
-                id: modelRefreshBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Refresh"
-                enabled: !root.modelCatalogLoading
-                foreground: root.bar.foreground
-                onClicked: root.loadModelCatalog(true)
-              }
-            }
-
-            // A cost figure here is measured, never projected, so an unpriced
-            // or never-rendered model says so — see model-rates.toml for why
-            // price can't be discovered from the API.
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              visible: {
-                var rows = root.modelCatalog.image || []
-                var current = rows.filter(function(r) {
-                  return r.model === root.configState.openaiModel && r.quality === root.configState.openaiQuality
-                })[0]
-                return !!current && typeof current.cost !== "number"
-              }
-              text: "Cost for this model is unknown. Render once to measure its token use, then add its price to pipeline/model-rates.toml."
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            // ---- Per-image cost ceiling. 0 means no ceiling, matching
-            // maxCostPerRun. Only ever compared against a MEASURED cost, so a
-            // model that has never been rendered is never silently blocked —
-            // but it also won't be quality-bumped while a ceiling is set, since
-            // the unpriced models are exactly the new and potentially expensive
-            // ones. Models whose measured cost exceeds this drop out of the
-            // dropdown above.
-            Item {
-              width: parent.width
-              height: Math.max(maxCostPerImageLabel.implicitHeight, maxCostPerImageField.implicitHeight)
-
-              Text {
-                id: maxCostPerImageLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Max $/image"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              TextField {
-                id: maxCostPerImageField
-                anchors.left: maxCostPerImageLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "0.00 (no ceiling)"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onEditingFinished: root.commitMaxCostPerImage(text)
-                Component.onCompleted: text = String(root.configState.maxCostPerImage)
-                Connections {
-                  target: root
-                  function onConfigStateChanged() {
-                    if (!maxCostPerImageField.activeFocus) maxCostPerImageField.text = String(root.configState.maxCostPerImage)
-                  }
-                }
-              }
-            }
-
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              visible: root.maxCostPerImageError !== ""
-              text: root.maxCostPerImageError
-              color: root.bar.urgent || "#f38ba8"
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: {
-                var e = root.monthlyCostEstimate
-                if (!e) return "Est. monthly: not enough cost history yet to estimate"
-                return "Est. monthly: " + Model.formatUsd(e.perMonth) + " at " + root.configState.frequency
-                  + " (" + Model.formatUsd(e.perRun) + "/run, mean of last " + e.sampleSize + ")"
-              }
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            // No separator/header here (unlike a section boundary) — this
-            // is the OpenAI image model's own API key, same key slot the
-            // model dropdown right above it configures, not a distinct
-            // section. Stage 1/Stage 2's ApiKeySections directly follow
-            // their model fields the same way, with nothing between them.
-            ApiKeySection { slot: "image"; visible: root.configState.imageBackend === "openai" }
-
             PanelSeparator { foreground: root.bar.foreground }
             PanelSectionHeader { text: "THEME"; foreground: root.bar.foreground }
 
@@ -1731,38 +1532,6 @@ Panel {
               }
             }
 
-            // ---- Pipeline mode: fixed composition (legacy) vs. composition
-            // driven by the day's transits (coherent). ------------------
-            Item {
-              width: parent.width
-              height: Math.max(pipelineModeLabel.implicitHeight, pipelineModeDropdown.implicitHeight)
-
-              Text {
-                id: pipelineModeLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Composition"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Dropdown {
-                id: pipelineModeDropdown
-                anchors.left: pipelineModeLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: root.configState.pipelineMode
-                options: Model.PIPELINE_MODE_CHOICES.map(function(c) {
-                  return { value: c.key, label: c.label }
-                })
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitPipelineMode(value) }
-              }
-            }
 
             // ---- History retention: days of "Themes Generated" entries
             // to keep (astro-arc-prune-history runs automatically every
@@ -2442,4 +2211,336 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
   }
+
+  // ---- Advanced settings popout -------------------------------------
+  // A real overlay window rather than an expanded panel, following the
+  // image-picker plugin's pattern (PanelWindow + WlrLayershell overlay): the
+  // bar panel is narrow, and this view has to hold every model the key can
+  // reach plus three key rows without either being cramped.
+  //
+  // Deliberately a sibling of the panel, not a separate QML file: ApiKeySection
+  // is an inline component of this file and inline components are not visible
+  // from another one, so extracting this would mean duplicating the key rows —
+  // the one part of this widget where duplication is genuinely dangerous.
+  PanelWindow {
+    id: advancedWindow
+
+    visible: root.advancedOpen
+    anchors { top: true; bottom: true; left: true; right: true }
+    color: "transparent"
+    WlrLayershell.namespace: "astro-arc-advanced-settings"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: root.advancedOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    exclusionMode: ExclusionMode.Ignore
+
+    // Click-outside-to-close, with the card itself swallowing clicks so a
+    // mis-aimed click inside doesn't dismiss a form being filled in.
+    MouseArea {
+      anchors.fill: parent
+      onClicked: root.advancedOpen = false
+    }
+
+    Rectangle {
+      anchors.fill: parent
+      color: "#cc000000"
+      z: -1
+    }
+
+    Keys.onEscapePressed: root.advancedOpen = false
+    focus: root.advancedOpen
+
+    Rectangle {
+      id: advancedCard
+      anchors.centerIn: parent
+      width: Math.min(parent.width - Style.space(16) * 2, 720)
+      height: Math.min(parent.height - Style.space(16) * 2, 860)
+      radius: 14
+      color: root.bar ? root.bar.background : "#11111b"
+      border.color: Qt.darker(root.bar ? root.bar.foreground : "#cdd6f4", 2.4)
+      border.width: 1
+
+      MouseArea { anchors.fill: parent }
+
+      Column {
+        id: advancedHeader
+        anchors { top: parent.top; left: parent.left; right: parent.right; margins: Style.space(14) }
+        spacing: Style.space(4)
+
+        Item {
+          width: parent.width
+          height: Math.max(advancedTitle.implicitHeight, advancedCloseBtn.implicitHeight)
+
+          Text {
+            id: advancedTitle
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Advanced settings"
+            color: root.bar ? root.bar.foreground : "#cdd6f4"
+            font.family: root.bar ? root.bar.fontFamily : "sans"
+            font.pixelSize: Style.font.body
+            font.bold: true
+          }
+
+          Button {
+            id: advancedCloseBtn
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Close"
+            foreground: root.bar ? root.bar.foreground : "#cdd6f4"
+            onClicked: root.advancedOpen = false
+          }
+        }
+
+        Text {
+          width: parent.width
+          wrapMode: Text.WordWrap
+          text: "Anything set here overrides the quality preset, which will then read \"Custom\". Costs marked (est) are published rates applied to token counts measured from real runs; (actual) means this exact combination has been measured on this machine."
+          color: Qt.darker(root.bar ? root.bar.foreground : "#cdd6f4", 1.3)
+          font.family: root.bar ? root.bar.fontFamily : "sans"
+          font.pixelSize: Style.font.caption
+        }
+      }
+
+      Flickable {
+        anchors { top: advancedHeader.bottom; left: parent.left; right: parent.right; bottom: parent.bottom; margins: Style.space(14) }
+        contentHeight: advancedContent.implicitHeight
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+
+        Column {
+          id: advancedContent
+          width: parent.width
+          spacing: Style.space(10)
+
+          PanelSectionHeader { text: "MODEL LIST"; foreground: root.bar.foreground }
+
+          Item {
+            width: parent.width
+            height: Math.max(advModelStatus.implicitHeight, advRefreshBtn.implicitHeight, advShowAllBtn.implicitHeight)
+
+            Text {
+              id: advModelStatus
+              anchors.left: parent.left
+              anchors.right: advShowAllBtn.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              wrapMode: Text.WordWrap
+              text: {
+                if (root.modelCatalogLoading) return "Refreshing…"
+                if (root.modelCatalogError !== "") return root.modelCatalogError
+                if (!root.modelCatalog.everFetched) return "Model list not fetched yet"
+                var n = (root.modelCatalog.image || []).length + (root.modelCatalog.chat || []).length
+                return n + " reachable" + (root.modelCatalog.stale ? " · over a day old" : "")
+              }
+              color: root.modelCatalogError !== "" ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Button {
+              id: advShowAllBtn
+              anchors.right: advRefreshBtn.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.showAllModels ? "Shortlist" : "All models"
+              foreground: root.bar.foreground
+              onClicked: root.showAllModels = !root.showAllModels
+            }
+
+            Button {
+              id: advRefreshBtn
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              text: "Refresh"
+              enabled: !root.modelCatalogLoading
+              foreground: root.bar.foreground
+              onClicked: root.loadModelCatalog(true)
+            }
+          }
+
+          PanelSeparator { foreground: root.bar.foreground }
+          PanelSectionHeader { text: "STAGE 1 · INTERPRETATION"; foreground: root.bar.foreground }
+
+          AdvancedChatPicker { stage: "stage1" }
+          ApiKeySection { slot: "stage1" }
+
+          PanelSeparator { foreground: root.bar.foreground }
+          PanelSectionHeader { text: "STAGE 2 · IMAGE PROMPT"; foreground: root.bar.foreground }
+
+          AdvancedChatPicker { stage: "stage2" }
+          ApiKeySection { slot: "stage2" }
+
+          PanelSeparator { foreground: root.bar.foreground }
+          PanelSectionHeader { text: "IMAGE GENERATION"; foreground: root.bar.foreground }
+
+          Item {
+            width: parent.width
+            height: Math.max(advImageLabel.implicitHeight, advImageDropdown.implicitHeight)
+
+            Text {
+              id: advImageLabel
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: root.labelColW
+              text: "Model"
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            Dropdown {
+              id: advImageDropdown
+              anchors.left: advImageLabel.right
+              anchors.leftMargin: Style.space(8)
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              showLabel: false
+              value: Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
+              options: {
+                var rows = Model.imageRowsWithinCeiling(
+                  Model.visibleRows(root.modelCatalog.image || [], root.showAllModels),
+                  root.configState.maxCostPerImage)
+                var opts = rows.map(function(r) {
+                  return { value: Model.openaiModelDropdownValue(r.model, r.quality), label: Model.imageModelLabel(r) }
+                })
+                var current = Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
+                if (current && !opts.some(function(o) { return o.value === current }))
+                  opts.unshift({ value: current, label: root.configState.openaiModel + " — " + root.configState.openaiQuality + "  · over ceiling" })
+                return opts
+              }
+              foreground: root.bar.foreground
+              onChanged: function(value) { root.commitOpenaiModel(value) }
+            }
+          }
+
+          Item {
+            width: parent.width
+            height: Math.max(advCeilingLabel.implicitHeight, advCeilingField.implicitHeight)
+
+            Text {
+              id: advCeilingLabel
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: root.labelColW
+              text: "Max $/image"
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            TextField {
+              id: advCeilingField
+              anchors.left: advCeilingLabel.right
+              anchors.leftMargin: Style.space(8)
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              placeholderText: "0.00 (no ceiling)"
+              foreground: root.bar.foreground
+              font.family: root.bar.fontFamily
+              onEditingFinished: root.commitMaxCostPerImage(text)
+              Component.onCompleted: text = String(root.configState.maxCostPerImage)
+              Connections {
+                target: root
+                function onConfigStateChanged() {
+                  if (!advCeilingField.activeFocus) advCeilingField.text = String(root.configState.maxCostPerImage)
+                }
+              }
+            }
+          }
+
+          Text {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            visible: root.maxCostPerImageError !== ""
+            text: root.maxCostPerImageError
+            color: root.bar.urgent || "#f38ba8"
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          ApiKeySection { slot: "image" }
+
+          PanelSeparator { foreground: root.bar.foreground }
+          PanelSectionHeader { text: "PIPELINE"; foreground: root.bar.foreground }
+
+          Item {
+            width: parent.width
+            height: Math.max(advPipelineLabel.implicitHeight, advPipelineDropdown.implicitHeight)
+
+            Text {
+              id: advPipelineLabel
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: root.labelColW
+              text: "Composition"
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            Dropdown {
+              id: advPipelineDropdown
+              anchors.left: advPipelineLabel.right
+              anchors.leftMargin: Style.space(8)
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              showLabel: false
+              value: root.configState.pipelineMode
+              options: Model.PIPELINE_MODE_CHOICES.map(function(c) { return { value: c.key, label: c.label } })
+              foreground: root.bar.foreground
+              onChanged: function(value) { root.commitPipelineMode(value) }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // One chat-model picker, used for both stages in the popout. The two stages
+  // are separate controls here precisely because splitting them is the point of
+  // this window; the panel shows them merged as "Chat models".
+  component AdvancedChatPicker: Item {
+    id: picker
+    required property string stage
+    readonly property string currentModel: stage === "stage1" ? root.configState.stage1Model : root.configState.stage2Model
+
+    width: parent.width
+    height: Math.max(pickerLabel.implicitHeight, pickerDropdown.implicitHeight)
+
+    Text {
+      id: pickerLabel
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      width: root.labelColW
+      text: "Model"
+      color: Qt.darker(root.bar.foreground, 1.3)
+      font.family: root.bar.fontFamily
+      font.pixelSize: Style.font.bodySmall
+    }
+
+    Dropdown {
+      id: pickerDropdown
+      anchors.left: pickerLabel.right
+      anchors.leftMargin: Style.space(8)
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      showLabel: false
+      value: picker.currentModel
+      options: {
+        var opts = Model.visibleRows(root.modelCatalog.chat || [], root.showAllModels).map(function(r) {
+          return { value: r.model, label: Model.chatModelLabel(r) }
+        })
+        var cur = picker.currentModel
+        if (cur && !opts.some(function(o) { return o.value === cur }))
+          opts.unshift({ value: cur, label: cur + "  · not in catalog" })
+        return opts
+      }
+      foreground: root.bar.foreground
+      onChanged: function(value) {
+        if (picker.stage === "stage1") root.commitStage1Model(value)
+        else root.commitStage2Model(value)
+      }
+    }
+  }
+
 }
