@@ -32,6 +32,7 @@ Panel {
     lastRunFile.reload()
     reviewsIndexFile.reload()
     costsFile.reload()
+    loadModelCatalogIfStale()
   }
 
   function openFromHotkey() {
@@ -596,6 +597,87 @@ Panel {
   // size regardless of what either image backend natively renders at
   // (see image_fit.py's fit_cover). --------------------------------------
   property string backgroundSizeError: ""
+  // ---- Per-image cost ceiling (dollars; 0 = none). -------------------
+  property string maxCostPerImageError: ""
+
+  function commitMaxCostPerImage(value) {
+    var trimmed = String(value || "").trim()
+    if (trimmed === "") trimmed = "0"
+    if (!/^[0-9]+(\.[0-9]+)?$/.test(trimmed)) {
+      root.maxCostPerImageError = "Enter a dollar amount, e.g. 0.03 (0 = no ceiling)"
+      return
+    }
+    root.maxCostPerImageError = ""
+    maxCostPerImageWriteProc.command = [root.configBin, "--set-max-cost-per-image", trimmed]
+    maxCostPerImageWriteProc.running = true
+  }
+
+  Process {
+    id: maxCostPerImageWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
+  // ---- Model catalog: which models this key can actually reach, what they
+  // cost, and what they have been measured consuming. Replaces the hardcoded
+  // four-row list that used to live in Model.js — that list offered 2 image
+  // models while the key could reach 10, so most of what had been paid for was
+  // unreachable from here. See backend/bin/model_catalog.py for why
+  // availability is discovered but price has to be hand-entered.
+  readonly property string modelCatalogBin: home + "/.local/share/omarchy/astro-arc/bin/model_catalog.py"
+  property var modelCatalog: ({ chat: [], image: [], stale: true, everFetched: false, fetchedAt: null })
+  property bool modelCatalogLoading: false
+  property string modelCatalogError: ""
+
+  // `refresh` hits GET /v1/models (free, no tokens billed, ~1s); without it
+  // this only reads the on-disk cache, so opening the panel is never gated on
+  // the network.
+  function loadModelCatalog(refresh) {
+    if (root.modelCatalogLoading) return
+    root.modelCatalogLoading = true
+    root.modelCatalogError = ""
+    var cmd = [root.venvPython, root.modelCatalogBin, "--size", root.configState.backgroundSize || "1024x1024"]
+    if (refresh) cmd.push("--refresh")
+    modelCatalogProc.command = cmd
+    modelCatalogProc.running = true
+  }
+
+  // Auto-refresh only when the cache has actually gone stale (24h, enforced
+  // backend-side), so the common case is a disk read and the network is only
+  // touched about once a day.
+  function loadModelCatalogIfStale() {
+    loadModelCatalog(root.modelCatalog.everFetched === true && root.modelCatalog.stale === true)
+  }
+
+  Process {
+    id: modelCatalogProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        root.modelCatalogLoading = false
+        try {
+          var parsed = JSON.parse(String(text || ""))
+          if (parsed && parsed.ok) {
+            root.modelCatalog = parsed
+            // A cache that has never been fetched yields empty lists; fetch
+            // once so a fresh install isn't stuck with no models to pick.
+            if (!parsed.everFetched) root.loadModelCatalog(true)
+          } else {
+            root.modelCatalogError = (parsed && parsed.error) ? parsed.error : "Couldn't read the model list"
+          }
+        } catch (e) {
+          root.modelCatalogError = "Couldn't read the model list"
+        }
+      }
+    }
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var err = String(text || "").trim()
+        if (err !== "" && root.modelCatalogError === "") root.modelCatalogError = err.split("\n").pop()
+      }
+    }
+  }
+
   readonly property string detectResolutionBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-detect-resolution"
 
   function commitBackgroundSize(value) {
@@ -711,14 +793,24 @@ Panel {
   // stays in openai_image_gen.py itself for now, just not wired to the UI
   // — see Conventions.
   property var costsSummary: ({ total: 0, unknownCount: 0, generationCount: 0 })
+  // Projected from REAL past runs (the mean of the last 10 totals x the
+  // cadence), never from a rate card — null when there's no history to average,
+  // same contract as the disk-space estimate.
+  property var monthlyCostEstimate: null
 
   property FileView costsFile: FileView {
     path: root.home + "/.local/state/omarchy/astro-arc/pipeline/costs.json"
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.costsSummary = Model.sumCosts(text())
-    onLoadFailed: root.costsSummary = { total: 0, unknownCount: 0, generationCount: 0 }
+    onLoaded: {
+      root.costsSummary = Model.sumCosts(text())
+      root.monthlyCostEstimate = Model.estimateMonthlyCost(text(), root.configState.frequency)
+    }
+    onLoadFailed: {
+      root.costsSummary = { total: 0, unknownCount: 0, generationCount: 0 }
+      root.monthlyCostEstimate = null
+    }
   }
 
   // ---- Themes Generated: every real generation, browsable and — since
@@ -1127,7 +1219,7 @@ Panel {
 
             Item {
               width: parent.width
-              height: Math.max(stage1ModelLabel.implicitHeight, stage1ModelField.implicitHeight)
+              height: Math.max(stage1ModelLabel.implicitHeight, stage1ModelDropdown.implicitHeight)
 
               Text {
                 id: stage1ModelLabel
@@ -1140,26 +1232,37 @@ Panel {
                 font.pixelSize: Style.font.bodySmall
               }
 
-              // Freeform, not a dropdown of presets: OpenAI's chat-model
-              // catalog changes often enough that a hardcoded list here
-              // would just as likely be stale as helpful.
-              TextField {
-                id: stage1ModelField
+              // Was a freeform TextField, on the reasoning that "OpenAI's
+              // chat-model catalog changes often enough that a hardcoded list
+              // would just as likely be stale as helpful." That was right about
+              // hardcoding and is now moot: this list is DISCOVERED from
+              // GET /v1/models and cached, so it cannot go stale the way a
+              // hand-written one does. The freeform box meanwhile showed no
+              // rates, validated nothing, and gave no way to find out what was
+              // even available — this key can reach 46 chat models.
+              Dropdown {
+                id: stage1ModelDropdown
                 anchors.left: stage1ModelLabel.right
                 anchors.leftMargin: Style.space(8)
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "gpt-4o-mini"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onEditingFinished: root.commitStage1Model(text)
-                Component.onCompleted: text = root.configState.stage1Model
-                Connections {
-                  target: root
-                  function onConfigStateChanged() {
-                    if (!stage1ModelField.activeFocus) stage1ModelField.text = root.configState.stage1Model
-                  }
+                showLabel: false
+                value: root.configState.stage1Model
+                options: {
+                  var opts = (root.modelCatalog.chat || []).map(function(r) {
+                    return { value: r.model, label: Model.chatModelLabel(r) }
+                  })
+                  // Keep whatever is configured selectable even before the
+                  // catalog loads, or if the model has since been retired —
+                  // otherwise this would show a different model than the one
+                  // the pipeline is actually going to run.
+                  var present = opts.some(function(o) { return o.value === root.configState.stage1Model })
+                  if (!present && root.configState.stage1Model)
+                    opts.unshift({ value: root.configState.stage1Model, label: root.configState.stage1Model + "  · not in catalog" })
+                  return opts
                 }
+                foreground: root.bar.foreground
+                onChanged: function(value) { root.commitStage1Model(value) }
               }
             }
 
@@ -1172,7 +1275,7 @@ Panel {
 
             Item {
               width: parent.width
-              height: Math.max(stage2ModelLabel.implicitHeight, stage2ModelField.implicitHeight)
+              height: Math.max(stage2ModelLabel.implicitHeight, stage2ModelDropdown.implicitHeight)
 
               Text {
                 id: stage2ModelLabel
@@ -1185,23 +1288,29 @@ Panel {
                 font.pixelSize: Style.font.bodySmall
               }
 
-              TextField {
-                id: stage2ModelField
+              Dropdown {
+                id: stage2ModelDropdown
                 anchors.left: stage2ModelLabel.right
                 anchors.leftMargin: Style.space(8)
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "gpt-4o-mini"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onEditingFinished: root.commitStage2Model(text)
-                Component.onCompleted: text = root.configState.stage2Model
-                Connections {
-                  target: root
-                  function onConfigStateChanged() {
-                    if (!stage2ModelField.activeFocus) stage2ModelField.text = root.configState.stage2Model
-                  }
+                showLabel: false
+                value: root.configState.stage2Model
+                options: {
+                  var opts = (root.modelCatalog.chat || []).map(function(r) {
+                    return { value: r.model, label: Model.chatModelLabel(r) }
+                  })
+                  // Keep whatever is configured selectable even before the
+                  // catalog loads, or if the model has since been retired —
+                  // otherwise this would show a different model than the one
+                  // the pipeline is actually going to run.
+                  var present = opts.some(function(o) { return o.value === root.configState.stage2Model })
+                  if (!present && root.configState.stage2Model)
+                    opts.unshift({ value: root.configState.stage2Model, label: root.configState.stage2Model + "  · not in catalog" })
+                  return opts
                 }
+                foreground: root.bar.foreground
+                onChanged: function(value) { root.commitStage2Model(value) }
               }
             }
 
@@ -1328,12 +1437,152 @@ Panel {
                 anchors.verticalCenter: parent.verticalCenter
                 showLabel: false
                 value: Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
-                options: Model.OPENAI_MODEL_CHOICES.map(function(c) {
-                  return { value: Model.openaiModelDropdownValue(c.model, c.quality), label: c.label }
-                })
+                // Was Model.OPENAI_MODEL_CHOICES, four rows hand-copied from
+                // openai_image_gen.py. That list offered 2 image models while
+                // this key can reach 10, so gpt-image-1.5 and both gpt-image-2.5
+                // variants were simply unreachable. Rows now come from the
+                // catalog, and each carries a MEASURED per-image cost once that
+                // combination has actually been rendered — never a projection.
+                options: {
+                  var rows = Model.imageRowsWithinCeiling(root.modelCatalog.image || [], root.configState.maxCostPerImage)
+                  var opts = rows.map(function(r) {
+                    return { value: Model.openaiModelDropdownValue(r.model, r.quality), label: Model.imageModelLabel(r) }
+                  })
+                  // The configured pick stays selectable even when the ceiling
+                  // would exclude it or the catalog hasn't loaded — the warning
+                  // below says it's over budget rather than the dropdown
+                  // silently disagreeing with what will actually run.
+                  var current = Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
+                  if (current && !opts.some(function(o) { return o.value === current }))
+                    opts.unshift({ value: current, label: root.configState.openaiModel + " — " + root.configState.openaiQuality + "  · over ceiling" })
+                  return opts
+                }
                 foreground: root.bar.foreground
                 onChanged: function(value) { root.commitOpenaiModel(value) }
               }
+            }
+
+            // ---- Refresh + provenance. GET /v1/models is free and takes
+            // about a second; the cache is re-read on every panel open and
+            // only re-fetched when it has gone stale (24h), so this button is
+            // for when you know something changed and don't want to wait.
+            Item {
+              width: parent.width
+              height: Math.max(modelRefreshStatus.implicitHeight, modelRefreshBtn.implicitHeight)
+
+              Text {
+                id: modelRefreshStatus
+                anchors.left: parent.left
+                anchors.right: modelRefreshBtn.left
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                wrapMode: Text.WordWrap
+                text: {
+                  if (root.modelCatalogLoading) return "Refreshing model list…"
+                  if (root.modelCatalogError !== "") return root.modelCatalogError
+                  if (!root.modelCatalog.everFetched) return "Model list not fetched yet"
+                  var n = (root.modelCatalog.image || []).length + (root.modelCatalog.chat || []).length
+                  return n + " models available" + (root.modelCatalog.stale ? " · list is over a day old" : "")
+                }
+                color: root.modelCatalogError !== "" ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Button {
+                id: modelRefreshBtn
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Refresh"
+                enabled: !root.modelCatalogLoading
+                foreground: root.bar.foreground
+                onClicked: root.loadModelCatalog(true)
+              }
+            }
+
+            // A cost figure here is measured, never projected, so an unpriced
+            // or never-rendered model says so — see model-rates.toml for why
+            // price can't be discovered from the API.
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              visible: {
+                var rows = root.modelCatalog.image || []
+                var current = rows.filter(function(r) {
+                  return r.model === root.configState.openaiModel && r.quality === root.configState.openaiQuality
+                })[0]
+                return !!current && typeof current.cost !== "number"
+              }
+              text: "Cost for this model is unknown. Render once to measure its token use, then add its price to pipeline/model-rates.toml."
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            // ---- Per-image cost ceiling. 0 means no ceiling, matching
+            // maxCostPerRun. Only ever compared against a MEASURED cost, so a
+            // model that has never been rendered is never silently blocked —
+            // but it also won't be quality-bumped while a ceiling is set, since
+            // the unpriced models are exactly the new and potentially expensive
+            // ones. Models whose measured cost exceeds this drop out of the
+            // dropdown above.
+            Item {
+              width: parent.width
+              height: Math.max(maxCostPerImageLabel.implicitHeight, maxCostPerImageField.implicitHeight)
+
+              Text {
+                id: maxCostPerImageLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.labelColW
+                text: "Max $/image"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              TextField {
+                id: maxCostPerImageField
+                anchors.left: maxCostPerImageLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                placeholderText: "0.00 (no ceiling)"
+                foreground: root.bar.foreground
+                font.family: root.bar.fontFamily
+                onEditingFinished: root.commitMaxCostPerImage(text)
+                Component.onCompleted: text = String(root.configState.maxCostPerImage)
+                Connections {
+                  target: root
+                  function onConfigStateChanged() {
+                    if (!maxCostPerImageField.activeFocus) maxCostPerImageField.text = String(root.configState.maxCostPerImage)
+                  }
+                }
+              }
+            }
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              visible: root.maxCostPerImageError !== ""
+              text: root.maxCostPerImageError
+              color: root.bar.urgent || "#f38ba8"
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: {
+                var e = root.monthlyCostEstimate
+                if (!e) return "Est. monthly: not enough cost history yet to estimate"
+                return "Est. monthly: " + Model.formatUsd(e.perMonth) + " at " + root.configState.frequency
+                  + " (" + Model.formatUsd(e.perRun) + "/run, mean of last " + e.sampleSize + ")"
+              }
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
             }
 
             // No separator/header here (unlike a section boundary) — this

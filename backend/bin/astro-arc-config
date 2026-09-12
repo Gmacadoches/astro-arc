@@ -27,6 +27,15 @@
 #                                          astro-arc-detect-resolution)
 #   --set-art-style <key>                 which pipeline/styles.toml preset
 #                                          Stage 2's prompt is suffixed with
+#   --set-max-cost-per-image <N>           most this install will spend on ONE
+#                                          image render, in dollars. 0 means no
+#                                          ceiling (same convention as
+#                                          maxCostPerRun). Only compares against
+#                                          MEASURED costs — a model that has
+#                                          never been rendered has no cost to
+#                                          check, so it is never silently
+#                                          blocked, but it also will not be
+#                                          quality-bumped while a ceiling is set.
 #   --set-pipeline-mode <legacy|coherent>
 #                                          how much of the image's SHAPE varies
 #                                          with the chart. "legacy" pins the
@@ -71,7 +80,7 @@
 set -euo pipefail
 
 CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"daily","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy"}'
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"daily","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerImage":0}'
 COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
 TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
 DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
@@ -164,6 +173,12 @@ case "${1:-}" in
   [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-art-style <key>" >&2; exit 1; }
   current=$(read_config)
   updated=$(jq --arg s "$2" '.artStyle=$s' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-max-cost-per-image)
+  [[ ${2:-} =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "Usage: astro-arc-config --set-max-cost-per-image <N> (dollars, 0 = no ceiling)" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --argjson c "$2" '.maxCostPerImage=$c' <<<"$current")
   write_config "$updated"
   ;;
 --set-pipeline-mode)

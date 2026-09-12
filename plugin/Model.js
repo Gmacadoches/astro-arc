@@ -20,7 +20,8 @@ var DEFAULT_CONFIG = {
   artStyle: "symbolist",
   themeGenerator: "built-in",
   historyRetentionDays: 30,
-  pipelineMode: "legacy"
+  pipelineMode: "legacy",
+  maxCostPerImage: 0
 }
 
 // Mirrors astro-arc-config's --set-pipeline-mode. "legacy" pins the composition
@@ -64,6 +65,66 @@ var ART_STYLE_CHOICES = [
   { key: "ukiyoe", label: "Ukiyo-e" },
   { key: "illuminated", label: "Illuminated Manuscript" }
 ]
+
+// ---- Model catalog labels -------------------------------------------------
+// Rows come from backend/bin/model_catalog.py. Cost is deliberately allowed to
+// be absent: a model with no hand-entered rate, or one never yet rendered, says
+// so instead of showing a number, because this project's standing rule is that
+// a cost figure is real tokens at a known rate or nothing at all.
+
+function formatUsd(n) {
+  if (typeof n !== "number") return ""
+  return n < 0.01 ? "$" + n.toFixed(4) : "$" + n.toFixed(3)
+}
+
+// Chat cost can't be a single number the way an image render can: it depends on
+// how many tokens the prompt and reply turn out to be. The honest label is the
+// rate itself, per 1M tokens in/out.
+function chatModelLabel(row) {
+  if (!row) return ""
+  if (!row.hasRate) return row.label + "  · rate not set"
+  return row.label + "  · $" + row.inputRate.toFixed(2) + "/$" + row.outputRate.toFixed(2) + " per 1M"
+}
+
+function imageModelLabel(row) {
+  if (!row) return ""
+  if (typeof row.cost === "number") return row.label + "  · " + formatUsd(row.cost) + "/image"
+  if (row.costState === "no-rate") return row.label + "  · rate not set"
+  return row.label + "  · cost unknown until first render"
+}
+
+// Runs per month for the monthly projection. Months vary; 30.44 is the mean
+// Gregorian month, which keeps a "monthly" cadence from reading as 1.0.
+var RUNS_PER_MONTH = { daily: 30.44, weekly: 4.35, monthly: 1 }
+
+// Projected monthly spend from REAL past runs, never from a rate card: the mean
+// totalCost of the most recent completed runs times the cadence. Returns null
+// rather than a guess when there is no cost history to average, same contract
+// as estimateHistorySpace.
+// Takes the raw costs.json text, matching sumCosts' contract so the FileView
+// handler doesn't have to hold a parsed copy of the log as well as a summary.
+function estimateMonthlyCost(costsText, frequency) {
+  var costsLog = []
+  try { costsLog = JSON.parse(costsText) || [] } catch (e) { costsLog = [] }
+  var withTotals = costsLog.filter(function(c) { return typeof c.totalCost === "number" && c.totalCost > 0 })
+  if (withTotals.length === 0) return null
+  var recent = withTotals.slice(0, 10)
+  var sum = recent.reduce(function(a, c) { return a + c.totalCost }, 0)
+  var perRun = sum / recent.length
+  var runs = RUNS_PER_MONTH[frequency] || RUNS_PER_MONTH.daily
+  return { perRun: perRun, perMonth: perRun * runs, sampleSize: recent.length }
+}
+
+// Which image rows fit a per-image ceiling. A ceiling of 0 means "no ceiling"
+// — the same convention maxCostPerRun already uses. Rows with no known cost are
+// KEPT: excluding them would hide every new model behind a number the API will
+// never provide, which is the dependency this whole change exists to remove.
+function imageRowsWithinCeiling(rows, ceiling) {
+  if (!ceiling || ceiling <= 0) return rows || []
+  return (rows || []).filter(function(r) {
+    return typeof r.cost !== "number" || r.cost <= ceiling
+  })
+}
 
 var SIZE_PATTERN = /^[0-9]{2,5}x[0-9]{2,5}$/
 
@@ -112,7 +173,10 @@ function parseConfig(raw) {
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
       historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
         ? data.historyRetentionDays : 30,
-      pipelineMode: data.pipelineMode === "coherent" ? "coherent" : "legacy"
+      pipelineMode: data.pipelineMode === "coherent" ? "coherent" : "legacy",
+      // 0 (or anything unparseable) means no ceiling, matching maxCostPerRun.
+      maxCostPerImage: typeof data.maxCostPerImage === "number" && data.maxCostPerImage >= 0
+        ? data.maxCostPerImage : 0
     }
   } catch (e) {
     return Object.assign({}, DEFAULT_CONFIG)
@@ -398,6 +462,11 @@ if (typeof module !== "undefined") {
     ART_STYLE_CHOICES: ART_STYLE_CHOICES,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PIPELINE_MODE_CHOICES: PIPELINE_MODE_CHOICES,
+    chatModelLabel: chatModelLabel,
+    imageModelLabel: imageModelLabel,
+    formatUsd: formatUsd,
+    estimateMonthlyCost: estimateMonthlyCost,
+    imageRowsWithinCeiling: imageRowsWithinCeiling,
     openaiModelDropdownValue: openaiModelDropdownValue,
     formatDateDigits: formatDateDigits,
     formatTimeDigits: formatTimeDigits,

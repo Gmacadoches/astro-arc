@@ -160,17 +160,40 @@ if [[ $(jq -r '.hasPeople // false' "$pipeline_meta_file" 2>/dev/null) == true ]
   if [[ $image_backend == openai ]]; then
     max_cost_per_run=$(jq -r '.maxCostPerRun // 0.05' "$CONFIG_FILE" 2>/dev/null || echo "0.05")
     chat_cost_so_far=$(jq -r '[.stage1Cost, .stage15Cost, .stage2Cost, .signatureCost] | map(select(. != null)) | add // 0' "$pipeline_meta_file" 2>/dev/null || echo 0)
-    high_estimate=$("$VENV_PY" "$BIN_DIR/openai_image_gen.py" --estimate-cost \
-      "$openai_model" high "$bg_width" "$bg_height" 2>/dev/null || echo "null")
+    max_cost_per_image=$(jq -r '.maxCostPerImage // 0' "$CONFIG_FILE" 2>/dev/null || echo 0)
+
+    # Prefer a MEASURED cost for this exact model/quality/render-size over the
+    # published-token-count estimate — see model_catalog.py. Falls back to the
+    # estimate when this combination has never been rendered.
+    render_size=$("$VENV_PY" -c "import sys;sys.path.insert(0,'$BIN_DIR');from model_catalog import render_size_for;print(render_size_for($bg_width,$bg_height))" 2>/dev/null || echo "")
+    high_estimate=null
+    if [[ -n $render_size ]]; then
+      high_estimate=$("$VENV_PY" "$BIN_DIR/model_catalog.py" --measured-cost "$openai_model" high "$render_size" 2>/dev/null || echo "null")
+    fi
+    high_source="measured"
     if [[ $high_estimate == null ]]; then
-      # Unknown rate for this model — don't guess, and don't let an unknown
-      # silently block the quality fix either. Bump, same as before.
-      openai_quality_used="high"
-    elif awk -v c="$chat_cost_so_far" -v i="$high_estimate" -v m="$max_cost_per_run" \
-           'BEGIN { exit !(m <= 0 || c + i <= m) }'; then
+      high_source="estimated"
+      high_estimate=$("$VENV_PY" "$BIN_DIR/openai_image_gen.py" --estimate-cost \
+        "$openai_model" high "$bg_width" "$bg_height" 2>/dev/null || echo "null")
+    fi
+
+    if [[ $high_estimate == null ]]; then
+      # Cost genuinely unknown: no hand-entered rate, and never rendered at this
+      # tier. This used to bump anyway, on the reasoning that an unknown
+      # shouldn't block the quality fix — but that inverted the ceiling's whole
+      # purpose, because the models with no rate are exactly the new, unvetted,
+      # potentially expensive ones. An unknown is now a reason NOT to spend,
+      # whenever any ceiling is set at all.
+      if awk -v r="$max_cost_per_run" -v i="$max_cost_per_image" 'BEGIN { exit !(r <= 0 && i <= 0) }'; then
+        openai_quality_used="high"
+      else
+        echo "Astro-Arc: person in frame, but the high-quality cost for $openai_model is unknown (no rate in model-rates.toml, and never rendered at that tier) and a cost ceiling is set — staying at $openai_quality. Render it once, or add its rate, to let the bump happen." >&2
+      fi
+    elif awk -v c="$chat_cost_so_far" -v i="$high_estimate" -v m="$max_cost_per_run" -v p="$max_cost_per_image" \
+           'BEGIN { exit !((m <= 0 || c + i <= m) && (p <= 0 || i <= p)) }'; then
       openai_quality_used="high"
     else
-      echo "Astro-Arc: person in frame, but high-quality render (~\$$high_estimate + \$$chat_cost_so_far chat) would exceed the \$$max_cost_per_run/run ceiling — staying at $openai_quality" >&2
+      echo "Astro-Arc: person in frame, but a high-quality render ($high_source ~\$$high_estimate, plus \$$chat_cost_so_far chat) would exceed a ceiling (\$$max_cost_per_run/run, \$$max_cost_per_image/image) — staying at $openai_quality" >&2
     fi
   else
     openai_quality_used="high"
