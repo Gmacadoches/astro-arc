@@ -94,6 +94,31 @@ PRICE_ESTIMATE_ASSUMPTION = (
     "platform.openai.com/docs/pricing."
 )
 
+# Models known to accept the /images/generations `moderation` parameter.
+#
+# Gated by name rather than sent unconditionally because an unrecognized
+# parameter is itself a 400: sending this to a model that doesn't take it
+# would trade a *rare* moderation block for a *guaranteed* failure on every
+# render. A model missing from this set simply gets the default ("auto")
+# — the behavior this pipeline had before 2026-09-12.
+MODERATION_PARAM_MODELS = {"gpt-image-1-mini", "gpt-image-2"}
+
+# "low" relaxes the safety classifier's threshold; it does NOT disable it.
+# Genuinely explicit content still blocks, and a block is still a hard
+# failure for the run (see generate()).
+#
+# Added 2026-09-12 after the day's generation was refused for "sexual"
+# content: the "bodily and anatomical" register (registers.toml) had Stage 2
+# compose a close-foreground scene of bare anatomy — an outstretched palm,
+# fingers, a bent knee, "vertebrae half-wrapped in linen" — which reads to
+# the classifier like a partially-draped nude. Nothing in that prompt was
+# actually sexual, which is exactly the margin this setting widens. It is
+# NOT a fix for the underlying register problem, and it can't be: the
+# classifier runs before the model and is deterministic per input, so a
+# prompt it refuses is refused identically every time no matter what this
+# is set to. Re-rendering the same prompt is always wasted spend.
+MODERATION_LEVEL = "low"
+
 MODEL_CHOICES = [
     {"model": "gpt-image-2", "quality": "auto", "label": "GPT Image 2", "estCost": MODEL_COSTS["gpt-image-2"]["auto"]},
     {"model": "gpt-image-1-mini", "quality": "low", "label": "GPT Image 1 Mini — Low", "estCost": MODEL_COSTS["gpt-image-1-mini"]["low"]},
@@ -186,6 +211,12 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
     payload = {"model": model, "prompt": prompt, "size": render_size, "n": 1}
     if model != "gpt-image-2":  # gpt-image-2 is used at its own "auto" quality
         payload["quality"] = quality
+    # See MODERATION_LEVEL / MODERATION_PARAM_MODELS above — widens the
+    # safety margin for this pipeline's non-sexual anatomical imagery on the
+    # models that accept the parameter, and is silently skipped on any that
+    # don't rather than risking a 400 on every render.
+    if model in MODERATION_PARAM_MODELS:
+        payload["moderation"] = MODERATION_LEVEL
 
     result = _request("/images/generations", payload=payload, method="POST", slot="image")
     b64_image = result["data"][0]["b64_json"]
