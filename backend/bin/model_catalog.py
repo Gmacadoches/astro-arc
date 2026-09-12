@@ -218,11 +218,24 @@ def _representative_stage_tokens(stage, learned):
     recent rather than averaging is deliberate: prompt lengths change when the
     prompts themselves are edited, and an average would blend the old shape with
     the new one indefinitely.
+
+    Falls back to another stage's measurement when this one has none, and that
+    fallback is not a nicety — Stage 1 and Stage 1.5 are cached per period, so on
+    most runs they never execute and never get measured. Without the fallback
+    every preset showed "cost unknown" indefinitely despite Stage 2 being
+    measured, which is worse than an approximation: it hides a number that is
+    roughly right behind a number that is absent. The three chat stages send
+    prompts of the same order of magnitude, so one stands in for another
+    acceptably — and anything priced this way is labelled "est", never "actual".
     """
-    by_model = (learned.get("stages") or {}).get(stage) or {}
-    if not by_model:
+    stages = learned.get("stages") or {}
+    by_model = stages.get(stage) or {}
+    if by_model:
+        return max(by_model.values(), key=lambda e: e.get("measuredAt", ""))
+    everything = [e for other in stages.values() for e in other.values()]
+    if not everything:
         return None
-    return max(by_model.values(), key=lambda e: e.get("measuredAt", ""))
+    return max(everything, key=lambda e: e.get("measuredAt", ""))
 
 
 def stage_cost(stage, model, rates=None, learned=None):

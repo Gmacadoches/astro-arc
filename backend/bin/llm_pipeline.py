@@ -1224,6 +1224,14 @@ def build(reading, config):
         "secondaryRegister": secondary_register,
         "conceptTags": concept_tags,
         "hasPeople": has_people,
+        # Which model actually ran each stage. Previously only the COSTS were
+        # recorded, so a review page could show what a stage cost but not what
+        # produced it — and with the models now freely switchable from the
+        # widget, a cost with no model attached is close to meaningless.
+        "stage1Model": stage1_model,
+        "stage15Model": stage1_model,  # Stage 1.5 deliberately runs on Stage 1's model
+        "stage2Model": stage2_model,
+        "signatureModel": stage2_model,
         "pipelineMode": dial["mode"],
         "texture": reading["arc"].get("texture"),
         "dial": {k: v for k, v in dial.items() if k != "mode"},

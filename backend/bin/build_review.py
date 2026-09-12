@@ -174,6 +174,8 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   .prompt-label {{ font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 6px; }}
   .cost-panel {{ background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-top: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }}
   .cost-row {{ display: flex; justify-content: space-between; padding: 3px 0; color: var(--ink-dim); }}
+  .cost-model {{ color: var(--ink-dim); font-size: 11px; }}
+  .cost-note {{ color: var(--ink-dim); font-size: 11px; line-height: 1.5; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }}
   .cost-row.total {{ color: var(--ink); font-weight: 600; border-top: 1px solid var(--border); margin-top: 4px; padding-top: 6px; }}
   footer {{ font-size: 12px; color: var(--ink-dim); border-top: 1px solid var(--border); padding-top: 16px; margin-top: 32px; }}
   #lightbox {{ position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: none; align-items: center; justify-content: center; padding: 40px; z-index: 10; cursor: zoom-out; }}
@@ -222,13 +224,14 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   </div>
 
   <div class="cost-panel">
-    <div class="prompt-label">Cost of this generation (all 3 API calls)</div>
-    <div class="cost-row"><span>Stage 1 (interpretation)</span><span>{stage1_cost}</span></div>
-    <div class="cost-row"><span>Stage 1.5 (amplification)</span><span>{stage15_cost}</span></div>
-    <div class="cost-row"><span>Stage 2 (image prompt)</span><span>{stage2_cost}</span></div>
-    <div class="cost-row"><span>Visual signature{signature_note}</span><span>{signature_cost}</span></div>
-    <div class="cost-row"><span>Image render ({image_cost_source})</span><span>{image_cost}</span></div>
-    <div class="cost-row total"><span>Total</span><span>{total_cost}</span></div>
+    <div class="prompt-label">What this generation cost</div>
+    <div class="cost-row"><span>Stage 1 (interpretation) <span class="cost-model">{stage1_model}</span></span><span>{stage1_cost}</span></div>
+    <div class="cost-row"><span>Stage 1.5 (amplification) <span class="cost-model">{stage15_model}</span></span><span>{stage15_cost}</span></div>
+    <div class="cost-row"><span>Stage 2 (image prompt) <span class="cost-model">{stage2_model}</span></span><span>{stage2_cost}</span></div>
+    <div class="cost-row"><span>Visual signature <span class="cost-model">{signature_model}</span></span><span>{signature_cost}</span></div>
+    <div class="cost-row"><span>Image render <span class="cost-model">{image_model}{image_quality_note}</span></span><span>{image_cost}</span></div>
+    <div class="cost-row total"><span>Total charged this run</span><span>{total_cost}</span></div>
+    <div class="cost-note">{cost_note}</div>
   </div>
 
   <footer>{footer_text}</footer>
@@ -309,6 +312,35 @@ def natal_and_arc_chips(reading):
     )
 
 
+def _fmt_stage_cost(value):
+    """A stage cost of None does NOT mean "unknown" — it means that stage did not
+    run, because Stage 1 and Stage 1.5 are cached per period and the visual
+    signature is cached per birth chart. Rendering it as a bare dash read as
+    missing data and made the total look wrong; "cached" says what actually
+    happened."""
+    return "cached" if value is None else _fmt_cost(value)
+
+
+def _cost_note(cost):
+    """Spell out what the total does and does not include, since a cached run's
+    total is genuinely lower than what the same image would cost from scratch."""
+    cached = [
+        name for name, key in (
+            ("Stage 1", "stage1Cost"), ("Stage 1.5", "stage15Cost"),
+            ("the visual signature", "signatureCost"),
+        ) if cost.get(key) is None
+    ]
+    if not cached:
+        return "Every stage ran and is billed above."
+    joined = cached[0] if len(cached) == 1 else ", ".join(cached[:-1]) + " and " + cached[-1]
+    return (
+        f"{joined} were reused from cache, so nothing was charged for them on this run — "
+        "Stage 1 and Stage 1.5 are cached per period, the signature per birth chart. "
+        "Regenerating the same day is cheap for that reason; a first run of a new day "
+        "pays for them again."
+    )
+
+
 def _fmt_cost(value):
     if value is None:
         return "—"
@@ -353,11 +385,19 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         avoided_chips="".join(_chip(t) for t in avoided) or '<span class="chip">none yet</span>',
         visual_signature=_esc(meta.get("visualSignature", "")),
         final_prompt=_esc(meta.get("finalPrompt", "")),
-        stage1_cost=_fmt_cost(cost.get("stage1Cost")),
-        stage15_cost=_fmt_cost(cost.get("stage15Cost")),
-        stage2_cost=_fmt_cost(cost.get("stage2Cost")),
-        signature_cost=_fmt_cost(cost.get("signatureCost")),
-        signature_note=" (one-time)" if cost.get("signatureCost") is not None else "",
+        stage1_cost=_fmt_stage_cost(cost.get("stage1Cost")),
+        stage15_cost=_fmt_stage_cost(cost.get("stage15Cost")),
+        stage2_cost=_fmt_stage_cost(cost.get("stage2Cost")),
+        signature_cost=_fmt_stage_cost(cost.get("signatureCost")),
+        stage1_model=meta.get("stage1Model") or "",
+        stage15_model=meta.get("stage15Model") or "",
+        stage2_model=meta.get("stage2Model") or "",
+        signature_model=meta.get("signatureModel") or "",
+        image_model=cost.get("imageModel") or "",
+        image_quality_note=(
+            f" · {cost['imageQualityUsed']}" if cost.get("imageQualityUsed") else ""
+        ),
+        cost_note=_cost_note(cost),
         image_cost=_fmt_cost(cost.get("imageCost")),
         image_cost_source=_esc(cost.get("imageCostSource") or "unknown"),
         total_cost=_fmt_cost(cost.get("totalCost")),

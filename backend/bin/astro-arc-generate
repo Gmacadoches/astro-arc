@@ -292,6 +292,7 @@ image_cost_source=$(jq -r '.costSource // "unknown"' "$image_cost_file" 2>/dev/n
 cost_entry=$(jq -n \
   --arg timestamp "$generated_at" --arg periodKey "$period_key" --arg frequency "$frequency" \
   --arg backend "$image_backend" --arg imageCostSource "$image_cost_source" \
+  --arg imageModel "$openai_model" --arg imageQualityUsed "$openai_quality_used" \
   --argjson stage1Cost "$stage1_cost" --argjson stage15Cost "$stage15_cost" \
   --argjson stage2Cost "$stage2_cost" \
   --argjson signatureCost "$signature_cost" --argjson imageCost "$image_cost" \
@@ -299,6 +300,7 @@ cost_entry=$(jq -n \
     timestamp: $timestamp, periodKey: $periodKey, frequency: $frequency, imageBackend: $backend,
     stage1Cost: $stage1Cost, stage15Cost: $stage15Cost, stage2Cost: $stage2Cost, signatureCost: $signatureCost,
     imageCost: $imageCost, imageCostSource: $imageCostSource,
+    imageModel: $imageModel, imageQualityUsed: $imageQualityUsed,
     totalCost: ([$stage1Cost, $stage15Cost, $stage2Cost, $signatureCost, $imageCost] | map(select(. != null)) | add)
   }')
 
