@@ -130,6 +130,25 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
         "temperature": temperature,
         "response_format": {"type": "json_object"},
     }
+
+    # Some models accept only the default temperature and 400 on anything else.
+    # Measured: gpt-5-mini, gpt-5.6-luna and gpt-6-astra refuse it; gpt-4.1,
+    # gpt-4o-mini and gpt-5.4 accept it. That doesn't follow family lines, so it
+    # is discovered rather than tabulated (see model_catalog.get_capability) and
+    # remembered, so the wasted attempt happens once per model, not once per call.
+    #
+    # Dropping temperature is a real change in behavior, not a silent no-op: this
+    # pipeline leans on it (0.95 on Stage 2 for imagery variation, 0.7 on Stage 1
+    # for a steadier reading). On these models the default is 1, so output runs
+    # slightly looser than configured. That beats failing the generation, but it
+    # is the reason the widget marks such a model rather than hiding the fact.
+    try:
+        from model_catalog import get_capability  # noqa: PLC0415
+
+        if get_capability(model, "temperature") is False:
+            payload.pop("temperature", None)
+    except Exception:  # noqa: BLE001
+        pass
     # Retry on 429 and 5xx with backoff (added 2026-09-12). Without this a single
     # rate-limit reply killed the whole generation — and killed it *after* the
     # earlier stages had already been billed, so a 429 on Stage 2 threw away the
@@ -143,7 +162,13 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
     # Deliberately not retrying 4xx other than 429: a bad request or a rejected
     # key will fail identically no matter how long we wait.
     last_detail = None
-    for attempt in range(CHAT_MAX_ATTEMPTS):
+    # Manual counter rather than `for ... in range(...)` so the temperature
+    # fallback below can retry WITHOUT spending one of the backoff attempts —
+    # a rejected parameter is not congestion, and a generation that hits both a
+    # capability mismatch and a rate limit should still get its full budget of
+    # real retries.
+    attempt = 0
+    while attempt < CHAT_MAX_ATTEMPTS:
         req = urllib.request.Request(
             CHAT_API_URL,
             data=json.dumps(payload).encode(),
@@ -161,8 +186,27 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode(errors="replace")[:300]
             last_detail = f"OpenAI chat API error {exc.code}: {detail}"
+
+            # A rejected temperature is a capability mismatch, not congestion:
+            # retry immediately without it and remember. Deliberately does NOT
+            # consume a backoff attempt, since nothing is overloaded and a 400
+            # bills nothing.
+            if (exc.code == 400 and "temperature" in detail
+                    and "unsupported" in detail.lower() and "temperature" in payload):
+                payload.pop("temperature", None)
+                try:
+                    from model_catalog import set_capability  # noqa: PLC0415
+
+                    set_capability(model, "temperature", False)
+                except Exception:  # noqa: BLE001
+                    pass
+                print(f"llm_pipeline: {model} rejects a custom temperature; retrying at its "
+                      f"default and remembering. Output will vary slightly more than configured.",
+                      file=sys.stderr)
+                continue  # deliberately without incrementing `attempt`
+
             retriable = exc.code == 429 or 500 <= exc.code < 600
-            if not retriable or attempt == CHAT_MAX_ATTEMPTS - 1:
+            if not retriable or attempt >= CHAT_MAX_ATTEMPTS - 1:
                 raise PipelineError(last_detail) from None
             wait = None
             match = re.search(r"try again in ([0-9.]+)s", detail)
@@ -173,6 +217,7 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
             print(f"llm_pipeline: {exc.code} from the chat API, retrying in {wait:.1f}s "
                   f"(attempt {attempt + 1}/{CHAT_MAX_ATTEMPTS})", file=sys.stderr)
             time.sleep(wait)
+            attempt += 1
     else:  # pragma: no cover — loop always breaks or raises
         raise PipelineError(last_detail or "OpenAI chat API call failed")
 

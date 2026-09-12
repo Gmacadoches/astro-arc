@@ -90,13 +90,20 @@
 "gpt-image-2.5-sunburst"  = { label = "GPT Image 2.5 Sunburst", input = 5.00, image_input = 8.00, output = 30.00 }
 
 [image_qualities]
-"gpt-image-1"            = ["low", "medium", "high"]
-"gpt-image-1-mini"       = ["low", "medium", "high"]
-"gpt-image-1.5"          = ["low", "medium", "high"]
-"gpt-image-2"            = ["auto"]
-"gpt-image-2.5-flare"    = ["auto"]
-"gpt-image-2.5-sunburst" = ["auto"]
-"chatgpt-image-latest"   = ["auto"]
+# Probed against the live API on 2026-09-12: every image model this key can
+# reach accepts all four. The previous table restricted gpt-image-2 and the 2.5
+# models to "auto", which was inherited from an assumption in the render code
+# rather than from anything the API says — it meant gpt-image-2 could never be
+# run at "low", i.e. the most expensive model was locked to its most expensive
+# setting. Re-probe with a deliberately invalid value (which costs nothing) if a
+# new model behaves differently; the error enumerates what it accepts.
+"gpt-image-1"            = ["low", "medium", "high", "auto"]
+"gpt-image-1-mini"       = ["low", "medium", "high", "auto"]
+"gpt-image-1.5"          = ["low", "medium", "high", "auto"]
+"gpt-image-2"            = ["low", "medium", "high", "auto"]
+"gpt-image-2.5-flare"    = ["low", "medium", "high", "auto"]
+"gpt-image-2.5-sunburst" = ["low", "medium", "high", "auto"]
+"chatgpt-image-latest"   = ["low", "medium", "high", "auto"]
 
 [hierarchy]
 image = [

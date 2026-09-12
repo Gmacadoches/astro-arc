@@ -53,19 +53,31 @@ MODEL_COSTS = {
         "medium": round(_GPT_IMAGE_1_TOKENS["medium"] * 8 / 1_000_000, 4),
         "high": round(_GPT_IMAGE_1_TOKENS["high"] * 8 / 1_000_000, 4),
     },
+    # Legacy estimate table. model_catalog.image_cost() is the real estimator
+    # now — it prices any model/tier from the rate table — and this only remains
+    # as the fallback inside generate() when the catalog can't be imported.
+    # gpt-image-2 is listed per tier rather than only at "auto" since every tier
+    # is now selectable on it.
     "gpt-image-2": {
-        # gpt-image-2 is used at "auto" quality in this UI, not a fixed
-        # tier — this is the estimated range across low..high.
+        "low": round(_GPT_IMAGE_1_TOKENS["low"] * 30 / 1_000_000, 4),
+        "medium": round(_GPT_IMAGE_1_TOKENS["medium"] * 30 / 1_000_000, 4),
+        "high": round(_GPT_IMAGE_1_TOKENS["high"] * 30 / 1_000_000, 4),
         "auto": round(_GPT_IMAGE_1_TOKENS["high"] * 30 / 1_000_000, 4),
     },
 }
 
 def quality_key_for(model, quality):
-    """The tier spelling to record and to price under. gpt-image-2 renders at
-    its own "auto" tier regardless of what the config asks for, so recording it
-    under the requested tier would file the measurement under a combination
-    that never actually ran."""
-    return "auto" if model == "gpt-image-2" else quality
+    """The tier spelling to record and to price under.
+
+    This used to force gpt-image-2 to "auto" because the render call refused to
+    send a quality for it. Probing the live API on 2026-09-12 showed every image
+    model accepts low/medium/high/auto, so that restriction was self-imposed —
+    and it meant the most expensive model was pinned to its most expensive
+    setting. The requested tier is now both sent and recorded. Kept as a single
+    function so the recorder and the estimator can never disagree on the
+    spelling, which is a real bug class here even when the mapping is identity.
+    """
+    return quality
 
 
 def estimate_cost(model, quality, target_width=1024, target_height=1024):
@@ -215,9 +227,7 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
     # target below.
     render_size = closest_supported_size(target_width, target_height, OPENAI_IMAGE_SIZES)
 
-    payload = {"model": model, "prompt": prompt, "size": render_size, "n": 1}
-    if model != "gpt-image-2":  # gpt-image-2 is used at its own "auto" quality
-        payload["quality"] = quality
+    payload = {"model": model, "prompt": prompt, "size": render_size, "n": 1, "quality": quality}
     # See MODERATION_LEVEL / MODERATION_PARAM_MODELS above — widens the
     # safety margin for this pipeline's non-sexual anatomical imagery on the
     # models that accept the parameter, and is silently skipped on any that

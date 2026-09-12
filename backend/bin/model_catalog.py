@@ -307,6 +307,29 @@ def run_cost(chat_model, image_model, quality, size, rates=None, learned=None):
     return round(total + image, 6), source
 
 
+# ---- Discovered capabilities --------------------------------------------
+#
+# Some models reject `temperature` at anything but the default: measured on
+# 2026-09-12, gpt-5-mini, gpt-5.6-luna and gpt-6-astra all refuse it while
+# gpt-4.1, gpt-4o-mini and gpt-5.4 accept it. That does NOT follow family lines,
+# so a hand-written capability table would be guesswork that goes stale. It is
+# discovered at runtime instead — the rejection is a 400, which bills nothing —
+# and cached here so the wasted first attempt happens once per model rather than
+# once per call.
+
+def get_capability(model, name, learned=None):
+    learned = learned if learned is not None else load_learned_usage()
+    return ((learned.get("capabilities") or {}).get(model) or {}).get(name)
+
+
+def set_capability(model, name, value):
+    learned = load_learned_usage()
+    learned.setdefault("capabilities", {}).setdefault(model, {})[name] = value
+    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    return value
+
+
 def measured_cost(model, quality, size, rates=None, learned=None):
     """Dollars for one render of this exact combination, from MEASURED tokens
     times a hand-entered rate. Returns None when either half is missing, which
