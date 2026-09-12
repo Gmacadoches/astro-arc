@@ -60,12 +60,64 @@ MODEL_COSTS = {
     },
 }
 
+def estimate_cost(model, quality, target_width=1024, target_height=1024):
+    """Projected $ for one render at the size it will actually be made at.
+
+    MODEL_COSTS above is per 1024x1024, but nothing here renders at
+    1024x1024 — a 1600x900 background renders at 1536x1024 (see
+    OPENAI_IMAGE_SIZES / closest_supported_size), which is 1.5x the area and
+    costs very close to 1.5x as much. Scaling the documented token counts by
+    the real render area matches measured billing closely: for
+    gpt-image-1-mini at 1536x1024 this predicts $0.0127 medium / $0.0500
+    high against $0.0131 / $0.0504 actually billed across a 12-render sweep
+    on 2026-09-09.
+
+    Used by astro-arc-generate's cost ceiling (`maxCostPerRun`) to decide
+    *before* spending whether the hasPeople quality bump fits the budget.
+    Still an estimate built on an estimate — see PRICE_ESTIMATE_ASSUMPTION —
+    so it returns None rather than a fabricated number for a model/quality
+    it doesn't know.
+    """
+    quality_key = "auto" if model == "gpt-image-2" else quality
+    base = MODEL_COSTS.get(model, {}).get(quality_key)
+    if base is None:
+        return None
+    render_size = closest_supported_size(target_width, target_height, OPENAI_IMAGE_SIZES)
+    w, h = (int(x) for x in render_size.split("x"))
+    return round(base * (w * h) / (1024 * 1024), 6)
+
+
 PRICE_ESTIMATE_ASSUMPTION = (
     "Estimated from gpt-image-1's published per-quality token counts "
     "applied to this model's own token rate — OpenAI hasn't published "
     "per-tier token counts for this model specifically. Verify at "
     "platform.openai.com/docs/pricing."
 )
+
+# Models known to accept the /images/generations `moderation` parameter.
+#
+# Gated by name rather than sent unconditionally because an unrecognized
+# parameter is itself a 400: sending this to a model that doesn't take it
+# would trade a *rare* moderation block for a *guaranteed* failure on every
+# render. A model missing from this set simply gets the default ("auto")
+# — the behavior this pipeline had before 2026-09-12.
+MODERATION_PARAM_MODELS = {"gpt-image-1-mini", "gpt-image-2"}
+
+# "low" relaxes the safety classifier's threshold; it does NOT disable it.
+# Genuinely explicit content still blocks, and a block is still a hard
+# failure for the run (see generate()).
+#
+# Added 2026-09-12 after the day's generation was refused for "sexual"
+# content: the "bodily and anatomical" register (registers.toml) had Stage 2
+# compose a close-foreground scene of bare anatomy — an outstretched palm,
+# fingers, a bent knee, "vertebrae half-wrapped in linen" — which reads to
+# the classifier like a partially-draped nude. Nothing in that prompt was
+# actually sexual, which is exactly the margin this setting widens. It is
+# NOT a fix for the underlying register problem, and it can't be: the
+# classifier runs before the model and is deterministic per input, so a
+# prompt it refuses is refused identically every time no matter what this
+# is set to. Re-rendering the same prompt is always wasted spend.
+MODERATION_LEVEL = "low"
 
 MODEL_CHOICES = [
     {"model": "gpt-image-2", "quality": "auto", "label": "GPT Image 2", "estCost": MODEL_COSTS["gpt-image-2"]["auto"]},
@@ -159,6 +211,12 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
     payload = {"model": model, "prompt": prompt, "size": render_size, "n": 1}
     if model != "gpt-image-2":  # gpt-image-2 is used at its own "auto" quality
         payload["quality"] = quality
+    # See MODERATION_LEVEL / MODERATION_PARAM_MODELS above — widens the
+    # safety margin for this pipeline's non-sexual anatomical imagery on the
+    # models that accept the parameter, and is silently skipped on any that
+    # don't rather than risking a 400 on every render.
+    if model in MODERATION_PARAM_MODELS:
+        payload["moderation"] = MODERATION_LEVEL
 
     result = _request("/images/generations", payload=payload, method="POST", slot="image")
     b64_image = result["data"][0]["b64_json"]
@@ -209,6 +267,13 @@ def main():
 
 
 if __name__ == "__main__":
+    # astro-arc-generate's cost ceiling asks for this before rendering —
+    # keeps the rate table in one place instead of duplicating it in bash.
+    if len(sys.argv) > 1 and sys.argv[1] == "--estimate-cost":
+        _, _, _model, _quality, _w, _h = sys.argv[:6]
+        _est = estimate_cost(_model, _quality, int(_w), int(_h))
+        print("null" if _est is None else _est)
+        sys.exit(0)
     if len(sys.argv) > 1 and sys.argv[1] == "--validate":
         slot = sys.argv[2] if len(sys.argv) > 2 else "image"
         ok, message = validate_key(slot)

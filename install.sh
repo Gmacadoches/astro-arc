@@ -4,9 +4,18 @@
 # Symlinks this repo's files into the locations Omarchy/Quickshell expect,
 # so editing a file in the repo takes effect immediately with no separate
 # "reinstall" step:
-#   plugin/         -> ~/.config/omarchy/plugins/astro-arc
-#   backend/bin      -> ~/.local/share/omarchy/astro-arc/bin
-#   backend/pipeline -> ~/.local/share/omarchy/astro-arc/pipeline
+#   plugin/           -> ~/.config/omarchy/plugins/astro-arc
+#   backend/bin        -> ~/.local/share/omarchy/astro-arc/bin
+#   backend/pipeline   -> ~/.local/share/omarchy/astro-arc/pipeline
+#   backend/systemd/*  -> ~/.config/systemd/user/ (one symlink per unit —
+#                         each needs its own individual name in that
+#                         directory, unlike the directory-level symlinks
+#                         above, so systemd itself can find them by name)
+#
+# The systemd units need no per-machine templating (unlike the desktop
+# entry below) — systemd's own %h specifier resolves to this user's home
+# directory at run time, so they're symlinked as plain files, edits to
+# them take effect on the next `daemon-reload` with no regeneration step.
 #
 # Also generates (not symlinks — it needs $HOME baked in, which a desktop
 # entry's Exec= can't itself expand) ~/.local/share/applications/astro-
@@ -61,11 +70,46 @@ link() {
   echo "LINKED  $dst -> $resolved_src"
 }
 
+# Same idempotent contract as link() above, but for a single file rather
+# than a directory — link()'s `cd "$src" && pwd` resolution assumes a
+# directory, which a systemd unit file isn't.
+link_file() {
+  local src="$1" dst="$2"
+  if [[ -L $dst ]]; then
+    if [[ "$(readlink -f "$dst")" == "$(readlink -f "$src")" ]]; then
+      echo "OK      $dst (already linked)"
+      return
+    fi
+    echo "RELINK  $dst (was pointing elsewhere)"
+    rm "$dst"
+  elif [[ -e $dst ]]; then
+    local backup="${dst}.pre-install-backup-$(date +%Y%m%d%H%M%S)"
+    echo "BACKUP  $dst -> $backup"
+    mv "$dst" "$backup"
+  fi
+  mkdir -p "$(dirname "$dst")"
+  ln -s "$src" "$dst"
+  echo "LINKED  $dst -> $src"
+}
+
 mkdir -p "$BACKEND_ROOT"
 
 link "$REPO_DIR/plugin" "$PLUGIN_TARGET"
 link "$REPO_DIR/backend/bin" "$BIN_TARGET"
 link "$REPO_DIR/backend/pipeline" "$PIPELINE_TARGET"
+
+SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
+for unit in "$REPO_DIR"/backend/systemd/*; do
+  link_file "$unit" "$SYSTEMD_USER_DIR/$(basename "$unit")"
+done
+
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl --user daemon-reload
+  systemctl --user enable --now astro-arc-generate.timer
+  echo "ENABLED astro-arc-generate.timer (systemctl --user)"
+else
+  echo "SKIPPED astro-arc-generate.timer enable — systemctl not found"
+fi
 
 DESKTOP_DIR="$HOME/.local/share/applications"
 DESKTOP_FILE="$DESKTOP_DIR/astro-arc-save-theme-handler.desktop"

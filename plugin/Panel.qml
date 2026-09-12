@@ -69,7 +69,10 @@ Panel {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.configState = Model.parseConfig(text())
+    onLoaded: {
+      root.configState = Model.parseConfig(text())
+      root.checkAutoGenerate()
+    }
     onLoadFailed: root.configState = Model.parseConfig("")
   }
 
@@ -78,8 +81,16 @@ Panel {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.lastRun = Model.parseLastRun(text())
-    onLoadFailed: root.lastRun = null
+    onLoaded: {
+      root.lastRun = Model.parseLastRun(text())
+      root.lastRunLoaded = true
+      root.checkAutoGenerate()
+    }
+    onLoadFailed: {
+      root.lastRun = null
+      root.lastRunLoaded = true
+      root.checkAutoGenerate()
+    }
   }
 
   // ---- Birth data ------------------------------------------------------
@@ -253,16 +264,75 @@ Panel {
   property bool generating: false
   property string generateError: ""
 
-  function regenerateNow() {
+  // ifDue selects astro-arc-generate's `--if-due` flag: the manual
+  // Regenerate button always forces a run (ifDue: false), while the
+  // widget's own auto-check (below) asks the script to first re-check
+  // last-run.json itself and no-op if the period's already covered —
+  // closing the race where the systemd timer (see below) finished a
+  // generation for this period in the moment between this widget's own
+  // JS-side check and this process actually starting.
+  function startGenerate(ifDue) {
     if (generating) return
     generating = true
     generateError = ""
+    generateProc.command = ifDue ? [root.generateBin, "--if-due"] : [root.generateBin]
     generateProc.running = true
+  }
+
+  function regenerateNow() {
+    startGenerate(false)
+  }
+
+  // ---- Automatic scheduling ---------------------------------------------
+  // Two independent, redundant triggers keep this from depending on any one
+  // thing staying alive: `systemd/astro-arc-generate.timer` (installed by
+  // install.sh) fires `astro-arc-generate --if-due` on its own schedule
+  // regardless of whether the bar/shell is even running, and — as long as
+  // the widget *is* loaded — this Panel also polls on its own Timer below,
+  // so a change made in the panel (e.g. switching frequency) is picked up
+  // without waiting on the system timer's own interval. Both funnel through
+  // the same `--if-due` flag and the script's own flock, so whichever one
+  // notices the new period first wins and the other one's next tick is
+  // just a no-op.
+  //
+  // "New period" is a plain string comparison against Model.currentPeriodKey
+  // (which mirrors astro-arc-generate's own `date +%Y-%m-%d`/`+%G-W%V`/
+  // `+%Y-%m`) — never elapsed-time math — so "daily" means "the calendar
+  // date changed", not "24 hours since the last run". 11pm and 1am the next
+  // morning are different dates the moment the clock crosses midnight, so
+  // the very next timer tick (at most autoGenerateCheckInterval later)
+  // starts that day's generation, however few hours actually separated them.
+  property bool lastRunLoaded: false
+  property string autoAttemptedPeriodKey: ""
+  readonly property int autoGenerateCheckInterval: 5 * 60 * 1000
+
+  function checkAutoGenerate() {
+    if (!root.lastRunLoaded || root.generating) return
+    // Nothing to generate from yet (fresh install, birth data never set) —
+    // don't nag the API with a doomed request every interval.
+    if (root.configState.birthDate === "") return
+
+    var currentKey = Model.currentPeriodKey(root.configState.frequency)
+    if (root.lastRun && root.lastRun.periodKey === currentKey) return
+    // Already tried this exact period this session (regardless of whether
+    // it succeeded) — avoid hammering a misconfigured setup (e.g. no API
+    // key) every autoGenerateCheckInterval; the next real period, or a
+    // manual "Regenerate" click, will try again.
+    if (root.autoAttemptedPeriodKey === currentKey) return
+
+    root.autoAttemptedPeriodKey = currentKey
+    root.startGenerate(true)
+  }
+
+  Timer {
+    interval: root.autoGenerateCheckInterval
+    running: true
+    repeat: true
+    onTriggered: root.checkAutoGenerate()
   }
 
   Process {
     id: generateProc
-    command: [root.generateBin]
     stdout: StdioCollector { waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true; onStreamFinished: root.generateError = String(text || "").trim() }
     onExited: function(exitCode) {

@@ -5,6 +5,11 @@
 #
 # Edit this list freely — add a register whenever you notice one producing
 # good results, remove one that never lands. Order doesn't matter.
+#
+# "figures in relation" and "crowd / the collective" are special-cased by
+# name in llm_pipeline.py's STAGE2_SYSTEM — it gates whether Stage 2 leans
+# into human presence on which register got picked, so renaming either
+# string here must be mirrored there too.
 
 registers = [
   "domestic interior",
@@ -17,4 +22,6 @@ registers = [
   "aquatic",
   "atmospheric",
   "ritual object",
+  "figures in relation",
+  "crowd / the collective",
 ]

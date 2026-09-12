@@ -21,6 +21,20 @@
 # default, no external dependency) or "aether" (Omarchy's own theme
 # generator, richer output, falls back to built-in automatically on any
 # failure — see the theming block below for exactly what that excludes/why).
+#
+# --if-due: skip the whole run (exit 0) if the current period already has a
+# generation — used by the systemd user timer (astro-arc-generate.timer)
+# and the bar widget's own polling Timer (Panel.qml's checkAutoGenerate),
+# so either scheduler can fire on a plain interval without needing its own
+# copy of the "is this actually due" logic, and without risking a wasted
+# paid image render on a period that's already generated. Plain manual runs
+# (the widget's Regenerate button) never pass this — a manual click always
+# means "regenerate right now", period match or not.
+if_due=0
+if [[ "${1:-}" == "--if-due" ]]; then
+  if_due=1
+  shift
+fi
 
 set -euo pipefail
 
@@ -34,8 +48,21 @@ THEME_DIR="$HOME/.config/omarchy/themes/astro-arc"
 PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
 COSTS_FILE="$PIPELINE_STATE_DIR/costs.json"
 COSTS_MAX=200
+LOCK_FILE="$STATE_DIR/generate.lock"
 
 mkdir -p "$STATE_DIR" "$HISTORY_DIR" "$THEME_DIR/backgrounds" "$PIPELINE_STATE_DIR"
+
+# Two independent schedulers (the systemd timer and the widget's own poll)
+# plus a possible manual click all shell out to this same script — this
+# non-blocking lock is what keeps two of them from ever rendering (and
+# paying for) two images at once. Whichever loses just skips this run
+# entirely rather than queuing: it'll get the next tick a few minutes
+# later, and by then the winner will have already made it not-due anyway.
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "Astro-Arc: another generation is already running — skipping" >&2
+  exit 0
+fi
 
 frequency=$(jq -r '.frequency // "daily"' "$CONFIG_FILE" 2>/dev/null || echo "daily")
 image_backend=$(jq -r '.imageBackend // "local"' "$CONFIG_FILE" 2>/dev/null || echo "local")
@@ -48,6 +75,14 @@ case "$frequency" in
   monthly) period_key=$(date +%Y-%m) ;;
   *) frequency="daily"; period_key=$(date +%Y-%m-%d) ;;
 esac
+
+if [[ $if_due == 1 ]]; then
+  last_period_key=$(jq -r '.periodKey // empty' "$LAST_RUN_FILE" 2>/dev/null || true)
+  if [[ -n $last_period_key && $last_period_key == "$period_key" ]]; then
+    echo "Astro-Arc: $frequency period $period_key already generated — nothing to do"
+    exit 0
+  fi
+fi
 
 # "auto" resolves fresh every run, so a monitor change (new laptop screen,
 # a plugged-in external display) is picked up next generation with no
@@ -71,9 +106,59 @@ fi
 
 prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
 
+# Bump to "high" quality whenever Stage 2 actually put a person in the
+# image — medium-quality gpt-image-1-mini renders visibly distort faces/
+# hands in busy or even single-figure scenes (confirmed via a same-prompt
+# medium-vs-high comparison), and there's no anatomy to distort in a
+# people-free object/place image, so this only spends more on the
+# generations that actually need it. No-op for gpt-image-2 (always
+# renders at its own "auto" quality regardless of this flag) and for the
+# local backend (image_gen.py has no quality tiers, only --steps).
+#
+# Gated on a real cost ceiling since 2026-09-09. Two things changed that
+# made an unconditional bump too expensive: denser scenes put a person in
+# frame far more often (5 of 12 in the verification sweep, against the ~1
+# in 8 this bump was originally sized for), and at the real render size
+# (1536x1024 for a 1600x900 background, 1.5x the area of the 1024x1024 the
+# published rates assume) "high" bills ~$0.050 rather than the ~$0.033 the
+# rate table's per-1024² figure implies. A people generation therefore
+# lands near $0.064 all-in, over the $0.05/run ceiling this install is
+# configured for.
+#
+# So the bump now has to fit the budget: project chat cost (already known
+# and already spent by this point) plus the high-quality render, and only
+# bump if the total stays under maxCostPerRun. Falling back to the
+# configured tier trades a possible face/hand distortion for staying inside
+# the budget — the 2026-09-07 comparison that motivated this bump is still
+# valid, this is a deliberate cost decision on top of it, and
+# `imageQualityUsed` in last-run.json still records what actually happened.
+# Raise maxCostPerRun (or set it to 0 to disable the ceiling entirely) to
+# get unconditional high quality back.
+openai_quality_used="$openai_quality"
+if [[ $(jq -r '.hasPeople // false' "$pipeline_meta_file" 2>/dev/null) == true ]]; then
+  if [[ $image_backend == openai ]]; then
+    max_cost_per_run=$(jq -r '.maxCostPerRun // 0.05' "$CONFIG_FILE" 2>/dev/null || echo "0.05")
+    chat_cost_so_far=$(jq -r '[.stage1Cost, .stage15Cost, .stage2Cost, .signatureCost] | map(select(. != null)) | add // 0' "$pipeline_meta_file" 2>/dev/null || echo 0)
+    high_estimate=$("$VENV_PY" "$BIN_DIR/openai_image_gen.py" --estimate-cost \
+      "$openai_model" high "$bg_width" "$bg_height" 2>/dev/null || echo "null")
+    if [[ $high_estimate == null ]]; then
+      # Unknown rate for this model — don't guess, and don't let an unknown
+      # silently block the quality fix either. Bump, same as before.
+      openai_quality_used="high"
+    elif awk -v c="$chat_cost_so_far" -v i="$high_estimate" -v m="$max_cost_per_run" \
+           'BEGIN { exit !(m <= 0 || c + i <= m) }'; then
+      openai_quality_used="high"
+    else
+      echo "Astro-Arc: person in frame, but high-quality render (~\$$high_estimate + \$$chat_cost_so_far chat) would exceed the \$$max_cost_per_run/run ceiling — staying at $openai_quality" >&2
+    fi
+  else
+    openai_quality_used="high"
+  fi
+fi
+
 if [[ $image_backend == openai ]]; then
   "$VENV_PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
-    --model "$openai_model" --quality "$openai_quality" \
+    --model "$openai_model" --quality "$openai_quality_used" \
     --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
 else
   "$VENV_PY" "$BIN_DIR/image_gen.py" "$prompt" "$bg_file" --steps 8 \
@@ -154,6 +239,7 @@ omarchy-theme-set astro-arc >/dev/null 2>&1
 # report null rather than a fabricated number.
 generated_at="$(date -Iseconds)"
 stage1_cost=$(jq -r '.stage1Cost // "null"' "$pipeline_meta_file")
+stage15_cost=$(jq -r '.stage15Cost // "null"' "$pipeline_meta_file")
 stage2_cost=$(jq -r '.stage2Cost // "null"' "$pipeline_meta_file")
 signature_cost=$(jq -r '.signatureCost // "null"' "$pipeline_meta_file")
 image_cost=$(jq -r '.cost // "null"' "$image_cost_file" 2>/dev/null || echo "null")
@@ -162,13 +248,14 @@ image_cost_source=$(jq -r '.costSource // "unknown"' "$image_cost_file" 2>/dev/n
 cost_entry=$(jq -n \
   --arg timestamp "$generated_at" --arg periodKey "$period_key" --arg frequency "$frequency" \
   --arg backend "$image_backend" --arg imageCostSource "$image_cost_source" \
-  --argjson stage1Cost "$stage1_cost" --argjson stage2Cost "$stage2_cost" \
+  --argjson stage1Cost "$stage1_cost" --argjson stage15Cost "$stage15_cost" \
+  --argjson stage2Cost "$stage2_cost" \
   --argjson signatureCost "$signature_cost" --argjson imageCost "$image_cost" \
   '{
     timestamp: $timestamp, periodKey: $periodKey, frequency: $frequency, imageBackend: $backend,
-    stage1Cost: $stage1Cost, stage2Cost: $stage2Cost, signatureCost: $signatureCost,
+    stage1Cost: $stage1Cost, stage15Cost: $stage15Cost, stage2Cost: $stage2Cost, signatureCost: $signatureCost,
     imageCost: $imageCost, imageCostSource: $imageCostSource,
-    totalCost: ([$stage1Cost, $stage2Cost, $signatureCost, $imageCost] | map(select(. != null)) | add)
+    totalCost: ([$stage1Cost, $stage15Cost, $stage2Cost, $signatureCost, $imageCost] | map(select(. != null)) | add)
   }')
 
 if [[ -f $COSTS_FILE ]]; then
@@ -184,8 +271,9 @@ theme_generator_used=$([[ $used_aether == 1 ]] && echo "aether" || echo "built-i
 jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg frequency "$frequency" \
   --arg backend "$image_backend" --arg prompt "$prompt" --arg backgroundSize "$background_size" \
   --arg themeGenerator "$theme_generator" --arg themeGeneratorUsed "$theme_generator_used" \
+  --arg imageQuality "$openai_quality" --arg imageQualityUsed "$openai_quality_used" \
   --slurpfile meta "$pipeline_meta_file" --argjson cost "$cost_entry" \
-  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
+  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, imageQuality: $imageQuality, imageQualityUsed: $imageQualityUsed, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
 
 # Log this as a browsable "Themes Generated" iteration — every real run,
 # not just manual style-comparison batches, so reverting to an earlier

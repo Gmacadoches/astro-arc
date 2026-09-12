@@ -3,43 +3,192 @@
 # imagery, the same way the old fixed style.toml suffix always did — only
 # now there's more than one to pick from.
 #
-# These five are the directions explored during Phase 3's style review
-# (see the review log); "symbolist" is the one that stuck and stayed the
-# default. Add more presets here freely — each needs a "label" (shown in
-# the dropdown) and a "suffix" (appended verbatim to every Stage 2 prompt).
+# "symbolist" was the one that stuck from Phase 3's original style review
+# and stayed the default. Curated down to 5 on 2026-09-07 (cut artdeco,
+# dystopianwwii, surreal — see CHANGELOG.md for the review method and
+# reasoning) after a batch of test renders across all 8 originals made
+# clear which ones were redundant or too generic to keep, then grew back
+# to 7 the same day with ukiyoe/illuminated (sourced from a user-supplied
+# reference guide, see CHANGELOG.md). Add more presets here freely — each
+# needs a "label" (shown in the dropdown), a "suffix"
+# (appended verbatim to every Stage 2 prompt),
+# and a "guidance" (below) — a one-line description of what kind of
+# imagery this style can actually depict, fed to Stage 2 itself so it
+# doesn't invent imagery the style has no vocabulary for (e.g. a
+# grounded/representational style being asked to render "a body made of
+# pure sound-wave energy" — added 2026-09-07, see CHANGELOG.md; every
+# preset needs one, not just the representational ones, since it's what
+# tells Stage 2 abstraction is *allowed* for the visionary styles too).
 
 [symbolist]
 label = "Symbolist / Visionary"
 suffix = "painterly, visionary symbolist painting in the tradition of Odilon Redon, Remedios Varo, Leonora Carrington, and Hilma af Klint's illuminated visions — strange, hand-painted, not digital or photographic"
+guidance = "A visionary/allegorical tradition — abstract, symbolic, or dreamlike forms (bodies dissolving into pattern, pure allegorical shapes) are natural here, alongside concrete objects and figures."
 
 [engraving]
 label = "Antique Engraving"
 suffix = "antique astronomical engraving, fine linework, star atlas illustration, sepia and ink tones, detailed etching"
-
-[artdeco]
-label = "Art Deco"
-suffix = "art deco poster design, bold geometric shapes, metallic gold and emerald, symmetrical, elegant linework"
+guidance = "An illustrative, diagrammatic tradition — depicts discrete objects, figures, and symbolic diagrams in fine engraved linework. Avoid glowing/immaterial energy forms that can't be rendered as etched line art."
 
 [cosmic]
 label = "Cosmic / Nebula"
 suffix = "ethereal cosmic art, nebula and starfield, dreamlike aurora colors, soft glowing light, painterly, otherworldly"
+guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae, and dreamlike or symbolic forms are all welcome here, alongside concrete subjects."
 
-[surreal]
-label = "Surreal Painting"
-suffix = "surreal dreamlike oil painting, soft brushwork, twilight color palette, fine art illustration"
-
+# Rewritten 2026-09-07 from actual research (see CHANGELOG.md), not general
+# impression — the original suffix wrongly called for "watercolor" character
+# rendering. Ghibli characters are flat cel-shaded (solid base color, one
+# hard-edged darker shadow tone, crisp clean outlines) — backgrounds are the
+# painted half, in opaque poster paint/gouache (not watercolor), wet-into-wet
+# for soft skies/clouds then sharp detail added as it dries. Keep that
+# character/background technique split if this is revised again.
+#
+# Revised again same day: the first version described character rendering
+# unconditionally, which the image model read as an instruction to include
+# a person — confirmed via a 3-sample test, it invented an unrequested
+# figure in a purely architectural Stage 2 prompt 2 of 3 times. The
+# character clause is now explicitly gated behind "only if a person is
+# already part of the scene" and leads with the background description
+# instead (which applies to every image, figure or not). Re-tested 0 of 3
+# on the same architectural prompt, and confirmed it still renders figures
+# correctly when a base prompt actually calls for them.
+#
+# guidance rewritten 2026-09-08 (external review of a user-requested
+# quality dossier — see CHANGELOG.md/CONTEXT.md): everything above fixed
+# *rendering* (suffix wording), but the real failure mode observed on
+# no-figure registers (e.g. a bare "architectural" prompt that read as
+# Magritte-style surrealism, not Ghibli) was a *content* problem — "Ghibli"
+# is not just a rendering technique like an engraving or a color-grade you
+# can apply to any subject, it's an authored world (nature reclaiming
+# structures, weather as presence, humble objects treated with reverence,
+# rural vernacular architecture, wide low horizons). Stage 2 was never
+# told any of that — the old guidance only said what to avoid. Widened
+# guidance from a pure prohibition into a vocabulary Stage 2 can actually
+# draw content from, on top of the retained prohibition.
+#
+# suffix split into suffix_base/suffix_figures 2026-09-08 (same review):
+# hasPeople is already computed by Stage 2 and already used for the
+# image-quality tier — this preset now also uses it for suffix assembly
+# (see load_style_suffix()/build() in llm_pipeline.py). suffix_figures is
+# appended only when a figure is actually in the prompt, so the character-
+# rendering clause below is no longer dead text on the ~88% of real ghibli
+# generations that have no person in them. This also retires the negative-
+# instruction hack ("do not add a person... unless one is already
+# described above") from 2026-09-07 above: a suffix that never mentions
+# character rendering on a figure-free generation cannot itself induce an
+# uninvited figure, so the sentence is now structurally unnecessary — kept
+# it in this comment, not in suffix_base, so the historical lesson (an
+# unconditional character-rendering description reads as an instruction to
+# include one) isn't lost. Re-tested against the same kind of real
+# figure-free architectural prompt that originally triggered the bug: 0/3
+# figure-injections with the negative sentence removed, confirming the
+# structural fix alone (not the negative sentence) is what's actually
+# doing the work now.
+#
+# suffix_base/suffix_figures rewritten 2026-09-08 (same review, immediate
+# follow-up): the 2026-09-07 research above was correct about the actual
+# technique (flat cel-shaded characters vs. gouache/wet-into-wet
+# backgrounds) but was written in process vocabulary — "opaque gouache/
+# poster color," "wet-into-wet," "tonal layering," naming background
+# painter Kazuo Oga by name — which describes *how a human made it*, not
+# what the finished frame looks like. An image model has weak associations
+# for process/medium/artist-name terminology (a background painter is far
+# more thinly represented in training data than the films themselves) and
+# much stronger ones for described visual outcomes. Rewritten to keep the
+# same research-grounded technique distinction but state it as what's
+# actually visible in frame: saturated layered greenery, hard-edged sunlit
+# cumulus clouds, visible brushwork, clear foreground/middle/horizon
+# depth, heightened-not-muted color for the background half; flat color/
+# single hard shadow/crisp outlines stated plainly (already outcome-
+# language, barely changed) for the figure half. Net effect on suffix
+# length: unchanged (~52 words) on the ~88% of generations with no figure
+# — the word-count win from the split above was already banked by cutting
+# suffix_figures entirely on those, not by this rewrite — and down from
+# ~120 to ~83 words combined on a generation that does have one.
+#
+# guidance revised again 2026-09-08 (register-collapse fix, found during
+# the 12-register verification sweep the widened-guidance rewrite above
+# was itself supposed to validate): fixed Ghibli-recognizability
+# comprehensively (12/12 real renders read as genuinely Ghibli, including
+# the exact "architectural" failure case that motivated the rewrite), but
+# 5 of the 10 non-figure/crowd registers (geological, bodily and
+# anatomical, mechanical, atmospheric, ritual object) collapsed into the
+# same cozy domestic-kitchen scene regardless of assigned register — the
+# guidance's own "recurring subjects" list was strong and specific enough
+# to out-compete "material register to draw from" for content invention.
+# Reframed guidance from "recurring subjects" (read as a substitute
+# content menu) to "qualities for rendering whatever your register calls
+# for" (a texture/mood layer applied to the register's own subject, never
+# a replacement for it), with an explicit instruction not to default to a
+# domestic interior. Paired with a matching addition to STAGE2_SYSTEM
+# itself (register names the subject; the style's world textures it) so
+# the same fix applies to every world-style, not just this one. Re-tested
+# the 5 failed registers plus 2 controls (domestic interior, crowd / the
+# collective) against the same fixed reading/signature as the original
+# sweep — see CHANGELOG.md for the result.
+# guidance extended again 2026-09-09 (symbolic-depth work — see
+# CHANGELOG.md and TASK-symbolic-depth.md): the pipeline now requires every
+# image to carry an "intrusion", an object belonging to a different world
+# from the rest of the scene, present and unexplained. The concern was that
+# ghibli is the worst-case style for that — its world is pastoral warmth
+# and reverence for humble detail, which sands a strange object down into
+# charm — and that the fix would be to switch styles.
+#
+# That concern turns out to be wrong about Ghibli specifically, and the
+# correction belongs in guidance rather than in a style change: this world
+# is *full* of the genuinely strange treated as utterly ordinary. A castle
+# walking on chicken legs, a bathhouse staffed by gods, a cat that is also
+# a bus, an abandoned sky-city, a rusting biplane in a flower field. What
+# makes those read as Ghibli rather than as generic fantasy is that they
+# are heavy, weathered, physically solid and mundanely lit, and that the
+# characters are not astonished by them. That is exactly the register an
+# intrusion needs, so the guidance now names it — without it, Stage 2 reads
+# the rest of this world description as "keep everything homely" and quietly
+# drops the intrusion or turns it into something twee.
 [ghibli]
 label = "Studio Ghibli"
-suffix = "Studio Ghibli-style hand-painted animation cel, soft watercolor backgrounds, warm pastel lighting, whimsical nostalgic atmosphere, lush painterly nature, in the visual tradition of Hayao Miyazaki"
+suffix_base = "Studio Ghibli feature-film animation style. Lush layered greenery in deep saturated greens, towering cumulus clouds with hard-edged sunlit tops against a deep blue sky, warm naturalistic low sunlight, visible painterly brushwork in foliage and stonework, clear separation between foreground, middle distance, and horizon, rich and slightly heightened color rather than muted realism"
+suffix_figures = ", figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
+guidance = "A grounded, representational tradition — real people, animals, nature, weather, and architecture only, never abstract energy-beings, geometric abstraction, or immaterial forms. The qualities below are a way of rendering whatever your assigned register actually calls for, not a substitute subject list: things show real wear and weather (nature reclaiming or growing through the man-made, wind moving through whatever's present, structures aged by use), and reverence lives in humble, ordinary detail rather than grandeur. If the register is stone, machinery, water, cloth, a body, or anything else, that stays the actual subject — do not default to a cottage kitchen or domestic interior just because it fits this world comfortably; find the version of these qualities that belongs to your actual register instead (weathered, moss-softened stone for geological; a mechanism aged and lovingly maintained rather than sterile for mechanical). Prefer scenes with air and depth — a near object, a middle ground, and a far distance, often a wide low horizon under an enormous sky — over a tight, isolated subject on a plain field. Symbolic meaning should come from how a concrete, lived-in scene is composed, not from making the subject itself immaterial. Crucially, this world is entirely at home with the genuinely strange treated as completely ordinary: enormous unexplained machinery rusting in a meadow, a creature the size of a house asleep among ordinary trees, a derelict flying city, a shrine crowded with objects nobody living remembers the use of. Such things are always rendered heavy, weathered, physically solid and lit exactly like everything around them — never glowing, translucent or ethereal — and nobody in the frame is astonished by them. Use that register for anything in the scene that does not belong: keep it matter-of-fact and unremarked rather than softening it into something charming or explaining it away. Scenes here are not obliged to be warm or pleasant — this world also holds real dread, decay, blight, abandonment, and weather that means harm, rendered with the same solidity."
 
 [cyberpunk]
 label = "Cyberpunk"
 suffix = "cyberpunk digital art, neon-lit rain-slicked streets, holographic signage, chrome and glass megastructures, moody blue and magenta lighting, high-tech-low-life atmosphere in the tradition of Blade Runner and Ghost in the Shell"
+guidance = "A grounded science-fiction tradition — real people, streets, machinery, and architecture in a neon-lit future. Avoid abstract energy-beings or pure geometric abstraction; ground the symbolism in a concrete piece of tech, signage, or urban space instead."
 
-# "Dystopian Future WWII Fusion" — interpreted as dieselpunk/retrofuturism:
-# WWII-era military iconography and machinery fused with a bleak sci-fi
-# future, not a literal WWII battle scene. Revisit the suffix if that's
-# not the intended reading.
-[dystopianwwii]
-label = "Dystopian Future WWII Fusion"
-suffix = "dystopian retrofuturism, WWII-era military iconography and machinery fused with a bleak futuristic wasteland, rusted war machines, gas masks, brutalist concrete architecture, muted propaganda-poster palette, ashen overcast light, gritty dieselpunk atmosphere"
+# Added 2026-09-07 from a user-supplied reference guide
+# (~/Downloads/art-style-guides.md), cross-checked against independent
+# research before use (see CHANGELOG.md for sources) — flat color planes
+# and confident black key-block outlines are the real technique, not
+# painterly shading; bokashi is a specific hand-inked gradient reserved
+# for skies/water only, never used as a general softening effect. The
+# "do not add a person... unless already described above" sentence was
+# added after the same day's illuminated-manuscript figure-injection bug
+# (see below) — applied here proactively even though this exact suffix
+# hadn't been observed failing.
+[ukiyoe]
+label = "Ukiyo-e"
+suffix = "Ukiyo-e Japanese woodblock print style: flat, unmodulated color fields bordered by confident, uniform-weight black outlines (the hand-carved key-block line), never digitally smooth or painterly-blended within a shape. Skies, water, and distant landscape may use bokashi — a soft hand-inked gradient — but this is the only place gradients belong; everything else stays flat. Compositions favor asymmetrical framing, bold cropping at the frame's edge, and a high oblique viewpoint rather than single-point perspective. Rain, snow, water, and textile patterns render as repeating graphic motifs (parallel diagonal lines for rain, stylized wave crests) rather than naturalistic texture. Palette leans toward deep indigo and Prussian blue alongside warm earth tones and muted reds. Do not add a person or figure unless one is already described above — many ukiyo-e prints are pure landscape, still life, or pattern with no one in them. Only if a person is explicitly part of the scene described above: render them with the same flat color planes and confident outline as everything else, never photorealistic shading."
+guidance = "A graphic, representational tradition — landscapes, figures, and everyday scenes rendered as flat stylized color planes, not painterly realism or abstract energy. Comfortable with bold pattern standing in for texture (waves, rain, fabric) but every subject should still read as a concrete, recognizable thing."
+
+# Added 2026-09-07, same source/verification as ukiyoe above. The
+# diagram/symbol-friendly guidance is deliberate — historiated initials
+# and marginalia are a real historical genre for exactly this kind of
+# esoteric/diagrammatic content (illuminated manuscripts include actual
+# astrological/zodiac diagrams), so unlike the other representational
+# styles this one doesn't need a literal figure to feel authentic.
+#
+# Revised same day: the first version mentioned gold leaf being "used for
+# haloes" as a general technique note (unconditionally) and only gated
+# actual figure rendering with a positive "only if a person is already
+# part of the scene" clause — same mistake as Ghibli's first pass. A real
+# production run with zero people in the Stage 2 prompt still rendered 8
+# haloed figures around a table. Fixed the same way Ghibli was: moved the
+# halo mention into the conditional clause only, and added an explicit
+# "do not add a person, halo, or figure unless one is already described
+# above." Retested 0 of 3 on the exact prompt that triggered the bug
+# (previously 1 of 1 observed failures).
+[illuminated]
+label = "Illuminated Manuscript"
+suffix = "Illuminated manuscript style: hand-painted in jewel-toned mineral pigments — ultramarine blue, vermilion red, verdigris green — on a warm, slightly imperfect parchment ground, never pure white. Gold leaf is burnished to a mirror shine and reads as a reflective, raised surface, not flat yellow paint. The composition sits inside an ornate decorative border of vegetal scrollwork, small symbolic creatures, and fine linework diagrams, framing the central image without competing with it. Do not add a person, halo, or figure unless one is already described above — plenty of manuscript pages are a decorated object, diagram, or pattern with no one in them. Only if a person is explicitly part of the scene described above: render them flattened and stylized rather than naturalistically proportioned, in the manner of Byzantine icon painting, with a gold halo if the scene calls for it, never modern dress or realistic anatomy."
+guidance = "A decorative, symbol-friendly tradition — comfortable with both a flattened, iconic central figure/scene AND purely diagrammatic or symbolic content living in the border (astrological charts, emblems, vegetal patterns) without needing a literal figure at all. Not photorealistic or naturalistic; every image reads as a manuscript page, not a window onto a real scene."

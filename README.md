@@ -16,10 +16,10 @@ covers getting it installed and running.
 
 ## Features
 
-- **8 art-style presets** (`pipeline/styles.toml`) Stage 2's prompt gets
-  suffixed with — Symbolist/Visionary, Antique Engraving, Art Deco,
-  Cosmic/Nebula, Surreal Painting, Studio Ghibli, Cyberpunk, and
-  Dystopian Future WWII Fusion. Add more freely; no code change needed.
+- **7 art-style presets** (`pipeline/styles.toml`) Stage 2's prompt gets
+  suffixed with — Symbolist/Visionary, Antique Engraving, Cosmic/Nebula,
+  Studio Ghibli, Cyberpunk, Ukiyo-e, and Illuminated Manuscript. Add more
+  freely; no code change needed.
 - **Two theme generators** — the built-in extractor (dependency-free), or
   Aether (Omarchy's own theme generator, richer output) if it's
   installed; falls back to built-in automatically on any failure.
