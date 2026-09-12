@@ -188,7 +188,9 @@ image = "gpt-image-2.5-sunburst"
 quality = "low"
 
 [presets.high]
-label = "High"
+# Marked recommended because the bakeoff found nothing above roughly $0.05 a run
+# got measurably better — see the hierarchy comment above.
+label = "High (Recommended)"
 chat = "gpt-4.1"
 image = "gpt-image-2.5-sunburst"
 quality = "auto"

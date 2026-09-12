@@ -1996,13 +1996,22 @@ Panel {
               // already cached for the current period — not the same as a
               // fresh day's cost.
               text: root.generating ? "Generating…" : Model.nextRunLabel(root.modelCatalog.nextRun)
-              iconText: root.generating ? "↻" : ""
               bordered: true
               foreground: root.bar.foreground
               fontSize: Style.font.caption
               enabled: !root.generating
-              iconSpinning: root.generating
               onClicked: root.regenerateNow()
+
+              // The button used to resize the moment it was clicked: the label
+              // shortens ("Regenerate · $0.069" -> "Generating…") AND a spinner
+              // icon appeared, so the width moved twice in one frame. Latching
+              // the widest width it has ever wanted fixes the shrink, and since
+              // the idle label is the longer of the two and no icon is added
+              // any more, that maximum is reached on the first paint and never
+              // changes again — so there is no initial jump either.
+              property real reservedWidth: 0
+              onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
+              width: Math.max(implicitWidth, reservedWidth)
             }
           }
 
