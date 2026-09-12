@@ -82,15 +82,14 @@ function formatUsd(n) {
 // rate itself, per 1M tokens in/out.
 function chatModelLabel(row) {
   if (!row) return ""
-  if (!row.hasRate) return row.label + "  · rate not set"
-  return row.label + "  · $" + row.inputRate.toFixed(2) + "/$" + row.outputRate.toFixed(2) + " per 1M"
+  if (!row.hasRate) return row.label + "  · cost unknown (no rate)"
+  return row.label + "  · " + costSuffix(row.chatRunCost, row.chatRunSource) + "/run (all 3 stages)"
 }
 
 function imageModelLabel(row) {
   if (!row) return ""
-  if (typeof row.cost === "number") return row.label + "  · " + formatUsd(row.cost) + "/image"
-  if (row.costState === "no-rate") return row.label + "  · rate not set"
-  return row.label + "  · cost unknown until first render"
+  if (row.costState === "no-rate") return row.label + "  · cost unknown (no rate)"
+  return row.label + "  · " + costSuffix(row.cost, row.costState) + "/image"
 }
 
 // Runs per month for the monthly projection. Months vary; 30.44 is the mean
@@ -113,6 +112,50 @@ function estimateMonthlyCost(costsText, frequency) {
   var perRun = sum / recent.length
   var runs = RUNS_PER_MONTH[frequency] || RUNS_PER_MONTH.daily
   return { perRun: perRun, perMonth: perRun * runs, sampleSize: recent.length }
+}
+
+// ---- Quality presets ------------------------------------------------------
+// Which tier the current settings correspond to, or "custom" when they match
+// none. DERIVED rather than stored: a stored preset name would drift out of
+// sync the moment any individual picker was touched, which is exactly the
+// situation this has to detect.
+function resolvePresetKey(config, presets) {
+  if (!config) return "custom"
+  var match = (presets || []).filter(function(p) {
+    return p.chat === config.stage1Model && p.chat === config.stage2Model
+      && p.image === config.openaiModel && p.quality === config.openaiQuality
+  })[0]
+  return match ? match.key : "custom"
+}
+
+// A tier's label carries the money, because that is the actual decision being
+// made — an adjective alone hides the only number that differs between tiers.
+// "(est)" vs "(actual)" is never dropped: the cost of a tier nobody has run is
+// a projection from published rates and borrowed token counts, and saying so is
+// the difference between an estimate and a claim.
+function presetLabel(preset) {
+  if (!preset) return ""
+  var base = preset.label
+  if (!preset.available) return base + "  · not available on this key"
+  if (typeof preset.runCost !== "number") return base + "  · cost unknown"
+  var perMonth = preset.runCost * 30.44
+  return base + "  · " + formatUsd(preset.runCost) + "/run  ~" + formatUsd(perMonth) + "/mo ("
+    + (preset.runSource === "actual" ? "actual" : "est") + ")"
+}
+
+// Cost suffix for an individual model row, with the same est/actual honesty.
+function costSuffix(cost, source) {
+  if (typeof cost !== "number") return "cost unknown"
+  return formatUsd(cost) + " (" + (source === "actual" || source === "measured" ? "actual" : "est") + ")"
+}
+
+// The shortlist is the default view; everything else is one toggle away. Never
+// a hard filter — hiding a model the key can reach is the dependency this whole
+// change exists to remove.
+function visibleRows(rows, showAll) {
+  if (showAll) return rows || []
+  var short = (rows || []).filter(function(r) { return r.shortlisted })
+  return short.length > 0 ? short : (rows || [])
 }
 
 // Which image rows fit a per-image ceiling. A ceiling of 0 means "no ceiling"
@@ -467,6 +510,10 @@ if (typeof module !== "undefined") {
     formatUsd: formatUsd,
     estimateMonthlyCost: estimateMonthlyCost,
     imageRowsWithinCeiling: imageRowsWithinCeiling,
+    resolvePresetKey: resolvePresetKey,
+    presetLabel: presetLabel,
+    costSuffix: costSuffix,
+    visibleRows: visibleRows,
     openaiModelDropdownValue: openaiModelDropdownValue,
     formatDateDigits: formatDateDigits,
     formatTimeDigits: formatTimeDigits,

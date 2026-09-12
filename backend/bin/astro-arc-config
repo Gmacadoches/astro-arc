@@ -27,6 +27,14 @@
 #                                          astro-arc-detect-resolution)
 #   --set-art-style <key>                 which pipeline/styles.toml preset
 #                                          Stage 2's prompt is suffixed with
+#   --set-models <stage1> <stage2> <image-model> <image-quality>
+#                                          all four model settings in ONE write.
+#                                          Used by the widget's quality-preset
+#                                          picker: writing them separately would
+#                                          leave the config in states that match
+#                                          no preset, so the picker would flicker
+#                                          through "Custom" on its way to the
+#                                          tier you actually chose.
 #   --set-max-cost-per-image <N>           most this install will spend on ONE
 #                                          image render, in dollars. 0 means no
 #                                          ceiling (same convention as
@@ -173,6 +181,13 @@ case "${1:-}" in
   [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-art-style <key>" >&2; exit 1; }
   current=$(read_config)
   updated=$(jq --arg s "$2" '.artStyle=$s' <<<"$current")
+  write_config "$updated"
+  ;;
+--set-models)
+  [[ -n ${2:-} && -n ${3:-} && -n ${4:-} && -n ${5:-} ]] || { echo "Usage: astro-arc-config --set-models <stage1> <stage2> <image-model> <image-quality>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg a "$2" --arg b "$3" --arg c "$4" --arg d "$5" \
+    '.stage1Model=$a | .stage2Model=$b | .openaiModel=$c | .openaiQuality=$d' <<<"$current")
   write_config "$updated"
   ;;
 --set-max-cost-per-image)

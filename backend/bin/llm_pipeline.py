@@ -109,11 +109,18 @@ class PipelineError(Exception):
 # nothing here stores it, logs it, or returns it.
 # ---------------------------------------------------------------------------
 
-def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8):
+def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=None):
     """`slot` picks which of the three independently-stored API keys
     (astro-arc-apikey's stage1/stage2/image) authenticates this call —
     Stage 1 and Stage 2 use separate keys/models by design, since they're
-    different tasks that may call for different accounts."""
+    different tasks that may call for different accounts.
+
+    `stage` names the PIPELINE stage (stage1/stage15/stage2/signature), which is
+    not the same thing as `slot` — Stage 1.5 runs on Stage 1's key. It exists
+    only to record how many tokens that stage actually consumes, which is what
+    lets the widget price a model that has never been run: measured tokens for
+    the stage times that model's published rate. See model_catalog.stage_cost.
+    """
     payload = {
         "model": model,
         "messages": [
@@ -168,6 +175,16 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8):
             time.sleep(wait)
     else:  # pragma: no cover — loop always breaks or raises
         raise PipelineError(last_detail or "OpenAI chat API call failed")
+
+    # Bookkeeping only — never allowed to break a call that has already been paid
+    # for, hence the guard and the placement after the response is in hand.
+    if stage:
+        try:
+            from model_catalog import record_stage_usage  # noqa: PLC0415
+
+            record_stage_usage(stage, model, body.get("usage"))
+        except Exception:  # noqa: BLE001
+            pass
 
     content = body["choices"][0]["message"]["content"]
     # Real token usage straight from the response — this is what the cost
@@ -564,7 +581,7 @@ def get_visual_signature(natal, config, stage2_model):
         except (json.JSONDecodeError, OSError):
             pass
 
-    result, usage = _chat_json(stage2_model, SIGNATURE_SYSTEM, describe_natal(natal), "stage2", temperature=0.9)
+    result, usage = _chat_json(stage2_model, SIGNATURE_SYSTEM, describe_natal(natal), "stage2", temperature=0.9, stage="signature")
     signature = result.get("signature", "").strip()
     if not signature:
         raise PipelineError("Signature generation returned no signature.")
@@ -632,7 +649,7 @@ def stage1_interpret(reading, stage1_model, period_key, config):
     arc = reading["arc"]
     user_prompt = f"Natal: {describe_natal(natal)}.\n{describe_arc(arc)}"
 
-    result, usage = _chat_json(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1", temperature=0.7)
+    result, usage = _chat_json(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1", temperature=0.7, stage="stage1")
     for key in ("reading", "distillation", "narrativePosition"):
         if not result.get(key):
             raise PipelineError(f"Stage 1 response missing '{key}': {result!r}")
@@ -919,7 +936,7 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     if dial.get("tonalDirection"):
         user_lines.append(f"Direction for this timeframe: {dial['tonalDirection']}")
 
-    result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95)
+    result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
 
     for key in ("constellation", "movement", "objects", "anomaly", "affect"):
         if not result.get(key):
@@ -1065,7 +1082,7 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         brief.append(f"  Light and concealment: {dial['light']}")
     user_lines += brief
 
-    result, usage = _chat_json(stage2_model, STAGE2_SYSTEM, "\n".join(user_lines), "stage2", temperature=0.95)
+    result, usage = _chat_json(stage2_model, STAGE2_SYSTEM, "\n".join(user_lines), "stage2", temperature=0.95, stage="stage2")
     if not result.get("prompt"):
         raise PipelineError(f"Stage 2 response missing 'prompt': {result!r}")
     concept_tags = result.get("conceptTags") or []

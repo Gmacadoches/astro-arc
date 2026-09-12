@@ -173,6 +173,140 @@ def record_usage(model, quality, size, usage):
     return learned[usage_key(model, quality, size)]
 
 
+# ---- Per-stage chat cost ------------------------------------------------
+#
+# An image render's cost is a property of (model, quality, size). A chat stage's
+# is not: the token count is a property of the STAGE — how long that stage's
+# prompt and reply run — and the price is a property of the MODEL. Splitting them
+# is what lets a model that has never been used still get a real estimate:
+# measured tokens for the stage, times that model's published rate.
+#
+# So a cost here is one of three things, and the UI always says which:
+#   "actual" — this exact model has run this exact stage; its own measured tokens.
+#   "est"    — measured tokens from whatever model HAS run this stage, priced at
+#              this model's rate. Token counts barely move between models for the
+#              same prompt, so this is a real projection, not a guess.
+#   None     — nobody has ever run this stage, or this model has no rate.
+
+STAGES = ("stage1", "stage15", "stage2", "signature")
+
+
+def record_stage_usage(stage, model, usage):
+    """Called after every chat call. Cheap, and never allowed to break a run."""
+    if not usage or stage not in STAGES:
+        return None
+    prompt_tokens = usage.get("prompt_tokens", usage.get("input_tokens"))
+    completion_tokens = usage.get("completion_tokens", usage.get("output_tokens"))
+    if not completion_tokens:
+        return None
+    learned = load_learned_usage()
+    stages = learned.setdefault("stages", {})
+    stages.setdefault(stage, {})[model] = {
+        "inputTokens": prompt_tokens or 0,
+        "outputTokens": completion_tokens,
+        "measuredAt": datetime.now(timezone.utc).isoformat(),
+    }
+    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    return stages[stage][model]
+
+
+def _representative_stage_tokens(stage, learned):
+    """Token counts for a stage from whichever model most recently ran it.
+
+    Used to price models that have never run it themselves. Picking the most
+    recent rather than averaging is deliberate: prompt lengths change when the
+    prompts themselves are edited, and an average would blend the old shape with
+    the new one indefinitely.
+    """
+    by_model = (learned.get("stages") or {}).get(stage) or {}
+    if not by_model:
+        return None
+    return max(by_model.values(), key=lambda e: e.get("measuredAt", ""))
+
+
+def stage_cost(stage, model, rates=None, learned=None):
+    """(cost, source) for one call of `stage` on `model`. source is "actual",
+    "est", or None when it genuinely cannot be known."""
+    rates = rates if rates is not None else load_rates()
+    learned = learned if learned is not None else load_learned_usage()
+    rate = rates.get("chat", {}).get(model)
+    if not rate:
+        return None, None
+    own = ((learned.get("stages") or {}).get(stage) or {}).get(model)
+    entry, source = (own, "actual") if own else (_representative_stage_tokens(stage, learned), "est")
+    if not entry:
+        return None, None
+    cost = round(
+        entry["inputTokens"] * rate["input"] / 1_000_000
+        + entry["outputTokens"] * rate["output"] / 1_000_000,
+        6,
+    )
+    return cost, source
+
+
+# gpt-image-1's published output-token counts per quality tier at 1024x1024 —
+# the only model OpenAI documents this for. Applied to any model's own rate to
+# project a render that has never happened. This is the ONE genuinely assumed
+# number in the whole cost path, and it is why an unmeasured image cost is always
+# labelled "est": the rate is published, the token count is borrowed.
+_TIER_OUTPUT_TOKENS = {"low": 272, "medium": 1056, "high": 4160, "auto": 4160}
+# Prompt lengths here run long; this is the observed order of magnitude, and it
+# is a small share of an image call either way.
+_TIER_INPUT_TOKENS = 320
+
+
+def image_cost(model, quality, size, rates=None, learned=None):
+    """(cost, source) for one render. "actual" once that exact combination has
+    been measured, "est" from published rate x borrowed tier tokens before that,
+    None when the model has no rate at all."""
+    rates = rates if rates is not None else load_rates()
+    learned = learned if learned is not None else load_learned_usage()
+    measured = measured_cost(model, quality, size, rates, learned)
+    if measured is not None:
+        return measured, "actual"
+    rate = rates.get("image", {}).get(model)
+    tokens = _TIER_OUTPUT_TOKENS.get(quality)
+    if not rate or not tokens:
+        return None, None
+    # Tier counts are per 1024x1024; scale by the real render area.
+    try:
+        w, h = (int(x) for x in size.split("x"))
+        scale = (w * h) / (1024 * 1024)
+    except (ValueError, AttributeError):
+        scale = 1.0
+    cost = (
+        _TIER_INPUT_TOKENS * rate["input"] / 1_000_000
+        + tokens * scale * rate["output"] / 1_000_000
+    )
+    return round(cost, 6), "est"
+
+
+def run_cost(chat_model, image_model, quality, size, rates=None, learned=None):
+    """Projected cost of one whole generation: the three chat stages plus the
+    render. `source` is "actual" only when EVERY part of it was measured for the
+    exact model in question — one estimated part makes the whole thing an
+    estimate, because calling a mixed figure "actual" would be a lie about the
+    weakest component.
+    """
+    rates = rates if rates is not None else load_rates()
+    learned = learned if learned is not None else load_learned_usage()
+    total, source = 0.0, "actual"
+    for stage in ("stage1", "stage15", "stage2"):
+        cost, st = stage_cost(stage, chat_model, rates, learned)
+        if cost is None:
+            return None, None
+        total += cost
+        if st != "actual":
+            source = "est"
+    image, image_source = image_cost(image_model, quality, size, rates, learned)
+    if image is None:
+        return None, None
+    if image_source != "actual":
+        source = "est"
+    return round(total + image, 6), source
+
+
 def measured_cost(model, quality, size, rates=None, learned=None):
     """Dollars for one render of this exact combination, from MEASURED tokens
     times a hand-entered rate. Returns None when either half is missing, which
@@ -221,6 +355,8 @@ def catalog(width=1024, height=1024):
     cached = load_availability() or {}
     learned = load_learned_usage()
     available = cached.get("models") or []
+    shortlist_chat = set(rates.get("shortlist", {}).get("chat", []))
+    shortlist_image = set(rates.get("shortlist", {}).get("image", []))
 
     chat_rows, image_rows = [], []
     for model_id in available:
@@ -229,25 +365,43 @@ def catalog(width=1024, height=1024):
         kind = classify(model_id)
         if kind == "chat":
             rate = rates["chat"].get(model_id)
+            # Per-stage cost for THIS model whether or not it has ever run:
+            # measured tokens for the stage priced at this model's rate. See
+            # stage_cost for what "actual" vs "est" mean.
+            stages = {}
+            run_total, run_source = 0.0, "actual"
+            for stage in ("stage1", "stage15", "stage2"):
+                cost, src = stage_cost(stage, model_id, rates, learned)
+                stages[stage] = {"cost": cost, "source": src}
+                if cost is None:
+                    run_total, run_source = None, None
+                elif run_total is not None:
+                    run_total += cost
+                    if src != "actual":
+                        run_source = "est"
             chat_rows.append({
                 "model": model_id,
                 "label": _label_for(model_id, rate),
                 "hasRate": rate is not None,
                 "inputRate": (rate or {}).get("input"),
                 "outputRate": (rate or {}).get("output"),
+                "shortlisted": model_id in shortlist_chat,
+                "stages": stages,
+                "chatRunCost": None if run_total is None else round(run_total, 6),
+                "chatRunSource": run_source,
             })
         elif kind == "image":
             rate = rates["image"].get(model_id)
             qualities = rates["image_qualities"].get(model_id, DEFAULT_IMAGE_QUALITIES)
             for quality in qualities:
                 size = render_size_for(width, height)
-                cost = measured_cost(model_id, quality, size, rates, learned)
-                if cost is not None:
+                cost, cost_source = image_cost(model_id, quality, size, rates, learned)
+                if cost_source == "actual":
                     cost_state = "measured"
-                elif rate is None:
-                    cost_state = "no-rate"
+                elif cost_source == "est":
+                    cost_state = "estimated"
                 else:
-                    cost_state = "not-yet-rendered"
+                    cost_state = "no-rate"
                 label = _label_for(model_id, rate)
                 image_rows.append({
                     "model": model_id,
@@ -256,6 +410,7 @@ def catalog(width=1024, height=1024):
                     "hasRate": rate is not None,
                     "cost": cost,
                     "costState": cost_state,
+                    "shortlisted": model_id in shortlist_image,
                 })
 
     def rank(rows, order, key):
@@ -265,7 +420,31 @@ def catalog(width=1024, height=1024):
         rows.sort(key=lambda r: (index.get(r[key], len(order)), r[key]))
         return rows
 
+    # Presets, priced exactly like everything else. A preset naming a model this
+    # key cannot reach is marked unavailable rather than hidden, so a short tier
+    # list never leaves you wondering what happened to the rest.
+    available_set = set(available)
+    presets = []
+    for key, row in (rates.get("presets") or {}).items():
+        chat_model, image_model = row.get("chat"), row.get("image")
+        quality = row.get("quality", "medium")
+        cost, source = run_cost(chat_model, image_model, quality, render_size_for(width, height), rates, learned)
+        presets.append({
+            "key": key,
+            "label": row.get("label", key.capitalize()),
+            "chat": chat_model,
+            "image": image_model,
+            "quality": quality,
+            "available": chat_model in available_set and image_model in available_set,
+            "runCost": cost,
+            "runSource": source,
+        })
+    # Ordered by cost where known, unpriced last, so the list reads as a ramp
+    # even before every tier has been measured.
+    presets.sort(key=lambda p: (p["runCost"] is None, p["runCost"] or 0))
+
     return {
+        "presets": presets,
         "fetchedAt": cached.get("fetchedAt"),
         "stale": cache_is_stale(cached),
         "everFetched": bool(cached),

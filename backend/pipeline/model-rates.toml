@@ -24,44 +24,153 @@
 #
 #   "some-new-model" = { label = "Some New Model", input = 1.25, output = 10.00 }
 #
-# Rates below were current when written; re-check before trusting any of them
-# for real budgeting. Deliberately NOT pre-filled with guesses for the newer
-# models your key can see — an invented rate is worse than an honest blank,
-# because it silently produces a confident wrong total.
+# Rates below were transcribed from developers.openai.com/api/docs/pricing on
+# 2026-09-12. They are published numbers, not guesses — but they DO go stale, and
+# nothing in this project can detect that, because the API never reports a price.
+# Re-check before trusting any of them for real budgeting.
+#
+# A model your key can reach that is absent here is still selectable and still
+# runs; it reports "cost unknown". That is the correct behavior — an invented
+# rate is worse than an honest blank, because it silently produces a confident
+# wrong total.
 
 [chat]
-"gpt-4o-mini"  = { label = "GPT-4o mini",  input = 0.15, output = 0.60 }
-"gpt-4o"       = { label = "GPT-4o",       input = 2.50, output = 10.00 }
-"gpt-4.1-mini" = { label = "GPT-4.1 mini", input = 0.40, output = 1.60 }
-"gpt-4.1"      = { label = "GPT-4.1",      input = 2.00, output = 8.00 }
+"gpt-3.5-turbo"           = { label = "gpt-3.5-turbo", input = 0.50, output = 1.50 }
+"gpt-4.1"                 = { label = "GPT-4.1", input = 2.00, output = 8.00 }
+"gpt-4.1-mini"            = { label = "GPT-4.1 mini", input = 0.40, output = 1.60 }
+"gpt-4.1-nano"            = { label = "GPT-4.1 nano", input = 0.10, output = 0.40 }
+"gpt-4o"                  = { label = "GPT-4o", input = 2.50, output = 10.00 }
+"gpt-4o-mini"             = { label = "GPT-4o mini", input = 0.15, output = 0.60 }
+"gpt-5"                   = { label = "GPT-5", input = 1.25, output = 10.00 }
+"gpt-5-mini"              = { label = "GPT-5 mini", input = 0.25, output = 2.00 }
+"gpt-5-nano"              = { label = "GPT-5 nano", input = 0.05, output = 0.40 }
+"gpt-5-pro"               = { label = "gpt-5-pro", input = 15.00, output = 120.00 }
+"gpt-5.1"                 = { label = "GPT-5.1", input = 1.25, output = 10.00 }
+"gpt-5.2"                 = { label = "GPT-5.2", input = 1.75, output = 14.00 }
+"gpt-5.2-pro"             = { label = "gpt-5.2-pro", input = 21.00, output = 168.00 }
+"gpt-5.3-codex"           = { label = "gpt-5.3-codex", input = 1.75, output = 14.00 }
+"gpt-5.4"                 = { label = "GPT-5.4", input = 2.50, output = 15.00 }
+"gpt-5.4-mini"            = { label = "GPT-5.4 mini", input = 0.75, output = 4.50 }
+"gpt-5.4-nano"            = { label = "GPT-5.4 nano", input = 0.20, output = 1.25 }
+"gpt-5.4-pro"             = { label = "gpt-5.4-pro", input = 30.00, output = 180.00 }
+"gpt-5.5"                 = { label = "GPT-5.5", input = 5.00, output = 30.00 }
+"gpt-5.5-pro"             = { label = "gpt-5.5-pro", input = 30.00, output = 180.00 }
+"gpt-5.6-luna"            = { label = "GPT-5.6 Luna", input = 0.20, output = 1.20 }
+"gpt-5.6-sol"             = { label = "GPT-5.6 Sol", input = 4.00, output = 20.00 }
+"gpt-5.6-terra"           = { label = "GPT-5.6 Terra", input = 2.00, output = 12.00 }
+"gpt-6-astra"             = { label = "GPT-6 Astra", input = 10.00, output = 50.00 }
+"o1"                      = { label = "o1", input = 15.00, output = 60.00 }
+"o1-pro"                  = { label = "o1-pro", input = 150.00, output = 600.00 }
+"o3"                      = { label = "o3", input = 2.00, output = 8.00 }
+"o3-mini"                 = { label = "o3-mini", input = 1.10, output = 4.40 }
+"o4-mini"                 = { label = "o4-mini", input = 1.10, output = 4.40 }
 
+# Image models publish THREE rates, and which one applies depends on what you
+# send. This pipeline sends a text prompt and receives image tokens back — the
+# real usage reads input_tokens_details.text_tokens and
+# output_tokens_details.image_tokens — so `input` here is the TEXT-input rate and
+# `output` is the image-output rate. `image_input` is recorded for completeness
+# and would only apply to an image-to-image edit, which this project never does.
+#
+# Correction 2026-09-12: gpt-image-1-mini was previously priced at input = 2.50,
+# which is its IMAGE-input rate. The text-input rate is 2.00. Every cost this
+# project has reported for an image render was therefore slightly overstated —
+# by about 1.5% of the total, since input tokens are a small share of an image
+# call. Note also that a "cost" in image-cost-*.json marked costSource "actual"
+# means real token counts priced with THIS table, not dollars billed by OpenAI:
+# the API never returns a dollar figure, so no number here is independently
+# confirmed against a bill.
 [image]
-"gpt-image-1"      = { label = "GPT Image 1",      input = 10.00, output = 40.00 }
-"gpt-image-1-mini" = { label = "GPT Image 1 Mini", input = 2.50,  output = 8.00 }
-"gpt-image-2"      = { label = "GPT Image 2",      input = 8.00,  output = 30.00 }
+"chatgpt-image-latest"    = { label = "ChatGPT Image (latest)", input = 5.00, image_input = 8.00, output = 32.00 }
+"gpt-image-1"             = { label = "GPT Image 1", input = 5.00, image_input = 10.00, output = 40.00 }
+"gpt-image-1-mini"        = { label = "GPT Image 1 Mini", input = 2.00, image_input = 2.50, output = 8.00 }
+"gpt-image-1.5"           = { label = "GPT Image 1.5", input = 5.00, image_input = 8.00, output = 32.00 }
+"gpt-image-2"             = { label = "GPT Image 2", input = 5.00, image_input = 8.00, output = 30.00 }
+"gpt-image-2.5-flare"     = { label = "GPT Image 2.5 Flare", input = 5.00, image_input = 8.00, output = 30.00 }
+"gpt-image-2.5-sunburst"  = { label = "GPT Image 2.5 Sunburst", input = 5.00, image_input = 8.00, output = 30.00 }
 
-# Quality tiers offered per image model. "auto" means the model picks its own
-# tier and the quality dropdown has nothing to choose. A model absent here gets
-# DEFAULT_IMAGE_QUALITIES from model_catalog.py; if the API then rejects that
-# tier, the error says so rather than this file silently being wrong.
 [image_qualities]
-"gpt-image-1"      = ["low", "medium", "high"]
-"gpt-image-1-mini" = ["low", "medium", "high"]
-"gpt-image-2"      = ["auto"]
+"gpt-image-1"            = ["low", "medium", "high"]
+"gpt-image-1-mini"       = ["low", "medium", "high"]
+"gpt-image-1.5"          = ["low", "medium", "high"]
+"gpt-image-2"            = ["auto"]
+"gpt-image-2.5-flare"    = ["auto"]
+"gpt-image-2.5-sunburst" = ["auto"]
+"chatgpt-image-latest"   = ["auto"]
 
-# Preference order for "pick the best model that fits my cost ceiling", best
-# first. Anything not listed sorts after everything listed, so a newly-released
-# model is never auto-selected over one you've actually vetted — add it here
-# once you've decided where it belongs.
 [hierarchy]
 image = [
+  "gpt-image-2.5-sunburst",
+  "gpt-image-2.5-flare",
   "gpt-image-2",
+  "gpt-image-1.5",
   "gpt-image-1",
   "gpt-image-1-mini",
 ]
 chat = [
+  "gpt-6-astra",
+  "gpt-5.6-sol",
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.6-terra",
+  "gpt-5.2",
+  "gpt-5.1",
   "gpt-4.1",
+  "gpt-5.4-mini",
   "gpt-4o",
+  "gpt-5-mini",
+  "gpt-5.6-luna",
   "gpt-4.1-mini",
   "gpt-4o-mini",
+  "gpt-5.4-nano",
+  "gpt-4.1-nano",
+  "gpt-5-nano",
 ]
+
+# The five offered by default, before "Show all". Chosen to span the real cost
+# range rather than to be uniformly good — the point of the shortlist is that
+# picking blind from it cannot go badly wrong. Everything else stays one click
+# away. Edit freely; this is a taste judgement, not a fact.
+[shortlist]
+chat = ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4.1", "gpt-5-mini", "gpt-5.4"]
+image = ["gpt-image-1-mini", "gpt-image-1", "gpt-image-1.5", "gpt-image-2", "gpt-image-2.5-flare"]
+
+# Named quality tiers, in the spirit of a game's graphics presets: one choice
+# that sets every model at once, with the individual pickers still free to
+# override (which shows the preset as "Custom"). Both chat stages get the same
+# model deliberately — Stage 1's reading is the raw material everything
+# downstream is built from, so starving it to save a fraction of a cent would
+# cap what Stage 2 has to work with.
+#
+# Tiers are CURATED, not computed: most models have no measured render yet, so
+# there is nothing to sort them by. Retune these freely — that is the point of
+# them living in a hand-edited file.
+[presets.low]
+label = "Low"
+chat = "gpt-4o-mini"
+image = "gpt-image-1-mini"
+quality = "low"
+
+[presets.medium]
+label = "Medium"
+chat = "gpt-4.1-mini"
+image = "gpt-image-1-mini"
+quality = "medium"
+
+[presets.high]
+label = "High"
+chat = "gpt-4.1"
+image = "gpt-image-1-mini"
+quality = "high"
+
+[presets.ultra]
+label = "Ultra"
+chat = "gpt-5.4"
+image = "gpt-image-1.5"
+quality = "high"
+
+[presets.maximum]
+label = "Maximum"
+chat = "gpt-6-astra"
+image = "gpt-image-2.5-sunburst"
+quality = "auto"

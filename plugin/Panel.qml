@@ -597,6 +597,30 @@ Panel {
   // size regardless of what either image backend natively renders at
   // (see image_fit.py's fit_cover). --------------------------------------
   property string backgroundSizeError: ""
+  // ---- Quality preset: one control that sets all four model settings, in
+  // the spirit of a game's graphics presets. The individual pickers below stay
+  // fully live; touching any of them makes the settings match no tier, and
+  // resolvePresetKey reports "Custom" — derived, never stored, so it cannot
+  // drift out of sync with the thing it describes.
+  property bool showAllModels: false
+
+  function commitPreset(key) {
+    if (key === "custom") return
+    var preset = (root.modelCatalog.presets || []).filter(function(p) { return p.key === key })[0]
+    if (!preset) return
+    // ONE write for all four. Writing them separately would put the config
+    // through intermediate states that match no preset, so the picker would
+    // flicker through "Custom" on its way to the tier just chosen.
+    presetWriteProc.command = [root.configBin, "--set-models",
+      preset.chat, preset.chat, preset.image, preset.quality]
+    presetWriteProc.running = true
+  }
+
+  Process {
+    id: presetWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
   // ---- Per-image cost ceiling (dollars; 0 = none). -------------------
   property string maxCostPerImageError: ""
 
@@ -1214,6 +1238,79 @@ Panel {
             spacing: Style.space(10)
             visible: root.showSettings
 
+            // ---- Quality preset -------------------------------------
+            PanelSectionHeader { text: "QUALITY"; foreground: root.bar.foreground }
+
+            Item {
+              width: parent.width
+              height: Math.max(qualityPresetLabel.implicitHeight, presetDropdown.implicitHeight)
+
+              Text {
+                id: qualityPresetLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.labelColW
+                text: "Preset"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              Dropdown {
+                id: presetDropdown
+                anchors.left: qualityPresetLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                showLabel: false
+                value: Model.resolvePresetKey(root.configState, root.modelCatalog.presets)
+                options: {
+                  var opts = (root.modelCatalog.presets || []).map(function(p) {
+                    return { value: p.key, label: Model.presetLabel(p) }
+                  })
+                  // "Custom" is only ever a readout, never something you pick —
+                  // you reach it by changing a picker below. Listed so the
+                  // dropdown can display the state it is actually in.
+                  opts.push({ value: "custom", label: "Custom" })
+                  return opts
+                }
+                foreground: root.bar.foreground
+                onChanged: function(value) { root.commitPreset(value) }
+              }
+            }
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: {
+                var c = root.configState
+                return "Currently: " + c.stage1Model + " · " + c.openaiModel + " / " + c.openaiQuality
+              }
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            // Costs marked (est) are published rates applied to token counts
+            // measured from real runs — for a tier nobody has run yet, the
+            // render's token count is borrowed from the one tier OpenAI
+            // publishes counts for. (actual) means this exact combination has
+            // been measured here.
+            Item {
+              width: parent.width
+              height: showAllToggle.implicitHeight
+
+              Button {
+                id: showAllToggle
+                anchors.left: parent.left
+                text: root.showAllModels
+                  ? "Show fewer models"
+                  : "Show all " + ((root.modelCatalog.chat || []).length + (root.modelCatalog.image || []).length) + " models"
+                foreground: root.bar.foreground
+                onClicked: root.showAllModels = !root.showAllModels
+              }
+            }
+
             // ---- Stage 1: interpretation (chart -> psychological reading)
             PanelSectionHeader { text: "STAGE 1 · INTERPRETATION"; foreground: root.bar.foreground }
 
@@ -1249,7 +1346,7 @@ Panel {
                 showLabel: false
                 value: root.configState.stage1Model
                 options: {
-                  var opts = (root.modelCatalog.chat || []).map(function(r) {
+                  var opts = Model.visibleRows(root.modelCatalog.chat || [], root.showAllModels).map(function(r) {
                     return { value: r.model, label: Model.chatModelLabel(r) }
                   })
                   // Keep whatever is configured selectable even before the
@@ -1297,7 +1394,7 @@ Panel {
                 showLabel: false
                 value: root.configState.stage2Model
                 options: {
-                  var opts = (root.modelCatalog.chat || []).map(function(r) {
+                  var opts = Model.visibleRows(root.modelCatalog.chat || [], root.showAllModels).map(function(r) {
                     return { value: r.model, label: Model.chatModelLabel(r) }
                   })
                   // Keep whatever is configured selectable even before the
@@ -1444,7 +1541,9 @@ Panel {
                 // catalog, and each carries a MEASURED per-image cost once that
                 // combination has actually been rendered — never a projection.
                 options: {
-                  var rows = Model.imageRowsWithinCeiling(root.modelCatalog.image || [], root.configState.maxCostPerImage)
+                  var rows = Model.imageRowsWithinCeiling(
+                    Model.visibleRows(root.modelCatalog.image || [], root.showAllModels),
+                    root.configState.maxCostPerImage)
                   var opts = rows.map(function(r) {
                     return { value: Model.openaiModelDropdownValue(r.model, r.quality), label: Model.imageModelLabel(r) }
                   })
