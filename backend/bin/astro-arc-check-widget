@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# Static checks for the QML widget, for the class of mistake that QML will not
+# tell you about until the shell is running — by which point the symptom is
+# usually "the widget doesn't open" with no obvious cause.
+#
+# Two real failures motivated this, both shipped despite the file parsing:
+#
+#   1. `focus: root.advancedOpen` on a PanelWindow. PanelWindow has no `focus`
+#      property; in QML a failed property assignment aborts creation of that
+#      object AND the parent it is declared in, so a two-word mistake inside a
+#      popout took down the entire widget.
+#   2. Model.js functions deleted while Panel.qml still called them, and while
+#      the export block still named them. `node --check` passes (the file is
+#      valid JavaScript) and qmlformat passes (the QML is valid too) — the
+#      binding only fails when it evaluates, at runtime.
+#
+# What this cannot check: whether a property exists on a Quickshell type. That
+# needs qmllint's full type resolution, which currently times out on Panel.qml.
+# The honest last line of defence remains `omarchy-restart-shell` followed by
+# reading the journal, which is what --journal below does.
+
+set -uo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PLUGIN_DIR="$REPO_DIR/plugin"
+failures=0
+
+fail() { echo "  FAIL: $*" >&2; failures=$((failures + 1)); }
+pass() { echo "  ok: $*"; }
+
+echo "Checking $PLUGIN_DIR"
+
+# --- 1. Both files parse -------------------------------------------------
+if command -v node >/dev/null 2>&1; then
+  if node --check "$PLUGIN_DIR/Model.js" 2>/dev/null; then
+    pass "Model.js is valid JavaScript"
+  else
+    fail "Model.js is not valid JavaScript"
+  fi
+else
+  echo "  skip: node not installed, cannot check Model.js"
+fi
+
+qmlformat=""
+for candidate in qmlformat /usr/lib/qt6/bin/qmlformat; do
+  command -v "$candidate" >/dev/null 2>&1 && { qmlformat="$candidate"; break; }
+  [[ -x $candidate ]] && { qmlformat="$candidate"; break; }
+done
+if [[ -n $qmlformat ]]; then
+  for f in "$PLUGIN_DIR"/*.qml; do
+    if timeout 60 "$qmlformat" "$f" >/dev/null 2>&1; then
+      pass "$(basename "$f") parses"
+    else
+      fail "$(basename "$f") does not parse"
+    fi
+  done
+else
+  echo "  skip: qmlformat not found, cannot check QML syntax"
+fi
+
+# --- 2. Every Model.* a QML file calls actually exists --------------------
+# This is the one that catches a deleted or renamed helper. Model.js exports
+# through a `typeof module` guard for exactly this kind of out-of-QML testing.
+if command -v node >/dev/null 2>&1; then
+  node - "$PLUGIN_DIR" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const dir = process.argv[2];
+const Model = require(path.join(dir, "Model.js"));
+let missing = [];
+for (const file of fs.readdirSync(dir).filter(f => f.endsWith(".qml"))) {
+  const src = fs.readFileSync(path.join(dir, file), "utf8");
+  const used = new Set([...src.matchAll(/\bModel\.([A-Za-z_][A-Za-z0-9_]*)/g)].map(m => m[1]));
+  // `Model.js` appears in the import statement itself, not as a member access.
+  used.delete("js");
+  for (const name of used) {
+    if (Model[name] === undefined) missing.push(`${file} calls Model.${name}`);
+  }
+}
+if (missing.length) {
+  for (const m of missing) console.error("  FAIL: " + m + " which does not exist");
+  process.exit(1);
+}
+console.log("  ok: every Model.* reference resolves");
+NODE
+  [[ $? -eq 0 ]] || failures=$((failures + 1))
+fi
+
+# --- 3. Nothing is exported that no longer exists -------------------------
+if command -v node >/dev/null 2>&1; then
+  node - "$PLUGIN_DIR" <<'NODE'
+const path = require("path");
+const Model = require(path.join(process.argv[2], "Model.js"));
+const dead = Object.keys(Model).filter(k => Model[k] === undefined);
+if (dead.length) {
+  console.error("  FAIL: exported but undefined: " + dead.join(", "));
+  process.exit(1);
+}
+console.log("  ok: no export names a missing value");
+NODE
+  [[ $? -eq 0 ]] || failures=$((failures + 1))
+fi
+
+# --- 4. The only check that catches a bad property on a Quickshell type ---
+if [[ ${1:-} == --journal ]]; then
+  echo
+  echo "Recent astro-arc QML complaints from the running shell:"
+  # Scoped to the RUNNING shell's pid, not a time window. A window catches
+  # complaints from the previous instance — which is exactly what happened the
+  # first time this check ran, reporting errors that had already been fixed and
+  # were simply still in the log from before the restart.
+  shell_pid=$(pgrep -x quickshell | tail -1)
+  if [[ -z $shell_pid ]]; then
+    echo "  (no running quickshell found)"
+    found=""
+  else
+    echo "  (shell pid $shell_pid)"
+    found=$(journalctl --user --no-pager _PID="$shell_pid" 2>/dev/null \
+      | grep -i "plugins/astro-arc" | grep -iE "WARN|ERROR|Cannot|TypeError" | tail -20)
+  fi
+  if [[ -n $found ]]; then
+    echo "$found" | sed 's/^/  /'
+    fail "the running shell is reporting problems (restart it after fixing)"
+  else
+    pass "no astro-arc warnings from the running shell"
+  fi
+else
+  echo
+  echo "  note: run with --journal AFTER omarchy-restart-shell to catch"
+  echo "        bad-property errors, which no static check here can see."
+fi
+
+echo
+if [[ $failures -gt 0 ]]; then
+  echo "$failures check(s) failed." >&2
+  exit 1
+fi
+echo "All checks passed."

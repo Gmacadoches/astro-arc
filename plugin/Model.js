@@ -56,7 +56,11 @@ var PROVIDER_CHOICES = [
 ]
 
 var THEME_GENERATOR_CHOICES = [
-  { key: "built-in", label: "Built-in" },
+  // Labelled "Astro-Arc" rather than "Built-in": from the panel the choice is
+  // between this project's own extractor and Omarchy's Aether, and "Built-in"
+  // reads as "built into Omarchy", which is the opposite of what it means. The
+  // config VALUE stays "built-in" — it is what astro-arc-generate branches on.
+  { key: "built-in", label: "Astro-Arc" },
   { key: "aether", label: "Aether (Omarchy)" }
 ]
 
@@ -102,27 +106,28 @@ function imageModelLabel(row) {
   return row.label + "  · " + costSuffix(row.cost, row.costState) + "/image"
 }
 
+// What the NEXT generation will charge, given what is already cached. Stage 1
+// and Stage 1.5 are cached per period and the signature per birth chart, so a
+// same-day re-run is far cheaper than a fresh day — putting that number on the
+// button is the difference between an informed click and a surprise.
+function nextRunLabel(nextRun) {
+  if (!nextRun || typeof nextRun.next !== "number") return "Regenerate"
+  return "Regenerate · " + formatUsd(nextRun.next)
+}
+
+// Recurring spend, projected from a FRESH period rather than from the cost log.
+// The log averages real runs, and same-day regenerations in it are mostly
+// cache hits, so averaging them reported a daily cost far below the truth —
+// $0.89/mo against an actual $5.60/mo in the case that prompted this.
+function projectedMonthlyCost(nextRun, frequency) {
+  if (!nextRun || typeof nextRun.full !== "number") return null
+  var runs = RUNS_PER_MONTH[frequency] || RUNS_PER_MONTH.daily
+  return { perRun: nextRun.full, perMonth: nextRun.full * runs, source: nextRun.source }
+}
+
 // Runs per month for the monthly projection. Months vary; 30.44 is the mean
 // Gregorian month, which keeps a "monthly" cadence from reading as 1.0.
 var RUNS_PER_MONTH = { daily: 30.44, weekly: 4.35, monthly: 1 }
-
-// Projected monthly spend from REAL past runs, never from a rate card: the mean
-// totalCost of the most recent completed runs times the cadence. Returns null
-// rather than a guess when there is no cost history to average, same contract
-// as estimateHistorySpace.
-// Takes the raw costs.json text, matching sumCosts' contract so the FileView
-// handler doesn't have to hold a parsed copy of the log as well as a summary.
-function estimateMonthlyCost(costsText, frequency) {
-  var costsLog = []
-  try { costsLog = JSON.parse(costsText) || [] } catch (e) { costsLog = [] }
-  var withTotals = costsLog.filter(function(c) { return typeof c.totalCost === "number" && c.totalCost > 0 })
-  if (withTotals.length === 0) return null
-  var recent = withTotals.slice(0, 10)
-  var sum = recent.reduce(function(a, c) { return a + c.totalCost }, 0)
-  var perRun = sum / recent.length
-  var runs = RUNS_PER_MONTH[frequency] || RUNS_PER_MONTH.daily
-  return { perRun: perRun, perMonth: perRun * runs, sampleSize: recent.length }
-}
 
 // ---- Quality presets ------------------------------------------------------
 // Which tier the current settings correspond to, or "custom" when they match
@@ -523,7 +528,8 @@ if (typeof module !== "undefined") {
     chatModelLabel: chatModelLabel,
     imageModelLabel: imageModelLabel,
     formatUsd: formatUsd,
-    estimateMonthlyCost: estimateMonthlyCost,
+    nextRunLabel: nextRunLabel,
+    projectedMonthlyCost: projectedMonthlyCost,
     imageRowsWithinCeiling: imageRowsWithinCeiling,
     resolvePresetKey: resolvePresetKey,
     presetLabel: presetLabel,

@@ -375,6 +375,141 @@ def render_size_for(width, height):
     return closest_supported_size(width, height, OPENAI_IMAGE_SIZES)
 
 
+SETTINGS_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
+
+
+def load_settings():
+    try:
+        return json.loads(SETTINGS_PATH.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _period_key(frequency, now_local=None):
+    """Mirrors astro_engine.derive_arc's key, which is what the caches are keyed
+    on. Duplicated rather than imported because importing the engine drags in
+    swisseph and PIL to answer a question about the calendar."""
+    now_local = now_local or datetime.now().astimezone()
+    if frequency == "weekly":
+        return now_local.strftime("%G-W%V")
+    if frequency == "monthly":
+        return now_local.strftime("%Y-%m")
+    return now_local.strftime("%Y-%m-%d")
+
+
+def _cache_is_valid(path, natal_hash, schema_version, required_key):
+    try:
+        cached = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return False
+    return bool(
+        cached.get(required_key)
+        and cached.get("natalHash") == natal_hash
+        and cached.get("schemaVersion") == schema_version
+    )
+
+
+def next_run_cost(width=1024, height=1024, settings=None):
+    """What the NEXT generation will actually cost, and what a generation costs
+    when nothing is cached.
+
+    These are different numbers and conflating them is what made the panel's
+    figures misleading. Stage 1 and Stage 1.5 are cached per period and the
+    visual signature per birth chart, so re-running the same day charges for
+    Stage 2 and the render only — which is why the last run came in at $0.069
+    while a fresh day of the same settings costs nearly three times that. The
+    cost log averages real runs, so with several same-day regenerations in it,
+    it reports something far below the true daily cost.
+
+    Returns both: `next` for the Regenerate button, `full` for anything
+    projecting a daily/weekly/monthly spend.
+
+    `full` deliberately EXCLUDES the visual signature. The signature is cached
+    per birth chart rather than per period, so it is paid once in the life of a
+    chart and never again by a new day — counting it in a daily projection
+    inflates every recurring figure. It is still reported in `stages` (and in
+    `oneTime`) so it is visible rather than silently dropped.
+    """
+    settings = settings if settings is not None else load_settings()
+    rates, learned = load_rates(), load_learned_usage()
+
+    chat_stage1 = settings.get("stage1Model") or "gpt-4o-mini"
+    chat_stage2 = settings.get("stage2Model") or "gpt-4o-mini"
+    image_model = settings.get("openaiModel") or "gpt-image-1-mini"
+    quality = settings.get("openaiQuality") or "medium"
+    size = render_size_for(width, height)
+    period_key = _period_key(settings.get("frequency") or "daily")
+
+    # Imported here, not at module scope: cost_estimate imports this module, so
+    # a top-level import of llm_pipeline would close the loop.
+    try:
+        from llm_pipeline import (  # noqa: PLC0415
+            SIGNATURE_SCHEMA_VERSION, STAGE1_SCHEMA_VERSION,
+            STAGE15_SCHEMA_VERSION, _natal_hash,
+        )
+        natal_hash = _natal_hash(settings)
+        cached_stage1 = _cache_is_valid(
+            STATE_DIR / "pipeline/readings" / f"{period_key}.json",
+            natal_hash, STAGE1_SCHEMA_VERSION, "reading")
+        cached_stage15 = _cache_is_valid(
+            STATE_DIR / "pipeline/amplifications" / f"{period_key}.json",
+            natal_hash, STAGE15_SCHEMA_VERSION, "constellation")
+        cached_signature = _cache_is_valid(
+            STATE_DIR / "pipeline/visual_signature.json",
+            natal_hash, SIGNATURE_SCHEMA_VERSION, "signature")
+        cache_known = True
+    except Exception:  # noqa: BLE001 — a cost readout must not break on this
+        cached_stage1 = cached_stage15 = cached_signature = False
+        cache_known = False
+
+    image, image_source = image_cost(image_model, quality, size, rates, learned)
+    parts, next_total, full_total, source = {}, 0.0, 0.0, "actual"
+
+    for name, model, is_cached in (
+        ("stage1", chat_stage1, cached_stage1),
+        ("stage15", chat_stage1, cached_stage15),   # Stage 1.5 runs on Stage 1's model
+        ("stage2", chat_stage2, False),             # always runs
+        ("signature", chat_stage2, cached_signature),
+    ):
+        cost, src = stage_cost(name if name != "signature" else "signature", model, rates, learned)
+        parts[name] = {"model": model, "cached": is_cached, "cost": cost, "source": src}
+        if cost is None:
+            next_total = full_total = None
+            source = None
+            continue
+        if next_total is not None:
+            # Signature excluded from `full` — see the docstring.
+            if name != "signature":
+                full_total += cost
+            if not is_cached:
+                next_total += cost
+            if src != "actual":
+                source = "est"
+
+    if next_total is not None and image is not None:
+        next_total += image
+        full_total += image
+        if image_source != "actual":
+            source = "est"
+    else:
+        next_total = full_total = None
+        source = None
+
+    signature_cost = (parts.get("signature") or {}).get("cost")
+    return {
+        "periodKey": period_key,
+        "cacheKnown": cache_known,
+        "stages": parts,
+        # One-time per birth chart, not per period. Broken out so a projection
+        # can exclude it without pretending it doesn't exist.
+        "oneTime": {"signature": signature_cost, "paid": cached_signature},
+        "image": {"model": image_model, "quality": quality, "cost": image, "source": image_source},
+        "next": None if next_total is None else round(next_total, 6),
+        "full": None if full_total is None else round(full_total, 6),
+        "source": source,
+    }
+
+
 def _label_for(model_id, rate_row):
     return (rate_row or {}).get("label") or model_id
 
@@ -480,6 +615,7 @@ def catalog(width=1024, height=1024):
     presets.sort(key=lambda p: (p["runCost"] is None, p["runCost"] or 0))
 
     return {
+        "nextRun": next_run_cost(width, height),
         "presets": presets,
         "fetchedAt": cached.get("fetchedAt"),
         "stale": cache_is_stale(cached),

@@ -863,24 +863,14 @@ Panel {
   // stays in openai_image_gen.py itself for now, just not wired to the UI
   // — see Conventions.
   property var costsSummary: ({ total: 0, unknownCount: 0, generationCount: 0 })
-  // Projected from REAL past runs (the mean of the last 10 totals x the
-  // cadence), never from a rate card — null when there's no history to average,
-  // same contract as the disk-space estimate.
-  property var monthlyCostEstimate: null
 
   property FileView costsFile: FileView {
     path: root.home + "/.local/state/omarchy/astro-arc/pipeline/costs.json"
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: {
-      root.costsSummary = Model.sumCosts(text())
-      root.monthlyCostEstimate = Model.estimateMonthlyCost(text(), root.configState.frequency)
-    }
-    onLoadFailed: {
-      root.costsSummary = { total: 0, unknownCount: 0, generationCount: 0 }
-      root.monthlyCostEstimate = null
-    }
+    onLoaded: root.costsSummary = Model.sumCosts(text())
+    onLoadFailed: root.costsSummary = { total: 0, unknownCount: 0, generationCount: 0 }
   }
 
   // ---- Themes Generated: every real generation, browsable and — since
@@ -1331,7 +1321,7 @@ Panel {
                 id: advancedBtn
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Popout"
+                text: "Advanced"
                 foreground: root.bar.foreground
                 onClicked: root.advancedOpen = true
               }
@@ -1340,6 +1330,18 @@ Panel {
             // One key, written to all three slots. The per-stage split lives in
             // the popout; showing three key rows here made the common case —
             // one account, one key — look like a three-step setup.
+            //
+            // Titled, because a stored key renders as a masked reference
+            // ("sk-...CxYA") and an unlabelled row of characters gives no clue
+            // what it is or why it is there.
+            Text {
+              width: parent.width
+              text: "API key"
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
             ApiKeySection { slot: "image"; storeAll: true }
 
             PanelSeparator { foreground: root.bar.foreground }
@@ -1415,11 +1417,18 @@ Panel {
               Text {
                 width: parent.width
                 wrapMode: Text.WordWrap
+                // Projected from a FRESH period, not from the cost log. The log
+                // averages real runs, and same-day regenerations in it are
+                // mostly cache hits, so it reported a daily cost far below the
+                // truth — the run that prompted this charged $0.07 because only
+                // Stage 2 and the render actually ran, while a new day of the
+                // same settings costs $0.18.
                 text: {
-                  var e = root.monthlyCostEstimate
-                  if (!e) return "Est. monthly: not enough cost history yet to estimate"
-                  return "Est. monthly: " + Model.formatUsd(e.perMonth) + " at " + root.configState.frequency
-                    + " (" + Model.formatUsd(e.perRun) + "/run, mean of last " + e.sampleSize + ")"
+                  var e = Model.projectedMonthlyCost(root.modelCatalog.nextRun, root.configState.frequency)
+                  if (!e) return "Est. monthly: cost unknown for the current models"
+                  return "Est. " + Model.formatUsd(e.perMonth) + "/month at " + root.configState.frequency
+                    + " · " + Model.formatUsd(e.perRun) + " per full run ("
+                    + (e.source === "actual" ? "actual" : "est") + ")"
                 }
                 color: Qt.darker(root.bar.foreground, 1.3)
                 font.family: root.bar.fontFamily
@@ -1983,7 +1992,10 @@ Panel {
               id: regenerateBtn
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              text: root.generating ? "Generating…" : "Regenerate"
+              // Shows what THIS click will charge, which depends on what is
+              // already cached for the current period — not the same as a
+              // fresh day's cost.
+              text: root.generating ? "Generating…" : Model.nextRunLabel(root.modelCatalog.nextRun)
               iconText: root.generating ? "↻" : ""
               bordered: true
               foreground: root.bar.foreground
@@ -2102,7 +2114,7 @@ Panel {
 
             Item {
               width: parent.width
-              height: Math.max(saveThemeBtn.implicitHeight, clearHistoryBtn.implicitHeight)
+              height: saveThemeBtn.implicitHeight
               visible: !root.themeNamePromptOpen
 
               Button {
@@ -2117,16 +2129,6 @@ Panel {
                 onClicked: root.openSaveThemePrompt()
               }
 
-              Button {
-                id: clearHistoryBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.clearHistoryArmed ? "Confirm Clear?" : "Clear History"
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.clearHistoryArmed ? (root.bar.urgent || "#f38ba8") : root.bar.foreground
-                onClicked: root.clearHistoryClicked()
-              }
             }
 
             // ---- Name prompt: shown in place of the row above once Save
@@ -2465,6 +2467,37 @@ Panel {
           }
 
           ApiKeySection { slot: "image" }
+
+          PanelSeparator { foreground: root.bar.foreground }
+          PanelSectionHeader { text: "DESTRUCTIVE"; foreground: root.bar.foreground }
+
+          // Moved out of the main panel: it sat next to "Save Selected Theme",
+          // one row apart from the thing it destroys, and a mis-click there
+          // deletes every generation. Two clicks are still required (the button
+          // arms, then confirms) — this just puts it somewhere you have to mean
+          // to go.
+          Column {
+            width: parent.width
+            spacing: Style.space(4)
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: "Deletes every entry in Themes Generated immediately, ignoring the retention window. Saved themes are not affected."
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Button {
+              id: advClearHistoryBtn
+              text: root.clearHistoryArmed ? "Confirm Clear?" : "Clear History"
+              bordered: true
+              fontSize: Style.font.caption
+              foreground: root.clearHistoryArmed ? (root.bar.urgent || "#f38ba8") : root.bar.foreground
+              onClicked: root.clearHistoryClicked()
+            }
+          }
 
           PanelSeparator { foreground: root.bar.foreground }
           PanelSectionHeader { text: "PIPELINE"; foreground: root.bar.foreground }
