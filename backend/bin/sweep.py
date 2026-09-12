@@ -177,11 +177,20 @@ def main():
         # so a sweep is reproducible.
         people = getattr(lp, "PEOPLE_REGISTERS", set())
         families = getattr(lp, "REGISTER_FAMILIES", {})
+        # Honor the dial's cohesion, or a cohere cell would be tested with
+        # colliding pairs and prove nothing about the mode it claims to test.
+        cohesion = (dial or {}).get("registerCohesion", "collide")
         jobs = []
         for i, primary in enumerate(registers):
             pool = [r for r in registers if r != primary and r not in people]
-            distant = [r for r in pool if families.get(r) != families.get(primary)]
-            pool = distant or pool
+            if cohesion == "cohere":
+                # Same family, and genuinely no partner for a single-member
+                # family (mineral holds only geological) — matching production,
+                # where that correctly yields no secondary at all.
+                pool = [r for r in pool if families.get(r) == families.get(primary)]
+            else:
+                distant = [r for r in pool if families.get(r) != families.get(primary)]
+                pool = distant or pool
             jobs.append((primary, pool[i % len(pool)] if pool else None))
     else:
         jobs = [(r, None) for r in registers]

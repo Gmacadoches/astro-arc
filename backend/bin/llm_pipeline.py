@@ -59,6 +59,7 @@ import hashlib
 import json
 import random
 import re
+import time
 import sys
 import tomllib
 from datetime import datetime, timedelta, timezone
@@ -89,6 +90,11 @@ AVOID_WINDOW = 8
 COLD_START_THRESHOLD = 10
 REGISTER_LOOKBACK_DAYS = 5
 
+# Bounded retry for the chat API — see _chat_json. 5 attempts with the wait the
+# API itself suggests, or doubling from 2s, covers a TPM limit refilling without
+# turning a hard failure into a silent 10-minute hang.
+CHAT_MAX_ATTEMPTS = 5
+CHAT_BACKOFF_BASE = 2.0
 CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
 
 
@@ -117,21 +123,51 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8):
         "temperature": temperature,
         "response_format": {"type": "json_object"},
     }
-    req = urllib.request.Request(
-        CHAT_API_URL,
-        data=json.dumps(payload).encode(),
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {get_api_key(slot)}",
-            "Content-Type": "application/json",
-        },
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            body = json.loads(resp.read())
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode(errors="replace")[:300]
-        raise PipelineError(f"OpenAI chat API error {exc.code}: {detail}") from None
+    # Retry on 429 and 5xx with backoff (added 2026-09-12). Without this a single
+    # rate-limit reply killed the whole generation — and killed it *after* the
+    # earlier stages had already been billed, so a 429 on Stage 2 threw away the
+    # money spent on Stages 1 and 1.5. It also made sweep.py unusable for the
+    # matrices this project relies on for verification: a 12-sample sweep needs
+    # roughly 48k tokens against a 30k TPM limit, so it cannot finish inside one
+    # minute and MUST pace itself.
+    #
+    # OpenAI states the wait in the error body ("Please try again in 8.364s"), so
+    # honor that when present rather than guessing; otherwise exponential.
+    # Deliberately not retrying 4xx other than 429: a bad request or a rejected
+    # key will fail identically no matter how long we wait.
+    last_detail = None
+    for attempt in range(CHAT_MAX_ATTEMPTS):
+        req = urllib.request.Request(
+            CHAT_API_URL,
+            data=json.dumps(payload).encode(),
+            method="POST",
+            headers={
+                # Rebuilt per attempt so the key is never held across a sleep.
+                "Authorization": f"Bearer {get_api_key(slot)}",
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                body = json.loads(resp.read())
+            break
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:300]
+            last_detail = f"OpenAI chat API error {exc.code}: {detail}"
+            retriable = exc.code == 429 or 500 <= exc.code < 600
+            if not retriable or attempt == CHAT_MAX_ATTEMPTS - 1:
+                raise PipelineError(last_detail) from None
+            wait = None
+            match = re.search(r"try again in ([0-9.]+)s", detail)
+            if match:
+                wait = float(match.group(1)) + 1.0
+            if wait is None:
+                wait = CHAT_BACKOFF_BASE * (2 ** attempt)
+            print(f"llm_pipeline: {exc.code} from the chat API, retrying in {wait:.1f}s "
+                  f"(attempt {attempt + 1}/{CHAT_MAX_ATTEMPTS})", file=sys.stderr)
+            time.sleep(wait)
+    else:  # pragma: no cover — loop always breaks or raises
+        raise PipelineError(last_detail or "OpenAI chat API call failed")
 
     content = body["choices"][0]["message"]["content"]
     # Real token usage straight from the response — this is what the cost
@@ -712,7 +748,7 @@ LEGACY_DIAL = {
     "spatial": None,
     "light": None,
     "anomalyRelation": "It is simply present, inert, and unremarked. Nothing reacts to it. No one looks at it.",
-    "anomalyTypes": "scale, time, or place",
+    "anomalyTypes": "scale (far too large or small for its kind), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
     "tonalDirection": None,
 }
 
@@ -754,7 +790,7 @@ def dial_from_texture(texture, mode="coherent"):
         # Out-of-place needs knowledge of the world, which Stage 1.5 deliberately
         # does not have; scale and age are both nameable blind, and they are also
         # the two qualities a rendering style cannot sand down into charm.
-        "anomalyTypes": "scale or time",
+        "anomalyTypes": "scale (far too large or small for its kind), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
         "tonalDirection": (
             "This timeframe is under strain. Do not soften it."
             if polarity == "hard" else
@@ -808,15 +844,22 @@ Rules:
 - Your objects must be **specific things with a use** — the kind a museum labels with a place and a date. A swaddling band. A beehive oven, still warm. A knotted red cord. A threshing floor. A votive eye of hammered tin. An apiary smoker. A lead curse tablet. A mourning brooch woven from hair. An ex-voto silver leg. A bone flute. A sin-eater's plate. A wax anatomical model. A plague doctor's beak stuffed with rue. A scold's bridle. A dowsing rod. A reliquary holding a tooth.
 - NEVER return a generic category or a stock prop. A door, a mirror, a key, a candle, a chain, a scale, a mask, a book, a clock, a lantern, a rope, a bridge, a tapestry, a gear, a tree with visible roots — these and anything similarly available are failures. If an object could illustrate any reading whatsoever, it is the wrong object.
 - Do not draw every object from one culture, one century, or one material. Reach across traditions and across the material world: bone, wax, lead, cloth, grain, glass, iron, salt.
+- Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
 - **Use no visual or compositional language at all.** Do not say where anything sits, how it is lit, what color it is, what it looks like, or how any two things are arranged relative to each other. You are not staging a picture. If you begin composing, you have failed this task.
 
 Respond with a JSON object with exactly these keys:
-{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object that belongs to the SAME world as the others — same kind of place, same order of reality — but is wrong in one specific way: either far out of {{ANOMALY_TYPES}}. Nothing in the rest of the material explains it.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'"}"""
+{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object that belongs to the SAME world as the others — same kind of place, same order of reality, same or earlier technology — but is wrong in one specific way: either far out of {{ANOMALY_TYPES}}. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE means far too large or far too small for its own kind, while still being the kind of thing this world contains. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'"}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
 # every cached amplification, for the same reason SIGNATURE_SCHEMA_VERSION
 # exists.
-STAGE15_SCHEMA_VERSION = 2
+# 2->3 on 2026-09-12: the first run of the anomaly rewrite had Stage 1.5 reading
+# "out of time" as "from a different century", which produced a disposable paper
+# party horn and a swollen early-2000s laptop battery among Roman and Byzantine
+# material — i.e. it reconstructed the very cross-world intrusion this change
+# existed to remove, in 2 of 6 samples. "Older, and only older" is now stated as a
+# hard constraint with the failure cases named.
+STAGE15_SCHEMA_VERSION = 3
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None):
@@ -918,7 +961,7 @@ WHAT THE IMAGE MUST CONTAIN
 
 HOW TO WRITE IT
 
-- Describe only what is physically there. NEVER explain what anything means. The following words and every close relative of them are forbidden in your output: symbolizing, symbolic, suggesting, suggestive, representing, as if, evoking, conveying, inviting, embodying, reflecting (in the figurative sense), hinting, capturing, "a sense of", "a feeling of", "creating an atmosphere of". An image model cannot paint a verb about meaning; every one of those words spends your budget to produce nothing. Say the thing; let it mean what it means.
+- Describe only what is physically there. NEVER explain what anything means. The following words and every close relative of them are forbidden in your output: symbolizing, symbolic, suggesting, suggestive, representing, as if, evoking, conveying, inviting, embodying, reflecting (in the figurative sense), hinting, capturing, "a sense of", "the sense of", "a feeling of", "the feeling of", "an impression of", "creating an atmosphere of", "limned with", "the whole scene is", "there is a quality of". Any article works the same way — "the sense of ripening" is forbidden exactly as "a sense of ripening" is. An image model cannot paint a verb about meaning; every one of those words spends your budget to produce nothing. Say the thing; let it mean what it means.
 - Concrete and oddly specific over generically mystical. Name particular objects, particular wear, particular substances. "A dented milk pail half full of chalk" beats "vessels of nourishment."
 - Avoid generic intensifiers. "Vibrant," "intricate," "swirling," "glowing," "mystical," "ethereal," "magical" are close to meaningless to an image model and are this pipeline's known crutch words. Prefer a described fact over an intensifier.
 - Match the light, scale and spatial pressure to the reading's actual feeling before any symbol does. When the reading is dark, the image is genuinely dark — close, heavy, dim, cold, airless, or too exposed — not a pleasant scene with a sad object in it. When the reading is light, let it be genuinely light. Do not default to warm golden pleasantness; that is this pipeline's known failure mode.
@@ -1006,9 +1049,14 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         "THE COMPOSITION BRIEF — these numbers govern this image. Obey them exactly:",
         f"  Discrete nameable things: {thing_lo} to {thing_hi}.",
         f"  Sites: {site_text}",
-        f"  Word range: {word_lo} to {word_hi} words (hard ceiling 140).",
+        # Stating the 140 ceiling here anchored the model upward: the 60-80 cells
+        # came back at 91 and 92 words, and one 100-130 cell came back at 146,
+        # breaching the absolute ceiling outright. The per-cell maximum is now the
+        # only number in this line, phrased as a rewrite condition.
+        f"  Word count: between {word_lo} and {word_hi} words. Count them before answering. If you are over {word_hi}, delete whole clauses until you are inside the range — do not summarise, and do not trade named things for adjectives. A prompt over {word_hi} words is a failed response.",
         f"  Verbs of interaction to draw on: {dial['verbs']}.",
         f"  The two registers: {'COLLIDE' if dial['registerCohesion'] == 'collide' else 'COHERE — build one continuous material world, not two things meeting'}.",
+        f"  REQUIRED: the primary register ({register}) must put at least one substantial thing of its own in the frame, named explicitly, beyond the objects you were given. A scene that merely takes place near that material does not count — if the register is \"mechanical\" an actual mechanism with working parts is visible; if \"aquatic\", real water; if \"bodily and anatomical\", actual anatomy as material rather than a person standing there.",
         f"  The anomaly, and how the world treats it: {dial['anomalyRelation']}",
     ]
     if dial.get("spatial"):
