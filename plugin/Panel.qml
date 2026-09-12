@@ -662,6 +662,23 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
+  // ---- Pipeline mode: how much of the image's SHAPE varies with the chart.
+  // "legacy" pins the composition dial to the constants used before
+  // 2026-09-12 (6-10 things across three depths, colliding registers, 90-130
+  // words — every single day, which is why every image carried the same
+  // implicit meaning). "coherent" lets density, word budget, register
+  // cohesion, spatial pressure and light follow the day's own transits.
+  // Defaults to legacy; see dial_from_texture() in llm_pipeline.py.
+  function commitPipelineMode(value) {
+    pipelineModeWriteProc.command = [root.configBin, "--set-pipeline-mode", value]
+    pipelineModeWriteProc.running = true
+  }
+
+  Process {
+    id: pipelineModeWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
   // ---- History retention: how many days of "Themes Generated" entries
   // astro-arc-generate keeps before astro-arc-prune-history deletes them,
   // every run. Never affects a theme already exported via Save Selected
@@ -1347,6 +1364,39 @@ Panel {
                 })
                 foreground: root.bar.foreground
                 onChanged: function(value) { root.commitThemeGenerator(value) }
+              }
+            }
+
+            // ---- Pipeline mode: fixed composition (legacy) vs. composition
+            // driven by the day's transits (coherent). ------------------
+            Item {
+              width: parent.width
+              height: Math.max(pipelineModeLabel.implicitHeight, pipelineModeDropdown.implicitHeight)
+
+              Text {
+                id: pipelineModeLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.labelColW
+                text: "Composition"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              Dropdown {
+                id: pipelineModeDropdown
+                anchors.left: pipelineModeLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                showLabel: false
+                value: root.configState.pipelineMode
+                options: Model.PIPELINE_MODE_CHOICES.map(function(c) {
+                  return { value: c.key, label: c.label }
+                })
+                foreground: root.bar.foreground
+                onChanged: function(value) { root.commitPipelineMode(value) }
               }
             }
 

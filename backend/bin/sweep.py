@@ -85,6 +85,14 @@ def main():
     ap.add_argument("--image-model", default=None)
     ap.add_argument("--size", default=None, help="WxH, defaults to config backgroundSize")
     ap.add_argument("--no-image", action="store_true", help="prompts only — free, for wording iteration")
+    # The composition dial (2026-09-12). Without these a sweep runs whatever the
+    # config says, which makes a legacy-vs-coherent comparison impossible; --cell
+    # is what lets one fixed dial cell be held constant while registers vary (and
+    # vice versa) — the two matrices that actually prove the dial works.
+    ap.add_argument("--pipeline-mode", choices=["legacy", "coherent"],
+                    help="override config's pipelineMode for this sweep")
+    ap.add_argument("--cell",
+                    help="pin one dial cell: polarity/intensityBand/multiplicity/exposureBand (e.g. soft/lo/1/hi)")
     ap.add_argument("--label", default="", help="one line recorded in the summary")
     args = ap.parse_args()
 
@@ -107,6 +115,24 @@ def main():
     out_dir = VERIFY_ROOT / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    # --- pin the dial ------------------------------------------------
+    # Pinned once and shared by every sample, for the same reason Stage 1 and the
+    # signature are: otherwise register differences are confounded with dial
+    # differences and the sweep proves nothing.
+    dial = None
+    if hasattr(lp, "dial_from_texture"):
+        mode = args.pipeline_mode or config.get("pipelineMode") or "legacy"
+        if args.cell:
+            pol, iband, mult, eband = args.cell.split("/")
+            texture = {"polarity": pol, "intensityBand": iband,
+                       "multiplicity": int(mult), "exposureBand": eband}
+        else:
+            texture = reading["arc"].get("texture")
+        dial = lp.dial_from_texture(texture, mode)
+        (out_dir / "00_dial.json").write_text(json.dumps(
+            {"pipelineMode": mode, "cell": args.cell, "texture": texture, "dial": dial},
+            indent=2, default=str))
+
     # --- pin Stage 1 -------------------------------------------------
     if args.stage1:
         stage1 = json.loads(Path(args.stage1).read_text())
@@ -123,9 +149,18 @@ def main():
     amplification = None
     amp_cost = None
     if hasattr(lp, "stage15_amplify"):
-        amplification, amp_cost = lp.stage15_amplify(
-            stage1, stage1_model, reading["arc"]["periodKey"], config, cache=False
-        )
+        amp_kwargs = {"cache": False}
+        if dial is not None:
+            amp_kwargs["dial"] = dial
+        try:
+            amplification, amp_cost = lp.stage15_amplify(
+                stage1, stage1_model, reading["arc"]["periodKey"], config, **amp_kwargs
+            )
+        except TypeError:
+            # Pre-dial pipeline — still produce a baseline.
+            amplification, amp_cost = lp.stage15_amplify(
+                stage1, stage1_model, reading["arc"]["periodKey"], config, cache=False
+            )
         (out_dir / "00_amplification.json").write_text(json.dumps(amplification, indent=2))
 
     registers = lp.load_registers()
@@ -166,6 +201,8 @@ def main():
             kwargs["secondary_register"] = secondary
         if amplification is not None:
             kwargs["amplification"] = amplification
+        if dial is not None:
+            kwargs["dial"] = dial
 
         try:
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(

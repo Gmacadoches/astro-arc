@@ -19,8 +19,19 @@ var DEFAULT_CONFIG = {
   backgroundSize: "auto",
   artStyle: "symbolist",
   themeGenerator: "built-in",
-  historyRetentionDays: 30
+  historyRetentionDays: 30,
+  pipelineMode: "legacy"
 }
+
+// Mirrors astro-arc-config's --set-pipeline-mode. "legacy" pins the composition
+// dial to the constants the pipeline used before 2026-09-12; "coherent" lets the
+// day's own transits set density, word budget, register cohesion, spatial
+// pressure and light. Hand-synced, same as ART_STYLE_CHOICES below — QML can't
+// read the Python side directly.
+var PIPELINE_MODE_CHOICES = [
+  { key: "legacy", label: "Legacy (fixed)" },
+  { key: "coherent", label: "Coherent (follows chart)" }
+]
 
 // How many days one "Themes Generated" entry represents, by frequency —
 // used only to estimate how many entries a retention window will hold
@@ -100,7 +111,8 @@ function parseConfig(raw) {
       artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist",
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
       historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
-        ? data.historyRetentionDays : 30
+        ? data.historyRetentionDays : 30,
+      pipelineMode: data.pipelineMode === "coherent" ? "coherent" : "legacy"
     }
   } catch (e) {
     return Object.assign({}, DEFAULT_CONFIG)
@@ -385,6 +397,7 @@ if (typeof module !== "undefined") {
     OPENAI_MODEL_CHOICES: OPENAI_MODEL_CHOICES,
     ART_STYLE_CHOICES: ART_STYLE_CHOICES,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
+    PIPELINE_MODE_CHOICES: PIPELINE_MODE_CHOICES,
     openaiModelDropdownValue: openaiModelDropdownValue,
     formatDateDigits: formatDateDigits,
     formatTimeDigits: formatTimeDigits,
