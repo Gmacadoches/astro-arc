@@ -1,0 +1,67 @@
+# Hand-maintained per-token prices, in US dollars per 1,000,000 tokens.
+#
+# THIS FILE EXISTS SO YOU DON'T HAVE TO EDIT PYTHON TO TRY A NEW MODEL.
+# Read fresh on every run, exactly like registers.toml / styles.toml /
+# cliches.toml — add a row here and the next generation (and the widget's
+# dropdowns) pick it up with no restart and no code change.
+#
+# WHY THIS IS HAND-MAINTAINED AND CANNOT BE AUTOMATED
+# OpenAI's API will tell you which models your key can reach (GET /v1/models,
+# which is what the widget's "Refresh" button calls) but it will NOT tell you
+# what they cost. There is no pricing endpoint on a normal key — the Admin-API
+# route was removed from this project on 2026-09-06 precisely because regular
+# users don't have that key. So: availability is discovered, price is typed in
+# by a human, from https://platform.openai.com/docs/pricing.
+#
+# A model missing from this file is still selectable and still runs. It simply
+# reports "cost unknown" rather than a fabricated number, per this project's
+# standing rule that cost figures are real token counts at a known rate or
+# nothing at all. Two numbers here turn that into a real measured cost.
+#
+# HOW TO ADD ONE
+# Look the model up on the pricing page and copy its input and output prices.
+# Both are "per 1M tokens". The label is what the widget's dropdown shows.
+#
+#   "some-new-model" = { label = "Some New Model", input = 1.25, output = 10.00 }
+#
+# Rates below were current when written; re-check before trusting any of them
+# for real budgeting. Deliberately NOT pre-filled with guesses for the newer
+# models your key can see — an invented rate is worse than an honest blank,
+# because it silently produces a confident wrong total.
+
+[chat]
+"gpt-4o-mini"  = { label = "GPT-4o mini",  input = 0.15, output = 0.60 }
+"gpt-4o"       = { label = "GPT-4o",       input = 2.50, output = 10.00 }
+"gpt-4.1-mini" = { label = "GPT-4.1 mini", input = 0.40, output = 1.60 }
+"gpt-4.1"      = { label = "GPT-4.1",      input = 2.00, output = 8.00 }
+
+[image]
+"gpt-image-1"      = { label = "GPT Image 1",      input = 10.00, output = 40.00 }
+"gpt-image-1-mini" = { label = "GPT Image 1 Mini", input = 2.50,  output = 8.00 }
+"gpt-image-2"      = { label = "GPT Image 2",      input = 8.00,  output = 30.00 }
+
+# Quality tiers offered per image model. "auto" means the model picks its own
+# tier and the quality dropdown has nothing to choose. A model absent here gets
+# DEFAULT_IMAGE_QUALITIES from model_catalog.py; if the API then rejects that
+# tier, the error says so rather than this file silently being wrong.
+[image_qualities]
+"gpt-image-1"      = ["low", "medium", "high"]
+"gpt-image-1-mini" = ["low", "medium", "high"]
+"gpt-image-2"      = ["auto"]
+
+# Preference order for "pick the best model that fits my cost ceiling", best
+# first. Anything not listed sorts after everything listed, so a newly-released
+# model is never auto-selected over one you've actually vetted — add it here
+# once you've decided where it belongs.
+[hierarchy]
+image = [
+  "gpt-image-2",
+  "gpt-image-1",
+  "gpt-image-1-mini",
+]
+chat = [
+  "gpt-4.1",
+  "gpt-4o",
+  "gpt-4.1-mini",
+  "gpt-4o-mini",
+]

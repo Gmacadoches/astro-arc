@@ -14,24 +14,45 @@ image rates specifically) — recheck platform.openai.com/docs/pricing
 before trusting any of this for real budgeting.
 """
 
-# model -> {input: $/1M tokens, output: $/1M tokens}. Deliberately small:
-# only models confidently known at the time this was written. Extend as
-# needed rather than guessing at ones not listed.
-CHAT_MODEL_RATES = {
-    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-    "gpt-4o": {"input": 2.50, "output": 10.00},
-    "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
-    "gpt-4.1": {"input": 2.00, "output": 8.00},
-}
+# Rates now live in pipeline/model-rates.toml and are loaded through
+# model_catalog, so there is ONE place to add a model rather than four that had
+# to be kept in agreement by hand (and had already drifted — gpt-image-1 was
+# priced here while being offered by no dropdown at all). The tables are still
+# exposed under their original names because callers and tests import them.
+from model_catalog import load_rates  # noqa: E402
 
-# Same shape, for the image-generation call — matches openai_image_gen.py's
-# MODEL_COSTS rate assumptions (kept here too so both the real-usage path
-# below and that module's own quality-tier estimate agree with each other).
-IMAGE_MODEL_RATES = {
-    "gpt-image-2": {"input": 8.00, "output": 30.00},
-    "gpt-image-1-mini": {"input": 2.50, "output": 8.00},
-    "gpt-image-1": {"input": 10.00, "output": 40.00},
-}
+
+def _rates(kind):
+    return load_rates().get(kind, {})
+
+
+class _LazyRates(dict):
+    """Looks like the old module-level dict, but re-reads the TOML on each
+    access so a hand edit takes effect without a restart — the same contract
+    registers.toml and styles.toml have."""
+
+    def __init__(self, kind):
+        super().__init__()
+        self._kind = kind
+
+    def get(self, model, default=None):
+        return _rates(self._kind).get(model, default)
+
+    def __getitem__(self, model):
+        return _rates(self._kind)[model]
+
+    def __contains__(self, model):
+        return model in _rates(self._kind)
+
+    def keys(self):
+        return _rates(self._kind).keys()
+
+    def items(self):
+        return _rates(self._kind).items()
+
+
+CHAT_MODEL_RATES = _LazyRates("chat")
+IMAGE_MODEL_RATES = _LazyRates("image")
 
 
 def _rate_cost(rates, input_tokens, output_tokens):

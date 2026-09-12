@@ -727,6 +727,11 @@ Panel {
   // configured retention window prunes it (astro-arc-prune-history). -----
   property var reviewsIndex: []
   property string selectedReviewId: ""
+  // The newest id as of the last load, so onLoaded can tell a genuinely new
+  // generation apart from any other rewrite of index.json. Empty until the
+  // first load, which makes that first load count as "new" and seeds the
+  // selection with the latest entry.
+  property string newestReviewId: ""
 
   property FileView reviewsIndexFile: FileView {
     path: root.home + "/.local/state/omarchy/astro-arc/reviews/index.json"
@@ -735,13 +740,24 @@ Panel {
     onFileChanged: reload()
     onLoaded: {
       root.reviewsIndex = Model.parseReviewsIndex(text())
-      // Auto-pruning can now remove the currently-selected entry out from
-      // under the user — re-picking the newest survivor (or clearing to
-      // "" when none are left) beats leaving selectedReviewId pointing at
-      // deleted data, which is a case the original "only fill in when
-      // empty" logic never had to consider.
+      var newestId = root.reviewsIndex.length > 0 ? root.reviewsIndex[0].id : ""
+
+      // Follow the newest generation. The previous rule only re-pointed the
+      // selection when the selected entry had been PRUNED, so a brand-new
+      // generation left it sitting on whatever was picked last — the picker
+      // went stale exactly when there was something new to look at, which is
+      // the one moment it matters.
+      //
+      // Tracking the newest id (rather than just assigning it every load)
+      // keeps manual browsing intact: index.json is rewritten and reloaded for
+      // reasons other than a new generation — a save, a prune, a clear — and
+      // those must not yank the user off an older entry they deliberately
+      // opened.
+      var isNewGeneration = newestId !== "" && newestId !== root.newestReviewId
       var stillExists = root.reviewsIndex.some(function(r) { return r.id === root.selectedReviewId })
-      if (!stillExists) root.selectedReviewId = root.reviewsIndex.length > 0 ? root.reviewsIndex[0].id : ""
+
+      if (isNewGeneration || !stillExists) root.selectedReviewId = newestId
+      root.newestReviewId = newestId
     }
     onLoadFailed: root.reviewsIndex = []
   }

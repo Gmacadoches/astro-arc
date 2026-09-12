@@ -60,6 +60,14 @@ MODEL_COSTS = {
     },
 }
 
+def quality_key_for(model, quality):
+    """The tier spelling to record and to price under. gpt-image-2 renders at
+    its own "auto" tier regardless of what the config asks for, so recording it
+    under the requested tier would file the measurement under a combination
+    that never actually ran."""
+    return "auto" if model == "gpt-image-2" else quality
+
+
 def estimate_cost(model, quality, target_width=1024, target_height=1024):
     """Projected $ for one render at the size it will actually be made at.
 
@@ -78,8 +86,7 @@ def estimate_cost(model, quality, target_width=1024, target_height=1024):
     so it returns None rather than a fabricated number for a model/quality
     it doesn't know.
     """
-    quality_key = "auto" if model == "gpt-image-2" else quality
-    base = MODEL_COSTS.get(model, {}).get(quality_key)
+    base = MODEL_COSTS.get(model, {}).get(quality_key_for(model, quality))
     if base is None:
         return None
     render_size = closest_supported_size(target_width, target_height, OPENAI_IMAGE_SIZES)
@@ -231,8 +238,23 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
     # quality-tier estimate — see cost_estimate.py and MODEL_COSTS' own
     # notes on why both of these are estimates, not confirmed numbers.
     usage = result.get("usage")
+
+    # Measure what this combination really consumed. The old path applied
+    # gpt-image-1's published per-tier token counts to other models' rates —
+    # an estimate resting on an estimate (see PRICE_ESTIMATE_ASSUMPTION). One
+    # real render replaces the token half of that with a measurement, which is
+    # also what lets an unpriced model report a real cost as soon as a rate is
+    # added to model-rates.toml. Never allowed to break a successful render:
+    # the image is already made and paid for by this point.
+    try:
+        from model_catalog import record_usage  # noqa: PLC0415
+
+        record_usage(model, quality_key_for(model, quality), render_size, usage)
+    except Exception:  # noqa: BLE001 — bookkeeping must not lose a paid image
+        pass
+
     actual_cost = image_call_cost(model, usage)
-    quality_key = "auto" if model == "gpt-image-2" else quality
+    quality_key = quality_key_for(model, quality)
     estimated_cost = MODEL_COSTS.get(model, {}).get(quality_key)
     cost_info = {
         "cost": actual_cost if actual_cost is not None else estimated_cost,

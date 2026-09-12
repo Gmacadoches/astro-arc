@@ -293,8 +293,9 @@ jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg freq
   --arg backend "$image_backend" --arg prompt "$prompt" --arg backgroundSize "$background_size" \
   --arg themeGenerator "$theme_generator" --arg themeGeneratorUsed "$theme_generator_used" \
   --arg imageQuality "$openai_quality" --arg imageQualityUsed "$openai_quality_used" \
+  --arg imageModel "$openai_model" \
   --slurpfile meta "$pipeline_meta_file" --argjson cost "$cost_entry" \
-  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, imageQuality: $imageQuality, imageQualityUsed: $imageQualityUsed, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
+  '{periodKey: $periodKey, generatedAt: $generatedAt, frequency: $frequency, imageBackend: $backend, prompt: $prompt, backgroundSize: $backgroundSize, themeGenerator: $themeGenerator, themeGeneratorUsed: $themeGeneratorUsed, imageQuality: $imageQuality, imageQualityUsed: $imageQualityUsed, imageModel: $imageModel, cost: $cost} * $meta[0]' >"$LAST_RUN_FILE"
 
 # Log this as a browsable "Themes Generated" iteration — every real run,
 # not just manual style-comparison batches, so reverting to an earlier
