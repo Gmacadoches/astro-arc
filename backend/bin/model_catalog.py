@@ -199,11 +199,19 @@ def record_stage_usage(stage, model, usage):
     completion_tokens = usage.get("completion_tokens", usage.get("output_tokens"))
     if not completion_tokens:
         return None
+    # Reasoning tokens are billed at the OUTPUT rate but never appear in the
+    # response text, so without recording them a stage's cost is unexplainable:
+    # gpt-6-astra billed 859 completion tokens for a 74-word prompt where
+    # gpt-5.4 billed 136 for a 76-word one, and the ~720-token difference is
+    # invisible anywhere else. Absent on models that don't reason.
+    details = usage.get("completion_tokens_details") or {}
+    reasoning = details.get("reasoning_tokens")
     learned = load_learned_usage()
     stages = learned.setdefault("stages", {})
     stages.setdefault(stage, {})[model] = {
         "inputTokens": prompt_tokens or 0,
         "outputTokens": completion_tokens,
+        "reasoningTokens": reasoning,
         "measuredAt": datetime.now(timezone.utc).isoformat(),
     }
     LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
