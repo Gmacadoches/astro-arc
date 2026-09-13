@@ -82,7 +82,8 @@ Period keys: `YYYY-MM-DDTHH` · `YYYY-MM-DD` · ISO `%G-W%V` · `YYYY-MM`.
 
 **Runs:** `astro_engine.py` · **Cost:** free · **Cache:** — · **Knob:** birth date, time, place
 
-Swiss Ephemeris (bundled Moshier — no data files to install) gives natal
+[Swiss Ephemeris](https://www.astro.com/swisseph/) (bundled Moshier, no data
+files to install) gives natal
 placements, houses, and today's transits. It emits an `arc`: the moon sign
 and phase, the dominant transit, and a **texture** block — polarity,
 intensity, exposure, multiplicity — which is the raw material for step 3.

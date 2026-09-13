@@ -53,7 +53,9 @@ Both are the same register at the same density. The difference is the chart.
 
 - **Omarchy** (Hyprland + Quickshell). This is a bar-widget plugin; it does not
   run standalone.
-- **Python 3.11+** (uses stdlib `tomllib`; developed against 3.14).
+- **Python 3.11+** (uses stdlib `tomllib`; developed against 3.14). The chart
+  maths comes from the [Swiss Ephemeris](https://www.astro.com/swisseph/) via
+  `pyswisseph`, installed by `install.sh`.
 - **System tools**: `jq`, `secret-tool` (libsecret), `hyprctl`, `xdg-mime` —
   all standard on an Omarchy install.
 - **An OpenAI API key.** Every stage is an API call, so a key is required
@@ -168,4 +170,16 @@ says which step each one changes:
 
 ## Licence
 
-[MIT](LICENSE).
+[GNU Affero General Public License v3.0 or later](LICENSE).
+
+Astro-Arc computes every chart with the
+[Swiss Ephemeris](https://www.astro.com/swisseph/)
+([source](https://github.com/aloistr/swisseph)), via the
+[pyswisseph](https://astrorigin.com/pyswisseph) bindings. Swiss Ephemeris is
+dual licensed, under the AGPL or under a paid Professional License from
+Astrodienst. This project takes the AGPL, which requires the project as a whole
+to be AGPL licensed. That is the reason for the licence, and it is worth knowing
+before you fork: anything you build on Astro-Arc inherits the same obligation.
+
+See [`NOTICE`](NOTICE) for the third party copyright notices, which the Swiss
+Ephemeris licence requires be preserved on all copies.

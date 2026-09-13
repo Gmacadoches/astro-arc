@@ -3,10 +3,15 @@
   "id": "garrett.astro-arc",
   "name": "Astro-Arc",
   "version": "0.1.0",
+  "license": "AGPL-3.0-or-later",
   "author": "garrett",
   "description": "Astrological theme generator: turns your natal chart and current transits into a full Omarchy theme on the cadence you pick, or only when you ask",
-  "kinds": ["bar-widget"],
-  "entryPoints": { "barWidget": "BarWidget.qml" },
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
   "barWidget": {
     "displayName": "Astro-Arc",
     "description": "Astrological theme generator",
