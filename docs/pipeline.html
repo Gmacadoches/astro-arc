@@ -1,0 +1,527 @@
+<title>Astro-Arc Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&display=swap">
+<style>
+:root {
+    --paper:      #eff1f5;
+    --panel:      #e5e8ef;
+    --ink:        #141a2a;
+    --ink-soft:   #4a5468;
+    --ink-faint:  #6d7689;
+    --rule:       #c6ccd9;
+    --rule-soft:  #d8dde7;
+    --brass:      #8c6115;
+    --brass-bg:   #e8e2d2;
+    --verdigris:  #28635a;
+    --iron:       #8a3a32;
+
+    --f-display: "Newsreader", Georgia, "Times New Roman", serif;
+    --f-body:    "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-mono:    "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --col: 68ch;
+    --rail: 3.25rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:     #0e1220;
+      --panel:     #171d2e;
+      --ink:       #e2e6ef;
+      --ink-soft:  #a3abbd;
+      --ink-faint: #7c8598;
+      --rule:      #2b3348;
+      --rule-soft: #222a3c;
+      --brass:     #cf9a45;
+      --brass-bg:  #241f14;
+      --verdigris: #63ad99;
+      --iron:      #cd7168;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:     #0e1220;
+    --panel:     #171d2e;
+    --ink:       #e2e6ef;
+    --ink-soft:  #a3abbd;
+    --ink-faint: #7c8598;
+    --rule:      #2b3348;
+    --rule-soft: #222a3c;
+    --brass:     #cf9a45;
+    --brass-bg:  #241f14;
+    --verdigris: #63ad99;
+    --iron:      #cd7168;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--f-body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: calc(var(--col) + var(--rail) + 4rem);
+    margin: 0 auto;
+    padding: clamp(2rem, 5vw, 4.5rem) clamp(1.1rem, 4vw, 2rem) 5rem;
+  }
+
+  /* ---- masthead ------------------------------------------------------ */
+
+  .mast { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  .eyebrow {
+    font-family: var(--f-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  h1 {
+    font-family: var(--f-display);
+    font-size: clamp(2.4rem, 7vw, 3.6rem);
+    font-weight: 500;
+    line-height: 1.04;
+    letter-spacing: -0.015em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-family: var(--f-display);
+    font-size: clamp(1.08rem, 2.4vw, 1.3rem);
+    line-height: 1.5;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 58ch;
+  }
+
+  .ledger {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.5rem;
+    padding: 1rem 0 0;
+    border-top: 1px solid var(--rule);
+    margin-top: 0.6rem;
+  }
+  .ledger div { padding: 0.5rem 0; }
+  .ledger dt {
+    font-family: var(--f-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 0.15rem;
+  }
+  .ledger dd {
+    margin: 0;
+    font-family: var(--f-mono);
+    font-size: 1.25rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--brass);
+  }
+  .ledger dd small {
+    display: block;
+    font-family: var(--f-body);
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--ink-faint);
+    letter-spacing: 0;
+  }
+
+  /* ---- section headings ---------------------------------------------- */
+
+  h2 {
+    font-family: var(--f-display);
+    font-size: clamp(1.5rem, 3.6vw, 1.95rem);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin: 0 0 0.4rem;
+    text-wrap: balance;
+  }
+
+  .section { margin-top: 4rem; }
+  .section > p { max-width: var(--col); color: var(--ink-soft); }
+
+  .lede { max-width: var(--col); margin: 0 0 1.6rem; color: var(--ink-soft); }
+
+  /* ---- the rail: the page's structure IS the pipeline ---------------- */
+
+  .flow {
+    margin: 2.2rem 0 0;
+    padding: 0;
+    list-style: none;
+    position: relative;
+  }
+  .flow::before {
+    content: "";
+    position: absolute;
+    left: calc(var(--rail) / 2);
+    top: 0.6rem;
+    bottom: 3.2rem;
+    width: 1px;
+    background: var(--rule);
+  }
+
+  .step {
+    position: relative;
+    padding-left: var(--rail);
+    padding-bottom: 2.6rem;
+  }
+
+  .step > .marker {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--rail);
+    display: flex;
+    justify-content: center;
+  }
+  .marker span {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--ink-faint);
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    width: 1.85rem;
+    height: 1.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .step.llm .marker span {
+    border-color: var(--brass);
+    color: var(--brass);
+  }
+
+  .step h3 {
+    font-family: var(--f-body);
+    font-size: 1.06rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    margin: 0.25rem 0 0.7rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  .step h3 .stage {
+    font-family: var(--f-mono);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--brass);
+    background: var(--brass-bg);
+    padding: 0.18rem 0.45rem;
+    border-radius: 2px;
+  }
+
+  .step p { margin: 0 0 0.8rem; max-width: var(--col); }
+  .step p:last-child { margin-bottom: 0; }
+
+  /* meta strip */
+  .meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 0.1rem 1.4rem;
+    margin: 0 0 0.95rem;
+    padding: 0.7rem 0;
+    border-top: 1px solid var(--rule-soft);
+    border-bottom: 1px solid var(--rule-soft);
+    max-width: var(--col);
+  }
+  .meta div { min-width: 0; }
+  .meta dt {
+    font-family: var(--f-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .meta dd {
+    margin: 0;
+    font-family: var(--f-mono);
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+  .meta .cost dd  { color: var(--brass); }
+  .meta .cache dd { color: var(--verdigris); }
+
+  /* ---- inline bits ---------------------------------------------------- */
+
+  code {
+    font-family: var(--f-mono);
+    font-size: 0.87em;
+    background: var(--panel);
+    padding: 0.1em 0.32em;
+    border-radius: 2px;
+  }
+  a { color: var(--brass); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--brass);
+    outline-offset: 2px;
+  }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .pull {
+    font-family: var(--f-display);
+    font-size: 1.05rem;
+    font-style: italic;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--rule);
+    padding-left: 1rem;
+    margin: 0 0 0.85rem;
+    max-width: 58ch;
+  }
+
+  /* ---- tables --------------------------------------------------------- */
+
+  .tablewrap { overflow-x: auto; margin: 0 0 1.5rem; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 30rem;
+    font-size: 0.9rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 1.1rem 0.6rem 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+  }
+  th {
+    font-family: var(--f-mono);
+    font-size: 0.64rem;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+  }
+  td:first-child { white-space: nowrap; }
+  td code { background: none; padding: 0; color: var(--ink); }
+
+  /* ---- callouts ------------------------------------------------------- */
+
+  .trap {
+    border-left: 2px solid var(--iron);
+    padding: 0.1rem 0 0.1rem 1.1rem;
+    margin: 0 0 1.4rem;
+    max-width: var(--col);
+  }
+  .trap.fixed-trap { border-left-color: var(--verdigris); }
+  .trap.fixed-trap h4 { color: var(--verdigris); }
+  .trap h4 {
+    font-family: var(--f-body);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.35rem;
+    color: var(--iron);
+  }
+  .trap p { margin: 0; color: var(--ink-soft); font-size: 0.94rem; }
+
+  pre {
+    font-family: var(--f-mono);
+    font-size: 0.82rem;
+    line-height: 1.65;
+    background: var(--panel);
+    padding: 0.9rem 1.1rem;
+    border-radius: 3px;
+    overflow-x: auto;
+    margin: 0 0 1.2rem;
+    max-width: var(--col);
+  }
+  pre .c { color: var(--ink-faint); }
+
+  /* ---- audit ---------------------------------------------------------- */
+
+  .audit { display: flex; flex-direction: column; gap: 1.7rem; margin-top: 1.8rem; }
+  .find { max-width: var(--col); }
+  .find h4 {
+    font-family: var(--f-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0 0 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--rule);
+    color: var(--ink-faint);
+  }
+  .find.removed h4 { color: var(--iron); }
+  .find.fixed h4   { color: var(--verdigris); }
+  .find.open h4    { color: var(--brass); }
+  .find.closed h4  { color: var(--verdigris); }
+  .find.kept h4    { color: var(--ink-faint); }
+  .find ul { margin: 0; padding-left: 1.15rem; }
+  .find li { margin-bottom: 0.55rem; color: var(--ink-soft); }
+  .find li:last-child { margin-bottom: 0; }
+  .find li b { color: var(--ink); font-weight: 600; }
+
+  footer {
+    margin-top: 4.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+    font-family: var(--f-mono);
+    font-size: 0.74rem;
+    color: var(--ink-faint);
+    max-width: var(--col);
+    line-height: 1.7;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+<header class="mast">
+<div class="eyebrow">Astro-Arc · generation pipeline</div>
+<h1>How one image gets made</h1>
+<p class="standfirst">One generation turns a birth chart and today's sky into a wallpaper and a matching desktop palette. A fresh one costs about $0.028 at the High preset; a same-day re-run is about $0.019, because the reading is cached and only the picture is remade. The render is the slow part.</p>
+<p class="standfirst sub">Twelve steps, three of them language models. This document walks the whole path in order, and every step names the file that runs it, what it reads, what it writes, whether it is cached, and <strong>the one knob that changes it</strong> — so you can retune this thing without reading any Python.</p>
+<p class="standfirst sub">If you only read one section, read <a href="#tweak-it-without-touching-code">Tweak it without touching code</a>.</p>
+<p class="standfirst sub">&gt; This file is the source. <code>docs/pipeline.html</code> is generated from it by &gt; <code>backend/bin/build_pipeline_page.py</code> — edit here, run that, never edit the &gt; HTML. <code>build_pipeline_page.py --check</code> fails if the two have drifted.</p>
+<dl class="ledger"><div><dt>fresh run</dt><dd>$0.028</dd></div><div><dt>same-day re-run</dt><dd>$0.019</dd></div><div><dt>render</dt><dd>~40s</dd></div><div><dt>registers</dt><dd>25</dd></div></dl>
+</header>
+<section class="section" id="the-pipeline">
+<h2>The pipeline</h2>
+<p>Steps 2–7 all live in one file, <code>llm_pipeline.py</code>, and are where the picture is actually decided. Everything else is plumbing. The steps that spend money are marked.</p>
+<ol class="flow"><li class="step">
+<div class="marker"><span>00</span></div>
+<h3>Decide whether to run at all</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>astro-arc-generate --if-due</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>frequency</code></dd></div></dl>
+<p>Two independent triggers fire this, deliberately: a systemd user timer every 15 minutes, and the panel's own 5-minute poll. Both pass <code>--if-due</code>, both hit the same <code>flock</code>, so whichever notices a new period first wins and the other is a no-op. Neither can outlive your login session — see the Schedule caption in the panel.</p>
+<p>"Already generated?" is decided by re-keying <code>last-run.json</code>'s <code>generatedAt</code> under the frequency set <strong>right now</strong>, never by comparing its stored <code>periodKey</code>. That key was filed under whatever frequency was set at the time, so comparing it directly made switching Daily → Monthly start a paid render as the immediate consequence of changing a dropdown.</p>
+<p>Period keys: <code>YYYY-MM-DDTHH</code> · <code>YYYY-MM-DD</code> · ISO <code>%G-W%V</code> · <code>YYYY-MM</code>.</p>
+</li>
+<li class="step">
+<div class="marker"><span>01</span></div>
+<h3>Compute the chart</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>astro_engine.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd>birth date, time, place</dd></div></dl>
+<p>Swiss Ephemeris (bundled Moshier — no data files to install) gives natal placements, houses, and today's transits. It emits an <code>arc</code>: the moon sign and phase, the dominant transit, and a <strong>texture</strong> block — polarity, intensity, exposure, multiplicity — which is the raw material for step 3.</p>
+<p>Hourly has no branch here on purpose: transits barely move in an hour, so an hourly schedule shares the daily arc and re-rolls only the picture.</p>
+</li>
+<li class="step llm">
+<div class="marker"><span>02</span></div>
+<h3><span class="stage">Stage 1</span>the reading</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.stage1_interpret</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0031</dd></div><div class="cache"><dt>Cache</dt><dd>per period + chart</dd></div><div class=""><dt>Knob</dt><dd><code>stage1Model</code></dd></div></dl>
+<p>One LLM call turns the chart into a psychological reading in a Jungian frame, plus a one-line distillation and a narrative position. It is told, forcefully, never to use visual language — that firewall is what stops the reading from quietly dictating the picture.</p>
+<p>Cached in <code>pipeline/readings/&lt;periodKey&gt;.json</code>, invalidated by <code>STAGE1_SCHEMA_VERSION</code>. <strong>Editing the prompt does not invalidate the cache</strong> — bump the schema version, or you will test yesterday's output.</p>
+</li>
+<li class="step">
+<div class="marker"><span>03</span></div>
+<h3>The dial — composition, without an LLM</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.dial_from_texture</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd>— always follows the chart</dd></div></dl>
+<p>The day's texture becomes hard numbers: how many sites, how many objects, the word budget, which verbs, whether the two registers <strong>collide</strong> or <strong>cohere</strong>, how much spatial pressure, how much light. These used to be constants, which is why every image once carried the same implicit meaning however the chart moved.</p>
+<p>The dial always follows the chart. A <code>pipelineMode: "legacy"</code> setting used to pin it back to fixed constants — an option to switch off the mechanism this whole project is built on, and it was the default. Removed 2026-09-13. The constants survive as <code>NO_TEXTURE_DIAL</code>, the fallback for a reading that has no texture block at all.</p>
+</li>
+<li class="step llm">
+<div class="marker"><span>04</span></div>
+<h3><span class="stage">Stage 1.5</span>amplification</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.stage15_amplify</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0051</dd></div><div class="cache"><dt>Cache</dt><dd>per period + chart</dd></div><div class=""><dt>Knob</dt><dd><code>stage1Model</code></dd></div></dl>
+<p>Turns the reading into an archetypal constellation, a movement, <strong>4–7 concrete objects</strong>, a felt quality, and an <strong>anomaly</strong> — one thing that belongs to the scene's world but is wrong in exactly one way (far out of scale, or far older and more ruined than everything around it). The anomaly is mandatory and must never be flagged as strange in the prompt; naming the wrongness out loud is what made it read as a bolted-on item.</p>
+<p>These objects are <strong>what is in the scene</strong>.</p>
+</li>
+<li class="step llm">
+<div class="marker"><span>05</span></div>
+<h3>The visual signature</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.get_visual_signature</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0087</dd></div><div class="cache"><dt>Cache</dt><dd>per chart, ~forever</dd></div><div class=""><dt>Knob</dt><dd><code>stage2Model</code></dd></div></dl>
+<p>One description of light and contrast for the whole series, so every image reads as the same hand. Stage 2 is explicitly told to honor its light and contrast and <strong>not</strong> to copy its color words — naming the same palette every time is what made the series monotonous.</p>
+</li>
+<li class="step">
+<div class="marker"><span>06</span></div>
+<h3>Registers — what the scene is made of</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.pick_registers</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>registers.toml</code></dd></div></dl>
+<p>Each image gets a <strong>primary</strong> register (the protagonist material) and usually a <strong>secondary</strong>. The dial decides whether they collide or cohere. Registers rotate by recency across a 5-day window, so the series moves between regions of image-space rather than merely avoiding recent words.</p>
+<p>The amplification objects are what is <em>in</em> the scene; the registers are what the scene is <em>made of</em>.</p>
+<p>Five of the 25 registers are people registers, and they alone decide whether figures appear. This is gated on the <strong>primary</strong> only — a human register arriving as a secondary would inject people into a material-led scene through a side door.</p>
+</li>
+<li class="step llm">
+<div class="marker"><span>07</span></div>
+<h3><span class="stage">Stage 2</span>the image prompt</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.stage2_image_prompt</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0087</dd></div><div class="cache"><dt>Cache</dt><dd>never (temp 0.95)</dd></div><div class=""><dt>Knob</dt><dd><code>stage2Model</code>, <code>artStyle</code></dd></div></dl>
+<p>Everything above converges here: reading, objects, anomaly, signature, both registers, the dial's composition brief, the art style's guidance, the concept tags of the last 8 generations to avoid, and any hard-blocked terms.</p>
+<p>This is the only stage that runs every time, which is why two generations an hour apart produce different pictures from the same reading.</p>
+<p>Its rules, in short: describe only what is physically there, never what it means; concrete and oddly specific over generically mystical; things must be doing something to each other; each register must contribute a substantial named thing of its own.</p>
+</li>
+<li class="step llm">
+<div class="marker"><span>08</span></div>
+<h3>Render</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>openai_image_gen.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0058</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>openaiModel</code>, <code>openaiQuality</code></dd></div></dl>
+<p>The style suffix is appended after Stage 2, then the prompt is rendered at the configured tier — every image, people or not. A bump to <code>high</code> for people images was removed on 2026-09-13: the bakeoff found this model <em>more</em> prompt-faithful at <code>low</code> than at <code>high</code>, for a seventh of the price.</p>
+<p>A refusal from the safety classifier is retried. That is not wasted spend: identical prompts have been refused once and accepted on a later attempt.</p>
+</li>
+<li class="step">
+<div class="marker"><span>09</span></div>
+<h3>Palette</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>palette_extract.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>themeGenerator</code></dd></div></dl>
+<p>Derives <code>colors.toml</code> from the rendered image, so the colors and the wallpaper always agree. Set <code>themeGenerator: "aether"</code> to hand this to Omarchy's own generator instead.</p>
+</li>
+<li class="step">
+<div class="marker"><span>10</span></div>
+<h3>Apply</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>omarchy-theme-set</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd>—</dd></div></dl>
+<p>Wallpaper and palette go live on the desktop.</p>
+</li>
+<li class="step">
+<div class="marker"><span>11</span></div>
+<h3>Record</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>build_review.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>historyRetentionDays</code></dd></div></dl>
+<p>Writes the browsable entry — one self-contained HTML page per generation, with the image, the reading and every dial value — and snapshots the theme so it can be saved or exported later. Then <code>astro-arc-prune-history</code> deletes entries past the retention window.</p>
+</li></ol>
+</section>
+<section class="section" id="tweak-it-without-touching-code">
+<h2>Tweak it without touching code</h2>
+<p>Four TOML files, read fresh on every run. No restart, no reinstall.</p>
+<div class="tablewrap"><table><thead><tr><th>File</th><th>What it controls</th><th>Try this</th></tr></thead><tbody><tr><td><code>pipeline/registers.toml</code></td><td>the 25 materials a scene is built from</td><td>add one; drop one that never lands</td></tr><tr><td><code>pipeline/styles.toml</code></td><td>the 7 art styles</td><td>add a preset with <code>label</code>, <code>suffix</code>, <code>guidance</code></td></tr><tr><td><code>pipeline/cliches.toml</code></td><td>hard-blocked exact terms</td><td>add a word <strong>only after</strong> you see it repeat</td></tr><tr><td><code>pipeline/model-rates.toml</code></td><td>model prices and the quality presets</td><td>add a model, or retune a preset</td></tr></tbody></table></div>
+<p>Everything else is one config file at <code>~/.local/state/omarchy/settings/astro-arc.json</code>, all of it settable through <code>astro-arc-config</code> or the panel:</p>
+<div class="tablewrap"><table><thead><tr><th>Knob</th><th>Does what</th></tr></thead><tbody><tr><td><code>frequency</code></td><td><code>hourly</code> / <code>daily</code> / <code>weekly</code> / <code>monthly</code> / <code>manual</code></td></tr><tr><td><code>artStyle</code></td><td>which styles.toml preset</td></tr><tr><td><code>stage1Model</code> / <code>stage2Model</code></td><td>the writing models</td></tr><tr><td><code>openaiModel</code> / <code>openaiQuality</code></td><td>the image model and tier</td></tr><tr><td><code>maxCostPerImage</code></td><td>hides image models above this price from the picker; <code>0</code> disables</td></tr><tr><td><code>themeGenerator</code></td><td><code>built-in</code> (palette from the image) or <code>aether</code></td></tr><tr><td><code>historyRetentionDays</code></td><td>how long generations are kept</td></tr></tbody></table></div>
+<h3>One trap, and one thing that used to be one</h3>
+
+<div class="trap"><h4>Editing a stage prompt does not invalidate its cache</h4><p>Stage 1, Stage 1.5 and the signature are cached by period and chart. Bump the matching <code>*_SCHEMA_VERSION</code> when you change a prompt, or you will be reading yesterday's answer and concluding your edit did nothing.</p></div>
+<div class="trap fixed-trap"><h4>Adding a register is now one line in one file</h4><p>Put its name under the family it is made of in <code>registers.toml</code> and you are done — the rotation list, the family lookup, the people gate and the sentence Stage 2 reads are all derived from that. Put it under <code>human</code> and it is gated as people automatically. This used to take three edits across two files, two of which failed silently.</p></div>
+<h3>Change something and measure it</h3>
+<pre>sweep.py --out my-test --registers all --pairs        <span class="c"># every register, one fixed reading</span>
+sweep.py --out wording --registers botanical --no-image  <span class="c"># prompts only, free</span></pre>
+<p><code>sweep.py</code> pins the reading, the signature and the dial so the only thing varying is the thing under test, and it touches no production state — your history, caches, last run and live theme are left alone. Output lands in <code>state/verification/&lt;name&gt;/</code> with every prompt, cost and render.</p>
+<p>Use it. This project's own history records that 2–4-sample spot checks let the same content bug ship three times, and that the one comparison batch which would have caught it was never saved.</p>
+</section>
+<section class="section" id="what-the-complexity-pass-found-2026-09-13">
+<h2>What the complexity pass found (2026-09-13)</h2>
+<div class="find removed">
+<h4>Removed</h4>
+<ul><li><strong><code>symbol_map.py</code></strong> — 189 lines of fixed-vocabulary image generation, superseded by the LLM pipeline. Nothing imported it; every remaining mention was prose in a comment.</li><li><strong>The FIGURE HIERARCHY rule</strong> in <code>STAGE2_SYSTEM</code>, which capped how many faces could turn toward the viewer. Removed against measured evidence — forced rows of six and nine equally-sized faces rendered cleanly at 3× zoom — with its provenance kept in a comment saying plainly that the finding is about <em>one image model at one quality tier</em>, so a model swap re-opens the question instead of inheriting the answer.</li></ul>
+</div>
+<div class="find fixed">
+<h4>Fixed — three things a fork would have hit</h4>
+<ul><li><code>openaiModel</code> and <code>openaiQuality</code> default to <code>""</code>, and <code>jq</code>'s <code>//</code> only substitutes for <code>null</code> — so a config where the image model had never been picked passed an <em>empty model name</em> to the API instead of falling back.</li><li><code>maxCostPerRun</code> had no setter for its entire life, despite the generate script telling you to raise it. Given one — then removed entirely later the same day, along with the quality bump it existed to gate.</li><li>A comment in <code>openai_image_gen.py</code> asserted the safety classifier is deterministic and that retrying is always wasted spend. Both are false, measured — and that comment was steering a real decision.</li></ul>
+</div>
+<div class="find kept">
+<h4>Left alone, on purpose</h4>
+<ul><li><strong><code>cliches.toml</code> is empty by design.</strong> Pre-seeding a blocklist from guesses gives false confidence and decays as the model finds synonyms for whatever you guessed instead.</li><li><strong><code>image_gen.py</code></strong> (local Stable Diffusion) is no longer offered in the UI but still works if set by hand.</li><li><strong>The <code>intrusion</code>/<code>anomaly</code> alias</strong> keeps old <code>pipeline-meta-*.json</code> files rendering.</li></ul>
+</div>
+<div class="find closed">
+<h4>Closed — the four judgment calls, all resolved</h4>
+<ul><li><strong>Period-key logic lived in four implementations.</strong> Now one, <code>period_key.py</code>, plus <code>Model.js</code>'s — which must exist because QML cannot call Python inside a property binding. <code>period_key.py --selftest</code> checks them against one table of cases, including the ISO week-year edges, and runs the JS through node when node is present.</li><li><strong><code>pipelineMode: legacy</code> removed.</strong> The dial always follows the chart.</li><li><strong>The people quality bump removed</strong>, and with it <code>maxCostPerRun</code>, two cost estimator CLI shims, and ~73 lines of budget projection.</li><li><strong><code>imageBackend</code> now defaults to <code>"openai"</code></strong>, matching <code>provider</code>.</li></ul>
+</div>
+</section>
+<footer>Generated from PIPELINE.md by backend/bin/build_pipeline_page.py — edit the Markdown, not this page.<br>Costs are measured at the High preset (gpt-4.1 · gpt-image-2.5-sunburst), not quoted from a rate card.</footer>
+</div>

@@ -1,21 +1,27 @@
 # How one image gets made
 
 One generation turns a birth chart and today's sky into a wallpaper and a
-matching desktop palette. A fresh one costs about **$0.027** at the High
-preset; a same-day re-run is about **$0.019**, because the reading is cached
-and only the picture is remade. The render itself is the slow part, around 40
-seconds.
+matching desktop palette. A fresh one costs about $0.028 at the High preset; a
+same-day re-run is about $0.019, because the reading is cached and only the
+picture is remade. The render is the slow part.
 
-This document walks the whole path in order. Every step names the file that
-runs it, what it reads, what it writes, whether it is cached, and **the one
-knob that changes it** — so you can retune this thing without reading any
-Python.
+**At a glance:** $0.028 fresh run · $0.019 same-day re-run · ~40s render · 25 registers
+
+Twelve steps, three of them language models. This document walks the whole path
+in order, and every step names the file that runs it, what it reads, what it
+writes, whether it is cached, and **the one knob that changes it** — so you can
+retune this thing without reading any Python.
 
 If you only read one section, read [Tweak it without touching
 code](#tweak-it-without-touching-code).
 
+> This file is the source. `docs/pipeline.html` is generated from it by
+> `backend/bin/build_pipeline_page.py` — edit here, run that, never edit the
+> HTML. `build_pipeline_page.py --check` fails if the two have drifted.
+
 ---
 
+<!-- page:skip -->
 ## The map
 
 ```
@@ -48,9 +54,15 @@ Steps 2–7 are the interesting part and all live in one file. Steps 0, 1 and
 
 ---
 
+## The pipeline
+
+Steps 2–7 all live in one file, `llm_pipeline.py`, and are where the picture is
+actually decided. Everything else is plumbing. The steps that spend money are
+marked.
+
 ## 0. Decide whether to run at all
 
-**Runs:** `astro-arc-generate --if-due` · **Knob:** `frequency`
+**Runs:** `astro-arc-generate --if-due` · **Cost:** free · **Cache:** — · **Knob:** `frequency`
 
 Two independent triggers fire this, deliberately: a systemd user timer every
 15 minutes, and the panel's own 5-minute poll. Both pass `--if-due`, both hit
@@ -68,7 +80,7 @@ Period keys: `YYYY-MM-DDTHH` · `YYYY-MM-DD` · ISO `%G-W%V` · `YYYY-MM`.
 
 ## 1. Compute the chart
 
-**Runs:** `astro_engine.py` · **Cost:** free · **Knob:** birth date/time/place
+**Runs:** `astro_engine.py` · **Cost:** free · **Cache:** — · **Knob:** birth date, time, place
 
 Swiss Ephemeris (bundled Moshier — no data files to install) gives natal
 placements, houses, and today's transits. It emits an `arc`: the moon sign
@@ -80,8 +92,7 @@ hourly schedule shares the daily arc and re-rolls only the picture.
 
 ## 2. Stage 1 — the reading
 
-**Runs:** `llm_pipeline.stage1_interpret` · **~$0.0031** · **cached per
-period + chart** · **Knob:** `stage1Model`
+**Runs:** `llm_pipeline.stage1_interpret` · **Cost:** ~$0.0031 · **Cache:** per period + chart · **Knob:** `stage1Model`
 
 One LLM call turns the chart into a psychological reading in a Jungian frame,
 plus a one-line distillation and a narrative position. It is told, forcefully,
@@ -94,8 +105,7 @@ bump the schema version, or you will test yesterday's output.
 
 ## 3. The dial — composition, without an LLM
 
-**Runs:** `llm_pipeline.dial_from_texture` · **free** · **Knob:** — always
-follows the chart
+**Runs:** `llm_pipeline.dial_from_texture` · **Cost:** free · **Cache:** — · **Knob:** — always follows the chart
 
 The day's texture becomes hard numbers: how many sites, how many objects, the
 word budget, which verbs, whether the two registers **collide** or **cohere**,
@@ -111,8 +121,7 @@ no texture block at all.
 
 ## 4. Stage 1.5 — amplification
 
-**Runs:** `llm_pipeline.stage15_amplify` · **~$0.0051** · **cached per period
-+ chart** · **Knob:** `stage1Model` (deliberately shares Stage 1's)
+**Runs:** `llm_pipeline.stage15_amplify` · **Cost:** ~$0.0051 · **Cache:** per period + chart · **Knob:** `stage1Model`
 
 Turns the reading into an archetypal constellation, a movement, **4–7 concrete
 objects**, a felt quality, and an **anomaly** — one thing that belongs to the
@@ -125,8 +134,7 @@ These objects are **what is in the scene**.
 
 ## 5. The visual signature
 
-**Runs:** `llm_pipeline.get_visual_signature` · **~$0.0087** · **cached per
-birth chart, effectively forever** · **Knob:** `stage2Model`
+**Runs:** `llm_pipeline.get_visual_signature` · **Cost:** ~$0.0087 · **Cache:** per chart, ~forever · **Knob:** `stage2Model`
 
 One description of light and contrast for the whole series, so every image
 reads as the same hand. Stage 2 is explicitly told to honor its light and
@@ -135,8 +143,7 @@ time is what made the series monotonous.
 
 ## 6. Registers — what the scene is made of
 
-**Runs:** `llm_pipeline.pick_registers` · **free** · **Knob:**
-`pipeline/registers.toml`
+**Runs:** `llm_pipeline.pick_registers` · **Cost:** free · **Cache:** — · **Knob:** `registers.toml`
 
 Each image gets a **primary** register (the protagonist material) and usually
 a **secondary**. The dial decides whether they collide or cohere. Registers
@@ -153,8 +160,7 @@ a side door.
 
 ## 7. Stage 2 — the image prompt
 
-**Runs:** `llm_pipeline.stage2_image_prompt` · **~$0.0087** · **never cached,
-temperature 0.95** · **Knob:** `stage2Model`, `artStyle`
+**Runs:** `llm_pipeline.stage2_image_prompt` · **Cost:** ~$0.0087 · **Cache:** never (temp 0.95) · **Knob:** `stage2Model`, `artStyle`
 
 Everything above converges here: reading, objects, anomaly, signature, both
 registers, the dial's composition brief, the art style's guidance, the concept
@@ -170,8 +176,7 @@ named thing of its own.
 
 ## 8. Render
 
-**Runs:** `openai_image_gen.py` · **~$0.0058 at the High preset** ·
-**Knob:** `openaiModel`, `openaiQuality`
+**Runs:** `openai_image_gen.py` · **Cost:** ~$0.0058 · **Cache:** — · **Knob:** `openaiModel`, `openaiQuality`
 
 The style suffix is appended after Stage 2, then the prompt is rendered at the
 configured tier — every image, people or not. A bump to `high` for people
@@ -181,15 +186,28 @@ prompt-faithful at `low` than at `high`, for a seventh of the price.
 A refusal from the safety classifier is retried. That is not wasted spend:
 identical prompts have been refused once and accepted on a later attempt.
 
-## 9–11. Palette, apply, record
+## 9. Palette
 
-`palette_extract.py` derives `colors.toml` from the rendered image, so the
-colors and the wallpaper always agree (set `themeGenerator: "aether"` to hand
-this to Omarchy's own generator instead). `omarchy-theme-set` applies it.
-`build_review.py` writes the browsable entry — one self-contained HTML page
-per generation with the image, the reading and every dial value — and
-snapshots the theme so it can be saved or exported later. Finally
-`astro-arc-prune-history` deletes entries past `historyRetentionDays`.
+**Runs:** `palette_extract.py` · **Cost:** free · **Cache:** — · **Knob:** `themeGenerator`
+
+Derives `colors.toml` from the rendered image, so the colors and the wallpaper
+always agree. Set `themeGenerator: "aether"` to hand this to Omarchy's own
+generator instead.
+
+## 10. Apply
+
+**Runs:** `omarchy-theme-set` · **Cost:** free · **Cache:** — · **Knob:** —
+
+Wallpaper and palette go live on the desktop.
+
+## 11. Record
+
+**Runs:** `build_review.py` · **Cost:** free · **Cache:** — · **Knob:** `historyRetentionDays`
+
+Writes the browsable entry — one self-contained HTML page per generation, with
+the image, the reading and every dial value — and snapshots the theme so it can
+be saved or exported later. Then `astro-arc-prune-history` deletes entries past
+the retention window.
 
 ---
 
@@ -218,19 +236,21 @@ Everything else is one config file at
 | `themeGenerator` | `built-in` (palette from the image) or `aether` |
 | `historyRetentionDays` | how long generations are kept |
 
-### Two traps worth knowing
+### One trap, and one thing that used to be one
 
-**Editing a stage prompt does not invalidate its cache.** Stage 1, Stage 1.5
-and the signature are cached by period and chart. Bump the matching
-`*_SCHEMA_VERSION` when you change a prompt, or you will be reading yesterday's
-answer and concluding your edit did nothing.
+#### Editing a stage prompt does not invalidate its cache
 
-**Adding a register means editing two files.** `registers.toml` for the name,
-`REGISTER_FAMILIES` in `llm_pipeline.py` for its material family — a register
-missing from the second gets family `None`, and every such register then
-coheres with every other one as an invisible pseudo-family. The pipeline warns
-about this at import. A register with people in it needs `PEOPLE_REGISTERS`
-and the matching `STAGE2_SYSTEM` sentence too.
+Stage 1, Stage 1.5 and the signature are cached by period and chart. Bump the
+matching `*_SCHEMA_VERSION` when you change a prompt, or you will be reading
+yesterday's answer and concluding your edit did nothing.
+
+#### Adding a register is now one line in one file
+
+Put its name under the family it is made of in `registers.toml` and you are
+done — the rotation list, the family lookup, the people gate and the sentence
+Stage 2 reads are all derived from that. Put it under `human` and it is gated
+as people automatically. This used to take three edits across two files, two of
+which failed silently.
 
 ### Change something and measure it
 
@@ -252,14 +272,19 @@ would have caught it was never saved.
 
 ## What the complexity pass found (2026-09-13)
 
-**Removed.** `symbol_map.py` — 189 lines of fixed-vocabulary image generation,
-replaced by the LLM pipeline long ago. Every remaining mention of it was prose
-in a comment; nothing imported it. The FIGURE HIERARCHY rule in
-`STAGE2_SYSTEM`, which constrained how many faces could face the viewer, was
-removed against measured evidence and its provenance left in a comment above
-the prompt.
+### Removed
 
-**Fixed.** Three things a fork would have hit:
+- **`symbol_map.py`** — 189 lines of fixed-vocabulary image generation,
+  superseded by the LLM pipeline. Nothing imported it; every remaining mention
+  was prose in a comment.
+- **The FIGURE HIERARCHY rule** in `STAGE2_SYSTEM`, which capped how many faces
+  could turn toward the viewer. Removed against measured evidence — forced rows
+  of six and nine equally-sized faces rendered cleanly at 3× zoom — with its
+  provenance kept in a comment saying plainly that the finding is about *one
+  image model at one quality tier*, so a model swap re-opens the question
+  instead of inheriting the answer.
+
+### Fixed — three things a fork would have hit
 
 - `openaiModel` and `openaiQuality` default to `""`, and `jq`'s `//` only
   substitutes for `null` — so a config where the image model had never been
@@ -271,15 +296,17 @@ the prompt.
   deterministic and that retrying is always wasted spend. Both are false,
   measured — and that comment was steering a real decision.
 
-**Left alone, on purpose.** `cliches.toml` is empty by design; pre-seeding a
-blocklist from guesses gives false confidence and decays as the model finds
-synonyms. `image_gen.py` (local Stable Diffusion) is no longer offered in the
-UI but still works if set by hand. The `intrusion`/`anomaly` alias keeps old
-`pipeline-meta-*.json` files rendering.
+### Left alone, on purpose
 
-**Judgment calls, still open.**
+- **`cliches.toml` is empty by design.** Pre-seeding a blocklist from guesses
+  gives false confidence and decays as the model finds synonyms for whatever
+  you guessed instead.
+- **`image_gen.py`** (local Stable Diffusion) is no longer offered in the UI but
+  still works if set by hand.
+- **The `intrusion`/`anomaly` alias** keeps old `pipeline-meta-*.json` files
+  rendering.
 
-All four were closed on 2026-09-13.
+### Closed — the four judgment calls, all resolved
 
 - **Period-key logic lived in four implementations.** Now one,
   `period_key.py`, plus `Model.js`'s — which must exist because QML cannot call

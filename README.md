@@ -136,7 +136,10 @@ says which step each one changes:
 
 - [`PIPELINE.md`](PIPELINE.md) — **start here.** How one image gets made, step by
   step, with the config knob that changes each step. Written for someone who
-  just forked this and wants to retune it without reading any Python.
+  just forked this and wants to retune it without reading any Python. Also
+  published as a page at [`docs/pipeline.html`](docs/pipeline.html), generated
+  from that file by `backend/bin/build_pipeline_page.py` — edit the Markdown,
+  run the script, never edit the HTML.
 - [`CONTEXT.md`](CONTEXT.md) — full architecture: every script, how they connect,
   the conventions, and the reasoning behind the ones that look odd.
 - [`CHANGELOG.md`](CHANGELOG.md) — what changed and, more usefully, what was
