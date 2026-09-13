@@ -24,6 +24,9 @@ from zoneinfo import ZoneInfo
 import swisseph as swe
 from timezonefinder import TimezoneFinder
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from period_key import period_key  # noqa: E402  — see that file: one definition, called from everywhere
+
 # Overridable via ASTRO_ARC_CONFIG for testing against a scratch file
 # without ever touching the user's real saved birth data.
 CONFIG_PATH = Path(os.environ.get(
@@ -393,7 +396,7 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
         )
         return {
             "frequency": "weekly",
-            "periodKey": now_local.strftime("%G-W%V"),
+            "periodKey": period_key("weekly", now_local),
             "dominantTransit": dominant,
             # Sampled over the same body set this frequency's dominant transit
             # uses. Note multiplicity saturates here (all-bodies hit counts were
@@ -414,7 +417,7 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
         )
         return {
             "frequency": "monthly",
-            "periodKey": now_local.strftime("%Y-%m"),
+            "periodKey": period_key("monthly", now_local),
             "transitingSun": {"sign": sun["sign"], "house": house},
             "dominantOuterTransit": dominant_outer,
             # Outers only, matching dominantOuterTransit. See the weekly note on
@@ -435,7 +438,7 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
     dominant = find_dominant_transit(transit_bodies, natal_bodies, ["moon"], houses)
     return {
         "frequency": "daily",
-        "periodKey": now_local.strftime("%Y-%m-%d"),
+        "periodKey": period_key("daily", now_local),
         "moonSign": moon["sign"],
         "moonPhase": phase_name,
         "moonPhaseAngle": phase_angle,

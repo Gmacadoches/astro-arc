@@ -43,6 +43,9 @@ import tomllib
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from period_key import cache_key  # noqa: E402  — one definition, see period_key.py
+
 PIPELINE_DIR = Path.home() / ".local/share/omarchy/astro-arc/pipeline"
 STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc"
 AVAILABILITY_CACHE = STATE_DIR / "model-availability.json"
@@ -431,20 +434,13 @@ def load_settings():
 
 
 def _period_key(frequency, now_local=None):
-    """Mirrors astro_engine.derive_arc's key, which is what the caches are keyed
-    on. Duplicated rather than imported because importing the engine drags in
-    swisseph and PIL to answer a question about the calendar."""
-    now_local = now_local or datetime.now().astimezone()
-    if frequency == "weekly":
-        return now_local.strftime("%G-W%V")
-    if frequency == "monthly":
-        return now_local.strftime("%Y-%m")
-    # "hourly" belongs on this line, not on one of its own: the engine has no
-    # hourly arc, so its caches stay keyed by date however often the schedule
-    # fires. This answers "which cache key will the next run look for", which
-    # is the date one — astro-arc-generate's own YYYY-MM-DDTHH key names files,
-    # not caches.
-    return now_local.strftime("%Y-%m-%d")
+    """Which cache key the next run will look for.
+
+    That is `cache_key`, not `period_key`: the engine has no hourly arc, so the
+    caches stay keyed by date however often an hourly schedule fires, while
+    astro-arc-generate's own YYYY-MM-DDTHH key names output files. period_key.py
+    owns both rules; this used to be a hand-kept copy of them."""
+    return cache_key(frequency, now_local)
 
 
 def _cache_is_valid(path, natal_hash, schema_version, required_key):
