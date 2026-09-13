@@ -1072,6 +1072,26 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
 # Stage 2: image prompt
 # ---------------------------------------------------------------------------
 
+# FIGURE HIERARCHY, removed 2026-09-13. The PEOPLE section used to carry a
+# mandatory rule — at most two faces toward the viewer, everyone else turned
+# away, occluded or distant — on the premise that "an image with several
+# equally-sized mid-distance faces is a guaranteed failure, because each face
+# ends up too small to render correctly".
+#
+# That premise was measured against THIS image model and no longer holds. With
+# the rule removed and replaced by its inverse (a forced row of six and nine
+# equally-sized faces turned toward the viewer, in both `engraving` and
+# `ghibli`), gpt-image-2.5-sunburst at `high` rendered every face cleanly,
+# background faces included, at 3x zoom. Left to itself the model also never
+# chose the risky composition: three unconstrained samples all came back with
+# figures turned away or lost in haze. Archived under
+# verification/hierarchy-{drop,force,force-engraving}-2026-09-13.
+#
+# THIS IS A FINDING ABOUT ONE MODEL, NOT ABOUT IMAGE MODELS. Face crowding is a
+# capability that varies per model and per quality tier; the evidence above is
+# gpt-image-2.5-sunburst at `high` only, and says nothing about `low` or about
+# whatever replaces it. Re-run that verification before assuming a new image
+# model inherits the result — and if it does not, the rule is in git history.
 STAGE2_SYSTEM = """You are composing a single dense image to communicate a specific psychological meaning to a viewer who knows nothing about astrology. You are given a psychological reading, its one-line distillation, and — most importantly — a set of amplification material: an archetypal constellation, a handful of specific ritual objects, and one intrusion. Your job is to BUILD A SCENE OUT OF THAT MATERIAL. You are not inventing a symbol from scratch; the symbols have already been found for you. Compose them.
 
 WHAT THE IMAGE MUST CONTAIN
@@ -1098,7 +1118,6 @@ PEOPLE
 - Let the primary register decide whether people belong. If it is "figures in relation", "crowd / the collective", "the solitary figure", "hands and handwork" or "man-beast", lean fully into human presence. If it is a material or place register, let the material carry the image — the objects and place are the protagonists — unless the reading's content makes a person unmistakably necessary.
 - Which human register it is decides the shape of that presence. "figures in relation" is people in the plural, related to each other. "the solitary figure" is exactly one person, alone in the frame, and the world around them does the rest of the work — do not add a companion, a witness or a crowd to give them something to react to. "hands and handwork" is the body at close range and mid-task: hands, forearms, a tool being used, the work in progress, with the face out of frame or incidental. "man-beast" is one or more part-human figures, and the hybrid anatomy is the subject rather than a detail.
 - When people do appear, make them participants in something larger, not a two-person drama. Two figures visibly in conflict, or one distressed while another looks on, explains the tension in literal human terms instead of embodying it — a failure. When the register is specifically the collective, let the many carry cultural or social material, with one figure marked out from the rest.
-- FIGURE HIERARCHY IS MANDATORY WHENEVER PEOPLE APPEAR. At most **two** people may have a face turned toward the viewer, and at least one of those must be close to the camera and large in frame. Everyone else is turned away, seen from behind, in profile, bent to a task, occluded by an object, or far enough back to be a silhouette. Never describe a row, line, cluster, or group of people all facing the viewer at the same distance — an image with several equally-sized mid-distance faces is a guaranteed failure, because each face ends up too small to render correctly and the whole group comes out distorted. Say explicitly, in the prompt, who is near and facing, and that the others are turned away or distant.
 - People are not a way to reach the density requirement. A crowd counts as ONE element no matter how many bodies are in it. Reach the six-to-ten count with objects, structures and materials, never by multiplying faces.
 
 STYLE

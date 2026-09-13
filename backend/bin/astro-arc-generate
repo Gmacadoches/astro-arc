@@ -72,8 +72,13 @@ frequency=$(jq -r '.frequency // "daily"' "$CONFIG_FILE" 2>/dev/null || echo "da
 # is set by hand, since removing a working free backend from under someone by
 # changing a dropdown would be a surprise.
 image_backend=$(jq -r '.provider // .imageBackend // "openai"' "$CONFIG_FILE" 2>/dev/null || echo "openai")
-openai_model=$(jq -r '.openaiModel // "gpt-image-1-mini"' "$CONFIG_FILE" 2>/dev/null || echo "gpt-image-1-mini")
-openai_quality=$(jq -r '.openaiQuality // "medium"' "$CONFIG_FILE" 2>/dev/null || echo "medium")
+# `// "default"` is NOT enough on these two. jq's // only substitutes for null
+# and false, and astro-arc-config DEFAULTS both of them to the empty string —
+# so on a config where the image model has never been picked, `//` passed ""
+# through and the render failed with an unhelpful API error instead of falling
+# back. Test the value, don't just test for null.
+openai_model=$(jq -r '(.openaiModel // "") | if . == "" then "gpt-image-1-mini" else . end' "$CONFIG_FILE" 2>/dev/null || echo "gpt-image-1-mini")
+openai_quality=$(jq -r '(.openaiQuality // "") | if . == "" then "medium" else . end' "$CONFIG_FILE" 2>/dev/null || echo "medium")
 background_size=$(jq -r '.backgroundSize // "auto"' "$CONFIG_FILE" 2>/dev/null || echo "auto")
 
 # The period key a moment belongs to under a given frequency — "now" when no

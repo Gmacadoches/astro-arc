@@ -132,10 +132,17 @@ MODERATION_PARAM_MODELS = {"gpt-image-1-mini", "gpt-image-2"}
 # fingers, a bent knee, "vertebrae half-wrapped in linen" — which reads to
 # the classifier like a partially-draped nude. Nothing in that prompt was
 # actually sexual, which is exactly the margin this setting widens. It is
-# NOT a fix for the underlying register problem, and it can't be: the
-# classifier runs before the model and is deterministic per input, so a
-# prompt it refuses is refused identically every time no matter what this
-# is set to. Re-rendering the same prompt is always wasted spend.
+# NOT a fix for the underlying register problem. It widens a margin; it does
+# not move a prompt that is genuinely over the line.
+#
+# CORRECTED 2026-09-13. This comment used to claim the classifier is
+# "deterministic per input, so a prompt it refuses is refused identically
+# every time" and that "re-rendering the same prompt is always wasted spend".
+# Both are false, measured: during verification/people-off-2026-09-13, two
+# renders were refused on the first attempt and went through on a later one
+# with a byte-identical prompt, model and parameters. The retry loop in
+# generate() is earning its keep rather than burning money, and a single
+# refusal is not proof that a prompt can never render.
 MODERATION_LEVEL = "low"
 
 MODEL_CHOICES = [

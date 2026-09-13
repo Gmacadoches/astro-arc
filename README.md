@@ -122,7 +122,8 @@ image prompt, never the reading that produced them.
 ## Tuning it
 
 Several tables are plain TOML, read fresh on every run, so an edit takes effect
-on the next generation with no restart and no code change:
+on the next generation with no restart and no code change. [`PIPELINE.md`](PIPELINE.md)
+says which step each one changes:
 
 | File | What it controls |
 | --- | --- |
@@ -133,6 +134,9 @@ on the next generation with no restart and no code change:
 
 ## Documentation
 
+- [`PIPELINE.md`](PIPELINE.md) — **start here.** How one image gets made, step by
+  step, with the config knob that changes each step. Written for someone who
+  just forked this and wants to retune it without reading any Python.
 - [`CONTEXT.md`](CONTEXT.md) — full architecture: every script, how they connect,
   the conventions, and the reasoning behind the ones that look odd.
 - [`CHANGELOG.md`](CHANGELOG.md) — what changed and, more usefully, what was

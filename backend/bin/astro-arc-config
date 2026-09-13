@@ -108,7 +108,7 @@ CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
 # that costs nothing is the only one safe to choose on a new user's behalf.
 # A frequency already written to CONFIG_FILE still wins — these are only the
 # values a missing key falls back to (see the jq merge in read_config).
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"manual","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerImage":0,"provider":"openai"}'
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"manual","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerRun":0.05,"maxCostPerImage":0,"provider":"openai"}'
 COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
 TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
 DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
@@ -216,6 +216,18 @@ case "${1:-}" in
     '.stage1Model=$a | .stage2Model=$b | .openaiModel=$c | .openaiQuality=$d' <<<"$current")
   write_config "$updated"
   ;;
+--set-max-cost-per-run)
+  # astro-arc-generate reads this (defaulting to 0.05) to decide whether a
+  # person-in-frame render may be bumped to high quality. It had no setter for
+  # its whole life, so the script's own advice — "raise maxCostPerRun, or set
+  # it to 0 to disable the ceiling entirely" — could only be followed by
+  # hand-editing the JSON.
+  [[ ${2:-} =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "Usage: astro-arc-config --set-max-cost-per-run <dollars, 0 to disable>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --argjson v "$2" '.maxCostPerRun=$v' <<<"$current")
+  write_config "$updated"
+  echo "maxCostPerRun=$2"
+  ;;
 --set-max-cost-per-image)
   [[ ${2:-} =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "Usage: astro-arc-config --set-max-cost-per-image <N> (dollars, 0 = no ceiling)" >&2; exit 1; }
   current=$(read_config)
@@ -241,7 +253,7 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 *)
-  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-history-retention-days <N>]" >&2
+  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-history-retention-days <N>|--set-max-cost-per-run <dollars>]" >&2
   exit 1
   ;;
 esac
