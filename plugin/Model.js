@@ -545,13 +545,25 @@ function currentPeriodKey(frequency, now) {
   return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
 }
 
-function frequencyLabel(value) {
-  switch (value) {
-    case "weekly": return "Weekly"
-    case "monthly": return "Monthly"
-    case "manual": return "Manual"
-    default: return "Daily"
-  }
+// Does this run already cover the period the given frequency is in right now?
+//
+// The run's own stored periodKey CANNOT answer that, and comparing against it
+// was a real bug: the key was written under whatever frequency was set at the
+// time, so a run filed as "2026-09-13" under Daily, compared against "2026-09"
+// once the dropdown moved to Monthly, looks like a period that has never been
+// generated — and a paid render started as the immediate consequence of
+// changing a setting. Re-keying the run's TIMESTAMP under the frequency in
+// effect now is the comparison that actually means "already covered".
+//
+// Falls back to the stored key for a run old enough to predate generatedAt, or
+// one carrying a timestamp that won't parse.
+function runCoversPeriod(lastRun, frequency, now) {
+  if (!lastRun) return false
+  var currentKey = currentPeriodKey(frequency, now)
+  var generated = lastRun.generatedAt ? new Date(lastRun.generatedAt) : null
+  if (generated && !isNaN(generated.getTime()))
+    return currentPeriodKey(frequency, generated) === currentKey
+  return lastRun.periodKey === currentKey
 }
 
 // Formats a generatedAt timestamp for display. Callers own the surrounding
@@ -600,7 +612,7 @@ if (typeof module !== "undefined") {
     isValidHistoryRetentionDays: isValidHistoryRetentionDays,
     isValidCoordinate: isValidCoordinate,
     currentPeriodKey: currentPeriodKey,
-    frequencyLabel: frequencyLabel,
+    runCoversPeriod: runCoversPeriod,
     formatGeneratedAt: formatGeneratedAt,
     sumCosts: sumCosts,
     formatBytes: formatBytes,

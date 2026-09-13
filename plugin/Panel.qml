@@ -314,8 +314,17 @@ Panel {
     // don't nag the API with a doomed request every interval.
     if (root.configState.birthDate === "") return
 
+    // Nothing is scheduled on "manual" — astro-arc-generate --if-due would
+    // exit immediately anyway, but there is no reason to spawn it to be told
+    // that.
+    if (root.configState.frequency === "manual") return
+
     var currentKey = Model.currentPeriodKey(root.configState.frequency)
-    if (root.lastRun && root.lastRun.periodKey === currentKey) return
+    // Model.runCoversPeriod, not a comparison against lastRun.periodKey: that
+    // key was filed under whatever frequency was set when the run happened, so
+    // comparing it across a frequency CHANGE made switching Daily -> Monthly
+    // generate on the spot. See its comment in Model.js.
+    if (Model.runCoversPeriod(root.lastRun, root.configState.frequency)) return
     // Already tried this exact period this session (regardless of whether
     // it succeeded) — avoid hammering a misconfigured setup (e.g. no API
     // key) every autoGenerateCheckInterval; the next real period, or a
@@ -348,9 +357,12 @@ Panel {
 
   // heroStatus: compact one-line summary shown under the title, matching
   // the built-in bluetooth/network panels' icon+title+status hero row.
+  // Deliberately says nothing about the schedule — the Frequency dropdown is
+  // the one place that reports it, and having the status line repeat it only
+  // made a cadence look like something this line was reporting *on*.
   readonly property string heroStatus: root.generating
     ? "Generating…"
-    : Model.frequencyLabel(root.configState.frequency) + (root.lastRun ? " — up to date" : " — not generated yet")
+    : (root.lastRun ? "Up to date" : "Not generated yet")
 
   // ---- Settings sub-view (image backend/model, Stage 1/2 models, API
   // keys) -------------------------------------------------------------------
@@ -2034,7 +2046,7 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               elide: Text.ElideRight
               text: root.lastRun
-                ? Model.frequencyLabel(root.lastRun.frequency) + " · " + Model.formatGeneratedAt(root.lastRun.generatedAt, function(d) {
+                ? "Last run: " + Model.formatGeneratedAt(root.lastRun.generatedAt, function(d) {
                     return Qt.formatDateTime(d, "MMM d, h:mm AP")
                   })
                 : "Not generated yet"

@@ -76,15 +76,28 @@ openai_model=$(jq -r '.openaiModel // "gpt-image-1-mini"' "$CONFIG_FILE" 2>/dev/
 openai_quality=$(jq -r '.openaiQuality // "medium"' "$CONFIG_FILE" 2>/dev/null || echo "medium")
 background_size=$(jq -r '.backgroundSize // "auto"' "$CONFIG_FILE" 2>/dev/null || echo "auto")
 
+# The period key a moment belongs to under a given frequency — "now" when no
+# timestamp is passed. Mirrored in Model.js's currentPeriodKey(); both run on
+# the local calendar, so "daily" means the date changed, not "24h elapsed".
+# "manual" keys by local date exactly like daily — the period key is what the
+# Stage 1/1.5 caches and the output filenames hang off, so it still has to be a
+# real period. The difference is only that nothing schedules a run.
+period_key_for() {
+  local freq="$1" when="${2:-}"
+  local -a when_args=()
+  [[ -n $when ]] && when_args=(-d "$when")
+  case "$freq" in
+    weekly) date "${when_args[@]}" +%G-W%V ;;
+    monthly) date "${when_args[@]}" +%Y-%m ;;
+    *) date "${when_args[@]}" +%Y-%m-%d ;;
+  esac
+}
+
 case "$frequency" in
-  weekly) period_key=$(date +%G-W%V) ;;
-  monthly) period_key=$(date +%Y-%m) ;;
-  # "manual" keys by local date exactly like daily — the period key is what the
-  # Stage 1/1.5 caches and the output filenames hang off, so it still has to be
-  # a real period. The difference is only that nothing schedules a run.
-  manual) period_key=$(date +%Y-%m-%d) ;;
-  *) frequency="daily"; period_key=$(date +%Y-%m-%d) ;;
+  weekly|monthly|manual) ;;
+  *) frequency="daily" ;;
 esac
+period_key=$(period_key_for "$frequency")
 
 # Scheduled invocations (--if-due, i.e. the systemd timer and the widget's poll)
 # do nothing at all on "manual". A deliberate Regenerate click does not pass
@@ -96,8 +109,23 @@ if [[ $if_due == 1 && $frequency == manual ]]; then
 fi
 
 if [[ $if_due == 1 ]]; then
+  # Re-key the last run's TIMESTAMP under the frequency in effect right now,
+  # rather than trusting the key it was filed under — that key was written
+  # under whatever frequency was set at the time. Comparing it directly meant
+  # that switching Daily -> Monthly put "2026-09-13" up against "2026-09", saw
+  # two different strings, and started a paid render as the immediate
+  # consequence of touching a dropdown. Re-keyed, a run from Sep 13 is plainly
+  # inside the September that Monthly is now asking about, and nothing runs.
+  # Falls back to the stored key for a last-run.json too old to carry
+  # generatedAt, or carrying one `date` can't parse.
+  last_generated_at=$(jq -r '.generatedAt // empty' "$LAST_RUN_FILE" 2>/dev/null || true)
   last_period_key=$(jq -r '.periodKey // empty' "$LAST_RUN_FILE" 2>/dev/null || true)
-  if [[ -n $last_period_key && $last_period_key == "$period_key" ]]; then
+  last_covered_key=""
+  if [[ -n $last_generated_at ]]; then
+    last_covered_key=$(period_key_for "$frequency" "$last_generated_at" 2>/dev/null || true)
+  fi
+  [[ -n $last_covered_key ]] || last_covered_key="$last_period_key"
+  if [[ -n $last_covered_key && $last_covered_key == "$period_key" ]]; then
     echo "Astro-Arc: $frequency period $period_key already generated — nothing to do"
     exit 0
   fi
