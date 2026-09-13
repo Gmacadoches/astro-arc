@@ -20,3 +20,9 @@ models/
 venv/
 __pycache__/
 *.pyc
+
+# Working notes. The repository IS the plugin now, so everything tracked here
+# is cloned by every user — planning documents are for the person writing the
+# code, not for the person installing it. The permanent record of what changed
+# and why lives in CHANGELOG.md and CONTEXT.md, which are published on purpose.
+TASK-*.md
