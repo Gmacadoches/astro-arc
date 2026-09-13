@@ -92,8 +92,7 @@ def estimate_cost(model, quality, target_width=1024, target_height=1024):
     high against $0.0131 / $0.0504 actually billed across a 12-render sweep
     on 2026-09-09.
 
-    Used by astro-arc-generate's cost ceiling (`maxCostPerRun`) to decide
-    *before* spending whether the hasPeople quality bump fits the budget.
+    Used by the model catalog to price a tier before it is rendered.
     Still an estimate built on an estimate — see PRICE_ESTIMATE_ASSUMPTION —
     so it returns None rather than a fabricated number for a model/quality
     it doesn't know.
@@ -308,11 +307,6 @@ def main():
 if __name__ == "__main__":
     # astro-arc-generate's cost ceiling asks for this before rendering —
     # keeps the rate table in one place instead of duplicating it in bash.
-    if len(sys.argv) > 1 and sys.argv[1] == "--estimate-cost":
-        _, _, _model, _quality, _w, _h = sys.argv[:6]
-        _est = estimate_cost(_model, _quality, int(_w), int(_h))
-        print("null" if _est is None else _est)
-        sys.exit(0)
     if len(sys.argv) > 1 and sys.argv[1] == "--validate":
         slot = sys.argv[2] if len(sys.argv) > 2 else "image"
         ok, message = validate_key(slot)

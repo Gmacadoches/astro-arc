@@ -1,74 +1,110 @@
-# Material/sensory registers Stage 2 (llm_pipeline.py) draws its physical
-# vocabulary from. Each generation gets assigned one register that hasn't
-# been used recently, so the series moves between genuinely different
-# regions of image-space instead of just avoiding recent words.
+# Every register, and everything the pipeline needs to know about one, in this
+# one file. Read fresh on every run — edit and the next generation uses it, no
+# restart, no code change.
 #
-# Edit this list freely — add a register whenever you notice one producing
-# good results, remove one that never lands. Order doesn't matter, except
-# that the first ~10 are what a cold-start install cycles through before
-# the history-based rotation takes over, so the longest-tested ones are
-# kept at the top.
+# A register is WHAT THE SCENE IS MADE OF. Stage 1.5 supplies the objects that
+# are IN the scene; the register supplies the setting and the substance they
+# are built from. Each image gets a primary register and usually a secondary,
+# and the day's chart decides whether the pair collides or coheres.
 #
-# These are NAMES, not vocabularies, and that is deliberate — see the
-# [guidance] note below.
+# These are NAMES, not vocabularies, and that is deliberate — see [guidance].
 #
-# "figures in relation", "crowd / the collective", "the solitary figure",
-# "hands and handwork" and "man-beast" are special-cased by name in
-# llm_pipeline.py (PEOPLE_REGISTERS + STAGE2_SYSTEM): they gate whether
-# Stage 2 leans into human presence, and they are never eligible as a
-# secondary. Renaming any of those strings here must be mirrored in both
-# places, or the people-gating silently stops firing for it.
+# ---------------------------------------------------------------------------
+# HOW TO EDIT
+#
+#   Add a register  -> add its name under the family it is made of. That is
+#                      all. Family membership, the people gate and the
+#                      rotation all follow from where you put it.
+#   Remove one      -> delete the line. Anything in history that used it still
+#                      reads back fine.
+#   Rename one      -> treat it as remove + add; the rotation's recency scan
+#                      keys on the exact string.
+#
+# Until 2026-09-13 this took THREE edits in two files — the name here, a
+# family in llm_pipeline.py's REGISTER_FAMILIES, and membership of
+# PEOPLE_REGISTERS — and missing either of the last two failed silently.
+# ---------------------------------------------------------------------------
+#
+# FAMILIES are what "cohere" and "collide" are measured against. A secondary
+# register from the SAME family makes one continuous material world; from a
+# different one, the friction between two materials is part of the picture.
+# Group by what a thing is actually made of, not by mood.
+#
+# The `human` family is special, and it is the only special case left: those
+# registers are the ones that put PEOPLE in the image. The primary register
+# alone decides that, and human registers are never eligible as a secondary —
+# otherwise a figure arrives through a side door into a scene that was meant
+# to be led by its materials. Add a register here and it is gated as people
+# automatically; there is no second list to remember.
+#
+# Order matters only for a cold start: an install with fewer than 10
+# generations cycles this list in order before the recency rotation takes
+# over, so it walks family by family and covers the whole space early.
 
-registers = [
-  # The original 12.
-  "domestic interior",
-  "geological",
-  "textile and fiber",
-  "architectural",
-  "bodily and anatomical",
+[families]
+living = [
   "botanical",
-  "mechanical",
-  "aquatic",
-  "atmospheric",
-  "ritual object",
-  "figures in relation",
-  "crowd / the collective",
-  # Added 2026-09-13, doubling the list. Families are assigned in
-  # llm_pipeline.py's REGISTER_FAMILIES — a register missing from there
-  # gets family None, and every such register would then "cohere" with
-  # every other one as a single pseudo-family. Add both together.
+  "bodily and anatomical",
   "fungal and decaying",
   "animal and creaturely",
+]
+
+mineral = [
+  "geological",
   "metallic and ore",
   "glass and ceramic",
+]
+
+built = [
+  "architectural",
+  "domestic interior",
+  "mechanical",
   "industrial and infrastructural",
   "agricultural and cultivated",
+]
+
+fluid = [
+  "aquatic",
+  "atmospheric",
   "glacial and frozen",
   "fire and ember",
+]
+
+made = [
+  "textile and fiber",
+  "ritual object",
   "paper and inscription",
   "instrument and measure",
+]
+
+human = [
+  "figures in relation",
+  "crowd / the collective",
   "the solitary figure",
   "hands and handwork",
   "man-beast",
 ]
 
-# Optional per-register steer, passed to Stage 2 alongside the register
-# name. Mirrors styles.toml's `guidance` field, and exists for the same
-# reason: a name whose obvious reading is much narrower than its real
-# territory needs to be told so.
+# Optional per-register steer, passed to Stage 2 alongside the register name.
+# Mirrors styles.toml's `guidance` field and exists for the same narrow reason:
+# a name whose obvious reading is much smaller than its real territory has to
+# be told so.
 #
 # THIS IS NOT A VOCABULARY LIST, AND MUST NOT BECOME ONE. A register is a
-# region of image-space, and the model's own vocabulary for one is far
-# larger than any list written here could be; handing it 50 nouns replaces
-# an open space with a closed menu and every image starts being assembled
-# from the same words. That is the failure this project has already
-# measured twice — see cliches.toml's header ("do not pre-seed it with
-# guesses"), and AVOID_WINDOW's cut from 14 to 8 once a 40-item negative
-# list turned out to be steering less than the register pair was.
+# region of image-space, and the model's own vocabulary for one is far larger
+# than any list written here; handing it 50 nouns replaces an open space with a
+# closed menu and every image starts being assembled from the same words. That
+# is the failure this project has already measured twice — see cliches.toml's
+# header ("do not pre-seed it with guesses"), and AVOID_WINDOW's cut from 14 to
+# 8 once a 40-item negative list turned out to steer less than the register
+# pair was.
 #
-# So: write guidance ONLY for a register with a demonstrated narrow
-# attractor, keep it to a span and a principle rather than an inventory,
-# and let anything listed read as a starting point the model is expected
-# to reach past.
+# So: write guidance ONLY for a register with a demonstrated narrow attractor,
+# keep it to a span and a principle rather than an inventory, and let anything
+# listed read as a starting point the model is expected to reach past.
 [guidance]
-"man-beast" = """A figure that is part human and part animal, drawn from any mythology and any era. The Greek ones — satyr, faun, centaur, minotaur — are the obvious reading and the least interesting; reach past them into the whole span: Mesopotamian lamassu, girtablullu and fish-cloaked apkallu; the jackal- and falcon-headed figures of Egyptian funerary art; the medieval bestiary's cynocephali, blemmyae, manticore and wodewose; Japanese tengu, kitsune and ushi-oni; Slavic leshy and volkodlak; Celtic selkie, pooka and the antlered horned-god figures; Norse wolf- and bear-skinned warriors; the Olmec were-jaguar; West African spider- and water-spirits; melusine, lamia, harpy, siren, sphinx, nagini, kinnara, and the foliate Green Man where the other half is plant rather than beast. Prefer the obscure and the regionally specific to the famous few. The hybrid is a fact of the figure's anatomy, rendered with the same weight and wear as everything else in the scene — never a costume, a mask, or a person wearing an animal."""
+"man-beast" = """A figure that is part human and part animal, drawn from any mythology and any era. The Greek ones — satyr, faun, centaur, minotaur — are the obvious reading and the least interesting; reach past them into the whole span: Mesopotamian lamassu, girtablullu and fish-cloaked apkallu; the jackal- and falcon-headed figures of Egyptian funerary art; the medieval bestiary's cynocephali, blemmyae, manticore and wodewose; Japanese tengu, kitsune and ushi-oni; Slavic leshy and volkodlak; Celtic selkie, pooka and the antlered horned-god figures; Norse wolf- and bear-skinned warriors; the Olmec were-jaguar; West African spider- and water-spirits; melusine, lamia, harpy, siren, sphinx, nagini, kinnara, and the foliate Green Man where the other half is plant rather than beast. Prefer the obscure and the regionally specific to the famous few. The hybrid is a fact of the figure's anatomy, rendered with the same weight and wear as everything else in the scene — never a costume, a mask, or a person wearing an animal. One or more part-human figures, with the hybrid anatomy as the subject rather than a detail."""
+"figures in relation" = """People in the plural, related to each other."""
+"the solitary figure" = """Exactly one person, alone in the frame, and the world around them does the rest of the work — do not add a companion, a witness or a crowd to give them something to react to."""
+"hands and handwork" = """The body at close range and mid-task: hands, forearms, a tool being used, the work in progress, with the face out of frame or incidental."""
+"crowd / the collective" = """Let the many carry cultural or social material, with one figure marked out from the rest."""

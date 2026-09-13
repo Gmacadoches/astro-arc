@@ -677,11 +677,6 @@ def main():
     # astro-arc-generate asks for this before deciding whether it can afford a
     # quality bump. Prints a number, or "null" when the cost is genuinely not
     # known — the caller must treat null as "unknown", never as "free".
-    if args and args[0] == "--measured-cost":
-        _, model, quality, size = args[:4]
-        cost = measured_cost(model, quality, size)
-        print("null" if cost is None else cost)
-        return
     if "--refresh" in args:
         try:
             refresh_availability()

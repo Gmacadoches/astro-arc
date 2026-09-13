@@ -258,12 +258,47 @@ def _parse_json_object(text):
 # every run so an edit takes effect on the next generation with no restart.
 # ---------------------------------------------------------------------------
 
-def load_registers():
+def _load_register_families():
+    """{family: [register, ...]} straight from registers.toml.
+
+    That file is the only place any of this is written down — see its header.
+    Everything below (the flat rotation list, the family lookup, which
+    registers put people in the image) is derived from it, so adding a register
+    is one edit in one file and cannot half-land."""
     path = PIPELINE_DIR / "registers.toml"
     if not path.exists():
-        return []
-    with open(path, "rb") as f:
-        return tomllib.load(f).get("registers", [])
+        return {}
+    try:
+        with open(path, "rb") as f:
+            families = tomllib.load(f).get("families", {})
+    except (tomllib.TOMLDecodeError, OSError):
+        return {}
+    return {fam: [r for r in regs if isinstance(r, str) and r.strip()]
+            for fam, regs in families.items() if isinstance(regs, list)}
+
+
+def load_registers():
+    """Every register, in file order — which is the order a cold-start install
+    cycles through before the recency rotation takes over."""
+    return [r for regs in _load_register_families().values() for r in regs]
+
+
+def register_family(register):
+    """Which material family a register belongs to, or None if the file does
+    not place it. Two registers with family None would cohere with each other,
+    so `None` is a real answer callers have to handle, not a default."""
+    for fam, regs in _load_register_families().items():
+        if register in regs:
+            return fam
+    return None
+
+
+def people_registers():
+    """The registers that put PEOPLE in the image — the `human` family, and
+    nothing else. This used to be a second hand-maintained set beside the
+    families, which meant a new human register could be added and silently not
+    gated. One concept, one place."""
+    return set(_load_register_families().get(PEOPLE_FAMILY, []))
 
 
 def load_register_guidance(register):
@@ -408,65 +443,23 @@ def avoid_concepts(history, window=AVOID_WINDOW):
 # — botanical + bodily, architectural + domestic interior — collapses back
 # into the single-material monoculture the pair exists to break, so the
 # secondary is drawn from a different group whenever one is available.
-REGISTER_FAMILIES = {
-    "botanical": "living",
-    "bodily and anatomical": "living",
-    "fungal and decaying": "living",
-    "animal and creaturely": "living",
-    "geological": "mineral",
-    "metallic and ore": "mineral",
-    "glass and ceramic": "mineral",
-    "architectural": "built",
-    "domestic interior": "built",
-    "mechanical": "built",
-    "industrial and infrastructural": "built",
-    "agricultural and cultivated": "built",
-    "aquatic": "fluid",
-    "atmospheric": "fluid",
-    "glacial and frozen": "fluid",
-    "fire and ember": "fluid",
-    "textile and fiber": "made",
-    "ritual object": "made",
-    "paper and inscription": "made",
-    "instrument and measure": "made",
-    "figures in relation": "human",
-    "crowd / the collective": "human",
-    "the solitary figure": "human",
-    "hands and handwork": "human",
-    "man-beast": "human",
-}
+# The one special family. Registers in it are what put people in an image, they
+# are gated on the PRIMARY register alone, and they are never eligible as a
+# secondary — a human register arriving as the secondary would inject figures
+# into a material-led scene through a side door. Named here rather than
+# hardcoded in three places; membership lives in registers.toml.
+PEOPLE_FAMILY = "human"
 
-# Every register in registers.toml must appear above. One that doesn't gets
-# family None from .get(), and since None == None, all such registers would
-# "cohere" with each other as a single invisible pseudo-family — a silent
-# behavior change rather than an error. Checked at import rather than left
-# to a reader noticing.
-_UNFAMILIED = [r for r in load_registers() if r not in REGISTER_FAMILIES]
-if _UNFAMILIED:
-    print(
-        "llm_pipeline: warning — registers.toml has entries with no "
-        "REGISTER_FAMILIES group, which will all cohere with each other: "
-        + ", ".join(_UNFAMILIED),
-        file=sys.stderr,
-    )
+# Backwards-compatible module-level views of registers.toml, for call sites
+# (sweep.py, this file) that read them as plain data. Computed at import, which
+# is fine because every generation is a fresh process — the file is still read
+# fresh on every run.
+REGISTER_FAMILIES = {r: fam for fam, regs in _load_register_families().items() for r in regs}
+PEOPLE_REGISTERS = people_registers()
 
-# Whether a generation contains people stays gated on the PRIMARY register
-# only — see CONTEXT.md's convention note. A "human" register arriving as
-# the secondary would inject figures into what is supposed to be a
-# material-led scene through a side door, which is exactly the failure the
-# register-gating convention was written to prevent, so these are never
-# eligible as a secondary.
-PEOPLE_REGISTERS = {
-    "figures in relation",
-    "crowd / the collective",
-    "the solitary figure",
-    "hands and handwork",
-    # A man-beast is half a person: the figure-hierarchy rules below (how many
-    # faces may turn toward the viewer, who is near and who is turned away) are
-    # exactly as load-bearing here as for any other register with a face in it,
-    # and they only fire for members of this set.
-    "man-beast",
-}
+if not REGISTER_FAMILIES:
+    print("llm_pipeline: warning — registers.toml has no [families] table; "
+          "the register rotation will be empty", file=sys.stderr)
 
 
 def pick_registers(history, registers, cohesion="collide"):
@@ -1119,9 +1112,8 @@ HOW TO WRITE IT
 
 PEOPLE
 
-- Let the primary register decide whether people belong. If it is "figures in relation", "crowd / the collective", "the solitary figure", "hands and handwork" or "man-beast", lean fully into human presence. If it is a material or place register, let the material carry the image — the objects and place are the protagonists — unless the reading's content makes a person unmistakably necessary.
-- Which human register it is decides the shape of that presence. "figures in relation" is people in the plural, related to each other. "the solitary figure" is exactly one person, alone in the frame, and the world around them does the rest of the work — do not add a companion, a witness or a crowd to give them something to react to. "hands and handwork" is the body at close range and mid-task: hands, forearms, a tool being used, the work in progress, with the face out of frame or incidental. "man-beast" is one or more part-human figures, and the hybrid anatomy is the subject rather than a detail.
-- When people do appear, make them participants in something larger, not a two-person drama. Two figures visibly in conflict, or one distressed while another looks on, explains the tension in literal human terms instead of embodying it — a failure. When the register is specifically the collective, let the many carry cultural or social material, with one figure marked out from the rest.
+- Let the primary register decide whether people belong. If it is one of the people registers (__PEOPLE_REGISTERS__), lean fully into human presence, in whatever shape that register's own description calls for. If it is a material or place register, let the material carry the image — the objects and place are the protagonists — unless the reading's content makes a person unmistakably necessary.
+- When people do appear, make them participants in something larger, not a two-person drama. Two figures visibly in conflict, or one distressed while another looks on, explains the tension in literal human terms instead of embodying it — a failure.
 - People are not a way to reach the density requirement. A crowd counts as ONE element no matter how many bodies are in it. Reach the six-to-ten count with objects, structures and materials, never by multiplying faces.
 
 STYLE
@@ -1138,6 +1130,24 @@ You are also given concepts to avoid because they were used recently — avoid t
 
 Respond with a JSON object with exactly these keys:
 {"prompt": "the image-generation prompt, inside the word range THE COMPOSITION BRIEF gives you and never more than 140 words, describing only the imagery itself — no style or artist references, those are added separately", "conceptTags": ["2 to 3 short tags naming this image's register at an abstract level, e.g. water/submersion, figure amid a vast unknown, crowd with one marked apart, architectural interior, descent/threshold, geological/weight"], "hasPeople": "true if the prompt describes any human figure, pair, or crowd — however incidental — false if it's purely objects/places/materials with no person in it"}"""
+
+
+def stage2_system():
+    """STAGE2_SYSTEM with the people-register list filled in from
+    registers.toml, so the prompt cannot fall out of step with the file.
+
+    It used to name all five registers literally, which made adding a human
+    register a three-file edit where the third was easy to miss and failed
+    silently — the register would be gated as people everywhere except in the
+    sentence that tells Stage 2 what to do about it. Per-register shape ("one
+    person, alone", "hands mid-task") moved to that file's [guidance] table,
+    beside everything else about a register.
+
+    Reads the module global at call time so a caller can still patch
+    STAGE2_SYSTEM for a verification run.
+    """
+    names = ", ".join('"%s"' % r for r in sorted(people_registers()))
+    return STAGE2_SYSTEM.replace("__PEOPLE_REGISTERS__", names or "none configured")
 
 
 def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
@@ -1218,7 +1228,7 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         brief.append(f"  Light and concealment: {dial['light']}")
     user_lines += brief
 
-    result, usage = _chat_json(stage2_model, STAGE2_SYSTEM, "\n".join(user_lines), "stage2", temperature=0.95, stage="stage2")
+    result, usage = _chat_json(stage2_model, stage2_system(), "\n".join(user_lines), "stage2", temperature=0.95, stage="stage2")
     if not result.get("prompt"):
         raise PipelineError(f"Stage 2 response missing 'prompt': {result!r}")
     concept_tags = result.get("conceptTags") or []

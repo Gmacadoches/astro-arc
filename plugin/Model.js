@@ -210,7 +210,7 @@ function visibleRows(rows, showAll) {
 }
 
 // Which image rows fit a per-image ceiling. A ceiling of 0 means "no ceiling"
-// — the same convention maxCostPerRun already uses. Rows with no known cost are
+// — 0 means no ceiling. Rows with no known cost are
 // KEPT: excluding them would hide every new model behind a number the API will
 // never provide, which is the dependency this whole change exists to remove.
 function imageRowsWithinCeiling(rows, ceiling) {
@@ -267,7 +267,7 @@ function parseConfig(raw) {
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
       historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
         ? data.historyRetentionDays : 30,
-      // 0 (or anything unparseable) means no ceiling, matching maxCostPerRun.
+      // 0 (or anything unparseable) means no ceiling.
       maxCostPerImage: typeof data.maxCostPerImage === "number" && data.maxCostPerImage >= 0
         ? data.maxCostPerImage : 0,
       // Falls back to the legacy imageBackend so an existing config keeps

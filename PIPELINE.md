@@ -94,8 +94,8 @@ bump the schema version, or you will test yesterday's output.
 
 ## 3. The dial — composition, without an LLM
 
-**Runs:** `llm_pipeline.dial_from_texture` · **free** · **Knob:**
-`pipelineMode`
+**Runs:** `llm_pipeline.dial_from_texture` · **free** · **Knob:** — always
+follows the chart
 
 The day's texture becomes hard numbers: how many sites, how many objects, the
 word budget, which verbs, whether the two registers **collide** or **cohere**,
@@ -103,8 +103,11 @@ how much spatial pressure, how much light. These used to be constants, which
 is why every image once carried the same implicit meaning however the chart
 moved.
 
-`pipelineMode: "coherent"` lets the chart drive all of it. `"legacy"` pins it
-to the old constants.
+The dial always follows the chart. A `pipelineMode: "legacy"` setting used to
+pin it back to fixed constants — an option to switch off the mechanism this
+whole project is built on, and it was the default. Removed 2026-09-13. The
+constants survive as `NO_TEXTURE_DIAL`, the fallback for a reading that has
+no texture block at all.
 
 ## 4. Stage 1.5 — amplification
 
@@ -167,12 +170,13 @@ named thing of its own.
 
 ## 8. Render
 
-**Runs:** `openai_image_gen.py` · **$0.0058 (low) – $0.042 (high)** ·
-**Knob:** `openaiModel`, `openaiQuality`, `maxCostPerRun`, `maxCostPerImage`
+**Runs:** `openai_image_gen.py` · **~$0.0058 at the High preset** ·
+**Knob:** `openaiModel`, `openaiQuality`
 
-The style suffix is appended after Stage 2, then the prompt is rendered. When
-a person is in frame the quality tier is bumped to `high`, subject to the cost
-ceilings — that bump is most of what a people image costs.
+The style suffix is appended after Stage 2, then the prompt is rendered at the
+configured tier — every image, people or not. A bump to `high` for people
+images was removed on 2026-09-13: the bakeoff found this model *more*
+prompt-faithful at `low` than at `high`, for a seventh of the price.
 
 A refusal from the safety classifier is retried. That is not wasted spend:
 identical prompts have been refused once and accepted on a later attempt.
@@ -208,10 +212,9 @@ Everything else is one config file at
 | --- | --- |
 | `frequency` | `hourly` / `daily` / `weekly` / `monthly` / `manual` |
 | `artStyle` | which styles.toml preset |
-| `pipelineMode` | `coherent` (chart drives composition) or `legacy` (fixed) |
 | `stage1Model` / `stage2Model` | the writing models |
 | `openaiModel` / `openaiQuality` | the image model and tier |
-| `maxCostPerRun` / `maxCostPerImage` | spend ceilings; `0` disables |
+| `maxCostPerImage` | hides image models above this price from the picker; `0` disables |
 | `themeGenerator` | `built-in` (palette from the image) or `aether` |
 | `historyRetentionDays` | how long generations are kept |
 
@@ -262,7 +265,8 @@ the prompt.
   substitutes for `null` — so a config where the image model had never been
   picked passed an *empty model name* to the API instead of falling back.
 - `maxCostPerRun` had no setter for its entire life, despite the generate
-  script telling you to raise it. It now has one, and appears in the defaults.
+  script telling you to raise it. Given one — then removed entirely later the
+  same day, along with the quality bump it existed to gate.
 - A comment in `openai_image_gen.py` asserted the safety classifier is
   deterministic and that retrying is always wasted spend. Both are false,
   measured — and that comment was steering a real decision.
@@ -275,18 +279,14 @@ UI but still works if set by hand. The `intrusion`/`anomaly` alias keeps old
 
 **Judgment calls, still open.**
 
-- **Period-key logic exists in five places** — `astro-arc-generate`,
-  `Model.js`, `astro_engine.py`, `model_catalog.py`, `Panel.qml` — because
-  bash, QML and Python cannot share a function. They are kept in sync by hand
-  and by comment. This is the single largest structural risk in the codebase,
-  and it has already produced one real bug.
-- **`pipelineMode` still defaults to `legacy`**, so a fresh install gets the
-  pre-2026-09-12 fixed composition rather than the chart-driven one. That is
-  probably the wrong default now.
-- **The people quality bump may be counterproductive on the current model.**
-  It renders people images at `high`, ~7× the cost — but the 2026-09-12 bakeoff
-  found `gpt-image-2.5-sunburst` at `low` *more* prompt-faithful than at
-  `high`. Worth re-measuring.
-- **`imageBackend` still defaults to `"local"`** while `provider` defaults to
-  `"openai"`, and the former is vestigial. Harmless, because `provider` is read
-  first, but confusing to read.
+All four were closed on 2026-09-13.
+
+- **Period-key logic lived in four implementations.** Now one,
+  `period_key.py`, plus `Model.js`'s — which must exist because QML cannot call
+  Python inside a property binding. `period_key.py --selftest` checks them
+  against one table of cases, including the ISO week-year edges, and runs the
+  JS through node when node is present.
+- **`pipelineMode: legacy` removed.** The dial always follows the chart.
+- **The people quality bump removed**, and with it `maxCostPerRun`, two cost
+  estimator CLI shims, and ~73 lines of budget projection.
+- **`imageBackend` now defaults to `"openai"`**, matching `provider`.
