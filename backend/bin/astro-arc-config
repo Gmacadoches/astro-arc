@@ -59,18 +59,6 @@
 #                                          check, so it is never silently
 #                                          blocked, but it also will not be
 #                                          quality-bumped while a ceiling is set.
-#   --set-pipeline-mode <legacy|coherent>
-#                                          how much of the image's SHAPE varies
-#                                          with the chart. "legacy" pins the
-#                                          composition dial to the constants the
-#                                          pipeline used before 2026-09-12 (6-10
-#                                          things, three depths, colliding
-#                                          registers, 90-130 words, every day);
-#                                          "coherent" lets density, word budget,
-#                                          register cohesion, spatial pressure
-#                                          and light follow the day's own
-#                                          transits. See dial_from_texture() in
-#                                          llm_pipeline.py.
 #   --set-theme-generator <built-in|aether>
 #                                          how colors.toml/icons.theme get
 #                                          derived from the rendered image:
@@ -108,7 +96,7 @@ CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
 # that costs nothing is the only one safe to choose on a new user's behalf.
 # A frequency already written to CONFIG_FILE still wins — these are only the
 # values a missing key falls back to (see the jq merge in read_config).
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"manual","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerRun":0.05,"maxCostPerImage":0,"provider":"openai"}'
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"manual","imageBackend":"openai","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"maxCostPerRun":0.05,"maxCostPerImage":0,"provider":"openai"}'
 COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
 TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
 DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
@@ -232,12 +220,6 @@ case "${1:-}" in
   [[ ${2:-} =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "Usage: astro-arc-config --set-max-cost-per-image <N> (dollars, 0 = no ceiling)" >&2; exit 1; }
   current=$(read_config)
   updated=$(jq --argjson c "$2" '.maxCostPerImage=$c' <<<"$current")
-  write_config "$updated"
-  ;;
---set-pipeline-mode)
-  [[ ${2:-} =~ ^(legacy|coherent)$ ]] || { echo "Usage: astro-arc-config --set-pipeline-mode <legacy|coherent>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg m "$2" '.pipelineMode=$m' <<<"$current")
   write_config "$updated"
   ;;
 --set-theme-generator)

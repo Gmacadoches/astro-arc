@@ -858,14 +858,19 @@ _ANOMALY_RELATION = {
     ("soft", "lo"): "It has weathered almost into landscape — the oldest thing in frame, grown over, worn down, long since stopped being remarkable to anyone.",
 }
 
-# The exact values that reproduce pre-dial behavior. This is also what a reading
-# with no texture block degrades to (old reading-*.json, sweep.py's pinned
-# inputs), which is deliberate: pipelineMode="legacy" is implemented as "pin the
-# dial to these", so ONE code path serves the config toggle and the
-# missing-data fallback. The alternative — a second editable copy of
-# STAGE2_SYSTEM — would drift, and fixes would land in only one of them.
-LEGACY_DIAL = {
-    "mode": "legacy",
+# What a reading with NO texture block degrades to — an old reading-*.json from
+# before the texture existed, or a hand-pinned input. These are the pre-dial
+# constants, and until 2026-09-13 they were also a user-facing choice
+# (`pipelineMode: "legacy"`), which is why they used to be called LEGACY_DIAL.
+#
+# That choice was removed. Selecting it disabled the one mechanism this whole
+# project is built on — the chart deciding what the image looks like — so
+# "legacy" was an option to make Astro-Arc stop being Astro-Arc, and it was the
+# DEFAULT, meaning every fresh install got the behaviour the project had already
+# decided was wrong. The constants stay because the missing-texture path is
+# real and still needs an answer.
+NO_TEXTURE_DIAL = {
+    "mode": "no-texture",
     "sites": 3,
     "objectRange": (4, 7),
     "thingRange": (6, 10),
@@ -880,14 +885,13 @@ LEGACY_DIAL = {
 }
 
 
-def dial_from_texture(texture, mode="coherent"):
+def dial_from_texture(texture):
     """The day's imperatives. `texture` is arc["texture"] from astro_engine.
 
-    Returns LEGACY_DIAL when mode is "legacy" or when there is no texture to read
-    — see LEGACY_DIAL's comment for why those are the same path.
+    Falls back to NO_TEXTURE_DIAL only when there is no texture to read at all.
     """
-    if mode == "legacy" or not texture:
-        return dict(LEGACY_DIAL)
+    if not texture:
+        return dict(NO_TEXTURE_DIAL)
 
     polarity = texture.get("polarity") or "soft"
     # A day with no aspect in orb (1 in 365) is a defined cell, not an exception:
@@ -1012,7 +1016,7 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     Returns (result_dict, cost) — cost is None on a cache hit.
     """
     if dial is None:
-        dial = dict(LEGACY_DIAL)
+        dial = dict(NO_TEXTURE_DIAL)
     natal_hash = _natal_hash(config)
     cache_path = AMPLIFICATIONS_DIR / f"{period_key}.json"
     if cache and cache_path.exists():
@@ -1183,7 +1187,7 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
     # Kept as counts and imperatives rather than mood words — "one site, three
     # named things, 60-80 words" is obeyed; "today is a calm day" is not.
     if dial is None:
-        dial = dict(LEGACY_DIAL)
+        dial = dict(NO_TEXTURE_DIAL)
     thing_lo, thing_hi = dial["thingRange"]
     word_lo, word_hi = dial["wordRange"]
     sites = dial["sites"]
@@ -1239,11 +1243,8 @@ def build(reading, config):
     period_key = reading["arc"]["periodKey"]
 
     # The dial has to exist BEFORE Stage 1.5, because it sets how many objects to
-    # ask for and gets stored in that stage's cache entry. "legacy" pins it to the
-    # pre-dial constants, which is the same path a reading with no texture block
-    # takes — see LEGACY_DIAL.
-    pipeline_mode = config.get("pipelineMode") or "legacy"
-    dial = dial_from_texture(reading["arc"].get("texture"), pipeline_mode)
+    # ask for and gets stored in that stage's cache entry.
+    dial = dial_from_texture(reading["arc"].get("texture"))
 
     visual_signature, signature_cost = get_visual_signature(reading["natal"], config, stage2_model)
     stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config)

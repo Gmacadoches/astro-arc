@@ -15,7 +15,12 @@ var DEFAULT_CONFIG = {
   // costs nothing is the only safe thing to pick on someone's behalf;
   // an explicit "daily" in an existing config.json still wins over this.
   frequency: "manual",
-  imageBackend: "local",
+  // "openai" — the legacy key `provider` superseded. It defaulted to "local"
+  // (Stable Diffusion) long after that path stopped being offered in the UI,
+  // which meant the default named a backend a new install could not reach.
+  // astro-arc-generate reads `provider` first and this only as a fallback, so
+  // the two must at least agree.
+  imageBackend: "openai",
   openaiModel: "",
   openaiQuality: "",
   stage1Model: "gpt-4o-mini",
@@ -24,20 +29,9 @@ var DEFAULT_CONFIG = {
   artStyle: "symbolist",
   themeGenerator: "built-in",
   historyRetentionDays: 30,
-  pipelineMode: "legacy",
   maxCostPerImage: 0,
   provider: "openai"
 }
-
-// Mirrors astro-arc-config's --set-pipeline-mode. "legacy" pins the composition
-// dial to the constants the pipeline used before 2026-09-12; "coherent" lets the
-// day's own transits set density, word budget, register cohesion, spatial
-// pressure and light. Hand-synced, same as ART_STYLE_CHOICES below — QML can't
-// read the Python side directly.
-var PIPELINE_MODE_CHOICES = [
-  { key: "legacy", label: "Legacy (fixed)" },
-  { key: "coherent", label: "Coherent (follows chart)" }
-]
 
 // How many days one "Themes Generated" entry represents, by frequency —
 // used only to estimate how many entries a retention window will hold
@@ -263,7 +257,7 @@ function parseConfig(raw) {
       latitude: hasCoords ? lat : null,
       longitude: hasCoords ? lon : null,
       frequency: ["hourly", "daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
-      imageBackend: data.imageBackend === "openai" ? "openai" : "local",
+      imageBackend: data.imageBackend === "local" ? "local" : "openai",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
       openaiQuality: typeof data.openaiQuality === "string" ? data.openaiQuality : "",
       stage1Model: typeof data.stage1Model === "string" && data.stage1Model !== "" ? data.stage1Model : "gpt-4o-mini",
@@ -273,7 +267,6 @@ function parseConfig(raw) {
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
       historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
         ? data.historyRetentionDays : 30,
-      pipelineMode: data.pipelineMode === "coherent" ? "coherent" : "legacy",
       // 0 (or anything unparseable) means no ceiling, matching maxCostPerRun.
       maxCostPerImage: typeof data.maxCostPerImage === "number" && data.maxCostPerImage >= 0
         ? data.maxCostPerImage : 0,
@@ -607,7 +600,6 @@ if (typeof module !== "undefined") {
     OPENAI_MODEL_CHOICES: OPENAI_MODEL_CHOICES,
     ART_STYLE_CHOICES: ART_STYLE_CHOICES,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
-    PIPELINE_MODE_CHOICES: PIPELINE_MODE_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,
     chatModelLabel: chatModelLabel,

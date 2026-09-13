@@ -27,7 +27,7 @@ Usage:
     sweep.py --out <name> [--registers all|a,b,c] [--pairs] [--style ghibli]
              [--reading <reading.json>] [--stage1 <stage1.json>]
              [--stage2-model M] [--stage1-model M]
-             [--no-image] [--quality medium] [--label TEXT]
+             [--no-image] [--quality medium] [--cell CELL] [--label TEXT]
 
 Output goes to ~/.local/state/omarchy/astro-arc/verification/<name>/:
     00_sweep.json          every prompt, register, tag set and cost
@@ -85,12 +85,8 @@ def main():
     ap.add_argument("--image-model", default=None)
     ap.add_argument("--size", default=None, help="WxH, defaults to config backgroundSize")
     ap.add_argument("--no-image", action="store_true", help="prompts only — free, for wording iteration")
-    # The composition dial (2026-09-12). Without these a sweep runs whatever the
-    # config says, which makes a legacy-vs-coherent comparison impossible; --cell
-    # is what lets one fixed dial cell be held constant while registers vary (and
-    # vice versa) — the two matrices that actually prove the dial works.
-    ap.add_argument("--pipeline-mode", choices=["legacy", "coherent"],
-                    help="override config's pipelineMode for this sweep")
+    # --cell pins one dial cell so it can be held constant while registers vary
+    # (and vice versa) — the two matrices that actually prove the dial works.
     ap.add_argument("--cell",
                     help="pin one dial cell: polarity/intensityBand/multiplicity/exposureBand (e.g. soft/lo/1/hi)")
     ap.add_argument("--label", default="", help="one line recorded in the summary")
@@ -121,16 +117,15 @@ def main():
     # differences and the sweep proves nothing.
     dial = None
     if hasattr(lp, "dial_from_texture"):
-        mode = args.pipeline_mode or config.get("pipelineMode") or "legacy"
         if args.cell:
             pol, iband, mult, eband = args.cell.split("/")
             texture = {"polarity": pol, "intensityBand": iband,
                        "multiplicity": int(mult), "exposureBand": eband}
         else:
             texture = reading["arc"].get("texture")
-        dial = lp.dial_from_texture(texture, mode)
+        dial = lp.dial_from_texture(texture)
         (out_dir / "00_dial.json").write_text(json.dumps(
-            {"pipelineMode": mode, "cell": args.cell, "texture": texture, "dial": dial},
+            {"cell": args.cell, "texture": texture, "dial": dial},
             indent=2, default=str))
 
     # --- pin Stage 1 -------------------------------------------------
