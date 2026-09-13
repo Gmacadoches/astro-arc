@@ -818,8 +818,15 @@ _DENSITY_BY_MULTIPLICITY = (
 _VERBS_HARD = "feeding, binding, eroding, crushing, spilling into, bearing down on"
 _VERBS_SOFT = "holding, drying, ripening, settling, leaning against, warming, being mended, being carried"
 
+# How close the event sits — never whether the frame is open. The "hi" cell used
+# to read "short sightlines, no far distance to escape into", which is a direct
+# instruction to build an enclosed image, and on a high-intensity day it beat
+# every other rule because the brief is the part that gets obeyed. Intensity now
+# moves where the pressure sits INSIDE an open frame: close and pressing, or far
+# and peripheral, with the distance visible either way. See the OPENNESS line in
+# the composition brief for why that is invariant.
 _SPATIAL_BY_INTENSITY = {
-    "hi": "The event is close and fills the frame. Short sightlines, no far distance to escape into — the viewer is inside it, not observing it.",
+    "hi": "The event is close and large, pressing into the foreground — the viewer is inside it rather than observing it. The pressure comes from its scale and nearness, not from being shut in: the world still continues past it to a far distance.",
     "mid": "The event sits at conversational distance, with one clear middle ground and a real but untroubled far distance.",
     "lo": "The event is far off or peripheral — small in frame, off to one side, or partly out of view. Most of the frame is world, not event.",
 }
@@ -1095,6 +1102,7 @@ WHAT THE IMAGE MUST CONTAIN
 
 - Length. THE COMPOSITION BRIEF in the user message gives you a word range for this specific image. Stay inside it, and never exceed 140 words under any circumstances. Count them before you answer. Density comes from what you name, not from how long the sentences are. The range is smaller on some days than others and that is deliberate: a scene with few things in it gets a SHORT prompt. Do not spend a leftover word budget on what the image means.
 - Density. THE COMPOSITION BRIEF gives you, for this image only, how many discrete nameable things to include, how many separate sites they occupy, and where the event sits relative to the viewer. Obey those numbers exactly. They are not the same every time and must not be normalised toward what you would usually do.
+- Openness is not optional and not a style. Every one of these images ends up as a desktop wallpaper, behind windows, all day. The frame has to breathe: there is always a way out of it — a horizon, a sky, a landscape, water, a distance that keeps going — and the scene is composed from far enough back to show it. An interior is allowed, but only one that opens onto that distance through a window, a doorway, a missing wall. A sealed room is the single most reliable way to make one of these images unusable, however good the objects in it are. THE COMPOSITION BRIEF states this as a share of the frame; treat that as a hard minimum.
 - When the brief asks for FEW things, that is a correct image and not a sparse one — but "few things" must never become "empty". Fill the frame with the WORLD instead of with more objects: the landscape, weather, water, architecture, vegetation and surface pattern native to the rendering style you are given. A low count means fewer separate subjects competing, not less to look at. Padding a quiet scene with extra objects defeats the entire point, and so does handing back a single subject on a plain field.
 - Use most of the amplification objects you were given. Put them in the scene as real physical things, at different depths and different scales. You may add a small number of connective things the scene needs to hold together, but the given objects are the substance.
 - THE ANOMALY IS MANDATORY. Place the anomaly object in the scene as a solid, physically present, matter-of-fact thing — the same weight, wear, dirt and lighting as everything else. It must NOT glow, float, shimmer, be translucent, be described as magical or otherworldly, or be visually marked out as special in any way. It BELONGS to this world: do not import an object from another century, another technology or another order of reality. What is wrong with it is one thing only, and you are told which — it is far out of scale for its kind, or far older and more ruined than everything around it. Nothing in the scene explains why it is there.
@@ -1202,7 +1210,7 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
     word_lo, word_hi = dial["wordRange"]
     sites = dial["sites"]
     site_text = {
-        1: "ONE site. A single place, one thing happening in it. Do not split the frame into near/middle/far stations.",
+        1: "ONE site. A single place, one thing happening in it. Do not split the frame into near/middle/far stations with a separate event at each — the single place still opens onto distance, it just does not stage a second scene out there.",
         2: "TWO sites — one near, one far — and nothing in between competing with them.",
         3: "THREE depths: something close to the viewer, a situation in the middle distance, and a far distance that keeps going.",
     }.get(sites, f"{sites} sites.")
@@ -1222,6 +1230,17 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         f"  REQUIRED: the primary register ({register}) must put at least one substantial thing of its own in the frame, named explicitly, beyond the objects you were given. A scene that merely takes place near that material does not count — if the register is \"mechanical\" an actual mechanism with working parts is visible; if \"aquatic\", real water; if \"bodily and anatomical\", actual anatomy as material rather than a person standing there.",
         f"  The anomaly, and how the world treats it: {dial['anomalyRelation']}",
     ]
+    # Unconditional, appended to EVERY brief whatever the dial says, and placed
+    # here rather than in STAGE2_SYSTEM because the brief is demonstrably the
+    # part that gets obeyed (see the register-contribution requirement above,
+    # moved here for the same reason). These are wallpapers: they sit behind a
+    # desktop all day, and an enclosed room reads as claustrophobic at that size
+    # however good its content is. Phrased as a countable share of frame and a
+    # failure condition, matching the word-count rule, because "make it feel
+    # open" is a mood word and mood words are not obeyed.
+    brief.append(
+        "  OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
+    )
     if dial.get("spatial"):
         brief.append(f"  Where the event sits: {dial['spatial']}")
     if dial.get("light"):

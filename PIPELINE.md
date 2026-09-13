@@ -174,6 +174,18 @@ means; concrete and oddly specific over generically mystical; things must be
 doing something to each other; each register must contribute a substantial
 named thing of its own.
 
+**And every image must be open.** At least half the frame is sky, horizon,
+landscape, sea or a distance that keeps going, and the viewpoint is pulled back
+far enough for that to be true. An interior is allowed only if it opens onto
+that distance through a large window, a doorway, a missing wall. A sealed room
+is a failed response.
+
+These are wallpapers — they sit behind windows all day, and an enclosed room
+reads as claustrophobic at that size however good its contents are. The rule
+lives in the composition brief rather than the system prompt because the brief
+is the part that gets obeyed, and it is stated as a share of the frame because
+"make it feel open" is a mood word, and mood words are not obeyed.
+
 ## 8. Render
 
 **Runs:** `openai_image_gen.py` · **Cost:** ~$0.0058 · **Cache:** — · **Knob:** `openaiModel`, `openaiQuality`
