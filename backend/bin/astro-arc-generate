@@ -79,8 +79,21 @@ background_size=$(jq -r '.backgroundSize // "auto"' "$CONFIG_FILE" 2>/dev/null |
 case "$frequency" in
   weekly) period_key=$(date +%G-W%V) ;;
   monthly) period_key=$(date +%Y-%m) ;;
+  # "manual" keys by local date exactly like daily — the period key is what the
+  # Stage 1/1.5 caches and the output filenames hang off, so it still has to be
+  # a real period. The difference is only that nothing schedules a run.
+  manual) period_key=$(date +%Y-%m-%d) ;;
   *) frequency="daily"; period_key=$(date +%Y-%m-%d) ;;
 esac
+
+# Scheduled invocations (--if-due, i.e. the systemd timer and the widget's poll)
+# do nothing at all on "manual". A deliberate Regenerate click does not pass
+# --if-due, so the button keeps working — which is the entire point of the
+# setting: no surprise spending, generate when you ask.
+if [[ $if_due == 1 && $frequency == manual ]]; then
+  echo "Astro-Arc: auto-generation is off (frequency is \"manual\") — nothing to do"
+  exit 0
+fi
 
 if [[ $if_due == 1 ]]; then
   last_period_key=$(jq -r '.periodKey // empty' "$LAST_RUN_FILE" 2>/dev/null || true)

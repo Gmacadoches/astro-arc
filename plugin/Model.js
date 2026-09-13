@@ -39,7 +39,17 @@ var PIPELINE_MODE_CHOICES = [
 // used only to estimate how many entries a retention window will hold
 // (real generations may skip a period; this is a projection, not a count
 // of what's actually on disk).
+// `manual` has no interval by definition. Left out rather than given a number,
+// so anything projecting from a cadence has to decide what to do about its
+// absence instead of silently treating it as daily.
 var FREQUENCY_INTERVAL_DAYS = { daily: 1, weekly: 7, monthly: 30 }
+
+var FREQUENCY_CHOICES = [
+  { key: "daily", label: "Daily" },
+  { key: "weekly", label: "Weekly" },
+  { key: "monthly", label: "Monthly" },
+  { key: "manual", label: "Don't auto-generate" }
+]
 
 // "aether" shells out to Omarchy's own theme generator for a richer theme
 // (it's what fixes the file-manager icon color, among other things — see
@@ -121,13 +131,24 @@ function nextRunLabel(nextRun) {
 // $0.89/mo against an actual $5.60/mo in the case that prompted this.
 function projectedMonthlyCost(nextRun, frequency) {
   if (!nextRun || typeof nextRun.full !== "number") return null
-  var runs = RUNS_PER_MONTH[frequency] || RUNS_PER_MONTH.daily
-  return { perRun: nextRun.full, perMonth: nextRun.full * runs, source: nextRun.source }
+  // Note `in` rather than a falsy check: manual is 0 runs a month, and `||`
+  // would have quietly turned that into the daily default — the one frequency
+  // where the answer is "nothing" would have reported the largest number.
+  var runs = (frequency in RUNS_PER_MONTH) ? RUNS_PER_MONTH[frequency] : RUNS_PER_MONTH.daily
+  return {
+    perRun: nextRun.full,
+    perMonth: nextRun.full * runs,
+    runsPerMonth: runs,
+    scheduled: runs > 0,
+    source: nextRun.source
+  }
 }
 
 // Runs per month for the monthly projection. Months vary; 30.44 is the mean
 // Gregorian month, which keeps a "monthly" cadence from reading as 1.0.
-var RUNS_PER_MONTH = { daily: 30.44, weekly: 4.35, monthly: 1 }
+// Monthly is exactly 1, not 30.44/30 — the cadence IS one run per month. Manual
+// is 0: nothing is scheduled, so there is no recurring cost to project.
+var RUNS_PER_MONTH = { daily: 30.44, weekly: 4.35, monthly: 1, manual: 0 }
 
 // ---- Quality presets ------------------------------------------------------
 // Which tier the current settings correspond to, or "custom" when they match
@@ -220,7 +241,7 @@ function parseConfig(raw) {
       locationName: typeof data.locationName === "string" ? data.locationName : "",
       latitude: hasCoords ? lat : null,
       longitude: hasCoords ? lon : null,
-      frequency: ["daily", "weekly", "monthly"].indexOf(data.frequency) >= 0 ? data.frequency : "daily",
+      frequency: ["daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "daily",
       imageBackend: data.imageBackend === "openai" ? "openai" : "local",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
       openaiQuality: typeof data.openaiQuality === "string" ? data.openaiQuality : "",
@@ -354,9 +375,16 @@ function estimateHistorySpace(reviewsIndex, retentionDays, frequency) {
   if (known.length === 0) return { estimatedBytes: null, knownCount: 0 }
 
   var avgBytes = known.reduce(function(sum, r) { return sum + r.sizeBytes }, 0) / known.length
-  var intervalDays = FREQUENCY_INTERVAL_DAYS[frequency] || 1
+  var intervalDays = FREQUENCY_INTERVAL_DAYS[frequency]
+  // No cadence means nothing to project from: on "manual" the number of entries
+  // depends entirely on how often you click, so report the average size and say
+  // the total is unknown rather than answering as if it were daily — which is
+  // what `|| 1` used to do, and it was the most alarming possible answer.
+  if (!intervalDays) {
+    return { estimatedBytes: null, knownCount: known.length, avgBytes: avgBytes, noCadence: true }
+  }
   var projectedEntries = Math.max(1, Math.round((retentionDays || 30) / intervalDays))
-  return { estimatedBytes: avgBytes * projectedEntries, knownCount: known.length }
+  return { estimatedBytes: avgBytes * projectedEntries, knownCount: known.length, avgBytes: avgBytes }
 }
 
 
@@ -502,6 +530,7 @@ function frequencyLabel(value) {
   switch (value) {
     case "weekly": return "Weekly"
     case "monthly": return "Monthly"
+    case "manual": return "Manual"
     default: return "Daily"
   }
 }
@@ -525,6 +554,7 @@ if (typeof module !== "undefined") {
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PIPELINE_MODE_CHOICES: PIPELINE_MODE_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
+    FREQUENCY_CHOICES: FREQUENCY_CHOICES,
     chatModelLabel: chatModelLabel,
     imageModelLabel: imageModelLabel,
     formatUsd: formatUsd,

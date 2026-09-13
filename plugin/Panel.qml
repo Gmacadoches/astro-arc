@@ -1468,9 +1468,13 @@ Panel {
                 text: {
                   var e = Model.projectedMonthlyCost(root.modelCatalog.nextRun, root.configState.frequency)
                   if (!e) return "Est. monthly: cost unknown for the current models"
-                  return "Est. " + Model.formatUsd(e.perMonth) + "/month at " + root.configState.frequency
-                    + " · " + Model.formatUsd(e.perRun) + " per full run ("
+                  var per = Model.formatUsd(e.perRun) + " per full run ("
                     + (e.source === "actual" ? "actual" : "est") + ")"
+                  // With nothing scheduled there is no monthly figure to give —
+                  // only what a run costs when you ask for one.
+                  if (!e.scheduled) return "No recurring cost — generates only when you click. " + per
+                  return "Est. " + Model.formatUsd(e.perMonth) + "/month at " + root.configState.frequency
+                    + " · " + per
                 }
                 color: Qt.darker(root.bar.foreground, 1.3)
                 font.family: root.bar.fontFamily
@@ -1651,10 +1655,21 @@ Panel {
               width: parent.width
               wrapMode: Text.WordWrap
               readonly property var estimate: Model.estimateHistorySpace(root.reviewsIndex, root.configState.historyRetentionDays, root.configState.frequency)
-              text: estimate.estimatedBytes !== null
-                ? "Est. space for " + root.configState.historyRetentionDays + " days: ~" + Model.formatBytes(estimate.estimatedBytes)
-                  + " (based on " + estimate.knownCount + " saved generation" + (estimate.knownCount === 1 ? "" : "s") + ")"
-                : "Est. space: not enough history yet to estimate"
+              text: {
+                var e = estimate
+                var basis = " (based on " + e.knownCount + " saved generation" + (e.knownCount === 1 ? "" : "s") + ")"
+                if (e.estimatedBytes !== null)
+                  return "Est. space for " + root.configState.historyRetentionDays + " days: ~"
+                    + Model.formatBytes(e.estimatedBytes) + basis
+                // No cadence: how much this ends up using depends on how often
+                // you click, so give the per-generation figure — which IS known
+                // — rather than the "not enough history" line, which would be
+                // untrue whenever there is history but nothing scheduled.
+                if (e.noCadence)
+                  return "Est. space: ~" + Model.formatBytes(e.avgBytes) + " per generation"
+                    + " — no total, since nothing is scheduled" + basis
+                return "Est. space: not enough history yet to estimate"
+              }
               color: Qt.darker(root.bar.foreground, 1.5)
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.caption
@@ -1962,11 +1977,9 @@ Panel {
               width: Style.space(100)
               showLabel: false
               value: root.configState.frequency
-              options: [
-                { value: "daily", label: "Daily" },
-                { value: "weekly", label: "Weekly" },
-                { value: "monthly", label: "Monthly" }
-              ]
+              options: Model.FREQUENCY_CHOICES.map(function(c) {
+                return { value: c.key, label: c.label }
+              })
               foreground: root.bar.foreground
               onChanged: function(value) { root.commitFrequency(value) }
             }

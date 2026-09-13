@@ -14,7 +14,11 @@
 #                                          optional but required for house/
 #                                          ascendant precision later
 #   --clear-location                      unset the location
-#   --set-frequency <daily|weekly|monthly>
+#   --set-frequency <daily|weekly|monthly|manual>
+#                                          "manual" means never generate on a
+#                                          schedule; the Regenerate button still
+#                                          works. Nothing else changes — a manual
+#                                          run is keyed by local date, same as daily.
 #   --set-image-backend <local|openai>    which generator astro-arc-generate uses
 #   --set-openai-model <model> <quality>  IMAGE model id + quality tier ("" if n/a)
 #   --set-stage1-model <model>            chat model for Stage 1 (llm_pipeline.py's
@@ -153,7 +157,7 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 --set-frequency)
-  [[ ${2:-} =~ ^(daily|weekly|monthly)$ ]] || { echo "Usage: astro-arc-config --set-frequency <daily|weekly|monthly>" >&2; exit 1; }
+  [[ ${2:-} =~ ^(daily|weekly|monthly|manual)$ ]] || { echo "Usage: astro-arc-config --set-frequency <daily|weekly|monthly|manual>" >&2; exit 1; }
   current=$(read_config)
   updated=$(jq --arg f "$2" '.frequency=$f' <<<"$current")
   write_config "$updated"
@@ -232,7 +236,7 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 *)
-  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <daily|weekly|monthly>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-history-retention-days <N>]" >&2
+  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <daily|weekly|monthly|manual>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-history-retention-days <N>]" >&2
   exit 1
   ;;
 esac
