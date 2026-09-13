@@ -349,7 +349,13 @@ jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg freq
 # and records --period-key so pruning can find the matching history/*.png.
 # build_review.py prints the review's index.html path on success —
 # captured (not discarded) so the notification below can open it.
-review_label="${frequency^} · $(date '+%b %-d, %-I:%M %p') ($image_backend)"
+# Title format: date, time, style — "Sep 13, 10:03 AM · Antique Engraving".
+# Cadence and image backend used to lead and trail this ("Daily · … (openai)")
+# and were dropped: every entry in the list carried the same two values, so
+# they distinguished nothing while crowding out the one field that actually
+# varies between entries generated on the same day — the style.
+review_style_label=$(jq -r '.artStyleLabel // .artStyle // empty' "$pipeline_meta_file" 2>/dev/null || true)
+review_label="$(date '+%b %-d, %-I:%M %p')${review_style_label:+ · $review_style_label}"
 review_path=""
 if review_path=$("$VENV_PY" "$BIN_DIR/build_review.py" \
   --reading "$reading_file" --meta "$pipeline_meta_file" --image "$bg_file" \

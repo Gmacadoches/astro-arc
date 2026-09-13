@@ -61,6 +61,10 @@ never copies your key anywhere — see **Your data** below.
 Then open the widget, paste your API key, and enter your birth date, time and
 place.
 
+Nothing generates on its own until you say so: **Frequency** starts at **None**,
+so the first theme is the one you ask for with **Regenerate**. Set it to Daily,
+Weekly or Monthly once you know what a run costs you.
+
 ## What it costs
 
 Real measured costs, not estimates from a rate card. One preset sets every

@@ -103,7 +103,12 @@
 set -euo pipefail
 
 CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"daily","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerImage":0,"provider":"openai"}'
+# frequency defaults to "manual": a fresh install generates nothing until it is
+# asked to. Every generation spends real money on an image API, so the cadence
+# that costs nothing is the only one safe to choose on a new user's behalf.
+# A frequency already written to CONFIG_FILE still wins — these are only the
+# values a missing key falls back to (see the jq merge in read_config).
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"manual","imageBackend":"local","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","historyRetentionDays":30,"pipelineMode":"legacy","maxCostPerImage":0,"provider":"openai"}'
 COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
 TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
 DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'

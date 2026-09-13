@@ -1237,6 +1237,11 @@ def build(reading, config):
         "dial": {k: v for k, v in dial.items() if k != "mode"},
         "avoidedConcepts": avoid,
         "artStyle": style_key,
+        # The display name for that key (styles.toml's own `label`), so
+        # anything captioning a run — the "Themes Generated" entry's
+        # title, the exported theme's README — can name the style the
+        # way the Style dropdown does without re-reading the TOML.
+        "artStyleLabel": style_label,
         "imagePrompt": image_prompt,
         "finalPrompt": final_prompt,
         # Cost of the chat calls this run actually made — None means

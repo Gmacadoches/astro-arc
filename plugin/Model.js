@@ -10,7 +10,11 @@ var DEFAULT_CONFIG = {
   locationName: "",
   latitude: null,
   longitude: null,
-  frequency: "daily",
+  // "manual" — a fresh install generates nothing until asked. Every
+  // generation spends real money on an image API, so the cadence that
+  // costs nothing is the only safe thing to pick on someone's behalf;
+  // an explicit "daily" in an existing config.json still wins over this.
+  frequency: "manual",
   imageBackend: "local",
   openaiModel: "",
   openaiQuality: "",
@@ -48,7 +52,7 @@ var FREQUENCY_CHOICES = [
   { key: "daily", label: "Daily" },
   { key: "weekly", label: "Weekly" },
   { key: "monthly", label: "Monthly" },
-  { key: "manual", label: "Don't auto-generate" }
+  { key: "manual", label: "None" }
 ]
 
 // "aether" shells out to Omarchy's own theme generator for a richer theme
@@ -241,7 +245,7 @@ function parseConfig(raw) {
       locationName: typeof data.locationName === "string" ? data.locationName : "",
       latitude: hasCoords ? lat : null,
       longitude: hasCoords ? lon : null,
-      frequency: ["daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "daily",
+      frequency: ["daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
       imageBackend: data.imageBackend === "openai" ? "openai" : "local",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
       openaiQuality: typeof data.openaiQuality === "string" ? data.openaiQuality : "",
@@ -281,6 +285,21 @@ function parseApiKeyStatus(raw) {
 // ("Themes Generated" in the widget). sizeBytes/periodKey/hasThemeSnapshot
 // are absent on entries built before that feature existed — null/false,
 // not a guessed number, so a mixed-age list never shows a fabricated size.
+// Legacy "Themes Generated" titles led with the cadence and trailed with the
+// image backend — "Daily · Sep 12, 5:16 PM (openai)". New entries carry
+// neither (see astro-arc-generate's review_label), so this trims them off the
+// entries already on disk: an existing history then reads exactly like
+// anything generated from now on, without rewriting index.json underneath
+// someone. Matches only the four known cadence words and the two known
+// backends, so it can never bite a chunk out of a real style name.
+function normalizeReviewLabel(label) {
+  var out = String(label)
+    .replace(/^(Daily|Weekly|Monthly|Manual)\s*\u00b7\s*/, "")
+    .replace(/\s*\((openai|local)\)\s*$/, "")
+    .trim()
+  return out === "" ? String(label) : out
+}
+
 function parseReviewsIndex(raw) {
   try {
     var data = JSON.parse(String(raw || "[]"))
@@ -289,7 +308,7 @@ function parseReviewsIndex(raw) {
       var size = Number.isInteger(r.sizeBytes) ? r.sizeBytes : parseInt(r.sizeBytes, 10)
       return {
         id: String(r.id),
-        label: String(r.label || "Untitled"),
+        label: normalizeReviewLabel(r.label || "Untitled"),
         createdAt: String(r.createdAt || ""),
         path: String(r.path),
         cardCount: parseInt(r.cardCount, 10) || 0,
@@ -572,6 +591,7 @@ if (typeof module !== "undefined") {
     parseLastRun: parseLastRun,
     parseApiKeyStatus: parseApiKeyStatus,
     parseReviewsIndex: parseReviewsIndex,
+    normalizeReviewLabel: normalizeReviewLabel,
     parseGeocodingResults: parseGeocodingResults,
     locationCommit: locationCommit,
     isValidDate: isValidDate,
