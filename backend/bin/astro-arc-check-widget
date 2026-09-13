@@ -23,7 +23,9 @@
 set -uo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PLUGIN_DIR="$REPO_DIR/plugin"
+# The repo root IS the plugin since 2026-09-13 — manifest.json and the .qml
+# files sit beside backend/, so there is no plugin/ subdirectory any more.
+PLUGIN_DIR="$REPO_DIR"
 failures=0
 
 fail() { echo "  FAIL: $*" >&2; failures=$((failures + 1)); }

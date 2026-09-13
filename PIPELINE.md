@@ -288,14 +288,15 @@ a directory:
 
 ```sh
 FRESH=$(mktemp -d)
-HOME=$FRESH ./install.sh
-HOME=$FRESH ~/.local/share/omarchy/astro-arc/bin/astro-arc-config
-HOME=$FRESH $FRESH/.local/share/omarchy/astro-arc/bin/astro-arc-generate
+git clone . $FRESH/.config/omarchy/plugins/astro-arc
+HOME=$FRESH $FRESH/.config/omarchy/plugins/astro-arc/install.sh
+HOME=$FRESH $FRESH/.config/omarchy/plugins/astro-arc/backend/bin/astro-arc-generate
 ```
 
 That exercises the real installer, the real defaults a new user gets, and the
 real first-run paths — the venv, the birth data, the API key, all absent, which
-is exactly where fresh-install bugs live. It found four on 2026-09-13.
+is exactly where fresh-install bugs live. It found five on 2026-09-13, the last
+of them only after the install itself was restructured.
 
 Two things it cannot cover, because they are not `$HOME`-scoped: the QML widget
 needs the running shell, and `secret-tool` talks to your real keyring, so a

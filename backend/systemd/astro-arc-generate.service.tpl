@@ -6,13 +6,15 @@
 # have a generation, so firing this on a plain interval never wastes a
 # paid image render on a period that's already covered.
 #
-# %h resolves to this user's home directory — same one astro-arc-generate
-# itself derives every path from — so this unit needs no per-machine
-# templating; unlike the astroarc:// desktop handler, it's symlinked into
-# place by install.sh exactly as written here.
+# Templated, not symlinked: since 2026-09-13 the backend lives inside the
+# plugin checkout rather than at a fixed path under ~/.local/share, so the
+# absolute path depends on where the repo was cloned. install.sh substitutes
+# __ASTRO_ARC_BIN__ and writes the result into ~/.config/systemd/user/ —
+# the same treatment the astroarc:// desktop entry already gets, and for the
+# same reason.
 [Unit]
 Description=Astro-Arc scheduled theme generation (no-op unless due)
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/share/omarchy/astro-arc/bin/astro-arc-generate --if-due
+ExecStart=__ASTRO_ARC_BIN__/astro-arc-generate --if-due

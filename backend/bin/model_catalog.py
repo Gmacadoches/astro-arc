@@ -46,7 +46,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from period_key import cache_key  # noqa: E402  — one definition, see period_key.py
 
-PIPELINE_DIR = Path.home() / ".local/share/omarchy/astro-arc/pipeline"
+PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
 STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc"
 AVAILABILITY_CACHE = STATE_DIR / "model-availability.json"
 LEARNED_USAGE_FILE = STATE_DIR / "model-usage.json"

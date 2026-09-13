@@ -48,15 +48,22 @@ Both are the same register at the same density. The difference is the chart.
 ## Install
 
 ```sh
-git clone https://github.com/Gmacadoches/astro-arc.git ~/Projects/astro-arc
-cd ~/Projects/astro-arc
-./install.sh
+git clone https://github.com/Gmacadoches/astro-arc.git \
+  ~/.config/omarchy/plugins/astro-arc
+~/.config/omarchy/plugins/astro-arc/install.sh
 omarchy-restart-shell
 ```
 
-`install.sh` symlinks `plugin/` and `backend/{bin,pipeline}` into the paths
-Omarchy loads from, so edits in your checkout take effect on the next run. It
-never copies your key anywhere — see **Your data** below.
+The clone *is* the plugin, the same as any other Omarchy plugin — nothing is
+symlinked or copied elsewhere. `install.sh` sets up the three things that
+can't live in a git checkout: the Python venv, the scheduled-generation timer,
+and the `astroarc://` handler the review pages use. It never copies your API
+key anywhere — see **Your data** below.
+
+```sh
+git -C ~/.config/omarchy/plugins/astro-arc pull       # update
+~/.config/omarchy/plugins/astro-arc/install.sh --uninstall
+```
 
 Then open the widget, paste your API key, and enter your birth date, time and
 place.

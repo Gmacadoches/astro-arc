@@ -72,7 +72,9 @@ from cost_estimate import chat_call_cost  # noqa: E402
 import urllib.error
 import urllib.request
 
-PIPELINE_DIR = Path.home() / ".local/share/omarchy/astro-arc/pipeline"
+# Ships beside the code — backend/pipeline, one directory up from backend/bin —
+# so the tables travel with the checkout and need no install step.
+PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
 STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc/pipeline"
 HISTORY_FILE = STATE_DIR / "history.json"
 SIGNATURE_FILE = STATE_DIR / "visual_signature.json"

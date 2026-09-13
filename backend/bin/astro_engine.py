@@ -7,6 +7,7 @@ directly to inspect the symbolic brief this cycle would hand to the image
 step in Phase 3:
 
     ~/.local/share/omarchy/astro-arc/venv/bin/python3 astro_engine.py
+    (the venv is generated and lives outside the plugin; the code does not)
 
 Reads birth data + location + frequency from
 ~/.local/state/omarchy/settings/astro-arc.json (the same file the widget's

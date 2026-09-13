@@ -40,7 +40,7 @@ from pathlib import Path
 
 REVIEWS_DIR = Path.home() / ".local/state/omarchy/astro-arc/reviews"
 INDEX_FILE = REVIEWS_DIR / "index.json"
-STYLES_FILE = Path.home() / ".local/share/omarchy/astro-arc/pipeline/styles.toml"
+STYLES_FILE = Path(__file__).resolve().parents[1] / "pipeline" / "styles.toml"
 
 # Same fixed palette this page always used, kept as the fallback for a
 # review built before --theme-dir existed (no snapshot to read a real

@@ -21,8 +21,20 @@ Panel {
   readonly property var barIdentity: hostWidget || root
 
   readonly property string home: Quickshell.env("HOME")
-  readonly property string configBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-config"
-  readonly property string generateBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-generate"
+  // Where this plugin actually lives, asked of QML rather than assumed. The
+  // backend ships beside these .qml files (backend/bin, backend/pipeline), so a
+  // clone into ~/.config/omarchy/plugins/astro-arc — the way every other
+  // Omarchy plugin is installed — needs no symlinks and no install path baked
+  // in anywhere. Qt.resolvedUrl(".") is the directory holding Panel.qml.
+  readonly property string pluginRoot: {
+    var u = String(Qt.resolvedUrl("."))
+    if (u.indexOf("file://") === 0) u = u.substring(7)
+    return u.replace(/\/+$/, "")
+  }
+  readonly property string binDir: pluginRoot + "/backend/bin"
+
+  readonly property string configBin: binDir + "/astro-arc-config"
+  readonly property string generateBin: binDir + "/astro-arc-generate"
 
   // ---- Lifecycle -----------------------------------------------------
   function open() {
@@ -371,8 +383,8 @@ Panel {
   // popout-coordination is already solved for this panel, and duplicating
   // that just to host a handful of extra rows isn't worth it.
   property bool showSettings: false
-  readonly property string apiKeyBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-apikey"
-  readonly property string openaiImageGenBin: home + "/.local/share/omarchy/astro-arc/bin/openai_image_gen.py"
+  readonly property string apiKeyBin: binDir + "/astro-arc-apikey"
+  readonly property string openaiImageGenBin: binDir + "/openai_image_gen.py"
   readonly property string venvPython: home + "/.local/share/omarchy/astro-arc/venv/bin/python3"
 
   function toggleSettings() {
@@ -705,7 +717,7 @@ Panel {
   // models while the key could reach 10, so most of what had been paid for was
   // unreachable from here. See backend/bin/model_catalog.py for why
   // availability is discovered but price has to be hand-entered.
-  readonly property string modelCatalogBin: home + "/.local/share/omarchy/astro-arc/bin/model_catalog.py"
+  readonly property string modelCatalogBin: binDir + "/model_catalog.py"
   property var modelCatalog: ({ chat: [], image: [], stale: true, everFetched: false, fetchedAt: null })
   property bool modelCatalogLoading: false
   property string modelCatalogError: ""
@@ -760,7 +772,7 @@ Panel {
     }
   }
 
-  readonly property string detectResolutionBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-detect-resolution"
+  readonly property string detectResolutionBin: binDir + "/astro-arc-detect-resolution"
 
   function commitBackgroundSize(value) {
     if (!Model.isValidBackgroundSize(value)) {
@@ -941,8 +953,8 @@ Panel {
   property string themeNameDraft: ""
   property string _saveThemeStdout: ""
   property string _saveThemeStderr: ""
-  readonly property string saveThemeBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-save-theme"
-  readonly property string pruneHistoryBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-prune-history"
+  readonly property string saveThemeBin: binDir + "/astro-arc-save-theme"
+  readonly property string pruneHistoryBin: binDir + "/astro-arc-prune-history"
 
   function reviewForId(id) {
     for (var i = 0; i < root.reviewsIndex.length; i++)
@@ -1000,7 +1012,7 @@ Panel {
   // (`omarchy theme install <url>`), so handing one to another user means
   // producing a git repo. astro-arc-export-theme builds that, preview and
   // README included, and prints where it put it.
-  readonly property string exportThemeBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-export-theme"
+  readonly property string exportThemeBin: binDir + "/astro-arc-export-theme"
   property string _exportStdout: ""
   property string _exportStderr: ""
 
