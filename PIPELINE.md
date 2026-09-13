@@ -7,7 +7,7 @@ picture is remade. The render is the slow part.
 
 **At a glance:** $0.028 fresh run · $0.019 same-day re-run · ~40s render · 25 registers
 
-Twelve steps, three of them language models. This document walks the whole path
+Twelve steps. Four of them call a language model: the reading, the objects, the visual signature and the prompt. The signature is computed once per chart, so a typical day makes three of those calls, not four. This document walks the whole path
 in order, and every step names the file that runs it, what it reads, what it
 writes, whether it is cached, and **the one knob that changes it** — so you can
 retune this thing without reading any Python.
