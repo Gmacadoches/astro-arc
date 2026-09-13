@@ -1011,7 +1011,7 @@ Panel {
 
   function exportSelectedTheme() {
     if (root.selectedReviewId === "" || exportThemeProc.running) return
-    var review = root.reviewById(root.selectedReviewId)
+    var review = root.reviewForId(root.selectedReviewId)
     // Named from the same concept-tag suggestion Save pre-fills its prompt
     // with, but without prompting: an export lands in a folder you can rename,
     // so asking first would add a step to the one-click path for nothing.
