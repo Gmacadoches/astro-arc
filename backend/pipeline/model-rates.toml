@@ -190,10 +190,16 @@ quality = "low"
 [presets.high]
 # Marked recommended because the bakeoff found nothing above roughly $0.05 a run
 # got measurably better — see the hierarchy comment above.
+#
+# Uses `low` rather than `auto` for two measured reasons. `low` produced the best
+# image in the bakeoff, more faithful to the prompt than the same model at
+# `high`. And `auto` is not a tier at all: the same model at the same size came
+# back at 343, 601 and 1372 output tokens on three runs, so its cost is a
+# 4x-wide guess. An explicit tier is both better and predictable.
 label = "High (Recommended)"
 chat = "gpt-4.1"
 image = "gpt-image-2.5-sunburst"
-quality = "auto"
+quality = "low"
 
 [presets.ultra]
 label = "Ultra"

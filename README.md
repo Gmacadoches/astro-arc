@@ -1,53 +1,49 @@
 # Astro-Arc
 
-An Omarchy bar-widget plugin that generates a personalized desktop theme —
-a background image plus a matching accent-color palette — from your natal
-astrology chart and current transits, on a daily/weekly/monthly cadence you
-pick. A two-stage LLM pipeline turns the chart into a psychological reading
-and then into a single dream-logic image prompt; the rendered image's
-palette gets applied as a live Omarchy theme via `omarchy-theme-set`. Every
-real generation is logged to a browsable local HTML review page — and any
-one of them can be exported as its own permanent, independently selectable
-Omarchy theme, from the widget or from the review page itself.
+**Your desktop, generated from your birth chart — every day.**
 
-See [`CONTEXT.md`](CONTEXT.md) for the full architecture, every script's
-role, conventions, and current implementation status — this file only
-covers getting it installed and running.
+Astro-Arc is an [Omarchy](https://omarchy.org) bar-widget plugin. It reads your
+natal astrology chart and the day's transits, turns them into a psychological
+reading, turns that into a single image, renders it, and derives a matching
+colour palette from the rendered image — so the wallpaper and the theme always
+agree, because the theme is made *from* the wallpaper.
 
-## Features
+It runs on a cadence you pick, and every generation is browsable, exportable and
+shareable.
 
-- **7 art-style presets** (`pipeline/styles.toml`) Stage 2's prompt gets
-  suffixed with — Symbolist/Visionary, Antique Engraving, Cosmic/Nebula,
-  Studio Ghibli, Cyberpunk, Ukiyo-e, and Illuminated Manuscript. Add more
-  freely; no code change needed.
-- **Two theme generators** — the built-in extractor (dependency-free), or
-  Aether (Omarchy's own theme generator, richer output) if it's
-  installed; falls back to built-in automatically on any failure.
-- **"Themes Generated" history** — every real generation, browsable from
-  the widget, each with its own on-disk size. Auto-pruned past a
-  configurable retention window (default 30 days) with a real-data-based
-  disk-space estimate — never a guessed number.
-- **Save a theme permanently** — export any past generation as its own
-  Omarchy theme (outside the live theme's overwrite cycle and the
-  retention window's pruning) from the widget's Save Selected Theme
-  button, or straight from that generation's own review page.
-- **A desktop notification on every real generation** — the psychological
-  distillation as the headline, click to open the full review.
+![A dim Sicilian room with a spilled divination cup, a bronze votive liver, and a window onto the coast](docs/images/interior.jpg)
+
+---
+
+## Why it looks different every day
+
+The image's *subject* comes from your chart. So does its **shape**.
+
+Four independent measurements of the day — how hard the aspects are, how exact,
+how many, and how much of the Moon is lit — decide how many things are in the
+frame, how many places they occupy, how long the prompt is, whether the two
+material registers collide or cohere, where the event sits relative to you, and
+how much is hidden in shadow.
+
+A loaded, hard day is crowded and close. A quiet one is not.
+
+| A quiet, dark day | A quiet, bright day |
+| --- | --- |
+| ![A shadowy forest floor, objects half-buried in undergrowth](docs/images/quiet-dark.jpg) | ![A lily marsh under an open sky with a few objects at its edge](docs/images/quiet-bright.jpg) |
+
+Both are the same register at the same density. The difference is the chart.
+
+---
 
 ## Requirements
 
-- **Omarchy** (Hyprland + Quickshell) — this is a Quickshell bar-widget
-  plugin; it won't run standalone.
+- **Omarchy** (Hyprland + Quickshell). This is a bar-widget plugin; it does not
+  run standalone.
 - **Python 3.11+** (uses stdlib `tomllib`; developed against 3.14).
-- **System tools**: `jq`, `secret-tool` (from `libsecret`), `hyprctl`
-  (ships with Hyprland), `xdg-mime`/`update-desktop-database` (registers
-  the review page's Save Theme button as a URI handler; install.sh skips
-  this gracefully if either is missing) — all are already part of a
-  standard Omarchy install.
-- **An OpenAI API key** — required regardless of image backend, since
-  Stage 1 (interpretation) and Stage 2 (image prompt) are both chat calls.
-  The "local" image backend only makes the *image render* free; get one at
-  <https://platform.openai.com/api-keys>.
+- **System tools**: `jq`, `secret-tool` (libsecret), `hyprctl`, `xdg-mime` —
+  all standard on an Omarchy install.
+- **An OpenAI API key.** Every stage is an API call, so a key is required
+  regardless of which models you pick.
 
 ## Install
 
@@ -55,87 +51,83 @@ covers getting it installed and running.
 git clone https://github.com/Gmacadoches/astro-arc.git ~/Projects/astro-arc
 cd ~/Projects/astro-arc
 ./install.sh
-```
-
-This symlinks `plugin/` and `backend/{bin,pipeline}` into the paths Omarchy
-expects (`~/.config/omarchy/plugins/astro-arc` and
-`~/.local/share/omarchy/astro-arc/{bin,pipeline}`) — editing a file in the
-repo takes effect immediately, no reinstall step. It also generates and
-registers `~/.local/share/applications/astro-arc-save-theme-handler.desktop`
-(the `astroarc://` URI handler a review page's Save Theme button opens —
-this one file is generated, not symlinked, since a desktop entry's `Exec=`
-needs your real home directory path baked in). Safe to re-run any time.
-Anything real already at a target path is backed up, never deleted.
-
-### Python environment
-
-```sh
-python3 -m venv ~/.local/share/omarchy/astro-arc/venv
-~/.local/share/omarchy/astro-arc/venv/bin/pip install \
-  pyswisseph timezonefinder pillow
-```
-
-Only if you'll use the local (free, CPU-only) image backend instead of
-OpenAI's, also install the SD stack (large download; its checkpoint is
-fetched automatically on first use):
-
-```sh
-~/.local/share/omarchy/astro-arc/venv/bin/pip install torch diffusers
-```
-
-### Configure birth data and location
-
-```sh
-~/.local/share/omarchy/astro-arc/bin/astro-arc-config \
-  --set-birth YYYY-MM-DD HH:MM
-~/.local/share/omarchy/astro-arc/bin/astro-arc-config \
-  --set-location "City Name" [lat,lon]
-```
-
-(Or set these from the widget's own settings panel instead — see below.)
-
-### Store an API key
-
-There's no CLI "store" command by design — keys go straight into the
-system keyring via `secret-tool`, never a file. Astro-Arc uses three
-independent slots (`stage1`/`stage2`/`image`, see `CONTEXT.md`), so at
-minimum store one for `stage1` and `stage2` (they can be the same key):
-
-```sh
-echo -n "sk-..." | secret-tool store --label="Astro-Arc stage1 key" \
-  service astro-arc account openai-api-key-stage1
-echo -n "sk-..." | secret-tool store --label="Astro-Arc stage2 key" \
-  service astro-arc account openai-api-key-stage2
-# Only if using the OpenAI image backend (default):
-echo -n "sk-..." | secret-tool store --label="Astro-Arc image key" \
-  service astro-arc account openai-api-key
-```
-
-Easier: skip this and use the widget's settings panel (gear icon) instead
-— it does the same `secret-tool` write for you, with validation.
-
-### Reload and run
-
-```sh
 omarchy-restart-shell
 ```
 
-Click the ✦ icon in the bar, open settings (⚙) to confirm your birth data
-and keys look right, then hit Regenerate.
+`install.sh` symlinks `plugin/` and `backend/{bin,pipeline}` into the paths
+Omarchy loads from, so edits in your checkout take effect on the next run. It
+never copies your key anywhere — see **Your data** below.
 
-## Repo layout
+Then open the widget, paste your API key, and enter your birth date, time and
+place.
 
+## What it costs
+
+Real measured costs, not estimates from a rate card. One preset sets every
+model at once:
+
+| Preset | Per run | Per month (daily) |
+| --- | ---: | ---: |
+| Low | $0.008 | **$0.23** |
+| Medium | $0.011 | $0.32 |
+| **High** *(recommended)* | $0.031 | **$0.93** |
+| Ultra | $0.076 | $2.32 |
+| Maximum | $0.210 | $6.39 |
+
+Above roughly $0.05 a run, nothing got measurably better in testing — the upper
+tiers buy a stronger *writing* model, not a better picture. Low already produces
+a good image.
+
+Figures are measured on this project's own renders and will drift as model
+prices change; the widget always shows the live number, what your next click
+will charge, and whether that figure is measured or projected.
+
+You can set a hard ceiling per image, and every model your key can reach is
+selectable in the Advanced popout if you want to tune it yourself.
+
+## Sharing a theme
+
+Any generation can be exported as a standalone Omarchy theme repository —
+palette, wallpaper, preview thumbnail and README. Push it to a git host and
+anyone can install it:
+
+```sh
+omarchy theme install https://github.com/you/omarchy-your-theme.git
 ```
-astro-arc/
-├── install.sh              symlink installer + astroarc:// handler setup
-├── CONTEXT.md               full architecture + conventions
-├── CHANGELOG.md              dated history of what changed and why
-├── plugin/                  Quickshell plugin (QML UI + manifest)
-│   ├── BarWidget.qml, Panel.qml, Model.js, manifest.json
-└── backend/                  everything the pipeline runs on
-    ├── bin/                   astro-arc-generate and all pipeline scripts
-    ├── pipeline/               registers.toml / cliches.toml / styles.toml
-    └── astro-arc-save-theme-handler.desktop.tpl
-                                template for the Save Theme button's
-                                registered astroarc:// URI handler
-```
+
+Exports deliberately contain no personal content: the palette, the image and the
+image prompt, never the reading that produced them.
+
+## Your data
+
+- **Your API key lives only in the system keyring** (`secret-tool`). Never in a
+  file, an environment variable, a command line, or this repo. See
+  `backend/bin/astro-arc-apikey`.
+- **Your birth data and your readings stay on your machine**, under
+  `~/.local/state/omarchy/astro-arc/`. Nothing in this repository contains them.
+- Your prompts and chart facts are sent to OpenAI to generate each image, which
+  is the entire mechanism — if that is not acceptable to you, this is not the
+  tool for you.
+
+## Tuning it
+
+Several tables are plain TOML, read fresh on every run, so an edit takes effect
+on the next generation with no restart and no code change:
+
+| File | What it controls |
+| --- | --- |
+| `backend/pipeline/styles.toml` | the art styles and the worlds they belong to |
+| `backend/pipeline/model-rates.toml` | model prices, quality presets, shortlists |
+| `backend/pipeline/registers.toml` | the material vocabulary a scene is built from |
+| `backend/pipeline/cliches.toml` | imagery to block when it starts recurring |
+
+## Documentation
+
+- [`CONTEXT.md`](CONTEXT.md) — full architecture: every script, how they connect,
+  the conventions, and the reasoning behind the ones that look odd.
+- [`CHANGELOG.md`](CHANGELOG.md) — what changed and, more usefully, what was
+  measured and why each decision went the way it did.
+
+## Licence
+
+[MIT](LICENSE).

@@ -163,9 +163,22 @@ def record_usage(model, quality, size, usage):
     if not output_tokens:
         return None
     learned = load_learned_usage()
-    learned[usage_key(model, quality, size)] = {
+    key = usage_key(model, quality, size)
+    previous = learned.get(key) or {}
+    # Keep a short history and project from the MEDIAN, because `auto` is not a
+    # fixed tier: the same model at the same size was measured at 343, 601 and
+    # 1372 output tokens on three runs, a 4x swing, and projecting from whichever
+    # ran last made the High preset appear to cost anywhere between $1.34 and
+    # $2.04 a month depending on nothing but recency. An explicit tier is stable
+    # and this history simply confirms that; `auto` needs the median to be
+    # predictable at all.
+    history = (previous.get("history") or [])[-4:]
+    history.append(output_tokens)
+    learned[key] = {
         "inputTokens": input_tokens or 0,
-        "outputTokens": output_tokens,
+        "outputTokens": sorted(history)[len(history) // 2],
+        "lastOutputTokens": output_tokens,
+        "history": history,
         "measuredAt": datetime.now(timezone.utc).isoformat(),
     }
     LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -239,11 +252,33 @@ def _representative_stage_tokens(stage, learned):
     stages = learned.get("stages") or {}
     by_model = stages.get(stage) or {}
     if by_model:
-        return max(by_model.values(), key=lambda e: e.get("measuredAt", ""))
+        return _without_reasoning(max(by_model.values(), key=lambda e: e.get("measuredAt", "")))
     everything = [e for other in stages.values() for e in other.values()]
     if not everything:
         return None
-    return max(everything, key=lambda e: e.get("measuredAt", ""))
+    return _without_reasoning(max(everything, key=lambda e: e.get("measuredAt", "")))
+
+
+def _without_reasoning(entry):
+    """Strip reasoning tokens when a measurement stands in for another model.
+
+    Reasoning is a property of the MODEL, not of the stage. gpt-6-astra spends
+    ~734 reasoning tokens writing the same 74-word prompt gpt-5.4 writes with
+    none, so lending astra's raw output count to gpt-4.1 priced gpt-4.1's stages
+    as if it reasoned too — it pushed the High preset from $1.39 to $2.04 a
+    month purely because a Maximum run happened to be the most recent
+    measurement. The visible output is the part that belongs to the stage, so
+    that is the part that is lent out.
+
+    A model's own measurement is never stripped: when it is priced against
+    itself, its reasoning is real cost it will genuinely incur.
+    """
+    if not entry:
+        return entry
+    reasoning = entry.get("reasoningTokens") or 0
+    if not reasoning:
+        return entry
+    return dict(entry, outputTokens=max(entry["outputTokens"] - reasoning, 1))
 
 
 def stage_cost(stage, model, rates=None, learned=None):
@@ -255,6 +290,8 @@ def stage_cost(stage, model, rates=None, learned=None):
     if not rate:
         return None, None
     own = ((learned.get("stages") or {}).get(stage) or {}).get(model)
+    # `own` is used as measured, reasoning included — that is cost this model
+    # really incurs. Only a BORROWED measurement gets its reasoning stripped.
     entry, source = (own, "actual") if own else (_representative_stage_tokens(stage, learned), "est")
     if not entry:
         return None, None
