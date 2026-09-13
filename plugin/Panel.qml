@@ -999,6 +999,48 @@ Panel {
     }
   }
 
+  // ---- Export: package the selected generation as a shareable Omarchy theme
+  // REPOSITORY, which is a different job from Save. Save installs a theme on
+  // THIS machine; Omarchy distributes themes by git clone
+  // (`omarchy theme install <url>`), so handing one to another user means
+  // producing a git repo. astro-arc-export-theme builds that, preview and
+  // README included, and prints where it put it.
+  readonly property string exportThemeBin: home + "/.local/share/omarchy/astro-arc/bin/astro-arc-export-theme"
+  property string _exportStdout: ""
+  property string _exportStderr: ""
+
+  function exportSelectedTheme() {
+    if (root.selectedReviewId === "" || exportThemeProc.running) return
+    var review = root.reviewById(root.selectedReviewId)
+    // Named from the same concept-tag suggestion Save pre-fills its prompt
+    // with, but without prompting: an export lands in a folder you can rename,
+    // so asking first would add a step to the one-click path for nothing.
+    var name = review ? Model.suggestThemeName(review.conceptTags) : ""
+    root.themeActionStatus = ""
+    root._exportStdout = ""
+    root._exportStderr = ""
+    exportThemeProc.command = name === ""
+      ? [root.exportThemeBin, root.selectedReviewId]
+      : [root.exportThemeBin, root.selectedReviewId, name]
+    exportThemeProc.running = true
+  }
+
+  Process {
+    id: exportThemeProc
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._exportStdout = String(text || "").trim() }
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._exportStderr = String(text || "").trim() }
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.themeActionStatus = "Exported to " + root._exportStdout
+          + " — push it to a git host and anyone can install it with \u201comarchy theme install <url>\u201d."
+        root.themeActionStatusIsError = false
+      } else {
+        root.themeActionStatus = root._exportStderr || "Export failed."
+        root.themeActionStatusIsError = true
+      }
+    }
+  }
+
   // ---- Clear History: deletes every "Themes Generated" entry right now
   // (astro-arc-prune-history --all), regardless of age. Two-click confirm
   // — arms on the first click, reverts on its own after 4s if not
@@ -2123,7 +2165,7 @@ Panel {
 
             Item {
               width: parent.width
-              height: saveThemeBtn.implicitHeight
+              height: Math.max(saveThemeBtn.implicitHeight, exportThemeBtn.implicitHeight)
               visible: !root.themeNamePromptOpen
 
               Button {
@@ -2138,6 +2180,25 @@ Panel {
                 onClicked: root.openSaveThemePrompt()
               }
 
+              // Save installs it here; Export packages it for someone else.
+              Button {
+                id: exportThemeBtn
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: exportThemeProc.running ? "Exporting…" : "Export"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== "" && !exportThemeProc.running
+                onClicked: root.exportSelectedTheme()
+
+                // Same latch as the Regenerate button: the label shortens while
+                // running, and a control that resizes under the cursor is what
+                // made that button feel wrong.
+                property real reservedWidth: 0
+                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
+                width: Math.max(implicitWidth, reservedWidth)
+              }
             }
 
             // ---- Name prompt: shown in place of the row above once Save

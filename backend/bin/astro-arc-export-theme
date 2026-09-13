@@ -1,0 +1,169 @@
+#!/bin/bash
+
+# Packages one "Themes Generated" entry as a STANDALONE, SHAREABLE Omarchy
+# theme repository — the format Omarchy itself installs from.
+#
+# This is not the same job as astro-arc-save-theme, which installs a generation
+# into ~/.config/omarchy/themes/ for use on THIS machine. Omarchy distributes
+# themes by git clone (`omarchy theme install <git-repo-url>`, see
+# omarchy-theme-install), so making a theme usable by anyone else means
+# producing a git repository, not a directory or a tarball. That is what this
+# does: a self-contained repo the recipient installs with one command.
+#
+# What goes in, and why each file is there:
+#   colors.toml              the palette; what omarchy-theme-set actually reads
+#   icons.theme              GNOME/Nautilus icon theme name (see palette_extract.py)
+#   backgrounds/*.png        the wallpaper itself
+#   preview.jpg              omarchy-theme-switcher looks for this name
+#                            (and a few other extensions) to show a thumbnail —
+#                            without it the theme is a blank tile in the picker
+#   README.md                install instructions plus how it was generated
+#
+# Deliberately NOT included: the psychological reading or its one-line
+# distillation. Those are about the person whose chart produced the theme, and
+# this output is made to be handed to strangers. The image prompt IS included —
+# it is imagery, it explains the picture, and it contains nothing personal.
+#
+# Usage: astro-arc-export-theme <review-id> [theme-name] [--out DIR]
+#   Prints the created directory on success.
+
+set -euo pipefail
+
+STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
+INDEX_FILE="$STATE_DIR/reviews/index.json"
+VENV_PY="$HOME/.local/share/omarchy/astro-arc/venv/bin/python3"
+
+review_id=""
+requested_name=""
+out_dir=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --out) out_dir="${2:-}"; shift 2 ;;
+    *) if [[ -z $review_id ]]; then review_id="$1"; else requested_name="$1"; fi; shift ;;
+  esac
+done
+
+[[ -n $review_id ]] || { echo "Usage: astro-arc-export-theme <review-id> [theme-name] [--out DIR]" >&2; exit 1; }
+[[ -f $INDEX_FILE ]] || { echo "astro-arc-export-theme: no reviews/index.json found" >&2; exit 1; }
+
+review_path=$(jq -r --arg id "$review_id" '.[] | select(.id == $id) | .path' "$INDEX_FILE")
+[[ -n $review_path ]] || { echo "astro-arc-export-theme: no review with id '$review_id'" >&2; exit 1; }
+
+theme_src="$(dirname "$review_path")/theme"
+[[ -d $theme_src ]] || { echo "astro-arc-export-theme: that generation has no theme snapshot" >&2; exit 1; }
+[[ -f $theme_src/colors.toml ]] || { echo "astro-arc-export-theme: snapshot has no colors.toml" >&2; exit 1; }
+
+# Same normalization omarchy-theme-set applies, so the name a user picks here
+# behaves identically to one typed into Omarchy's own tooling.
+sanitize() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//'; }
+name=$(sanitize "${requested_name:-astro-arc-$review_id}")
+[[ -n $name ]] || name="astro-arc-$review_id"
+
+# Downloads by default: an export is something you are about to hand to someone,
+# not state this program manages.
+if [[ -z $out_dir ]]; then
+  out_dir="$HOME/Downloads"
+  [[ -d $out_dir ]] || out_dir="$HOME"
+fi
+
+# The naming convention Omarchy's own theme repos use.
+repo_dir="$out_dir/omarchy-$name-theme"
+if [[ -e $repo_dir ]]; then
+  echo "astro-arc-export-theme: $repo_dir already exists — move or rename it first" >&2
+  exit 1
+fi
+
+mkdir -p "$repo_dir/backgrounds"
+cp "$theme_src/colors.toml" "$repo_dir/colors.toml"
+[[ -f $theme_src/icons.theme ]] && cp "$theme_src/icons.theme" "$repo_dir/icons.theme"
+# Copy every background the snapshot has, not just background.png: aether
+# themes can carry several, and dropping the extras would silently change the
+# theme the recipient gets.
+shopt -s nullglob
+for bg in "$theme_src"/backgrounds/*; do cp "$bg" "$repo_dir/backgrounds/"; done
+shopt -u nullglob
+
+# preview.jpg — omarchy-theme-switcher accepts preview.{png,jpg,jpeg,webp,gif,bmp}
+# and only ever draws a thumbnail from it. JPEG at 800px rather than a downscaled
+# PNG: the first attempt shipped a 2.1MB preview.png beside a 3.3MB wallpaper,
+# very nearly doubling the size of every shared repo to show a thumbnail. These
+# are painterly full-colour images, so PNG stays large however far it is scaled;
+# JPEG lands near 100KB with no visible difference at the size it is drawn.
+first_bg=$(find "$repo_dir/backgrounds" -type f | head -1)
+if [[ -n $first_bg && -x $VENV_PY ]]; then
+  "$VENV_PY" - "$first_bg" "$repo_dir/preview.jpg" <<'PREVIEW' || echo "astro-arc-export-theme: could not build a preview (theme is still valid without one)" >&2
+import sys
+from PIL import Image
+src, dst = sys.argv[1], sys.argv[2]
+img = Image.open(src).convert("RGB")
+img.thumbnail((800, 800), Image.LANCZOS)
+img.save(dst, quality=88, optimize=True, progressive=True)
+PREVIEW
+fi
+
+# Provenance, with the reading deliberately left out — see the header.
+meta_prompt=""
+period_key=$(jq -r --arg id "$review_id" '.[] | select(.id == $id) | .periodKey // empty' "$INDEX_FILE" 2>/dev/null || true)
+if [[ -n $period_key && -f "$STATE_DIR/pipeline-meta-$period_key.json" ]]; then
+  meta_prompt=$(jq -r '.imagePrompt // empty' "$STATE_DIR/pipeline-meta-$period_key.json" 2>/dev/null || true)
+  art_style=$(jq -r '.artStyle // empty' "$STATE_DIR/pipeline-meta-$period_key.json" 2>/dev/null || true)
+fi
+
+{
+  echo "# omarchy-$name-theme"
+  echo
+  echo "An [Omarchy](https://omarchy.org) theme — wallpaper and matching palette —"
+  echo "generated by [Astro-Arc](https://github.com/Gmacadoches/astro-arc)."
+  echo
+  echo "## Install"
+  echo
+  echo '```sh'
+  echo "omarchy theme install <this repo's git URL>"
+  echo '```'
+  echo
+  echo "Then pick it from the theme switcher, or:"
+  echo
+  echo '```sh'
+  echo "omarchy-theme-set $name"
+  echo '```'
+  echo
+  echo "## What's in here"
+  echo
+  echo "| File | Purpose |"
+  echo "| --- | --- |"
+  echo "| \`colors.toml\` | the palette Omarchy themes everything from |"
+  echo "| \`icons.theme\` | GNOME/Nautilus icon theme name |"
+  echo "| \`backgrounds/\` | the wallpaper |"
+  echo "| \`preview.jpg\` | thumbnail for the theme switcher |"
+  echo
+  if [[ -n ${art_style:-} ]]; then
+    echo "## How it was made"
+    echo
+    echo "Astro-Arc turns a natal astrology chart and the day's transits into an"
+    echo "image prompt, renders it, and derives the palette from the rendered"
+    echo "image — so the colors and the wallpaper always agree."
+    echo
+    echo "Rendered in the **$art_style** style."
+    if [[ -n $meta_prompt ]]; then
+      echo
+      echo "The prompt behind the image:"
+      echo
+      echo "> $meta_prompt"
+    fi
+    echo
+  fi
+} >"$repo_dir/README.md"
+
+# Initialize the repo so it is one `git remote add` and one push from being
+# installable by anyone. Not fatal if git is missing — the directory is still a
+# perfectly good theme, it just has to be shared some other way.
+if command -v git >/dev/null 2>&1; then
+  git -C "$repo_dir" init -q
+  git -C "$repo_dir" add -A
+  git -C "$repo_dir" -c user.email= -c user.name="Astro-Arc" \
+    commit -q -m "$name: an Omarchy theme generated by Astro-Arc" 2>/dev/null \
+    || git -C "$repo_dir" commit -q -m "$name: an Omarchy theme generated by Astro-Arc" 2>/dev/null \
+    || echo "astro-arc-export-theme: created the repo but could not commit (set git user.name/user.email)" >&2
+fi
+
+echo "$repo_dir"
