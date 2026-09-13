@@ -184,9 +184,11 @@ def main():
         for i, primary in enumerate(registers):
             pool = [r for r in registers if r != primary and r not in people]
             if cohesion == "cohere":
-                # Same family, and genuinely no partner for a single-member
-                # family (mineral holds only geological) — matching production,
-                # where that correctly yields no secondary at all.
+                # Same family, and genuinely no partner where a family has no
+                # other member — matching production, where that correctly
+                # yields no secondary at all. Since the 2026-09-13 expansion
+                # that is only the human registers, which are excluded from the
+                # pool above anyway.
                 pool = [r for r in pool if families.get(r) == families.get(primary)]
             else:
                 distant = [r for r in pool if families.get(r) != families.get(primary)]
@@ -212,6 +214,14 @@ def main():
             kwargs["amplification"] = amplification
         if dial is not None:
             kwargs["dial"] = dial
+        if hasattr(lp, "load_register_guidance"):
+            # Production passes this (see llm_pipeline.build); without it a sweep
+            # of a register that HAS guidance measures a prompt production never
+            # sends. Guarded by hasattr so the harness still runs against a
+            # pre-guidance build of the pipeline, same as the kwargs above.
+            guidance = lp.load_register_guidance(primary)
+            if guidance:
+                kwargs["register_guidance"] = guidance
 
         try:
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
