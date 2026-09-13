@@ -103,12 +103,24 @@ for unit in "$REPO_DIR"/backend/systemd/*; do
   link_file "$unit" "$SYSTEMD_USER_DIR/$(basename "$unit")"
 done
 
-if command -v systemctl >/dev/null 2>&1; then
-  systemctl --user daemon-reload
-  systemctl --user enable --now astro-arc-generate.timer
+# `command -v systemctl` is not enough: systemctl can be installed and still
+# have no user manager to talk to — an install over SSH with no lingering
+# session, inside a container, or before the graphical session comes up. Under
+# `set -e` that took the whole script down HALF DONE, after the symlinks but
+# before the astroarc:// handler and the "what to do next" instructions, with
+# nothing but "Failed to connect to user scope bus" to explain it. The timer is
+# a backstop, not a requirement — the widget polls on its own — so failing to
+# enable it must never be fatal.
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "SKIPPED astro-arc-generate.timer enable — systemctl not found"
+elif systemctl --user daemon-reload >/dev/null 2>&1 \
+     && systemctl --user enable --now astro-arc-generate.timer >/dev/null 2>&1; then
   echo "ENABLED astro-arc-generate.timer (systemctl --user)"
 else
-  echo "SKIPPED astro-arc-generate.timer enable — systemctl not found"
+  echo "SKIPPED astro-arc-generate.timer enable — no user systemd session reachable."
+  echo "        Re-run this script from a normal desktop session, or enable it by hand:"
+  echo "          systemctl --user enable --now astro-arc-generate.timer"
+  echo "        Astro-Arc still works without it: the widget polls on its own."
 fi
 
 DESKTOP_DIR="$HOME/.local/share/applications"

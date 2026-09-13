@@ -280,6 +280,29 @@ Use it. This project's own history records that 2–4-sample spot checks let the
 same content bug ship three times, and that the one comparison batch which
 would have caught it was never saved.
 
+### Test a fresh install without touching your own
+
+Every path in this project derives from `$HOME`, so a throwaway one gives you a
+genuinely new install in seconds, with no container and nothing to clean up but
+a directory:
+
+```sh
+FRESH=$(mktemp -d)
+HOME=$FRESH ./install.sh
+HOME=$FRESH ~/.local/share/omarchy/astro-arc/bin/astro-arc-config
+HOME=$FRESH $FRESH/.local/share/omarchy/astro-arc/bin/astro-arc-generate
+```
+
+That exercises the real installer, the real defaults a new user gets, and the
+real first-run paths — the venv, the birth data, the API key, all absent, which
+is exactly where fresh-install bugs live. It found four on 2026-09-13.
+
+Two things it cannot cover, because they are not `$HOME`-scoped: the QML widget
+needs the running shell, and `secret-tool` talks to your real keyring, so a
+throwaway home still finds your real API key. Docker buys you only the
+OS-level dependency question (`jq`, `python3`, `secret-tool` present on a clean
+Arch) and costs an image build to ask it.
+
 ---
 
 ## What the complexity pass found (2026-09-13)

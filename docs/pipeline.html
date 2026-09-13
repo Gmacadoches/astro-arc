@@ -505,6 +505,14 @@
 sweep.py --out wording --registers botanical --no-image  <span class="c"># prompts only, free</span></pre>
 <p><code>sweep.py</code> pins the reading, the signature and the dial so the only thing varying is the thing under test, and it touches no production state — your history, caches, last run and live theme are left alone. Output lands in <code>state/verification/&lt;name&gt;/</code> with every prompt, cost and render.</p>
 <p>Use it. This project's own history records that 2–4-sample spot checks let the same content bug ship three times, and that the one comparison batch which would have caught it was never saved.</p>
+<h3>Test a fresh install without touching your own</h3>
+<p>Every path in this project derives from <code>$HOME</code>, so a throwaway one gives you a genuinely new install in seconds, with no container and nothing to clean up but a directory:</p>
+<pre>FRESH=$(mktemp -d)
+HOME=$FRESH ./install.sh
+HOME=$FRESH ~/.local/share/omarchy/astro-arc/bin/astro-arc-config
+HOME=$FRESH $FRESH/.local/share/omarchy/astro-arc/bin/astro-arc-generate</pre>
+<p>That exercises the real installer, the real defaults a new user gets, and the real first-run paths — the venv, the birth data, the API key, all absent, which is exactly where fresh-install bugs live. It found four on 2026-09-13.</p>
+<p>Two things it cannot cover, because they are not <code>$HOME</code>-scoped: the QML widget needs the running shell, and <code>secret-tool</code> talks to your real keyring, so a throwaway home still finds your real API key. Docker buys you only the OS-level dependency question (<code>jq</code>, <code>python3</code>, <code>secret-tool</code> present on a clean Arch) and costs an image build to ask it.</p>
 </section>
 <section class="section" id="what-the-complexity-pass-found-2026-09-13">
 <h2>What the complexity pass found (2026-09-13)</h2>

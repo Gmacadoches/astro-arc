@@ -64,22 +64,28 @@ if ! flock -n 9; then
   exit 0
 fi
 
-frequency=$(jq -r '.frequency // "daily"' "$CONFIG_FILE" 2>/dev/null || echo "daily")
+# One read, through astro-arc-config, so the defaults live in exactly one place.
+# Reading $CONFIG_FILE directly meant every value here carried a second copy of
+# a default, and the frequency copy had already drifted from DEFAULTS.
+config_json=$("$BIN_DIR/astro-arc-config" 2>/dev/null || echo '{}')
+cfg() { jq -r "$1" <<<"$config_json" 2>/dev/null; }
+
+frequency=$(cfg '.frequency // "manual"')
 # `provider` is the global setting now (see astro-arc-config --set-provider);
 # `imageBackend` is the legacy key it supersedes. Reading provider first and
 # falling back keeps an existing config working, including one that still says
 # "local" — that path is no longer offered in the UI but is still honored if it
 # is set by hand, since removing a working free backend from under someone by
 # changing a dropdown would be a surprise.
-image_backend=$(jq -r '.provider // .imageBackend // "openai"' "$CONFIG_FILE" 2>/dev/null || echo "openai")
+image_backend=$(cfg '.provider // .imageBackend // "openai"')
 # `// "default"` is NOT enough on these two. jq's // only substitutes for null
 # and false, and astro-arc-config DEFAULTS both of them to the empty string —
 # so on a config where the image model has never been picked, `//` passed ""
 # through and the render failed with an unhelpful API error instead of falling
 # back. Test the value, don't just test for null.
-openai_model=$(jq -r '(.openaiModel // "") | if . == "" then "gpt-image-1-mini" else . end' "$CONFIG_FILE" 2>/dev/null || echo "gpt-image-1-mini")
-openai_quality=$(jq -r '(.openaiQuality // "") | if . == "" then "medium" else . end' "$CONFIG_FILE" 2>/dev/null || echo "medium")
-background_size=$(jq -r '.backgroundSize // "auto"' "$CONFIG_FILE" 2>/dev/null || echo "auto")
+openai_model=$(cfg '(.openaiModel // "") | if . == "" then "gpt-image-1-mini" else . end')
+openai_quality=$(cfg '(.openaiQuality // "") | if . == "" then "medium" else . end')
+background_size=$(cfg '.backgroundSize // "auto"')
 
 # Delegates to period_key.py, which is the single definition of what a period
 # key is — see that file's header for why it stopped being four hand-synced
@@ -139,6 +145,16 @@ if [[ $if_due == 1 ]]; then
   fi
 fi
 
+# Checked here rather than earlier so the --if-due no-ops above (nothing due,
+# or auto-generation off) stay quiet on an install that has not been set up.
+if [[ ! -x $VENV_PY ]]; then
+  echo "astro-arc-generate: no Python venv at $VENV_PY" >&2
+  echo "  Create it once:" >&2
+  echo "    python3 -m venv \"$HOME/.local/share/omarchy/astro-arc/venv\"" >&2
+  echo "    \"$VENV_PY\" -m pip install pyswisseph timezonefinder pillow" >&2
+  exit 1
+fi
+
 # "auto" resolves fresh every run, so a monitor change (new laptop screen,
 # a plugged-in external display) is picked up next generation with no
 # setting to remember to update.
@@ -153,7 +169,18 @@ bg_file="$HISTORY_DIR/$period_key.png"
 pipeline_meta_file="$STATE_DIR/pipeline-meta-$period_key.json"
 image_cost_file="$STATE_DIR/image-cost-$period_key.json"
 
-"$VENV_PY" "$BIN_DIR/astro_engine.py" >"$reading_file"
+# The engine reports its own failures as {"error": "..."} on STDOUT, and stdout
+# here goes straight into the reading file — so a fresh install with no birth
+# data yet produced exit 1, an empty terminal, a reading file containing the
+# error object, and (because the widget shows stderr) a Regenerate button that
+# looked like it did nothing. Capture, surface, and do not write a broken file.
+if ! reading_json=$("$VENV_PY" "$BIN_DIR/astro_engine.py" 2>&1); then
+  engine_error=$(jq -r '.error // empty' <<<"$reading_json" 2>/dev/null || true)
+  echo "astro-arc-generate: ${engine_error:-the chart engine failed}" >&2
+  [[ -n $engine_error ]] || echo "$reading_json" >&2
+  exit 1
+fi
+printf '%s' "$reading_json" >"$reading_file"
 if jq -e '.error' "$reading_file" >/dev/null 2>&1; then
   echo "Astro-Arc: $(jq -r '.error' "$reading_file")" >&2
   exit 1
@@ -224,7 +251,7 @@ find "$THEME_DIR" -mindepth 1 -maxdepth 1 ! -name backgrounds -exec rm -rf {} +
 mkdir -p "$THEME_DIR/backgrounds"
 cp -f "$bg_file" "$THEME_DIR/backgrounds/background.png"
 
-theme_generator=$(jq -r '.themeGenerator // "built-in"' "$CONFIG_FILE" 2>/dev/null || echo "built-in")
+theme_generator=$(cfg '.themeGenerator // "built-in"')
 
 # Theming: derive colors.toml + icons.theme from the rendered image.
 # icons.theme is the file GNOME/Nautilus's icon color actually comes from
@@ -357,7 +384,7 @@ fi
 # cron needed. Never touches a theme astro-arc-save-theme exported; that's
 # a permanent copy outside this whole system. Best-effort: a failure here
 # must never fail the generation that already succeeded.
-history_retention_days=$(jq -r '.historyRetentionDays // 30' "$CONFIG_FILE" 2>/dev/null || echo 30)
+history_retention_days=$(cfg '.historyRetentionDays // 30')
 "$BIN_DIR/astro-arc-prune-history" --older-than-days "$history_retention_days" >/dev/null 2>&1 \
   || echo "Astro-Arc: warning — history pruning failed" >&2
 
