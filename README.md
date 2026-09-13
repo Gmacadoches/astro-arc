@@ -15,6 +15,20 @@ shareable.
 
 ---
 
+## Seven art styles
+
+Pick one from the widget, or write your own into
+[`styles.toml`](backend/pipeline/styles.toml). These three are the same reading,
+the same objects and the same two material registers — only the style differs:
+
+| Ukiyo-e | Cyberpunk | Antique Engraving |
+| --- | --- | --- |
+| ![Ukiyo-e](docs/images/styles/ukiyoe.jpg) | ![Cyberpunk](docs/images/styles/cyberpunk.jpg) | ![Antique Engraving](docs/images/styles/engraving.jpg) |
+
+**[See all seven →](docs/styles.md)**
+
+---
+
 ## Why it looks different every day
 
 The image's *subject* comes from your chart. So does its **shape**.

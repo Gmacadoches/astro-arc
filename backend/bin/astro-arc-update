@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# Check for, and optionally apply, an Astro-Arc update — for people who would
+# rather not run git by hand. Since 2026-09-13 the plugin IS its git checkout,
+# so "update" really is just a fetch and a fast-forward; this wraps that with
+# the safety checks a one-click button needs.
+#
+#   astro-arc-update            check only, never writes anything
+#   astro-arc-update --apply    fast-forward to the latest, if it is safe
+#
+# Prints one JSON object on stdout either way, so Panel.qml can read a status
+# without parsing prose. Human-readable text goes to stderr.
+#
+# It will NOT update over local modifications. That is deliberate and it is not
+# paranoia: the whole tuning story here is that people edit the pipeline TOMLs
+# in place, so a plugin directory with uncommitted changes is the expected
+# state for anyone who has customised anything. Those edits are worth more than
+# the update — `git pull` would refuse or conflict anyway, and stashing behind
+# someone's back is how tuning quietly disappears. So a dirty checkout reports
+# exactly which files are modified and stops.
+
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+APPLY=0
+[[ "${1:-}" == "--apply" ]] && APPLY=1
+
+# jq -n builds the JSON so quoting and escaping are never hand-rolled; a branch
+# name or a filename with a quote in it would otherwise produce output the
+# widget cannot parse.
+emit() {
+  local status="$1" message="$2" behind="${3:-0}" files="${4:-}"
+  jq -nc --arg status "$status" --arg message "$message" \
+     --argjson behind "$behind" --arg files "$files" \
+     '{status: $status, message: $message, behind: $behind,
+       files: ($files | if . == "" then [] else split("\n") end)}'
+  echo "$message" >&2
+}
+
+if ! command -v git >/dev/null 2>&1; then
+  emit "error" "git is not installed, so Astro-Arc cannot check for updates."
+  exit 0
+fi
+
+if ! git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  emit "not-git" "This copy of Astro-Arc is not a git checkout, so there is nothing to update from. Re-install with git clone to get updates."
+  exit 0
+fi
+
+# A shallow or detached checkout has no upstream to compare against.
+upstream=$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+if [[ -z $upstream ]]; then
+  emit "no-upstream" "This checkout is not tracking a remote branch, so there is nothing to update from."
+  exit 0
+fi
+
+# Bounded: this runs from a button, and a hung fetch would spin the widget
+# forever on a captive portal or a dead remote.
+if ! timeout 20 git -C "$REPO_DIR" fetch --quiet 2>/dev/null; then
+  emit "offline" "Could not reach the update server. Check your connection and try again."
+  exit 0
+fi
+
+behind=$(git -C "$REPO_DIR" rev-list --count "HEAD..$upstream" 2>/dev/null || echo 0)
+ahead=$(git -C "$REPO_DIR" rev-list --count "$upstream..HEAD" 2>/dev/null || echo 0)
+dirty_files=$(git -C "$REPO_DIR" status --porcelain 2>/dev/null | sed 's/^...//' || true)
+
+if [[ $behind == 0 ]]; then
+  emit "up-to-date" "Astro-Arc is up to date."
+  exit 0
+fi
+
+plural="s"; [[ $behind == 1 ]] && plural=""
+
+if [[ $APPLY == 0 ]]; then
+  if [[ -n $dirty_files ]]; then
+    emit "dirty" "$behind update$plural available, but you have unsaved changes to files in the plugin folder. Updating would overwrite them, so it has been left alone." "$behind" "$dirty_files"
+  else
+    emit "behind" "$behind update$plural available." "$behind"
+  fi
+  exit 0
+fi
+
+# --- applying ---------------------------------------------------------------
+
+if [[ -n $dirty_files ]]; then
+  emit "dirty" "Not updating: you have changed files inside the plugin folder, and updating would overwrite them." "$behind" "$dirty_files"
+  exit 0
+fi
+if [[ $ahead != 0 ]]; then
+  emit "diverged" "Not updating: this checkout has $ahead local commit(s) that are not in the update. Merge them yourself with git." "$behind"
+  exit 0
+fi
+
+if git -C "$REPO_DIR" merge --ff-only "$upstream" >/dev/null 2>&1; then
+  emit "updated" "Updated. Restart the shell to load it: omarchy-restart-shell" "$behind"
+else
+  emit "error" "The update could not be applied cleanly. Run git pull in $REPO_DIR to see why." "$behind"
+fi

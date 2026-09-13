@@ -711,6 +711,50 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
+  // ---- Updates: the plugin is its own git checkout, so "update" is a fetch
+  // and a fast-forward. astro-arc-update does the work and the safety checks
+  // and answers in JSON; this only drives it and shows what it said. Exists
+  // because installing no longer requires the terminal, so updating should not
+  // either. -----------------------------------------------------------------
+  readonly property string updateBin: binDir + "/astro-arc-update"
+  property string updateStatus: ""
+  property string updateMessage: ""
+  property var updateFiles: []
+  property bool updateBusy: false
+
+  function checkForUpdates(apply) {
+    if (root.updateBusy) return
+    root.updateBusy = true
+    root.updateMessage = ""
+    updateProc.command = apply ? [root.updateBin, "--apply"] : [root.updateBin]
+    updateProc.running = true
+  }
+
+  Process {
+    id: updateProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var parsed = null
+        try { parsed = JSON.parse(String(text || "")) } catch (e) { parsed = null }
+        if (parsed) {
+          root.updateStatus = String(parsed.status || "")
+          root.updateMessage = String(parsed.message || "")
+          root.updateFiles = parsed.files || []
+        } else {
+          // The script answers in JSON on every path, so unparseable output
+          // means it did not run at all — a missing file, a broken PATH.
+          root.updateStatus = "error"
+          root.updateMessage = "Could not run the update check."
+          root.updateFiles = []
+        }
+      }
+    }
+    onExited: root.updateBusy = false
+  }
+
+  Process { id: restartShellProc; command: ["omarchy-restart-shell"] }
+
   // ---- Model catalog: which models this key can actually reach, what they
   // cost, and what they have been measured consuming. Replaces the hardcoded
   // four-row list that used to live in Model.js — that list offered 2 image
@@ -1717,6 +1761,81 @@ Panel {
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.bodySmall
               }
+            }
+
+            PanelSeparator { foreground: root.bar.foreground }
+            PanelSectionHeader { text: "UPDATES"; foreground: root.bar.foreground }
+
+            Item {
+              width: parent.width
+              height: Math.max(updateLabel.implicitHeight, updateBtn.implicitHeight)
+
+              Text {
+                id: updateLabel
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.labelColW
+                text: "Version"
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+              }
+
+              // One button with three jobs, because they are three steps of one
+              // errand: find out, apply, load. Never two buttons where the
+              // second is meaningless until the first has run.
+              Button {
+                id: updateBtn
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !root.updateBusy
+                text: root.updateBusy
+                  ? "Checking…"
+                  : root.updateStatus === "behind"
+                    ? "Update now"
+                    : root.updateStatus === "updated"
+                      ? "Restart shell"
+                      : "Check for updates"
+                onClicked: {
+                  if (root.updateStatus === "updated") restartShellProc.running = true
+                  else root.checkForUpdates(root.updateStatus === "behind")
+                }
+
+                // Same latch the Regenerate and Export buttons use: the label
+                // changes width between states, and a control that resizes
+                // under the cursor feels broken.
+                property real reservedWidth: 0
+                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
+                width: Math.max(implicitWidth, reservedWidth)
+              }
+            }
+
+            Text {
+              visible: root.updateMessage !== ""
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: root.updateMessage
+              color: (root.updateStatus === "up-to-date" || root.updateStatus === "updated")
+                ? Qt.darker(root.bar.foreground, 1.3)
+                : (root.bar.urgent || "#f38ba8")
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            // Naming the files matters more than the refusal does: this is the
+            // one message where the user is being told their own tuning is what
+            // stopped the update, and it is useless without saying which.
+            Text {
+              visible: root.updateFiles.length > 0
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: "Changed: " + root.updateFiles.join(", ")
+              color: Qt.darker(root.bar.foreground, 1.5)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
             }
 
           }
