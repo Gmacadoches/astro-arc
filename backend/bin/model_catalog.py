@@ -439,6 +439,11 @@ def _period_key(frequency, now_local=None):
         return now_local.strftime("%G-W%V")
     if frequency == "monthly":
         return now_local.strftime("%Y-%m")
+    # "hourly" belongs on this line, not on one of its own: the engine has no
+    # hourly arc, so its caches stay keyed by date however often the schedule
+    # fires. This answers "which cache key will the next run look for", which
+    # is the date one — astro-arc-generate's own YYYY-MM-DDTHH key names files,
+    # not caches.
     return now_local.strftime("%Y-%m-%d")
 
 

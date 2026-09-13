@@ -61,9 +61,15 @@ never copies your key anywhere — see **Your data** below.
 Then open the widget, paste your API key, and enter your birth date, time and
 place.
 
-Nothing generates on its own until you say so: **Frequency** starts at **None**,
-so the first theme is the one you ask for with **Regenerate**. Set it to Daily,
-Weekly or Monthly once you know what a run costs you.
+Nothing generates on its own until you say so: **Schedule** starts at **None**,
+so the first theme is the one you ask for with **Regenerate**. Set it to Hourly,
+Daily, Weekly or Monthly once you know what a run costs you — the panel prices
+the month for whichever you pick.
+
+A schedule only advances while the computer is on and you are logged in. A
+locked screen still counts, so it keeps generating behind the lock screen;
+being switched off, asleep or logged out does not, and anything that came due
+during that runs shortly after you are back rather than being skipped.
 
 ## What it costs
 

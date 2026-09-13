@@ -1997,6 +1997,28 @@ Panel {
             }
           }
 
+          // ---- What a schedule actually promises. Neither trigger outlives
+          // the login session: the systemd timer is a --user unit with no
+          // lingering, and the panel's own poll obviously needs the shell
+          // running. Locking the screen stops neither (a lock is not a
+          // logout), and Persistent=true on the timer means a boundary
+          // crossed while the machine was off or asleep fires shortly after
+          // it comes back rather than being skipped. Worth stating plainly:
+          // "every hour" reads as a promise the machine cannot keep while it
+          // is switched off. ----------------------------------------------
+          Text {
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: root.configState.frequency === "manual"
+              ? "Nothing generates on its own — Regenerate is the only trigger."
+              : "Runs only while the computer is on and you are logged in; a locked "
+                + "screen still counts. Anything due while it was off, asleep or "
+                + "logged out runs shortly after you are back."
+            color: Qt.darker(root.bar.foreground, 1.5)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
           // ---- Style: label left, dropdown right — no longer locked;
           // options come from pipeline/styles.toml (mirrored in Model.js
           // as ART_STYLE_CHOICES). -----------------------------------------

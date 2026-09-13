@@ -87,6 +87,7 @@ period_key_for() {
   local -a when_args=()
   [[ -n $when ]] && when_args=(-d "$when")
   case "$freq" in
+    hourly) date "${when_args[@]}" +%Y-%m-%dT%H ;;
     weekly) date "${when_args[@]}" +%G-W%V ;;
     monthly) date "${when_args[@]}" +%Y-%m ;;
     *) date "${when_args[@]}" +%Y-%m-%d ;;
@@ -94,7 +95,7 @@ period_key_for() {
 }
 
 case "$frequency" in
-  weekly|monthly|manual) ;;
+  hourly|weekly|monthly|manual) ;;
   *) frequency="daily" ;;
 esac
 period_key=$(period_key_for "$frequency")

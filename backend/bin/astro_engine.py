@@ -425,7 +425,12 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
             ),
         }
 
-    # daily (default)
+    # daily (default) — and "hourly", deliberately. An hourly schedule is about
+    # how often a new IMAGE appears, not about the sky: transits barely move in
+    # an hour, so an hourly arc would be the daily one with a longer key and 23
+    # redundant readings a day to pay for. Falling through to here keys the arc
+    # (and so Stage 1, Stage 1.5 and the signature caches) by date, and each
+    # hourly run re-rolls only Stage 2's imagery against the day's reading.
     moon = transit_bodies["moon"]
     dominant = find_dominant_transit(transit_bodies, natal_bodies, ["moon"], houses)
     return {

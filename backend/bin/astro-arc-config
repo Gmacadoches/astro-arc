@@ -14,7 +14,7 @@
 #                                          optional but required for house/
 #                                          ascendant precision later
 #   --clear-location                      unset the location
-#   --set-frequency <daily|weekly|monthly|manual>
+#   --set-frequency <hourly|daily|weekly|monthly|manual>
 #                                          "manual" means never generate on a
 #                                          schedule; the Regenerate button still
 #                                          works. Nothing else changes — a manual
@@ -162,7 +162,7 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 --set-frequency)
-  [[ ${2:-} =~ ^(daily|weekly|monthly|manual)$ ]] || { echo "Usage: astro-arc-config --set-frequency <daily|weekly|monthly|manual>" >&2; exit 1; }
+  [[ ${2:-} =~ ^(hourly|daily|weekly|monthly|manual)$ ]] || { echo "Usage: astro-arc-config --set-frequency <hourly|daily|weekly|monthly|manual>" >&2; exit 1; }
   current=$(read_config)
   updated=$(jq --arg f "$2" '.frequency=$f' <<<"$current")
   write_config "$updated"
@@ -241,7 +241,7 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 *)
-  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <daily|weekly|monthly|manual>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-history-retention-days <N>]" >&2
+  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-history-retention-days <N>]" >&2
   exit 1
   ;;
 esac

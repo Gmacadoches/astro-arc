@@ -46,9 +46,10 @@ var PIPELINE_MODE_CHOICES = [
 // `manual` has no interval by definition. Left out rather than given a number,
 // so anything projecting from a cadence has to decide what to do about its
 // absence instead of silently treating it as daily.
-var FREQUENCY_INTERVAL_DAYS = { daily: 1, weekly: 7, monthly: 30 }
+var FREQUENCY_INTERVAL_DAYS = { hourly: 1 / 24, daily: 1, weekly: 7, monthly: 30 }
 
 var FREQUENCY_CHOICES = [
+  { key: "hourly", label: "Hourly" },
   { key: "daily", label: "Daily" },
   { key: "weekly", label: "Weekly" },
   { key: "monthly", label: "Monthly" },
@@ -139,9 +140,25 @@ function projectedMonthlyCost(nextRun, frequency) {
   // would have quietly turned that into the daily default — the one frequency
   // where the answer is "nothing" would have reported the largest number.
   var runs = (frequency in RUNS_PER_MONTH) ? RUNS_PER_MONTH[frequency] : RUNS_PER_MONTH.daily
+
+  // Hourly is the one cadence that runs more than once inside a single period
+  // of the READING. astro_engine keys its arc by local date whatever the
+  // schedule says, and Stage 1, Stage 1.5 and the visual signature all cache
+  // against that key — so the first run of each day pays for a fresh reading
+  // and the other 23 only re-roll Stage 2's imagery and the render. Charging
+  // all 730 runs at the full rate overstated the month by about 40% at the
+  // rates measured here ($19.57 against a real $13.77), which is exactly the
+  // kind of invented number this project's cost rule exists to prevent.
+  var fullRuns = runs
+  var cachedRuns = 0
+  if (frequency === "hourly" && typeof nextRun.next === "number") {
+    fullRuns = RUNS_PER_MONTH.daily
+    cachedRuns = runs - fullRuns
+  }
+
   return {
     perRun: nextRun.full,
-    perMonth: nextRun.full * runs,
+    perMonth: fullRuns * nextRun.full + cachedRuns * nextRun.next,
     runsPerMonth: runs,
     scheduled: runs > 0,
     source: nextRun.source
@@ -152,7 +169,7 @@ function projectedMonthlyCost(nextRun, frequency) {
 // Gregorian month, which keeps a "monthly" cadence from reading as 1.0.
 // Monthly is exactly 1, not 30.44/30 — the cadence IS one run per month. Manual
 // is 0: nothing is scheduled, so there is no recurring cost to project.
-var RUNS_PER_MONTH = { daily: 30.44, weekly: 4.35, monthly: 1, manual: 0 }
+var RUNS_PER_MONTH = { hourly: 730.56, daily: 30.44, weekly: 4.35, monthly: 1, manual: 0 }
 
 // ---- Quality presets ------------------------------------------------------
 // Which tier the current settings correspond to, or "custom" when they match
@@ -245,7 +262,7 @@ function parseConfig(raw) {
       locationName: typeof data.locationName === "string" ? data.locationName : "",
       latitude: hasCoords ? lat : null,
       longitude: hasCoords ? lon : null,
-      frequency: ["daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
+      frequency: ["hourly", "daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
       imageBackend: data.imageBackend === "openai" ? "openai" : "local",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
       openaiQuality: typeof data.openaiQuality === "string" ? data.openaiQuality : "",
@@ -379,7 +396,12 @@ function formatBytes(bytes) {
   if (bytes < 1024) return bytes + " B"
   var kb = bytes / 1024
   if (kb < 1024) return Math.round(kb) + " KB"
-  return (kb / 1024).toFixed(1) + " MB"
+  var mb = kb / 1024
+  // GB became reachable with the Hourly schedule: 30 days of hourly entries
+  // projects to ~5GB, and "5068.7 MB" is a number a reader has to stop and
+  // convert before it means anything.
+  if (mb < 1024) return mb.toFixed(1) + " MB"
+  return (mb / 1024).toFixed(1) + " GB"
 }
 
 // Real average size of every "Themes Generated" entry that actually has a
@@ -542,7 +564,9 @@ function currentPeriodKey(frequency, now) {
   var d = now || new Date()
   if (frequency === "weekly") return isoWeekKey(d)
   if (frequency === "monthly") return d.getFullYear() + "-" + pad2(d.getMonth() + 1)
-  return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
+  var day = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
+  if (frequency === "hourly") return day + "T" + pad2(d.getHours())
+  return day
 }
 
 // Does this run already cover the period the given frequency is in right now?
