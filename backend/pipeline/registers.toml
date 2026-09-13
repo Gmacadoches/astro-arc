@@ -4,14 +4,23 @@
 # regions of image-space instead of just avoiding recent words.
 #
 # Edit this list freely — add a register whenever you notice one producing
-# good results, remove one that never lands. Order doesn't matter.
+# good results, remove one that never lands. Order doesn't matter, except
+# that the first ~10 are what a cold-start install cycles through before
+# the history-based rotation takes over, so the longest-tested ones are
+# kept at the top.
 #
-# "figures in relation" and "crowd / the collective" are special-cased by
-# name in llm_pipeline.py's STAGE2_SYSTEM — it gates whether Stage 2 leans
-# into human presence on which register got picked, so renaming either
-# string here must be mirrored there too.
+# These are NAMES, not vocabularies, and that is deliberate — see the
+# [guidance] note below.
+#
+# "figures in relation", "crowd / the collective", "the solitary figure",
+# "hands and handwork" and "man-beast" are special-cased by name in
+# llm_pipeline.py (PEOPLE_REGISTERS + STAGE2_SYSTEM): they gate whether
+# Stage 2 leans into human presence, and they are never eligible as a
+# secondary. Renaming any of those strings here must be mirrored in both
+# places, or the people-gating silently stops firing for it.
 
 registers = [
+  # The original 12.
   "domestic interior",
   "geological",
   "textile and fiber",
@@ -24,4 +33,42 @@ registers = [
   "ritual object",
   "figures in relation",
   "crowd / the collective",
+  # Added 2026-09-13, doubling the list. Families are assigned in
+  # llm_pipeline.py's REGISTER_FAMILIES — a register missing from there
+  # gets family None, and every such register would then "cohere" with
+  # every other one as a single pseudo-family. Add both together.
+  "fungal and decaying",
+  "animal and creaturely",
+  "metallic and ore",
+  "glass and ceramic",
+  "industrial and infrastructural",
+  "agricultural and cultivated",
+  "glacial and frozen",
+  "fire and ember",
+  "paper and inscription",
+  "instrument and measure",
+  "the solitary figure",
+  "hands and handwork",
+  "man-beast",
 ]
+
+# Optional per-register steer, passed to Stage 2 alongside the register
+# name. Mirrors styles.toml's `guidance` field, and exists for the same
+# reason: a name whose obvious reading is much narrower than its real
+# territory needs to be told so.
+#
+# THIS IS NOT A VOCABULARY LIST, AND MUST NOT BECOME ONE. A register is a
+# region of image-space, and the model's own vocabulary for one is far
+# larger than any list written here could be; handing it 50 nouns replaces
+# an open space with a closed menu and every image starts being assembled
+# from the same words. That is the failure this project has already
+# measured twice — see cliches.toml's header ("do not pre-seed it with
+# guesses"), and AVOID_WINDOW's cut from 14 to 8 once a 40-item negative
+# list turned out to be steering less than the register pair was.
+#
+# So: write guidance ONLY for a register with a demonstrated narrow
+# attractor, keep it to a span and a principle rather than an inventory,
+# and let anything listed read as a starting point the model is expected
+# to reach past.
+[guidance]
+"man-beast" = """A figure that is part human and part animal, drawn from any mythology and any era. The Greek ones — satyr, faun, centaur, minotaur — are the obvious reading and the least interesting; reach past them into the whole span: Mesopotamian lamassu, girtablullu and fish-cloaked apkallu; the jackal- and falcon-headed figures of Egyptian funerary art; the medieval bestiary's cynocephali, blemmyae, manticore and wodewose; Japanese tengu, kitsune and ushi-oni; Slavic leshy and volkodlak; Celtic selkie, pooka and the antlered horned-god figures; Norse wolf- and bear-skinned warriors; the Olmec were-jaguar; West African spider- and water-spirits; melusine, lamia, harpy, siren, sphinx, nagini, kinnara, and the foliate Green Man where the other half is plant rather than beast. Prefer the obscure and the regionally specific to the famous few. The hybrid is a fact of the figure's anatomy, rendered with the same weight and wear as everything else in the scene — never a costume, a mask, or a person wearing an animal."""

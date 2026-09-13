@@ -128,7 +128,7 @@ on the next generation with no restart and no code change:
 | --- | --- |
 | `backend/pipeline/styles.toml` | the art styles and the worlds they belong to |
 | `backend/pipeline/model-rates.toml` | model prices, quality presets, shortlists |
-| `backend/pipeline/registers.toml` | the material vocabulary a scene is built from |
+| `backend/pipeline/registers.toml` | the 25 material registers a scene is built from |
 | `backend/pipeline/cliches.toml` | imagery to block when it starts recurring |
 
 ## Documentation

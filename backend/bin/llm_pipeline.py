@@ -266,6 +266,31 @@ def load_registers():
         return tomllib.load(f).get("registers", [])
 
 
+def load_register_guidance(register):
+    """Optional per-register steer from registers.toml's [guidance] table —
+    "" for the registers that have none, which is most of them by design.
+
+    Mirrors load_style_info()'s guidance for art styles, and exists for the
+    same narrow reason: a register whose obvious reading is much smaller than
+    its real territory has to be told so. `man-beast` is the case that
+    prompted it — the word lands on minotaurs and satyrs and stops, when the
+    register is meant to span every part-human figure in world myth.
+
+    Deliberately NOT a vocabulary list per register. See registers.toml's
+    [guidance] header for why that trade goes the way it does.
+    """
+    if not register:
+        return ""
+    path = PIPELINE_DIR / "registers.toml"
+    if not path.exists():
+        return ""
+    try:
+        with open(path, "rb") as f:
+            return tomllib.load(f).get("guidance", {}).get(register, "")
+    except (tomllib.TOMLDecodeError, OSError):
+        return ""
+
+
 def load_cliches():
     path = PIPELINE_DIR / "cliches.toml"
     if not path.exists():
@@ -386,17 +411,44 @@ def avoid_concepts(history, window=AVOID_WINDOW):
 REGISTER_FAMILIES = {
     "botanical": "living",
     "bodily and anatomical": "living",
+    "fungal and decaying": "living",
+    "animal and creaturely": "living",
     "geological": "mineral",
+    "metallic and ore": "mineral",
+    "glass and ceramic": "mineral",
     "architectural": "built",
     "domestic interior": "built",
     "mechanical": "built",
+    "industrial and infrastructural": "built",
+    "agricultural and cultivated": "built",
     "aquatic": "fluid",
     "atmospheric": "fluid",
+    "glacial and frozen": "fluid",
+    "fire and ember": "fluid",
     "textile and fiber": "made",
     "ritual object": "made",
+    "paper and inscription": "made",
+    "instrument and measure": "made",
     "figures in relation": "human",
     "crowd / the collective": "human",
+    "the solitary figure": "human",
+    "hands and handwork": "human",
+    "man-beast": "human",
 }
+
+# Every register in registers.toml must appear above. One that doesn't gets
+# family None from .get(), and since None == None, all such registers would
+# "cohere" with each other as a single invisible pseudo-family — a silent
+# behavior change rather than an error. Checked at import rather than left
+# to a reader noticing.
+_UNFAMILIED = [r for r in load_registers() if r not in REGISTER_FAMILIES]
+if _UNFAMILIED:
+    print(
+        "llm_pipeline: warning — registers.toml has entries with no "
+        "REGISTER_FAMILIES group, which will all cohere with each other: "
+        + ", ".join(_UNFAMILIED),
+        file=sys.stderr,
+    )
 
 # Whether a generation contains people stays gated on the PRIMARY register
 # only — see CONTEXT.md's convention note. A "human" register arriving as
@@ -404,7 +456,17 @@ REGISTER_FAMILIES = {
 # material-led scene through a side door, which is exactly the failure the
 # register-gating convention was written to prevent, so these are never
 # eligible as a secondary.
-PEOPLE_REGISTERS = {"figures in relation", "crowd / the collective"}
+PEOPLE_REGISTERS = {
+    "figures in relation",
+    "crowd / the collective",
+    "the solitary figure",
+    "hands and handwork",
+    # A man-beast is half a person: the figure-hierarchy rules below (how many
+    # faces may turn toward the viewer, who is near and who is turned away) are
+    # exactly as load-bearing here as for any other register with a face in it,
+    # and they only fire for members of this set.
+    "man-beast",
+}
 
 
 def pick_registers(history, registers, cohesion="collide"):
@@ -438,10 +500,13 @@ def pick_registers(history, registers, cohesion="collide"):
 
     primary_family = REGISTER_FAMILIES.get(primary)
     if cohesion == "cohere":
-        # Same family, so the frame reads as one material world. `mineral` holds
-        # only `geological`, so a soft geological day legitimately has no partner —
-        # fall through to None, which the prompt already handles by omitting the
-        # secondary line entirely (pre-1.5 history entries have a null secondary).
+        # Same family, so the frame reads as one material world. Falling through
+        # to None is a legitimate outcome, which the prompt already handles by
+        # omitting the secondary line entirely (pre-1.5 history entries have a
+        # null secondary). It used to happen to `mineral`, which held only
+        # `geological` until the 2026-09-13 expansion gave it two partners; it
+        # now happens only to the human registers, which are never eligible as a
+        # secondary at all and so can never find a same-family one.
         near = [r for r in candidates if REGISTER_FAMILIES.get(r) == primary_family]
         if not near:
             return primary, None
@@ -1030,7 +1095,8 @@ HOW TO WRITE IT
 
 PEOPLE
 
-- Let the primary register decide whether people belong. If it is "figures in relation" or "crowd / the collective," lean fully into human presence. If it is a material or place register, let the material carry the image — the objects and place are the protagonists — unless the reading's content makes a person unmistakably necessary.
+- Let the primary register decide whether people belong. If it is "figures in relation", "crowd / the collective", "the solitary figure", "hands and handwork" or "man-beast", lean fully into human presence. If it is a material or place register, let the material carry the image — the objects and place are the protagonists — unless the reading's content makes a person unmistakably necessary.
+- Which human register it is decides the shape of that presence. "figures in relation" is people in the plural, related to each other. "the solitary figure" is exactly one person, alone in the frame, and the world around them does the rest of the work — do not add a companion, a witness or a crowd to give them something to react to. "hands and handwork" is the body at close range and mid-task: hands, forearms, a tool being used, the work in progress, with the face out of frame or incidental. "man-beast" is one or more part-human figures, and the hybrid anatomy is the subject rather than a detail.
 - When people do appear, make them participants in something larger, not a two-person drama. Two figures visibly in conflict, or one distressed while another looks on, explains the tension in literal human terms instead of embodying it — a failure. When the register is specifically the collective, let the many carry cultural or social material, with one figure marked out from the rest.
 - FIGURE HIERARCHY IS MANDATORY WHENEVER PEOPLE APPEAR. At most **two** people may have a face turned toward the viewer, and at least one of those must be close to the camera and large in frame. Everyone else is turned away, seen from behind, in profile, bent to a task, occluded by an object, or far enough back to be a silhouette. Never describe a row, line, cluster, or group of people all facing the viewer at the same distance — an image with several equally-sized mid-distance faces is a guaranteed failure, because each face ends up too small to render correctly and the whole group comes out distorted. Say explicitly, in the prompt, who is near and facing, and that the others are turned away or distant.
 - People are not a way to reach the density requirement. A crowd counts as ONE element no matter how many bodies are in it. Reach the six-to-ten count with objects, structures and materials, never by multiplying faces.
@@ -1053,7 +1119,7 @@ Respond with a JSON object with exactly these keys:
 
 def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
                          style_label=None, style_guidance=None, secondary_register=None,
-                         amplification=None, dial=None):
+                         amplification=None, dial=None, register_guidance=None):
     """`amplification` is Stage 1.5's output (see stage15_amplify). It is
     passed last and defaults to None so the function still works without a
     Stage 1.5 result — sweep.py relies on that to produce a pre-Stage-1.5
@@ -1083,6 +1149,8 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         user_lines.append(f"Rendering style for this image: {style_label} — {style_guidance}")
     if register:
         user_lines.append(f"Primary material register (the scene's protagonist material): {register}")
+    if register_guidance:
+        user_lines.append(f"  What that register covers: {register_guidance}")
     if secondary_register:
         user_lines.append(f"Secondary material register (must be physically present in the frame as real matter): {secondary_register}")
     if avoid_tags:
@@ -1181,6 +1249,10 @@ def build(reading, config):
         secondary_register=secondary_register,
         amplification=amplification,
         dial=dial,
+        # Primary only: the secondary is a supporting material, and the one
+        # register with guidance today can never be a secondary anyway (it is
+        # in PEOPLE_REGISTERS).
+        register_guidance=load_register_guidance(register),
     )
 
     # has_people is already known by this point (stage2_image_prompt above
