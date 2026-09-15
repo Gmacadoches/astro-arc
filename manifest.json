@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "license": "AGPL-3.0-or-later",
   "author": "Garrett McDaniel",
-  "description": "Astrological theme generator: turns your natal chart and current transits into a full Omarchy theme on the cadence you pick, or only when you ask",
+  "description": "Reads your natal chart and the day's transits as psychology rather than symbolism. The chart first becomes a Jungian character study, written by a model forbidden any visual language; that reading is amplified into archetypes and four to seven concrete objects, one deliberately out of scale or ruined; a final pass describes them as a physical scene and never what it means. The rendered image's own colours become the theme, so wallpaper and palette always agree.",
   "kinds": [
     "bar-widget"
   ],
