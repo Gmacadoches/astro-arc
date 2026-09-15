@@ -4,7 +4,7 @@ One sample per preset in [`backend/pipeline/styles.toml`](../backend/pipeline/st
 
 Every one of these is the **same** reading, the same visual signature, the
 same Stage 1.5 objects, the same dial cell and the same two material
-registers (`botanical` + `geological`). Only the style differs — otherwise this would be
+registers (`man-beast` + `geological`). Only the style differs — otherwise this would be
 seven different scenes rather than a comparison of styles.
 
 Change the style from the widget's Style dropdown, or add your own preset

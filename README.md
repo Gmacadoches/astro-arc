@@ -11,7 +11,7 @@ agree, because the theme is made *from* the wallpaper.
 It runs on a cadence you pick, and every generation is browsable, exportable and
 shareable.
 
-![A dim Sicilian room with a spilled divination cup, a bronze votive liver, and a window onto the coast](docs/images/interior.jpg)
+![A shaggy wodewose kneeling to feed bees at an open straw skep, a Neolithic limestone figurine at its knee, harvesters working a field under an enormous sky beyond](docs/images/hero.jpg)
 
 ---
 
@@ -37,15 +37,29 @@ Four independent measurements of the day — how hard the aspects are, how exact
 how many, and how much of the Moon is lit — decide how many things are in the
 frame, how many places they occupy, how long the prompt is, whether the two
 material registers collide or cohere, where the event sits relative to you, and
-how much is hidden in shadow.
+how much the image *attempts* to hide in shadow.
 
 A loaded, hard day is crowded and close. A quiet one is not.
 
-| A quiet, dark day | A quiet, bright day |
-| --- | --- |
-| ![A shadowy forest floor, objects half-buried in undergrowth](docs/images/quiet-dark.jpg) | ![A lily marsh under an open sky with a few objects at its edge](docs/images/quiet-bright.jpg) |
+That last one — light — is the only instruction a style can talk the renderer
+out of, and it is worth showing honestly. Each row below is one style. Within a
+row, everything is pinned except the day's exposure: same register, same
+density, same number of objects. Only the chart differs.
 
-Both are the same register at the same density. The difference is the chart.
+| | A quiet, dark day | A quiet, bright day |
+| --- | --- | --- |
+| **Symbolist** | ![A langur-headed figure in a star-embroidered robe on a fogbound hillside, a valley lost in mist behind](docs/images/quiet-dark-symbolist.jpg) | ![A fox-headed figure in the same robe reclining in clover under flat even light, a river valley open to the horizon](docs/images/quiet-bright-symbolist.jpg) |
+| **Ghibli** | ![A kappa half-hidden in wet reeds holding a Roman stylus, a misted river and bridge behind](docs/images/quiet-dark-ghibli.jpg) | ![A crane-headed figure kneeling in marsh reeds with a terracotta swan rattle, dawn light across open water](docs/images/quiet-bright-ghibli.jpg) |
+
+Symbolist does what it is told: the dark day is genuinely fogbound and most of
+the frame is lost in it. Ghibli mostly does not. Its own guidance asks for a
+wide low horizon under an enormous sky, and when that collides with an
+instruction to leave the frame unlit, the sky tends to win — so its "dark" day
+arrives as a bright morning that merely happens to have mist in it.
+
+Both rows are working as designed. The dial always follows the chart; the style
+decides how much of that survives contact with the picture. Density and
+distance come through in every style. Light is the one that negotiates.
 
 ---
 
