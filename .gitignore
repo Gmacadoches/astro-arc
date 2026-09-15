@@ -23,6 +23,10 @@ __pycache__/
 
 # Working notes. The repository IS the plugin now, so everything tracked here
 # is cloned by every user — planning documents are for the person writing the
-# code, not for the person installing it. The permanent record of what changed
-# and why lives in CHANGELOG.md and CONTEXT.md, which are published on purpose.
+# code, not for the person installing it. These stay on the author's machine
+# and were purged from history on 2026-09-15: CONTEXT.md is the architecture
+# dossier, CHANGELOG.md the record of what was measured and why, and TASK-*.md
+# the per-feature plans. PIPELINE.md is the published explanation instead.
 TASK-*.md
+CONTEXT.md
+CHANGELOG.md

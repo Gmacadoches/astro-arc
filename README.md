@@ -163,10 +163,11 @@ says which step each one changes:
   published as a page at [`docs/pipeline.html`](docs/pipeline.html), generated
   from that file by `backend/bin/build_pipeline_page.py` — edit the Markdown,
   run the script, never edit the HTML.
-- [`CONTEXT.md`](CONTEXT.md) — full architecture: every script, how they connect,
-  the conventions, and the reasoning behind the ones that look odd.
-- [`CHANGELOG.md`](CHANGELOG.md) — what changed and, more usefully, what was
-  measured and why each decision went the way it did.
+- [`docs/styles.md`](docs/styles.md) — all seven art styles, same reading and
+  same objects in each, so the style is the only variable.
+
+Each script carries its own header comment explaining what it does and why it
+does it that way; that is the reference for anything PIPELINE.md does not cover.
 
 ## Licence
 
