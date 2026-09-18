@@ -69,8 +69,12 @@ Panel {
     return false
   }
 
+  // Omarchy 4.0.4 hands plugins a bar facade whose property is read-only;
+  // older shells expose the bar itself, so fall back to assigning.
   function setCenterHoverRevealSuppressed(value) {
-    if (root.bar && "centerHoverRevealSuppressed" in root.bar)
+    if (root.bar && typeof root.bar.setCenterHoverRevealSuppressed === "function")
+      root.bar.setCenterHoverRevealSuppressed(value)
+    else if (root.bar && "centerHoverRevealSuppressed" in root.bar)
       root.bar.centerHoverRevealSuppressed = value
   }
 
