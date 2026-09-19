@@ -29,6 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cost_estimate import image_call_cost  # noqa: E402
+from http_limits import b64_image_bytes, read_error_capped, read_json_capped  # noqa: E402
 from image_fit import ImageError, closest_supported_size, fit_cover  # noqa: E402
 
 API_BASE = "https://api.openai.com/v1"
@@ -197,10 +198,12 @@ def _request(path, payload=None, method="GET", slot="image"):
         },
     )
     try:
+        # Bounded read: see http_limits. The 60s timeout stays — it covers a
+        # stalled peer, while the cap covers one that keeps talking forever.
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read())
+            return read_json_capped(resp)
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode(errors="replace")
+        body = read_error_capped(exc)
         # Never include headers (which carried the key) in an error dump.
         raise RuntimeError(f"OpenAI API error {exc.code}: {body[:300]}") from None
 
@@ -222,8 +225,6 @@ def validate_key(slot="image"):
 
 
 def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", target_width=1024, target_height=1024):
-    import base64
-
     # OpenAI can only render at OPENAI_IMAGE_SIZES, not the arbitrary
     # target the background is actually supposed to end up at — render at
     # the closest-matching aspect ratio, then crop/scale to the exact
@@ -243,10 +244,18 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
     # The API's PNG goes to disk as-is, then ImageMagick fits it to the screen.
     # The raw render sits beside the output (same filesystem, so the fit never
     # crosses devices) and is removed whether or not the fit succeeds.
+    #
+    # Size is checked against MAX_IMAGE_BYTES before the decode allocates and
+    # again before anything reaches the disk, so an oversized reply costs
+    # neither memory nor a partly written file.
+    try:
+        image_bytes = b64_image_bytes(result["data"][0]["b64_json"])
+    except (KeyError, IndexError, TypeError):
+        raise RuntimeError("OpenAI returned no image data.") from None
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     raw_path = output_path.with_name(output_path.stem + ".raw.png")
-    raw_path.write_bytes(base64.b64decode(result["data"][0]["b64_json"]))
+    raw_path.write_bytes(image_bytes)
     try:
         fit_cover(raw_path, output_path, target_width, target_height)
     finally:

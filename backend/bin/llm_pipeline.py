@@ -68,6 +68,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from openai_image_gen import ApiKeyError, get_api_key  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
+from http_limits import ResponseTooLarge, read_error_capped, read_json_capped  # noqa: E402
 
 import urllib.error
 import urllib.request
@@ -182,11 +183,17 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
             },
         )
         try:
+            # Bounded read: see http_limits. The timeout covers a stalled
+            # peer; the cap covers one that keeps sending.
             with urllib.request.urlopen(req, timeout=60) as resp:
-                body = json.loads(resp.read())
+                body = read_json_capped(resp)
             break
+        except ResponseTooLarge as exc:
+            # Not congestion and not transient: a reply this size is broken,
+            # and retrying only invites it again. Fail the stage outright.
+            raise PipelineError(f"OpenAI chat API: {exc}") from None
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")[:300]
+            detail = read_error_capped(exc)[:300]
             last_detail = f"OpenAI chat API error {exc.code}: {detail}"
 
             # A rejected temperature is a capability mismatch, not congestion:

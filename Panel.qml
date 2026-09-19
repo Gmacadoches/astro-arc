@@ -724,53 +724,12 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
-  // ---- Updates: the plugin is its own git checkout, so "update" is a fetch
-  // and a fast-forward. astro-arc-update does the work and the safety checks
-  // and answers in JSON; this only drives it and shows what it said. Exists
-  // because installing no longer requires the terminal, so updating should not
-  // either. -----------------------------------------------------------------
-  readonly property string updateBin: binDir + "/astro-arc-update"
-  property string updateStatus: ""
-  property string updateMessage: ""
-  property var updateFiles: []
-  property bool updateBusy: false
-
-  function checkForUpdates(apply) {
-    if (root.updateBusy) return
-    root.updateBusy = true
-    root.updateMessage = ""
-    updateProc.command = apply ? [root.updateBin, "--apply"] : [root.updateBin]
-    updateProc.running = true
-  }
-
-  Process {
-    id: updateProc
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var parsed = null
-        try { parsed = JSON.parse(String(text || "")) } catch (e) { parsed = null }
-        if (parsed) {
-          root.updateStatus = String(parsed.status || "")
-          root.updateMessage = String(parsed.message || "")
-          root.updateFiles = parsed.files || []
-        } else {
-          // The script answers in JSON on every path, so unparseable output
-          // means it did not run at all — a missing file, a broken PATH.
-          root.updateStatus = "error"
-          root.updateMessage = "Could not run the update check."
-          root.updateFiles = []
-        }
-      }
-    }
-    onExited: {
-      root.updateBusy = false
-      // An applied update fast-forwards the checkout, so the version moved.
-      root.refreshVersion()
-    }
-  }
-
-  Process { id: restartShellProc; command: ["omarchy-restart-shell"] }
+  // ---- Updates: deliberately not done from in here. The plugin does not
+  // update itself; `omarchy plugin update` does, which is Omarchy's own code
+  // path and not something this plugin can influence. A button that fetched
+  // tags and checked one out would let whatever the remote offers next become
+  // executable plugin code, so the panel only reports the version it is on and
+  // links to the releases page. ---------------------------------------------
 
   function openArchive() {
     Quickshell.execDetached(["xdg-open", root.galleryFile])
@@ -778,8 +737,8 @@ Panel {
 
   // ---- Version: read from git by astro-arc-version, so a release is a tag
   // and nothing in here is edited per release. Links to that release's GitHub
-  // page. Refreshed each time the panel opens and after an update, since
-  // either can find it moved while the shell keeps running. --------------------------------
+  // page. Refreshed each time the panel opens, since `omarchy plugin update`
+  // can move the checkout while the shell keeps running. ---------------------
   readonly property string versionBin: binDir + "/astro-arc-version"
   property string versionLabel: ""
   property string versionUrl: ""
@@ -1843,14 +1802,14 @@ Panel {
             }
 
             PanelSeparator { foreground: root.bar.foreground }
-            PanelSectionHeader { text: "UPDATES"; foreground: root.bar.foreground }
+            PanelSectionHeader { text: "VERSION"; foreground: root.bar.foreground }
 
             Item {
               width: parent.width
-              height: Math.max(updateLabel.implicitHeight, updateBtn.implicitHeight)
+              height: versionRowLabel.implicitHeight
 
               Text {
-                id: updateLabel
+                id: versionRowLabel
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
                 width: root.labelColW
@@ -1862,13 +1821,14 @@ Panel {
 
               // The release this checkout is on, linked to its GitHub page.
               // "v1.0.1 (a3f9c21)" on a release; "v1.0.1 +3 (a3f9c21)" on a
-              // development copy that is 3 commits past it. Users update to
-              // release tags, so they only ever see the first form.
+              // development copy that is 3 commits past it. The link is the
+              // whole update story now: it lands on the release page, which
+              // says to run `omarchy plugin update`.
               Text {
                 id: versionText
-                anchors.left: updateLabel.right
+                anchors.left: versionRowLabel.right
                 anchors.leftMargin: Style.space(8)
-                anchors.right: updateBtn.left
+                anchors.right: parent.right
                 anchors.rightMargin: Style.space(8)
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
@@ -1892,59 +1852,15 @@ Panel {
                 }
               }
 
-              // One button with three jobs, because they are three steps of one
-              // errand: find out, apply, load. Never two buttons where the
-              // second is meaningless until the first has run.
-              Button {
-                id: updateBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: !root.updateBusy
-                text: root.updateBusy
-                  ? "Checking…"
-                  : root.updateStatus === "behind"
-                    ? "Update now"
-                    : root.updateStatus === "updated"
-                      ? "Restart shell"
-                      : "Check for updates"
-                onClicked: {
-                  if (root.updateStatus === "updated") restartShellProc.running = true
-                  else root.checkForUpdates(root.updateStatus === "behind")
-                }
-
-                // Same latch the Regenerate and Export buttons use: the label
-                // changes width between states, and a control that resizes
-                // under the cursor feels broken.
-                property real reservedWidth: 0
-                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
-                width: Math.max(implicitWidth, reservedWidth)
-              }
             }
 
+            // Updating is a terminal command on purpose — see the Updates note
+            // above the version properties for why the panel does not do it.
             Text {
-              visible: root.updateMessage !== ""
               width: parent.width
               wrapMode: Text.WordWrap
-              text: root.updateMessage
-              color: (root.updateStatus === "up-to-date" || root.updateStatus === "updated")
-                ? Qt.darker(root.bar.foreground, 1.3)
-                : (root.bar.urgent || "#f38ba8")
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            // Naming the files matters more than the refusal does: this is the
-            // one message where the user is being told their own tuning is what
-            // stopped the update, and it is useless without saying which.
-            Text {
-              visible: root.updateFiles.length > 0
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: "Changed: " + root.updateFiles.join(", ")
-              color: Qt.darker(root.bar.foreground, 1.5)
+              text: "Update with: omarchy plugin update"
+              color: Qt.darker(root.bar.foreground, 1.3)
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.caption
             }
