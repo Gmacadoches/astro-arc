@@ -65,52 +65,54 @@ distance come through in every style. Light is the one that negotiates.
 
 ## Requirements
 
-- **Omarchy** (Hyprland + Quickshell). This is a bar-widget plugin; it does not
-  run standalone.
-- **Python 3.11+** (uses stdlib `tomllib`; developed against 3.14). The chart
-  maths comes from the [Swiss Ephemeris](https://www.astro.com/swisseph/) via
-  `pyswisseph`, installed by `install.sh` from a hash-checked lock
-  (`backend/requirements.lock`). pyswisseph publishes no wheel for Python
-  3.12+, so it compiles from source: that needs a C compiler
-  (`sudo pacman -S --needed base-devel`).
-- **System tools**: `jq`, `secret-tool` (libsecret), `hyprctl`, `xdg-mime` —
-  all standard on an Omarchy install.
+- **Omarchy.** This is a bar-widget plugin; it does not run standalone.
 - **An OpenAI API key.** Every stage is an API call, so a key is required
   regardless of which models you pick.
 
+That is all. There is no install step: nothing is compiled, nothing is
+downloaded, no service is registered. The backend runs on the Python and
+ImageMagick every Omarchy install already has, using the standard library only,
+and the chart maths is [Astronomy Engine](https://github.com/cosinekitty/astronomy),
+vendored in this repository as a single file.
+
 ## Install
 
-```sh
-git clone https://github.com/Gmacadoches/astro-arc.git \
-  ~/.config/omarchy/plugins/astro-arc
-~/.config/omarchy/plugins/astro-arc/install.sh
-omarchy-restart-shell
-```
-
-The clone *is* the plugin, the same as any other Omarchy plugin — nothing is
-symlinked or copied elsewhere. `install.sh` sets up the three things that
-can't live in a git checkout: the Python venv, the scheduled-generation timer,
-and the `astroarc://` handler the review pages use. It never copies your API
-key anywhere — see **Your data** below.
+From Omarchy's plugin marketplace, or:
 
 ```sh
-git -C ~/.config/omarchy/plugins/astro-arc pull       # update
-~/.config/omarchy/plugins/astro-arc/install.sh         # re-sync the venv if the lock changed
-~/.config/omarchy/plugins/astro-arc/install.sh --uninstall
+omarchy plugin add https://github.com/Gmacadoches/astro-arc.git --enable
 ```
 
-Then open the widget, paste your API key, and enter your birth date, time and
-place.
+Then click ✦ in the bar, paste your API key, and enter your birth date, time
+and place.
 
 Nothing generates on its own until you say so: **Schedule** starts at **None**,
 so the first theme is the one you ask for with **Regenerate**. Set it to Hourly,
 Daily, Weekly or Monthly once you know what a run costs you — the panel prices
 the month for whichever you pick.
 
-A schedule only advances while the computer is on and you are logged in. A
-locked screen still counts, so it keeps generating behind the lock screen;
-being switched off, asleep or logged out does not, and anything that came due
-during that runs shortly after you are back rather than being skipped.
+A schedule only advances while you are logged in, because the widget itself is
+the scheduler. A locked screen still counts; being switched off, asleep or
+logged out does not, and anything that came due during that runs within a few
+minutes of your being back rather than being skipped.
+
+**Update:** *Check for updates* under the panel's Settings, or
+`omarchy plugin update garrett.astro-arc`.
+**Remove:** `omarchy plugin remove garrett.astro-arc`. Your archive stays —
+see below.
+
+## Your archive
+
+Every generation is kept as a page of its own — the image, the reading, the
+prompt and what it cost — together with its complete theme, in
+`~/.local/share/astro-arc/`. **Browse all generations** in the panel opens the
+gallery, `~/.local/share/astro-arc/index.html`: every generation, newest first,
+each linking to its page. Bookmark it.
+
+Uninstalling the plugin leaves your archive untouched, because it was always
+just files in your home directory. Delete the folder when you no longer want
+it. *History* in Settings sets how long generations are kept; the newest is
+never pruned.
 
 ## What it costs
 
@@ -154,11 +156,14 @@ image prompt, never the reading that produced them.
 - **Your API key lives only in the system keyring** (`secret-tool`). Never in a
   file, an environment variable, a command line, or this repo. See
   `backend/bin/astro-arc-apikey`.
-- **Your birth data and your readings stay on your machine**, under
-  `~/.local/state/omarchy/astro-arc/`. Nothing in this repository contains them.
+- **Your birth data and your readings stay on your machine**: settings in
+  `~/.local/state/omarchy/settings/astro-arc.json`, caches in
+  `~/.local/state/omarchy/astro-arc/` (safe to delete), your archive in
+  `~/.local/share/astro-arc/`. Nothing in this repository contains them.
 - Your prompts and chart facts are sent to OpenAI to generate each image, which
   is the entire mechanism — if that is not acceptable to you, this is not the
-  tool for you.
+  tool for you. The birth place is looked up with Open-Meteo's geocoder, which
+  also supplies its timezone.
 
 ## Tuning it
 
@@ -181,6 +186,8 @@ says which step each one changes:
   published as a page at [`docs/pipeline.html`](docs/pipeline.html), generated
   from that file by `backend/bin/build_pipeline_page.py` — edit the Markdown,
   run the script, never edit the HTML.
+- [`RELEASING.md`](RELEASING.md) — how a release is cut (`bin/release`), why
+  `master` only ever holds releases, and how updates find them.
 - [`docs/styles.md`](docs/styles.md) — all seven art styles, same reading and
   same objects in each, so the style is the only variable.
 
@@ -191,14 +198,6 @@ does it that way; that is the reference for anything PIPELINE.md does not cover.
 
 [GNU Affero General Public License v3.0 or later](LICENSE).
 
-Astro-Arc computes every chart with the
-[Swiss Ephemeris](https://www.astro.com/swisseph/)
-([source](https://github.com/aloistr/swisseph)), via the
-[pyswisseph](https://astrorigin.com/pyswisseph) bindings. Swiss Ephemeris is
-dual licensed, under the AGPL or under a paid Professional License from
-Astrodienst. This project takes the AGPL, which requires the project as a whole
-to be AGPL licensed. That is the reason for the licence, and it is worth knowing
-before you fork: anything you build on Astro-Arc inherits the same obligation.
-
-See [`NOTICE`](NOTICE) for the third party copyright notices, which the Swiss
-Ephemeris licence requires be preserved on all copies.
+Charts are computed with [Astronomy Engine](https://github.com/cosinekitty/astronomy)
+by Don Cross, vendored unmodified in `backend/vendor/astronomy/` under the MIT
+License. See [`NOTICE`](NOTICE) for the third-party notices.

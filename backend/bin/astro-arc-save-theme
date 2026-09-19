@@ -21,8 +21,10 @@
 
 set -euo pipefail
 
-STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
-INDEX_FILE="$STATE_DIR/reviews/index.json"
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"
+INDEX_FILE="$GENERATIONS_INDEX"
 THEMES_DIR="$HOME/.config/omarchy/themes"
 
 review_id="${1:-}"
@@ -32,7 +34,7 @@ if [[ -z $review_id ]]; then
   exit 1
 fi
 
-[[ -f $INDEX_FILE ]] || { echo "astro-arc-save-theme: no reviews/index.json found" >&2; exit 1; }
+[[ -f $INDEX_FILE ]] || { echo "astro-arc-save-theme: no generations.json in the archive yet" >&2; exit 1; }
 
 review_path=$(jq -r --arg id "$review_id" '.[] | select(.id == $id) | .path' "$INDEX_FILE")
 if [[ -z $review_path ]]; then

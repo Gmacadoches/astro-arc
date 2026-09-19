@@ -44,7 +44,7 @@ account_for_slot() {
 
 require_secret_tool() {
   command -v secret-tool >/dev/null 2>&1 || {
-    echo "secret-tool not found. Install libsecret's secret-tool (e.g. \`omarchy pkg add libsecret\`) — Astro-Arc refuses to fall back to plaintext key storage." >&2
+    echo "secret-tool not found. Install secret-tool (the libsecret package, part of Omarchy's base install) — Astro-Arc refuses to fall back to plaintext key storage." >&2
     exit 1
   }
 }

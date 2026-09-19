@@ -1,37 +1,66 @@
 #!/usr/bin/env python3
-"""Fits a generated image to an exact target size ("cover" scaling + center
-crop, like CSS `object-fit: cover`), shared by both image backends.
+"""Every image operation Astro-Arc performs, done by ImageMagick.
 
-Neither backend can just be asked to render at an arbitrary desktop
-resolution: sd-turbo (image_gen.py) is CPU-bound and trained around ~512px,
-and OpenAI's image models only accept a small fixed set of sizes. Both
-generate at whichever size actually suits them, then this crops/scales the
-result to the exact background size the user configured (or auto-detected),
-so the final file always matches the screen regardless of what the model
-itself could produce.
+OpenAI's image models only accept a small fixed set of sizes, so a render is
+made at whichever of those best matches the screen's aspect ratio and then
+fitted to the exact background size the user configured (or auto-detected):
+scaled to cover it and cropped from the center, like CSS `object-fit: cover`.
+
+This used to be Pillow, which was one of the three packages that made a Python
+venv necessary at all. ImageMagick is in Omarchy's base package list, so the
+same work now needs nothing installed — and the scripts run on the system's
+own python3.
 """
 
-from PIL import Image
+import shutil
+import subprocess
 
 
-def fit_cover(image, target_width, target_height):
-    """Resize `image` (a PIL Image) to exactly target_width x target_height,
-    scaling to cover the target box and cropping the overflow from the
-    center — never distorts aspect ratio, never letterboxes."""
-    src_w, src_h = image.size
-    scale = max(target_width / src_w, target_height / src_h)
-    scaled_w, scaled_h = round(src_w * scale), round(src_h * scale)
-    resized = image.resize((scaled_w, scaled_h), Image.LANCZOS)
+class ImageError(Exception):
+    pass
 
-    left = (scaled_w - target_width) // 2
-    top = (scaled_h - target_height) // 2
-    return resized.crop((left, top, left + target_width, top + target_height))
+
+def _magick():
+    """ImageMagick 7's `magick`, or 6's `convert` on a system that has only
+    the older one. Omarchy ships 7."""
+    for name in ("magick", "convert"):
+        path = shutil.which(name)
+        if path:
+            return path
+    raise ImageError("ImageMagick is not installed (need `magick`). It is part of "
+                     "Omarchy's base install, in the imagemagick package.")
+
+
+def run_magick(args):
+    """Run ImageMagick with `args` and return stdout as text. Raises ImageError
+    with ImageMagick's own message on failure, never a bare traceback."""
+    proc = subprocess.run([_magick(), *map(str, args)], capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise ImageError(f"ImageMagick failed: {proc.stderr.strip()[:300]}")
+    return proc.stdout
+
+
+def fit_cover(src_path, dst_path, target_width, target_height):
+    """Write `src_path` to `dst_path` at exactly target_width x target_height:
+    scaled to cover the box (the `^` flag), then the overflow cropped from the
+    center. Never distorts the aspect ratio, never letterboxes. `+repage`
+    drops the crop offset a PNG would otherwise carry."""
+    size = f"{int(target_width)}x{int(target_height)}"
+    run_magick([src_path, "-resize", f"{size}^", "-gravity", "center",
+                "-extent", size, "+repage", dst_path])
+
+
+def thumbnail_jpeg(src_path, dst_path, max_px, quality=86):
+    """A progressive JPEG no larger than max_px on its longest side (the `>`
+    flag never enlarges), stripped of metadata."""
+    run_magick([src_path, "-resize", f"{int(max_px)}x{int(max_px)}>", "-strip",
+                "-interlace", "JPEG", "-quality", str(int(quality)), dst_path])
 
 
 def closest_supported_size(target_width, target_height, supported_sizes):
     """Pick whichever of `supported_sizes` ("WxH" strings) best matches the
-    target's aspect ratio — used where a backend can only render at a few
-    fixed sizes (OpenAI's image API) rather than any size sd-turbo can."""
+    target's aspect ratio — the OpenAI image API renders only at a few fixed
+    sizes, and fit_cover() takes it from there."""
     target_ratio = target_width / target_height
 
     def ratio_distance(size_str):

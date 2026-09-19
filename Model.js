@@ -10,6 +10,7 @@ var DEFAULT_CONFIG = {
   locationName: "",
   latitude: null,
   longitude: null,
+  timezone: "",
   // "manual" — a fresh install generates nothing until asked. Every
   // generation spends real money on an image API, so the cadence that
   // costs nothing is the only safe thing to pick on someone's behalf;
@@ -28,6 +29,10 @@ var DEFAULT_CONFIG = {
   backgroundSize: "auto",
   artStyle: "symbolist",
   themeGenerator: "built-in",
+  // true — change only the wallpaper and leave the user's theme colors alone.
+  // Most people already run a theme they chose, often several theme plugins;
+  // repainting all of it every day is the opt-in, not the default.
+  backgroundOnly: true,
   historyRetentionDays: 30,
   maxCostPerImage: 0,
   provider: "openai"
@@ -256,6 +261,7 @@ function parseConfig(raw) {
       locationName: typeof data.locationName === "string" ? data.locationName : "",
       latitude: hasCoords ? lat : null,
       longitude: hasCoords ? lon : null,
+      timezone: typeof data.timezone === "string" ? data.timezone : "",
       frequency: ["hourly", "daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
       imageBackend: data.imageBackend === "local" ? "local" : "openai",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
@@ -265,6 +271,8 @@ function parseConfig(raw) {
       backgroundSize: data.backgroundSize === "auto" || (typeof data.backgroundSize === "string" && SIZE_PATTERN.test(data.backgroundSize)) ? data.backgroundSize : "auto",
       artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist",
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
+      // Only an explicit false turns it off, matching astro-arc-generate.
+      backgroundOnly: data.backgroundOnly !== false,
       historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
         ? data.historyRetentionDays : 30,
       // 0 (or anything unparseable) means no ceiling.
@@ -460,7 +468,11 @@ function parseGeocodingResults(raw) {
         name: String(r.name),
         description: region,
         latitude: r.latitude,
-        longitude: r.longitude
+        longitude: r.longitude,
+        // The place's IANA zone. The birth time is civil time THERE, so the
+        // chart needs it — and Open-Meteo already knows it, which is what let
+        // the timezonefinder package (and its 60 MB polygon database) go.
+        timezone: typeof r.timezone === "string" ? r.timezone : ""
       })
     }
     return out
@@ -471,14 +483,14 @@ function parseGeocodingResults(raw) {
 
 function locationCommit(text, suggestions, selectedIndex) {
   var name = String(text || "").replace(/^\s+|\s+$/g, "")
-  if (name === "") return { name: "", latitude: null, longitude: null }
+  if (name === "") return { name: "", latitude: null, longitude: null, timezone: "" }
 
   var choices = suggestions || []
   var index = Math.max(0, Math.min(parseInt(selectedIndex, 10) || 0, choices.length - 1))
   var suggestion = choices[index]
   if (suggestion) return suggestion
 
-  return { name: name, latitude: null, longitude: null }
+  return { name: name, latitude: null, longitude: null, timezone: "" }
 }
 
 // Digit-only input mask helpers: strip everything but digits, cap the

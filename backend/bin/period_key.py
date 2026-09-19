@@ -27,7 +27,7 @@ midnight, however few hours separate them.
                              still names the caches and the output filenames
 
 Deliberately dependency-free (datetime only) so the shell can call it without
-the project's venv, and so importing it costs nothing.
+anything installed, and so importing it costs nothing.
 
 Usage:
     period_key.py <frequency> [iso-timestamp]   # the scheduler's key

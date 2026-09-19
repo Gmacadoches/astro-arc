@@ -1,23 +1,40 @@
 #!/bin/bash
 
-# Check for, and optionally apply, an Astro-Arc update — for people who would
-# rather not run git by hand. Since 2026-09-13 the plugin IS its git checkout,
-# so "update" really is just a fetch and a fast-forward; this wraps that with
-# the safety checks a one-click button needs.
+# Check for, and optionally apply, an Astro-Arc update — the panel's "Check for
+# updates" button. The plugin is its own git checkout, so an update is a git
+# operation; this wraps it in the checks a one-click button needs.
 #
-#   astro-arc-update            check only, never writes anything
-#   astro-arc-update --apply    fast-forward to the latest, if it is safe
+#   astro-arc-update            check only, never changes anything
+#   astro-arc-update --apply    move to the update, if it is safe
 #
 # Prints one JSON object on stdout either way, so Panel.qml can read a status
 # without parsing prose. Human-readable text goes to stderr.
+#
+# RELEASES, NOT COMMITS. By default an update moves the checkout to the newest
+# release tag (vX.Y.Z), never to whatever the branch happens to hold, so a user
+# only ever sits exactly on a release — which is what the version row in the
+# panel then shows. It only moves forward: a checkout already past the newest
+# release (which is what every install made before this was, on master) is
+# left alone until a newer release contains it. See RELEASING.md for how
+# releases are cut.
+#
+# A development copy can opt out and follow its branch instead, per checkout,
+# with nothing committed:
+#     git -C <plugin dir> config astro-arc.updateChannel branch
+# (unset it to go back to releases). That channel is the old behaviour: fetch
+# and fast-forward to the tracked branch.
+#
+# Omarchy's own `omarchy plugin update` is a second, independent path: it
+# fast-forwards to the remote's default branch, master. That lands on a release
+# too, because master only ever moves by a tagged release merge (RELEASING.md).
 #
 # It will NOT update over local modifications. That is deliberate and it is not
 # paranoia: the whole tuning story here is that people edit the pipeline TOMLs
 # in place, so a plugin directory with uncommitted changes is the expected
 # state for anyone who has customised anything. Those edits are worth more than
-# the update — `git pull` would refuse or conflict anyway, and stashing behind
-# someone's back is how tuning quietly disappears. So a dirty checkout reports
-# exactly which files are modified and stops.
+# the update, and stashing behind someone's back is how tuning quietly
+# disappears. So a dirty checkout reports exactly which files are modified and
+# stops.
 
 set -euo pipefail
 
@@ -29,71 +46,105 @@ APPLY=0
 # name or a filename with a quote in it would otherwise produce output the
 # widget cannot parse.
 emit() {
-  local status="$1" message="$2" behind="${3:-0}" files="${4:-}"
+  local status="$1" message="$2" behind="${3:-0}" files="${4:-}" version="${5:-}"
   jq -nc --arg status "$status" --arg message "$message" \
-     --argjson behind "$behind" --arg files "$files" \
-     '{status: $status, message: $message, behind: $behind,
+     --argjson behind "$behind" --arg files "$files" --arg version "$version" \
+     '{status: $status, message: $message, behind: $behind, version: $version,
        files: ($files | if . == "" then [] else split("\n") end)}'
   echo "$message" >&2
 }
+
+g() { git -C "$REPO_DIR" "$@"; }
 
 if ! command -v git >/dev/null 2>&1; then
   emit "error" "git is not installed, so Astro-Arc cannot check for updates."
   exit 0
 fi
 
-if ! git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-  emit "not-git" "This copy of Astro-Arc is not a git checkout, so there is nothing to update from. Re-install with git clone to get updates."
+if ! g rev-parse --git-dir >/dev/null 2>&1; then
+  emit "not-git" "This copy of Astro-Arc is not a git checkout, so there is nothing to update from. Re-install it with: omarchy plugin add https://github.com/Gmacadoches/astro-arc.git"
   exit 0
 fi
 
-# A shallow or detached checkout has no upstream to compare against.
-upstream=$(git -C "$REPO_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
-if [[ -z $upstream ]]; then
-  emit "no-upstream" "This checkout is not tracking a remote branch, so there is nothing to update from."
-  exit 0
-fi
+channel=$(g config --get astro-arc.updateChannel 2>/dev/null || echo release)
 
 # Bounded: this runs from a button, and a hung fetch would spin the widget
-# forever on a captive portal or a dead remote.
-if ! timeout 20 git -C "$REPO_DIR" fetch --quiet 2>/dev/null; then
+# forever on a captive portal or a dead remote. --tags because the release
+# channel needs every tag, not just those on already-fetched history.
+if ! timeout 20 git -C "$REPO_DIR" fetch --quiet --tags origin 2>/dev/null; then
   emit "offline" "Could not reach the update server. Check your connection and try again."
   exit 0
 fi
 
-behind=$(git -C "$REPO_DIR" rev-list --count "HEAD..$upstream" 2>/dev/null || echo 0)
-ahead=$(git -C "$REPO_DIR" rev-list --count "$upstream..HEAD" 2>/dev/null || echo 0)
-dirty_files=$(git -C "$REPO_DIR" status --porcelain 2>/dev/null | sed 's/^...//' || true)
+dirty_files=$(g status --porcelain 2>/dev/null | sed 's/^...//' || true)
 
-if [[ $behind == 0 ]]; then
-  emit "up-to-date" "Astro-Arc is up to date."
-  exit 0
-fi
+# ---- branch channel (opt-in, for a development copy) ------------------------
 
-plural="s"; [[ $behind == 1 ]] && plural=""
-
-if [[ $APPLY == 0 ]]; then
-  if [[ -n $dirty_files ]]; then
-    emit "dirty" "$behind update$plural available, but you have unsaved changes to files in the plugin folder. Updating would overwrite them, so it has been left alone." "$behind" "$dirty_files"
+if [[ $channel == branch ]]; then
+  upstream=$(g rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)
+  if [[ -z $upstream ]]; then
+    emit "no-upstream" "This checkout follows a branch (astro-arc.updateChannel = branch), but the branch is not tracking a remote."
+    exit 0
+  fi
+  behind=$(g rev-list --count "HEAD..$upstream" 2>/dev/null || echo 0)
+  ahead=$(g rev-list --count "$upstream..HEAD" 2>/dev/null || echo 0)
+  plural="s"; [[ $behind == 1 ]] && plural=""
+  if [[ $behind == 0 ]]; then
+    emit "up-to-date" "Up to date with $upstream."
+  elif [[ -n $dirty_files ]]; then
+    emit "dirty" "$behind commit$plural on $upstream, but files in the plugin folder have been changed, so it has been left alone." "$behind" "$dirty_files"
+  elif [[ $APPLY == 0 ]]; then
+    emit "behind" "$behind commit$plural on $upstream." "$behind"
+  elif [[ $ahead != 0 ]]; then
+    emit "diverged" "Not updating: this checkout has $ahead local commit(s) that are not on $upstream. Merge them yourself with git." "$behind"
+  elif g merge --ff-only "$upstream" >/dev/null 2>&1; then
+    emit "updated" "Updated. Restart the shell to load it: omarchy-restart-shell" "$behind"
   else
-    emit "behind" "$behind update$plural available." "$behind"
+    emit "error" "The update could not be applied cleanly. Run git pull in $REPO_DIR to see why." "$behind"
   fi
   exit 0
 fi
 
-# --- applying ---------------------------------------------------------------
+# ---- release channel (the default) -------------------------------------------
+
+# Highest version, not newest date: version order is what "latest" means.
+latest=$(g tag --list 'v[0-9]*' --sort=-v:refname 2>/dev/null | head -1)
+if [[ -z $latest ]]; then
+  emit "up-to-date" "No releases have been published yet."
+  exit 0
+fi
+latest_commit=$(g rev-parse "$latest^{commit}")
+head_commit=$(g rev-parse HEAD)
+
+if [[ $head_commit == "$latest_commit" ]]; then
+  emit "up-to-date" "Astro-Arc is up to date ($latest)." 0 "" "$latest"
+  exit 0
+fi
+
+# Forward only. If HEAD is not an ancestor of the latest release, moving there
+# would drop commits this copy has — a newer master from before releases were
+# tags, or local work. Leave it until a release contains it.
+if ! g merge-base --is-ancestor HEAD "$latest_commit" 2>/dev/null; then
+  emit "up-to-date" "This copy is already newer than the latest release ($latest)." 0 "" "$latest"
+  exit 0
+fi
+
+behind=$(g rev-list --count "HEAD..$latest_commit" 2>/dev/null || echo 0)
 
 if [[ -n $dirty_files ]]; then
-  emit "dirty" "Not updating: you have changed files inside the plugin folder, and updating would overwrite them." "$behind" "$dirty_files"
+  emit "dirty" "$latest is available, but files in the plugin folder have been changed, so it has been left alone." "$behind" "$dirty_files" "$latest"
   exit 0
 fi
-if [[ $ahead != 0 ]]; then
-  emit "diverged" "Not updating: this checkout has $ahead local commit(s) that are not in the update. Merge them yourself with git." "$behind"
+if [[ $APPLY == 0 ]]; then
+  emit "behind" "$latest is available." "$behind" "" "$latest"
   exit 0
 fi
 
-if git -C "$REPO_DIR" merge --ff-only "$upstream" >/dev/null 2>&1; then
-  emit "updated" "Updated. Restart the shell to load it: omarchy-restart-shell" "$behind"
+# A detached checkout of the tag: the copy is exactly the release, nothing else.
+# `omarchy plugin update` still works from here — it fast-forwards a detached
+# HEAD to master, which is itself a release.
+if g -c advice.detachedHead=false checkout --quiet --detach "$latest" 2>/dev/null; then
+  emit "updated" "Updated to $latest. Restart the shell to load it: omarchy-restart-shell" "$behind" "" "$latest"
 else
-  emit "error" "The update could not be applied cleanly. Run git pull in $REPO_DIR to see why." "$behind"
+  emit "error" "The update to $latest could not be applied. Run git status in $REPO_DIR to see why." "$behind" "" "$latest"
 fi

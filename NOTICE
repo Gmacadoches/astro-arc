@@ -18,32 +18,31 @@ with this program. If not, see <https://www.gnu.org/licenses/>.
 THIRD PARTY NOTICES
 -------------------------------------------------------------------------------
 
-Swiss Ephemeris
-https://www.astro.com/swisseph/
-https://github.com/aloistr/swisseph
+Astronomy Engine
+https://github.com/cosinekitty/astronomy
 
-Astro-Arc computes every chart with the Swiss Ephemeris, reached through the
-pyswisseph bindings (https://astrorigin.com/pyswisseph).
+Astro-Arc computes every chart with Astronomy Engine, vendored unmodified at
+backend/vendor/astronomy/astronomy.py (release v2.1.19). It is distributed under
+the MIT License, reproduced in full at backend/vendor/astronomy/LICENSE:
 
-Swiss Ephemeris is dual licensed: under the GNU Affero General Public License,
-or under the Swiss Ephemeris Professional License available from Astrodienst.
-Astro-Arc is distributed under the AGPL, which is why this project as a whole is
-AGPL licensed rather than permissively licensed.
+  MIT License
 
-Copyright notice, reproduced as the Swiss Ephemeris license requires:
+  Copyright (c) 2019-2023 Don Cross <cosinekitty@gmail.com>
 
-  Authors of the Swiss Ephemeris: Dieter Koch and Alois Treindl
-  Copyright holder: Astrodienst AG, Dammstr. 27, 8702 Zollikon, Switzerland
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
 
-  The authors of Swiss Ephemeris have no control or influence over any of the
-  derived works, i.e. over software or services created by other programmers
-  which use Swiss Ephemeris functions.
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
 
-  The names of the authors or of the copyright holder (Astrodienst) must not be
-  used for promoting any software, product or service which uses or contains
-  the Swiss Ephemeris. This copyright notice is the ONLY place where the names
-  of the authors can legally appear, except in cases where they have given
-  special permission in writing.
-
-Astro-Arc uses the bundled Moshier ephemeris, so no Swiss Ephemeris data files
-are distributed with this project.
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.

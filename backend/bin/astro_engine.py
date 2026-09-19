@@ -2,12 +2,12 @@
 """Astro-Arc's astrology engine: natal chart + current transits, and the
 derived "current arc" for whatever frequency the user has configured.
 
-Phase 2 of the project plan — CLI-only, no image generation yet. Run
-directly to inspect the symbolic brief this cycle would hand to the image
-step in Phase 3:
+Run directly to inspect the chart and arc a generation would work from:
 
-    ~/.local/share/omarchy/astro-arc/venv/bin/python3 astro_engine.py
-    (the venv is generated and lives outside the plugin; the code does not)
+    python3 backend/bin/astro_engine.py
+
+Standard library only. The astronomy is ephemeris.py, on the vendored
+Astronomy Engine; nothing here needs a package installed.
 
 Reads birth data + location + frequency from
 ~/.local/state/omarchy/settings/astro-arc.json (the same file the widget's
@@ -20,12 +20,10 @@ import math
 import os
 import sys
 from pathlib import Path
-from zoneinfo import ZoneInfo
-
-import swisseph as swe
-from timezonefinder import TimezoneFinder
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import ephemeris  # noqa: E402  — Astronomy Engine; see that file for why and how accurate
 from period_key import period_key  # noqa: E402  — see that file: one definition, called from everywhere
 
 # Overridable via ASTRO_ARC_CONFIG for testing against a scratch file
@@ -52,20 +50,10 @@ SIGNS = [
     ("Pisces", "water", "mutable"),
 ]
 
-# Body id -> (name, swisseph constant). Classical + modern planets only for
-# v1 — nodes/Chiron/asteroids can be added once the symbolic model needs them.
-BODIES = [
-    ("sun", swe.SUN),
-    ("moon", swe.MOON),
-    ("mercury", swe.MERCURY),
-    ("venus", swe.VENUS),
-    ("mars", swe.MARS),
-    ("jupiter", swe.JUPITER),
-    ("saturn", swe.SATURN),
-    ("uranus", swe.URANUS),
-    ("neptune", swe.NEPTUNE),
-    ("pluto", swe.PLUTO),
-]
+# Classical + modern planets only — nodes/Chiron/asteroids can be added once
+# the symbolic model needs them. (name, None) pairs, kept in this shape because
+# callers iterate `for n, _ in BODIES`; ephemeris.BODIES maps the names.
+BODIES = [(name, None) for name in ephemeris.BODIES]
 OUTER_BODIES = {"mars", "jupiter", "saturn", "uranus", "neptune", "pluto"}
 
 # aspect name -> (angle, max orb)
@@ -129,34 +117,26 @@ def moon_phase_name(sun_lon, moon_lon):
     return best[1], round(angle, 2)
 
 
-def julian_day_ut(dt_utc):
-    return swe.julday(dt_utc.year, dt_utc.month, dt_utc.day,
-                       dt_utc.hour + dt_utc.minute / 60 + dt_utc.second / 3600)
-
-
-def compute_bodies(jd_ut):
-    """Ecliptic longitude + retrograde flag for every tracked body at jd_ut."""
+def compute_bodies(dt_utc):
+    """Ecliptic longitude + retrograde flag for every tracked body at dt_utc."""
     out = {}
-    for name, body_id in BODIES:
-        (lon, _lat, _dist, _speed_lon, _speed_lat, _speed_dist), _flags = swe.calc_ut(
-            jd_ut, body_id, swe.FLG_SPEED
-        )
+    for name, (lon, retrograde) in ephemeris.positions(dt_utc).items():
         entry = sign_for(lon)
         entry["longitude"] = round(lon, 4)
-        entry["retrograde"] = _speed_lon < 0
+        entry["retrograde"] = retrograde
         out[name] = entry
     return out
 
 
-def compute_houses(jd_ut, lat, lon):
-    try:
-        cusps, ascmc = swe.houses(jd_ut, lat, lon, b"P")  # Placidus
-    except swe.Error:
-        return None  # e.g. undefined at extreme polar latitudes
-    ascendant = sign_for(ascmc[0])
-    ascendant["longitude"] = round(ascmc[0], 4)
-    midheaven = sign_for(ascmc[1])
-    midheaven["longitude"] = round(ascmc[1], 4)
+def compute_houses(dt_utc, lat, lon):
+    result = ephemeris.placidus(dt_utc, lat, lon)
+    if result is None:
+        return None  # undefined at polar latitudes
+    cusps, asc, mc = result
+    ascendant = sign_for(asc)
+    ascendant["longitude"] = round(asc, 4)
+    midheaven = sign_for(mc)
+    midheaven["longitude"] = round(mc, 4)
     return {
         "ascendant": ascendant,
         "midheaven": midheaven,
@@ -374,7 +354,7 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
 
     Local is the right choice rather than UTC because this generates a desktop
     background: "today" means the user's day. Note it is the *system* local zone,
-    not the birth-location zone TimezoneFinder derives in main() — someone born
+    not the birth-location zone stored with the location — someone born
     in Tokyo and living in Denver gets Denver days.
 
     Positions are still computed from `now_utc`; only the key is civil-local.
@@ -451,8 +431,6 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
 
 
 def main():
-    swe.set_ephe_path(None)  # bundled Moshier ephemeris — plenty accurate for this use
-
     try:
         config = load_config()
     except AstroError as exc:
@@ -465,9 +443,20 @@ def main():
     birth_date = config["birthDate"]
     birth_time = "12:00" if birth_time_unknown else config.get("birthTime") or "12:00"
 
-    tf = TimezoneFinder()
-    tz_name = tf.timezone_at(lat=lat, lng=lon) or "UTC"
-    tz = ZoneInfo(tz_name)
+    # The birth place's zone, stored with the location. The location picker
+    # takes it from the geocoder, and astro-arc-generate fills it in once for a
+    # config saved before this field existed. It used to be derived here from
+    # the coordinates by the timezonefinder package, which carried a 63 MB
+    # polygon database to answer a question the geocoder had already answered.
+    #
+    # No silent UTC fallback: a wrong zone moves the birth time by hours, which
+    # moves the Moon by degrees and the Ascendant by whole signs. Refuse instead.
+    tz_name = config.get("timezone") or ""
+    try:
+        tz = ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        print(json.dumps({"error": "The birth place has no timezone yet — pick the location again in the Astro-Arc widget."}))
+        sys.exit(1)
 
     birth_naive = datetime.datetime.strptime(f"{birth_date} {birth_time}", "%Y-%m-%d %H:%M")
     birth_local = birth_naive.replace(tzinfo=tz)
@@ -478,9 +467,8 @@ def main():
     # see derive_arc()'s docstring for why that is not the same as now_utc.
     now_local = now_utc.astimezone()
 
-    natal_jd = julian_day_ut(birth_utc)
-    natal_planets = compute_bodies(natal_jd)
-    natal_houses = None if birth_time_unknown else compute_houses(natal_jd, lat, lon)
+    natal_planets = compute_bodies(birth_utc)
+    natal_houses = None if birth_time_unknown else compute_houses(birth_utc, lat, lon)
     element_count, modality_count, dominant_element, dominant_modality = element_modality_balance(natal_planets)
 
     natal = {
@@ -492,8 +480,7 @@ def main():
         "dominantModality": dominant_modality,
     }
 
-    transit_jd = julian_day_ut(now_utc)
-    transits_now = {"planets": compute_bodies(transit_jd)}
+    transits_now = {"planets": compute_bodies(now_utc)}
 
     frequency = config.get("frequency", "daily")
     arc = derive_arc(frequency, now_utc, natal, transits_now, now_local)

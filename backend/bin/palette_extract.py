@@ -12,10 +12,12 @@ Usage: palette_extract.py <image_path> <colors_toml_output_path>
 """
 
 import colorsys
+import re
 import sys
 from pathlib import Path
 
-from PIL import Image
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from image_fit import ImageError, run_magick  # noqa: E402
 
 # GNOME/Nautilus (the file manager) doesn't read colors.toml at all — Omarchy's
 # omarchy-theme-set-gnome reads a sibling icons.theme file naming one of these
@@ -180,16 +182,25 @@ def _ensure_contrast(rgb, reference_rgb, min_ratio):
 
 
 def dominant_colors(image_path, count=5):
-    img = Image.open(image_path).convert("RGB")
-    img = img.resize((150, 150))  # quantize on a small copy — plenty for a palette, fast
-    quantized = img.quantize(colors=count, method=Image.MEDIANCUT)
-    palette = quantized.getpalette()[: count * 3]
-    counts = sorted(quantized.getcolors(), reverse=True)  # [(pixelCount, paletteIndex), ...]
-    colors = []
-    for _n, idx in counts:
-        r, g, b = palette[idx * 3: idx * 3 + 3]
-        colors.append((r, g, b))
-    return colors
+    """The image's `count` dominant colors, most common first, as (r, g, b).
+
+    Quantized on a 150x150 copy (the `!` ignores aspect, as this always has —
+    it only needs a palette, and small is fast), then read back from
+    ImageMagick's histogram, one line per color:
+        "  24410: (52,51,49) #343331 srgb(52,51,49)"
+    `-colors` is ImageMagick's own quantizer rather than the median cut Pillow
+    used, so the picked colors can differ slightly from older generations'."""
+    out = run_magick([image_path, "-resize", "150x150!", "+dither", "-colors", str(count),
+                      "-format", "%c", "histogram:info:-"])
+    counted = []
+    for line in out.splitlines():
+        match = re.match(r"\s*(\d+):\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)", line)
+        if match:
+            n, r, g, b = match.groups()
+            counted.append((int(n), tuple(max(0, min(255, round(float(c)))) for c in (r, g, b))))
+    if not counted:
+        raise ImageError(f"ImageMagick returned no colors for {image_path}")
+    return [rgb for _n, rgb in sorted(counted, key=lambda item: -item[0])]
 
 
 def build_colors_toml(image_path):
@@ -265,7 +276,11 @@ def main():
         print("Usage: palette_extract.py <image_path> <colors_toml_output_path>", file=sys.stderr)
         sys.exit(1)
     image_path, output_path = sys.argv[1], sys.argv[2]
-    toml_text, accent = build_colors_toml(image_path)
+    try:
+        toml_text, accent = build_colors_toml(image_path)
+    except ImageError as exc:
+        print(f"palette_extract: {exc}", file=sys.stderr)
+        sys.exit(1)
     output_path = Path(output_path)
     output_path.write_text(toml_text)
     print(f"Wrote {output_path}", file=sys.stderr)
