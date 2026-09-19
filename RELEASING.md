@@ -8,12 +8,11 @@ Users only ever run releases. Everything below exists to make that true.
 - **`master` only moves by a release.** Each release is one merge commit from
   `development`, tagged `vX.Y.Z`. Nothing is ever committed to `master`
   directly, not even a one-line fix.
-- **So `master` is always exactly a release.** That matters because users
-  update two ways, and both land on one:
-  - the panel's **Check for updates** moves the plugin to the newest `v` tag,
-    never to a branch;
-  - Omarchy's `omarchy plugin update` fast-forwards to `master`, which is the
-    newest tag.
+- **So `master` is always exactly a release.** That matters because
+  `omarchy plugin update` — the only way the plugin is updated — fast-forwards
+  to `master`, which is the newest tag. The plugin ships no updater of its own:
+  code that fetches and checks out whatever the remote offers next is code that
+  decides what runs here, and that decision stays with Omarchy.
 
 A new install (`omarchy plugin add`, a full clone of `master`) therefore starts
 on a release too.
@@ -76,17 +75,10 @@ release is one command, so the fast path and the correct path are the same one.
 ## Your own development copy
 
 Your installed plugin is probably a symlink to your working tree
-(`ln -s ~/Projects/astro-arc ~/.config/omarchy/plugins/astro-arc`). Make its
-**Check for updates** follow your branch instead of releases:
-
-```sh
-git -C ~/Projects/astro-arc config astro-arc.updateChannel branch
-git -C ~/Projects/astro-arc config --unset astro-arc.updateChannel   # back to releases
-```
-
-It is local git configuration, never committed, so users cannot inherit it. In
-that mode the version row reads like `v1.0.1 +3 (a3f9c21)`: three commits past
-the release, at `a3f9c21`. A user always sees just `v1.0.1 (a3f9c21)`.
+(`ln -s ~/Projects/astro-arc ~/.config/omarchy/plugins/astro-arc`), so it is
+already on your branch and nothing needs to fetch anything. The version row
+reads like `v1.0.1 +3 (a3f9c21)`: three commits past the release, at `a3f9c21`.
+A user, sitting on a release, always sees just `v1.0.1 (a3f9c21)`.
 
 Because that symlink makes your working tree the live plugin, the shell can
 hot-reload an edited `Panel.qml`, and anything it runs on load runs for real in

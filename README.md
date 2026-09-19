@@ -96,8 +96,9 @@ the scheduler. A locked screen still counts; being switched off, asleep or
 logged out does not, and anything that came due during that runs within a few
 minutes of your being back rather than being skipped.
 
-**Update:** *Check for updates* under the panel's Settings, or
-`omarchy plugin update garrett.astro-arc`.
+**Update:** `omarchy plugin update garrett.astro-arc`. The plugin never
+updates itself — the panel shows which release you are on and leaves the
+updating to Omarchy.
 **Remove:** `omarchy plugin remove garrett.astro-arc`. Your archive stays —
 see below.
 

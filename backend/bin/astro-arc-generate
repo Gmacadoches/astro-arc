@@ -177,7 +177,10 @@ image_cost_file="$STATE_DIR/image-cost-$period_key.json"
 # the location picker geocodes with — and store it, so this never runs again.
 # Failure is not fatal here: the engine refuses clearly on a missing zone.
 if [[ -z $(cfg '.timezone // ""') && -n $(cfg '.latitude // ""') && -n $(cfg '.longitude // ""') ]]; then
-  lookup_tz=$(curl -fsS --max-time 10 \
+  # --max-filesize for the same reason the Python calls read through a cap:
+  # a reply is a few hundred bytes of JSON, and anything larger is not an
+  # answer worth buffering. curl aborts rather than filling memory.
+  lookup_tz=$(curl -fsS --max-time 10 --max-filesize 1048576 \
     "https://api.open-meteo.com/v1/forecast?latitude=$(cfg '.latitude')&longitude=$(cfg '.longitude')&timezone=auto&forecast_days=1" \
     2>/dev/null | jq -r '.timezone // empty' 2>/dev/null || true)
   if [[ -n $lookup_tz ]] && "$BIN_DIR/astro-arc-config" --set-timezone "$lookup_tz" >/dev/null; then
