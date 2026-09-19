@@ -11,9 +11,11 @@
 # That is the same shape every other Omarchy plugin uses, and it means nothing
 # here is symlinked or copied into place: manifest.json sits where the plugin
 # registry looks for it, and the backend runs from backend/bin beside it. So
-# `git pull` is the entire update story, and an edit to a pipeline TOML takes
-# effect on the next generation — in a git working tree, where a later pull
-# shows you a conflict instead of silently overwriting your tuning.
+# `git pull` updates the code, re-running this script brings the venv up to
+# backend/requirements.lock if a pull changed it (it is a no-op otherwise), and
+# an edit to a pipeline TOML takes effect on the next generation — in a git
+# working tree, where a later pull shows you a conflict instead of silently
+# overwriting your tuning.
 #
 # Until 2026-09-13 this script symlinked plugin/ and backend/ from a checkout
 # somewhere else (~/Projects/astro-arc by convention). That worked, but it made
@@ -123,22 +125,49 @@ done
 # ---- 2. the Python venv ---------------------------------------------------
 # Outside the repo deliberately: it is generated, it is large, and it must
 # never show up in a git status.
+#
+# Every package comes from the two lock files in backend/, at exact versions,
+# checked against committed sha256 hashes — nothing is resolved at install
+# time, and pip itself is never upgraded (the venv's own bundled pip is used).
+# See the header of backend/requirements.lock for why one package is built from
+# source rather than installed as a wheel.
+#
+# The venv is stamped with the hash of both lock files. An install whose stamp
+# does not match — including every venv made before the lock existed, which
+# pulled whatever versions were current that day — is synced to the lock
+# rather than skipped.
+BUILD_LOCK="$REPO_DIR/backend/requirements-build.lock"
+RUN_LOCK="$REPO_DIR/backend/requirements.lock"
+LOCK_STAMP="$VENV_DIR/.astro-arc-lock"
+lock_hash=$(cat "$BUILD_LOCK" "$RUN_LOCK" | sha256sum | cut -d' ' -f1)
+
+install_locked() {
+  local pip=("$VENV_DIR/bin/python3" -m pip install --quiet --disable-pip-version-check --require-hashes)
+  "${pip[@]}" --only-binary=:all: -r "$BUILD_LOCK" \
+    && "${pip[@]}" --only-binary=:all: --no-binary=pyswisseph --no-build-isolation -r "$RUN_LOCK"
+}
 
 if [[ $MAKE_VENV == 0 ]]; then
   echo "SKIPPED venv (--no-venv)"
-elif [[ -x "$VENV_DIR/bin/python3" ]]; then
-  echo "OK      venv already exists at $VENV_DIR"
+elif [[ -x "$VENV_DIR/bin/python3" && -f $LOCK_STAMP && $(<"$LOCK_STAMP") == "$lock_hash" ]]; then
+  echo "OK      venv matches the lock at $VENV_DIR"
 else
-  echo "CREATE  $VENV_DIR"
-  if python3 -m venv "$VENV_DIR" \
-     && "$VENV_DIR/bin/pip" install --quiet --upgrade pip \
-     && "$VENV_DIR/bin/pip" install --quiet pyswisseph timezonefinder pillow; then
-    echo "OK      venv ready (pyswisseph, timezonefinder, pillow)"
+  if [[ -x "$VENV_DIR/bin/python3" ]]; then
+    echo "SYNC    $VENV_DIR to backend/requirements.lock"
   else
+    echo "CREATE  $VENV_DIR"
+  fi
+  if { [[ -x "$VENV_DIR/bin/python3" ]] || python3 -m venv "$VENV_DIR"; } && install_locked; then
+    echo "$lock_hash" >"$LOCK_STAMP"
+    echo "OK      venv ready (pyswisseph, timezonefinder, pillow — locked, hash-checked)"
+  else
+    rm -f "$LOCK_STAMP"
     echo "FAILED  could not build the venv. Astro-Arc cannot generate without it." >&2
-    echo "        Try it by hand to see the error:" >&2
-    echo "          python3 -m venv \"$VENV_DIR\"" >&2
-    echo "          \"$VENV_DIR/bin/pip\" install pyswisseph timezonefinder pillow" >&2
+    echo "        pyswisseph compiles from source, so it needs a C compiler:" >&2
+    echo "          sudo pacman -S --needed base-devel" >&2
+    echo "        then re-run this script. To see pip's own error:" >&2
+    echo "          \"$VENV_DIR/bin/python3\" -m pip install --require-hashes --only-binary=:all: \\" >&2
+    echo "            --no-binary=pyswisseph --no-build-isolation -r \"$RUN_LOCK\"" >&2
   fi
 fi
 
