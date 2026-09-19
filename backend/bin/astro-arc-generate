@@ -1,35 +1,27 @@
 #!/bin/bash
 
 # Orchestrates one full Astro-Arc generation cycle:
-#   astro_engine.py -> llm_pipeline.py (Stage 1 interpret, Stage 2 image
-#     prompt) -> openai_image_gen.py -> theming (aether, or
-#     palette_extract.py as its default/fallback) -> Omarchy theme ->
-#     omarchy-theme-set -> build_review.py (logs it + snapshots the theme
-#     dir for astro-arc-save-theme) -> astro-arc-prune-history (deletes
-#     entries past config.historyRetentionDays, default 30)
+#   astro_engine.py (chart) -> llm_pipeline.py (Stage 1 reading, Stage 1.5
+#   objects, Stage 2 image prompt) -> openai_image_gen.py (render) ->
+#   palette_extract.py or aether (theme) -> build_review.py (the archive
+#   entry and gallery) -> the wallpaper, and optionally the theme, goes live
+#   -> astro-arc-prune-history (retention)
 #
-# llm_pipeline.py replaced the old lookup-table symbol_map.py: both its
-# stages are themselves OpenAI chat calls, so an API key is required now
-# regardless of which backend below actually renders the image — the
-# local/free choice only applies to the image render, not the prompt.
-#
-# Backend is whichever the widget's settings picked (config.imageBackend):
-# "local" (free, the pinned sd-turbo checkpoint) or "openai" (the widget's
-# model/quality picker) — either way needs a key stored via astro-arc-apikey.
+# Needs nothing installed: the system's python3 (standard library only), plus
+# ImageMagick, jq and curl, all in Omarchy's base install. Every stage is an
+# OpenAI call, so it needs an API key stored via astro-arc-apikey.
 #
 # Theme generator is config.themeGenerator: "built-in" (palette_extract.py,
-# default, no external dependency) or "aether" (Omarchy's own theme
-# generator, richer output, falls back to built-in automatically on any
-# failure — see the theming block below for exactly what that excludes/why).
+# default) or "aether" (Omarchy's own theme generator, richer output, falls
+# back to built-in automatically on any failure — see the theming block below
+# for exactly what that excludes/why).
 #
 # --if-due: skip the whole run (exit 0) if the current period already has a
-# generation — used by the systemd user timer (astro-arc-generate.timer)
-# and the bar widget's own polling Timer (Panel.qml's checkAutoGenerate),
-# so either scheduler can fire on a plain interval without needing its own
-# copy of the "is this actually due" logic, and without risking a wasted
-# paid image render on a period that's already generated. Plain manual runs
-# (the widget's Regenerate button) never pass this — a manual click always
-# means "regenerate right now", period match or not.
+# generation. The panel's own 5-minute poll (Panel.qml's checkAutoGenerate)
+# passes it, so it can fire on a plain interval without its own copy of the
+# "is this actually due" logic, and without risking a wasted paid render on a
+# period that's already generated. A manual Regenerate never passes it — a
+# click always means "regenerate right now", period match or not.
 if_due=0
 if [[ "${1:-}" == "--if-due" ]]; then
   if_due=1
@@ -39,9 +31,10 @@ fi
 set -euo pipefail
 
 BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_PY="$HOME/.local/share/omarchy/astro-arc/venv/bin/python3"
-CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
-STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"   # STATE_DIR, CONFIG_FILE, the archive
+# The system's own Python. Every script it runs uses the standard library only.
+PY=python3
 HISTORY_DIR="$STATE_DIR/history"
 LAST_RUN_FILE="$STATE_DIR/last-run.json"
 THEME_DIR="$HOME/.config/omarchy/themes/astro-arc"
@@ -52,17 +45,21 @@ LOCK_FILE="$STATE_DIR/generate.lock"
 
 mkdir -p "$STATE_DIR" "$HISTORY_DIR" "$THEME_DIR/backgrounds" "$PIPELINE_STATE_DIR"
 
-# Two independent schedulers (the systemd timer and the widget's own poll)
-# plus a possible manual click all shell out to this same script — this
-# non-blocking lock is what keeps two of them from ever rendering (and
-# paying for) two images at once. Whichever loses just skips this run
-# entirely rather than queuing: it'll get the next tick a few minutes
-# later, and by then the winner will have already made it not-due anyway.
+# The panel's poll and a manual click can both start this script — this
+# non-blocking lock is what keeps two of them from ever rendering (and paying
+# for) two images at once. Whichever loses just skips this run entirely rather
+# than queuing: the next poll comes a few minutes later, and by then the winner
+# will have made it not-due anyway.
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
   echo "Astro-Arc: another generation is already running — skipping" >&2
   exit 0
 fi
+
+# Bring an install made with the old install.sh onto the current layout (timer
+# and URL handler removed, archive moved to ~/.local/share/astro-arc). A no-op
+# once done; never allowed to stop a generation.
+"$BIN_DIR/astro-arc-migrate" || true
 
 # One read, through astro-arc-config, so the defaults live in exactly one place.
 # Reading $CONFIG_FILE directly meant every value here carried a second copy of
@@ -89,8 +86,7 @@ background_size=$(cfg '.backgroundSize // "auto"')
 
 # Delegates to period_key.py, which is the single definition of what a period
 # key is — see that file's header for why it stopped being four hand-synced
-# copies. It imports nothing but datetime, so plain system python3 runs it
-# without this project's venv.
+# copies. It imports nothing but datetime.
 period_key_for() {
   local freq="$1" when="${2:-}"
   if [[ -n $when ]]; then
@@ -113,7 +109,7 @@ period_key=$(period_key_for "$frequency")
   exit 1
 }
 
-# Scheduled invocations (--if-due, i.e. the systemd timer and the widget's poll)
+# Scheduled invocations (--if-due, i.e. the panel's poll)
 # do nothing at all on "manual". A deliberate Regenerate click does not pass
 # --if-due, so the button keeps working — which is the entire point of the
 # setting: no surprise spending, generate when you ask.
@@ -152,12 +148,18 @@ if [[ $image_backend != openai ]]; then
 fi
 
 # Checked here rather than earlier so the --if-due no-ops above (nothing due,
-# or auto-generation off) stay quiet on an install that has not been set up.
-if [[ ! -x $VENV_PY ]]; then
-  echo "astro-arc-generate: no Python venv at $VENV_PY" >&2
-  echo "  Create it by running the installer, which builds it from the hash-checked" >&2
-  echo "  lock in backend/requirements.lock:" >&2
-  echo "    \"$BIN_DIR/../../install.sh\"" >&2
+# or auto-generation off) stay quiet. All are in Omarchy's base install; this
+# only fires on a system that removed one.
+missing=()
+command -v python3 >/dev/null 2>&1 || missing+=(python)
+command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1 || missing+=(imagemagick)
+command -v curl >/dev/null 2>&1 || missing+=(curl)
+if (( ${#missing[@]} )); then
+  echo "astro-arc-generate: missing ${missing[*]}. Install with: sudo pacman -S ${missing[*]}" >&2
+  exit 1
+fi
+if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then
+  echo "astro-arc-generate: needs Python 3.11 or newer (for tomllib)" >&2
   exit 1
 fi
 
@@ -193,7 +195,7 @@ fi
 # data yet produced exit 1, an empty terminal, a reading file containing the
 # error object, and (because the widget shows stderr) a Regenerate button that
 # looked like it did nothing. Capture, surface, and do not write a broken file.
-if ! reading_json=$("$VENV_PY" "$BIN_DIR/astro_engine.py" 2>&1); then
+if ! reading_json=$("$PY" "$BIN_DIR/astro_engine.py" 2>&1); then
   engine_error=$(jq -r '.error // empty' <<<"$reading_json" 2>/dev/null || true)
   echo "astro-arc-generate: ${engine_error:-the chart engine failed}" >&2
   [[ -n $engine_error ]] || echo "$reading_json" >&2
@@ -234,7 +236,7 @@ if [[ -n $engine_period_key && -n $expected_engine_key && $engine_period_key != 
   echo "Astro-Arc: period key drift — the engine says $engine_period_key, expected $expected_engine_key (clock crossed a period boundary mid-run). Cache and filenames will disagree for this run." >&2
 fi
 
-prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
+prompt=$("$PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
 
 # Quality is whatever the config says, for every image. There used to be a bump
 # to "high" whenever Stage 2 put a person in frame, on evidence from a
@@ -250,7 +252,7 @@ prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_f
 # `imageQualityUsed` survives in the metadata below, identical to `imageQuality`
 # now, because build_review.py reads it and every archived run carries it.
 
-"$VENV_PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
+"$PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
   --model "$openai_model" --quality "$openai_quality" \
   --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
 
@@ -315,32 +317,7 @@ if [[ $theme_generator == aether ]]; then
 fi
 
 if [[ $used_aether == 0 ]]; then
-  "$VENV_PY" "$BIN_DIR/palette_extract.py" "$bg_file" "$THEME_DIR/colors.toml"
-fi
-
-# backgroundOnly (default true): change the wallpaper and leave the user's own
-# theme — its colors and every app it themes — exactly as it was. The palette
-# above is still derived, because the review page's theme snapshot and Save
-# Selected Theme are built from it; it is just not applied.
-#
-# NOT `.backgroundOnly // true`: jq's // treats false as missing, so that would
-# turn an explicit "off" back into "on". Only a literal false turns it off.
-#
-# The wallpaper is copied to its own per-run filename rather than pointed at
-# history/<period>.png, for two reasons: history files are pruned on the
-# retention window and overwritten by a same-period rerun, and the shell's
-# background can miss a change of content at an unchanged path.
-background_only=$(cfg 'if .backgroundOnly == false then "false" else "true" end')
-if [[ $background_only == true ]]; then
-  wallpaper_dir="$STATE_DIR/wallpaper"
-  mkdir -p "$wallpaper_dir"
-  wallpaper="$wallpaper_dir/astro-arc-$(date +%Y%m%d-%H%M%S).png"
-  cp -f "$bg_file" "$wallpaper"
-  find "$wallpaper_dir" -maxdepth 1 -name 'astro-arc-*.png' ! -path "$wallpaper" -delete
-  omarchy-theme-bg-set "$wallpaper" >/dev/null 2>&1 \
-    || echo "Astro-Arc: warning — could not set the background" >&2
-else
-  omarchy-theme-set astro-arc >/dev/null 2>&1
+  "$PY" "$BIN_DIR/palette_extract.py" "$bg_file" "$THEME_DIR/colors.toml"
 fi
 
 # Cost log: real token-based cost for the two chat calls (from
@@ -394,9 +371,9 @@ jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg freq
 # not just manual style-comparison batches, so reverting to an earlier
 # reading/prompt/register later on means finding it in this list rather
 # than trying to remember it. Also snapshots the live theme dir (--theme-dir)
-# so astro-arc-save-theme has a complete standalone theme to export later,
-# and records --period-key so pruning can find the matching history/*.png.
-# build_review.py prints the review's index.html path on success —
+# so astro-arc-save-theme has a complete standalone theme to export later.
+# It files everything in the archive (~/.local/share/astro-arc) and rewrites
+# the gallery. build_review.py prints the page's index.html path on success —
 # captured (not discarded) so the notification below can open it.
 # Title format: date, time, style — "Sep 13, 10:03 AM · Antique Engraving".
 # Cadence and image backend used to lead and trail this ("Daily · … (openai)")
@@ -406,14 +383,37 @@ jq -n --arg periodKey "$period_key" --arg generatedAt "$generated_at" --arg freq
 review_style_label=$(jq -r '.artStyleLabel // .artStyle // empty' "$pipeline_meta_file" 2>/dev/null || true)
 review_label="$(date '+%b %-d, %-I:%M %p')${review_style_label:+ · $review_style_label}"
 review_path=""
-if review_path=$("$VENV_PY" "$BIN_DIR/build_review.py" \
+if review_path=$("$PY" "$BIN_DIR/build_review.py" \
   --reading "$reading_file" --meta "$pipeline_meta_file" --image "$bg_file" \
   --label "$review_label" --cost-json "$cost_entry" \
   --theme-dir "$THEME_DIR" --period-key "$period_key"); then
   :
 else
-  echo "Astro-Arc: warning — could not log this iteration to the review history" >&2
+  echo "Astro-Arc: warning — could not add this generation to the archive" >&2
   review_path=""
+fi
+
+# Now the desktop. After the archive entry, so the wallpaper can be the
+# archived file itself: a stable path per generation that the retention prune
+# never deletes while it is the newest (see astro-arc-prune-history).
+#
+# backgroundOnly (default true): change the wallpaper and leave the user's own
+# theme — its colors and every app it themes — exactly as it was. The palette
+# above is still derived, because the archive's theme snapshot and Save
+# Selected Theme are built from it; it is just not applied.
+#
+# NOT `.backgroundOnly // true`: jq's // treats false as missing, so that would
+# turn an explicit "off" back into "on". Only a literal false turns it off.
+background_only=$(cfg 'if .backgroundOnly == false then "false" else "true" end')
+if [[ $background_only == true ]]; then
+  wallpaper="$bg_file"
+  if [[ -n $review_path && -f "$(dirname "$review_path")/theme/backgrounds/background.png" ]]; then
+    wallpaper="$(dirname "$review_path")/theme/backgrounds/background.png"
+  fi
+  omarchy-theme-bg-set "$wallpaper" >/dev/null 2>&1 \
+    || echo "Astro-Arc: warning — could not set the background" >&2
+else
+  omarchy-theme-set astro-arc >/dev/null 2>&1
 fi
 
 # Prune "Themes Generated" entries (and their matching history/*.png) past

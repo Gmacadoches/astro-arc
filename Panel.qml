@@ -32,6 +32,11 @@ Panel {
     return u.replace(/\/+$/, "")
   }
   readonly property string binDir: pluginRoot + "/backend/bin"
+  // The archive: every generation's page, wallpaper and theme, plus the
+  // gallery. The user's data, so it lives in ~/.local/share rather than in
+  // state, and outlives the plugin. Must match backend/bin/astro-arc-paths.sh.
+  readonly property string archiveDir: (Quickshell.env("XDG_DATA_HOME") || (home + "/.local/share")) + "/astro-arc"
+  readonly property string galleryFile: archiveDir + "/index.html"
 
   readonly property string configBin: binDir + "/astro-arc-config"
   readonly property string generateBin: binDir + "/astro-arc-generate"
@@ -289,9 +294,9 @@ Panel {
   // Regenerate button always forces a run (ifDue: false), while the
   // widget's own auto-check (below) asks the script to first re-check
   // last-run.json itself and no-op if the period's already covered —
-  // closing the race where the systemd timer (see below) finished a
-  // generation for this period in the moment between this widget's own
-  // JS-side check and this process actually starting.
+  // closing the race where a manual Regenerate finished a generation for
+  // this period in the moment between this widget's own JS-side check and
+  // this process actually starting.
   function startGenerate(ifDue) {
     if (generating) return
     generating = true
@@ -305,16 +310,17 @@ Panel {
   }
 
   // ---- Automatic scheduling ---------------------------------------------
-  // Two independent, redundant triggers keep this from depending on any one
-  // thing staying alive: `systemd/astro-arc-generate.timer` (installed by
-  // install.sh) fires `astro-arc-generate --if-due` on its own schedule
-  // regardless of whether the bar/shell is even running, and — as long as
-  // the widget *is* loaded — this Panel also polls on its own Timer below,
-  // so a change made in the panel (e.g. switching frequency) is picked up
-  // without waiting on the system timer's own interval. Both funnel through
-  // the same `--if-due` flag and the script's own flock, so whichever one
-  // notices the new period first wins and the other one's next tick is
-  // just a no-op.
+  // This Timer IS the scheduler. The bar widget loads this panel eagerly (see
+  // BarWidget.qml's Loader), so it polls from the moment the shell starts,
+  // whether or not the panel is ever opened, and calls
+  // `astro-arc-generate --if-due`, which does nothing unless the period is due
+  // and holds a lock so a manual click can never double-render.
+  //
+  // There used to be a systemd timer too, installed by install.sh as a
+  // "backstop". On Omarchy the shell IS the desktop, so it only ever added
+  // coverage for a logged-in session with no shell — and it outlived the
+  // plugin, firing into a deleted script after removal. astro-arc-migrate
+  // removes it from installs that still have it.
   //
   // "New period" is a plain string comparison against Model.currentPeriodKey
   // (which mirrors astro-arc-generate's own `date +%Y-%m-%d`/`+%G-W%V`/
@@ -392,7 +398,8 @@ Panel {
   property bool showSettings: false
   readonly property string apiKeyBin: binDir + "/astro-arc-apikey"
   readonly property string openaiImageGenBin: binDir + "/openai_image_gen.py"
-  readonly property string venvPython: home + "/.local/share/omarchy/astro-arc/venv/bin/python3"
+  // The system's own Python: the backend uses the standard library only.
+  readonly property string python: "python3"
 
   function toggleSettings() {
     showSettings = !showSettings
@@ -586,7 +593,7 @@ Panel {
   function validateApiKey(slot) {
     root.activeKeySlot = slot
     root.setApiKeyField(slot, "validating", true)
-    apiKeyValidateProc.command = [root.venvPython, root.openaiImageGenBin, "--validate", slot]
+    apiKeyValidateProc.command = [root.python, root.openaiImageGenBin, "--validate", slot]
     apiKeyValidateProc.running = true
   }
 
@@ -766,6 +773,21 @@ Panel {
 
   Process { id: restartShellProc; command: ["omarchy-restart-shell"] }
 
+  // Once per shell start: brings an install made with the old install.sh onto
+  // the current layout — removes its systemd timer and astroarc:// handler,
+  // and moves the archive out of ~/.local/state. Silent, and a no-op once
+  // done. astro-arc-generate runs it too, for a generation started elsewhere.
+  Process {
+    id: migrateProc
+    command: [root.binDir + "/astro-arc-migrate"]
+    running: true
+    onExited: root.reviewsIndexFile.reload()
+  }
+
+  function openArchive() {
+    Quickshell.execDetached(["xdg-open", root.galleryFile])
+  }
+
   // ---- Version: read from git by astro-arc-version, so a release is a tag
   // and nothing in here is edited per release. Links to that release's GitHub
   // page. Refreshed each time the panel opens and after an update, since
@@ -812,7 +834,7 @@ Panel {
     if (root.modelCatalogLoading) return
     root.modelCatalogLoading = true
     root.modelCatalogError = ""
-    var cmd = [root.venvPython, root.modelCatalogBin, "--size", root.configState.backgroundSize || "1024x1024"]
+    var cmd = [root.python, root.modelCatalogBin, "--size", root.configState.backgroundSize || "1024x1024"]
     if (refresh) cmd.push("--refresh")
     modelCatalogProc.command = cmd
     modelCatalogProc.running = true
@@ -990,7 +1012,7 @@ Panel {
   property string newestReviewId: ""
 
   property FileView reviewsIndexFile: FileView {
-    path: root.home + "/.local/state/omarchy/astro-arc/reviews/index.json"
+    path: root.archiveDir + "/generations.json"
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
@@ -2210,13 +2232,12 @@ Panel {
             }
           }
 
-          // ---- What a schedule actually promises. Neither trigger outlives
-          // the login session: the systemd timer is a --user unit with no
-          // lingering, and the panel's own poll obviously needs the shell
-          // running. Locking the screen stops neither (a lock is not a
-          // logout), and Persistent=true on the timer means a boundary
-          // crossed while the machine was off or asleep fires shortly after
-          // it comes back rather than being skipped. Worth stating plainly:
+          // ---- What a schedule actually promises. The scheduler is the
+          // panel's own poll, so it needs the shell running: it does not
+          // outlive the login session. Locking the screen does not stop it (a
+          // lock is not a logout), and a boundary crossed while the machine
+          // was off or asleep is caught by the first poll after it comes back,
+          // within five minutes, rather than skipped. Worth stating plainly:
           // "every hour" reads as a promise the machine cannot keep while it
           // is switched off. ----------------------------------------------
           Text {
@@ -2420,6 +2441,25 @@ Panel {
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 onClicked: root.openSelectedReview()
+              }
+            }
+
+            // The whole history as one browsable page — the URL worth
+            // bookmarking. Plain files; opens in the default browser.
+            Item {
+              width: parent.width
+              height: archiveBtn.implicitHeight
+
+              Button {
+                id: archiveBtn
+                anchors.left: parent.left
+                anchors.leftMargin: root.labelColW + Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                text: "Browse all generations"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                onClicked: root.openArchive()
               }
             }
 

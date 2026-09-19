@@ -408,7 +408,8 @@
 <div class="marker"><span>00</span></div>
 <h3>Decide whether to run at all</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>astro-arc-generate --if-due</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>frequency</code></dd></div></dl>
-<p>Two independent triggers fire this, deliberately: a systemd user timer every 15 minutes, and the panel's own 5-minute poll. Both pass <code>--if-due</code>, both hit the same <code>flock</code>, so whichever notices a new period first wins and the other is a no-op. Neither can outlive your login session — see the Schedule caption in the panel.</p>
+<p>The panel is the scheduler. The bar widget loads it with the shell, so its 5-minute poll runs from login whether or not the panel is ever opened, and it passes <code>--if-due</code>; a manual Regenerate does not. Both take the same <code>flock</code>, so a click can never double-render a period the poll just started. Nothing runs while you are logged out — see the Schedule caption in the panel.</p>
+<p>There used to be a systemd timer as well. On Omarchy the shell is the desktop, so it only ever covered a session with no shell running, and it outlived the plugin: after removal it fired into a deleted script every fifteen minutes. <code>astro-arc-migrate</code> removes it from installs that still have it.</p>
 <p>"Already generated?" is decided by re-keying <code>last-run.json</code>'s <code>generatedAt</code> under the frequency set <strong>right now</strong>, never by comparing its stored <code>periodKey</code>. That key was filed under whatever frequency was set at the time, so comparing it directly made switching Daily → Monthly start a paid render as the immediate consequence of changing a dropdown.</p>
 <p>Period keys: <code>YYYY-MM-DDTHH</code> · <code>YYYY-MM-DD</code> · ISO <code>%G-W%V</code> · <code>YYYY-MM</code>.</p>
 </li>
@@ -416,7 +417,7 @@
 <div class="marker"><span>01</span></div>
 <h3>Compute the chart</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>astro_engine.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd>birth date, time, place</dd></div></dl>
-<p><a href="https://www.astro.com/swisseph/">Swiss Ephemeris</a> (bundled Moshier, no data files to install) gives natal placements, houses, and today's transits. It emits an <code>arc</code>: the moon sign and phase, the dominant transit, and a <strong>texture</strong> block — polarity, intensity, exposure, multiplicity — which is the raw material for step 3.</p>
+<p><a href="https://github.com/cosinekitty/astronomy">Astronomy Engine</a>, vendored as one file, gives natal placements and today's transits to about an arcminute; <code>ephemeris.py</code> adds Placidus houses on top of it. It replaced pyswisseph, which needed compiling on every install, after a year of daily outputs compared identical on all but a handful of threshold days. It emits an <code>arc</code>: the moon sign and phase, the dominant transit, and a <strong>texture</strong> block — polarity, intensity, exposure, multiplicity — which is the raw material for step 3.</p>
 <p>Hourly has no branch here on purpose: transits barely move in an hour, so an hourly schedule shares the daily arc and re-rolls only the picture.</p>
 </li>
 <li class="step llm">
@@ -479,15 +480,15 @@
 </li>
 <li class="step">
 <div class="marker"><span>10</span></div>
-<h3>Apply</h3>
-<dl class="meta"><div class=""><dt>Runs</dt><dd><code>omarchy-theme-bg-set</code>, or <code>omarchy-theme-set</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>backgroundOnly</code></dd></div></dl>
-<p>By default only the wallpaper changes, and whatever theme you already run keeps its colors. Turn <code>backgroundOnly</code> off and the palette from step 9 is applied as the <code>astro-arc</code> theme too. The palette is derived either way, so every review entry can still be saved or exported as a full theme.</p>
+<h3>Record</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>build_review.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>historyRetentionDays</code></dd></div></dl>
+<p>Files the generation in the archive, <code>~/.local/share/astro-arc/</code>: a page with the image, the reading and every dial value, the complete theme (so it can be saved or exported later), and a thumbnail. Then rewrites the gallery, <code>index.html</code>, which lists every generation newest first. The archive is the user's data, not state, so it lives where removing the plugin cannot touch it. <code>astro-arc-prune-history</code> then drops entries past the retention window, never the newest.</p>
 </li>
 <li class="step">
 <div class="marker"><span>11</span></div>
-<h3>Record</h3>
-<dl class="meta"><div class=""><dt>Runs</dt><dd><code>build_review.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>historyRetentionDays</code></dd></div></dl>
-<p>Writes the browsable entry — one self-contained HTML page per generation, with the image, the reading and every dial value — and snapshots the theme so it can be saved or exported later. Then <code>astro-arc-prune-history</code> deletes entries past the retention window.</p>
+<h3>Apply</h3>
+<dl class="meta"><div class=""><dt>Runs</dt><dd><code>omarchy-theme-bg-set</code>, or <code>omarchy-theme-set</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>backgroundOnly</code></dd></div></dl>
+<p>By default only the wallpaper changes, and whatever theme you already run keeps its colors. The wallpaper is the archived file itself, which is why this runs after step 10. Turn <code>backgroundOnly</code> off and the palette from step 9 is applied as the <code>astro-arc</code> theme too.</p>
 </li></ol>
 </section>
 <section class="section" id="tweak-it-without-touching-code">
@@ -506,13 +507,12 @@ sweep.py --out wording --registers botanical --no-image  <span class="c"># promp
 <p><code>sweep.py</code> pins the reading, the signature and the dial so the only thing varying is the thing under test, and it touches no production state — your history, caches, last run and live theme are left alone. Output lands in <code>state/verification/&lt;name&gt;/</code> with every prompt, cost and render.</p>
 <p>Use it. This project's own history records that 2–4-sample spot checks let the same content bug ship three times, and that the one comparison batch which would have caught it was never saved.</p>
 <h3>Test a fresh install without touching your own</h3>
-<p>Every path in this project derives from <code>$HOME</code>, so a throwaway one gives you a genuinely new install in seconds, with no container and nothing to clean up but a directory:</p>
+<p>There is no install step, and every path derives from <code>$HOME</code> (the archive from <code>$XDG_DATA_HOME</code>, defaulting under it), so a throwaway home is a genuinely new user in seconds:</p>
 <pre>FRESH=$(mktemp -d)
-git clone . $FRESH/.config/omarchy/plugins/astro-arc
-HOME=$FRESH $FRESH/.config/omarchy/plugins/astro-arc/install.sh
-HOME=$FRESH $FRESH/.config/omarchy/plugins/astro-arc/backend/bin/astro-arc-generate</pre>
-<p>That exercises the real installer, the real defaults a new user gets, and the real first-run paths — the venv, the birth data, the API key, all absent, which is exactly where fresh-install bugs live. It found five on 2026-09-13, the last of them only after the install itself was restructured.</p>
-<p>Two things it cannot cover, because they are not <code>$HOME</code>-scoped: the QML widget needs the running shell, and <code>secret-tool</code> talks to your real keyring, so a throwaway home still finds your real API key. Docker buys you only the OS-level dependency question (<code>jq</code>, <code>python3</code>, <code>secret-tool</code> present on a clean Arch) and costs an image build to ask it.</p>
+git clone . $FRESH/.config/omarchy/plugins/garrett.astro-arc
+HOME=$FRESH $FRESH/.config/omarchy/plugins/garrett.astro-arc/backend/bin/astro-arc-generate</pre>
+<p>That exercises the real defaults a new user gets and the real first-run paths — no birth data, no archive, no caches — which is where fresh-install bugs live.</p>
+<p>Two things it cannot cover, because they are not <code>$HOME</code>-scoped: the QML widget needs the running shell, and <code>secret-tool</code> talks to your real keyring, so a throwaway home still finds your real API key.</p>
 </section>
 <section class="section" id="what-the-complexity-pass-found-2026-09-13">
 <h2>What the complexity pass found (2026-09-13)</h2>

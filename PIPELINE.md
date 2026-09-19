@@ -25,11 +25,11 @@ code](#tweak-it-without-touching-code).
 ## The map
 
 ```
-  SCHEDULER  systemd timer + panel poll ──┐
+  SCHEDULER  the panel's 5-minute poll ───┐
                                           ▼
   0  DECIDE      astro-arc-generate --if-due      is this period already done?
                                           │
-  1  CHART       astro_engine.py                  swisseph → planets, houses, texture
+  1  CHART       astro_engine.py                  ephemeris → planets, houses, texture
                                           │
   ╭───────────────── llm_pipeline.py ──────────────────────────────────╮
   │ 2  READING     Stage 1      what the sky means for this person     │  cached / day
@@ -44,9 +44,9 @@ code](#tweak-it-without-touching-code).
                                           │
   9  PALETTE     palette_extract.py                PNG → colors.toml
                                           │
- 10  APPLY       omarchy-theme-bg-set              wallpaper goes live (+ palette if opted in)
+ 10  RECORD      build_review.py                   archive entry + gallery + cost log
                                           │
- 11  RECORD      build_review.py                   browsable entry + cost log
+ 11  APPLY       omarchy-theme-bg-set              wallpaper goes live (+ palette if opted in)
 ```
 
 Steps 2–7 are the interesting part and all live in one file. Steps 0, 1 and
@@ -64,11 +64,16 @@ marked.
 
 **Runs:** `astro-arc-generate --if-due` · **Cost:** free · **Cache:** — · **Knob:** `frequency`
 
-Two independent triggers fire this, deliberately: a systemd user timer every
-15 minutes, and the panel's own 5-minute poll. Both pass `--if-due`, both hit
-the same `flock`, so whichever notices a new period first wins and the other
-is a no-op. Neither can outlive your login session — see the Schedule caption
-in the panel.
+The panel is the scheduler. The bar widget loads it with the shell, so its
+5-minute poll runs from login whether or not the panel is ever opened, and it
+passes `--if-due`; a manual Regenerate does not. Both take the same `flock`, so
+a click can never double-render a period the poll just started. Nothing runs
+while you are logged out — see the Schedule caption in the panel.
+
+There used to be a systemd timer as well. On Omarchy the shell is the desktop,
+so it only ever covered a session with no shell running, and it outlived the
+plugin: after removal it fired into a deleted script every fifteen minutes.
+`astro-arc-migrate` removes it from installs that still have it.
 
 "Already generated?" is decided by re-keying `last-run.json`'s `generatedAt`
 under the frequency set **right now**, never by comparing its stored
@@ -82,9 +87,11 @@ Period keys: `YYYY-MM-DDTHH` · `YYYY-MM-DD` · ISO `%G-W%V` · `YYYY-MM`.
 
 **Runs:** `astro_engine.py` · **Cost:** free · **Cache:** — · **Knob:** birth date, time, place
 
-[Swiss Ephemeris](https://www.astro.com/swisseph/) (bundled Moshier, no data
-files to install) gives natal
-placements, houses, and today's transits. It emits an `arc`: the moon sign
+[Astronomy Engine](https://github.com/cosinekitty/astronomy), vendored as one
+file, gives natal placements and today's transits to about an arcminute;
+`ephemeris.py` adds Placidus houses on top of it. It replaced pyswisseph, which
+needed compiling on every install, after a year of daily outputs compared
+identical on all but a handful of threshold days. It emits an `arc`: the moon sign
 and phase, the dominant transit, and a **texture** block — polarity,
 intensity, exposure, multiplicity — which is the raw material for step 3.
 
@@ -207,23 +214,26 @@ Derives `colors.toml` from the rendered image, so the colors and the wallpaper
 always agree. Set `themeGenerator: "aether"` to hand this to Omarchy's own
 generator instead.
 
-## 10. Apply
+## 10. Record
+
+**Runs:** `build_review.py` · **Cost:** free · **Cache:** — · **Knob:** `historyRetentionDays`
+
+Files the generation in the archive, `~/.local/share/astro-arc/`: a page with
+the image, the reading and every dial value, the complete theme (so it can be
+saved or exported later), and a thumbnail. Then rewrites the gallery,
+`index.html`, which lists every generation newest first. The archive is the
+user's data, not state, so it lives where removing the plugin cannot touch it.
+`astro-arc-prune-history` then drops entries past the retention window, never
+the newest.
+
+## 11. Apply
 
 **Runs:** `omarchy-theme-bg-set`, or `omarchy-theme-set` · **Cost:** free · **Cache:** — · **Knob:** `backgroundOnly`
 
 By default only the wallpaper changes, and whatever theme you already run keeps
-its colors. Turn `backgroundOnly` off and the palette from step 9 is applied as
-the `astro-arc` theme too. The palette is derived either way, so every review
-entry can still be saved or exported as a full theme.
-
-## 11. Record
-
-**Runs:** `build_review.py` · **Cost:** free · **Cache:** — · **Knob:** `historyRetentionDays`
-
-Writes the browsable entry — one self-contained HTML page per generation, with
-the image, the reading and every dial value — and snapshots the theme so it can
-be saved or exported later. Then `astro-arc-prune-history` deletes entries past
-the retention window.
+its colors. The wallpaper is the archived file itself, which is why this runs
+after step 10. Turn `backgroundOnly` off and the palette from step 9 is applied
+as the `astro-arc` theme too.
 
 ---
 
@@ -287,27 +297,22 @@ would have caught it was never saved.
 
 ### Test a fresh install without touching your own
 
-Every path in this project derives from `$HOME`, so a throwaway one gives you a
-genuinely new install in seconds, with no container and nothing to clean up but
-a directory:
+There is no install step, and every path derives from `$HOME` (the archive from
+`$XDG_DATA_HOME`, defaulting under it), so a throwaway home is a genuinely new
+user in seconds:
 
 ```sh
 FRESH=$(mktemp -d)
-git clone . $FRESH/.config/omarchy/plugins/astro-arc
-HOME=$FRESH $FRESH/.config/omarchy/plugins/astro-arc/install.sh
-HOME=$FRESH $FRESH/.config/omarchy/plugins/astro-arc/backend/bin/astro-arc-generate
+git clone . $FRESH/.config/omarchy/plugins/garrett.astro-arc
+HOME=$FRESH $FRESH/.config/omarchy/plugins/garrett.astro-arc/backend/bin/astro-arc-generate
 ```
 
-That exercises the real installer, the real defaults a new user gets, and the
-real first-run paths — the venv, the birth data, the API key, all absent, which
-is exactly where fresh-install bugs live. It found five on 2026-09-13, the last
-of them only after the install itself was restructured.
+That exercises the real defaults a new user gets and the real first-run paths —
+no birth data, no archive, no caches — which is where fresh-install bugs live.
 
 Two things it cannot cover, because they are not `$HOME`-scoped: the QML widget
 needs the running shell, and `secret-tool` talks to your real keyring, so a
-throwaway home still finds your real API key. Docker buys you only the
-OS-level dependency question (`jq`, `python3`, `secret-tool` present on a clean
-Arch) and costs an image build to ask it.
+throwaway home still finds your real API key.
 
 ---
 

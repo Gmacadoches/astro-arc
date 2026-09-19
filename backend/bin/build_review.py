@@ -1,45 +1,45 @@
 #!/usr/bin/env python3
-"""Builds a self-contained, local "iteration review" page for one real
-Astro-Arc generation — the reading, the prompt, the image, and the tuning
-metadata (register, concept tags, visual signature) that produced it — and
-logs it so every iteration stays browsable from the widget instead of only
-the most recent one being visible.
+"""Builds the page for one Astro-Arc generation — the reading, the prompt, the
+image and the tuning metadata that produced it — and files it in the archive.
 
-Every build is saved under
-~/.local/state/omarchy/astro-arc/reviews/<id>/index.html, plus a full
-theme-dir snapshot at reviews/<id>/theme/ (colors.toml, icons.theme,
-backgrounds/, ...) when --theme-dir is given, and registered in
-~/.local/state/omarchy/astro-arc/reviews/index.json (newest first) —
-including each entry's real on-disk size — which Panel.qml reads to
-populate its "Themes Generated" picker. astro-arc-save-theme copies a
-review's theme/ snapshot out to a new permanent Omarchy theme; astro-arc-
-prune-history deletes entries (and their matching history/<periodKey>.png)
-past the configured retention window.
+Every generation gets its own folder in the archive (see paths.py):
 
-This is called automatically from astro-arc-generate after every real run
-— it is not a manual dev-only tool. (An earlier version of this file was
-never wired into astro-arc-generate at all, and built its "reading" panel
-from symbol_map.py's fixed vocabulary — both wrong since the two-stage LLM
-pipeline replaced that lookup-table approach.)
+    ~/.local/share/astro-arc/generations/<id>/
+        index.html     this page
+        theme/         the generation's complete Omarchy theme: colors.toml,
+                       icons.theme, backgrounds/background.png (the wallpaper,
+                       which the page shows by relative link), and whatever
+                       else the theme generator produced
+        thumb.jpg      the gallery's thumbnail
 
-Usage:
-    build_review.py --reading reading.json --meta pipeline_meta.json \\
-      --image background.png --label "Daily · Sep 6, 1:15 PM" \\
-      --backend openai --image-model gpt-image-1-mini
+and is registered at the top of generations.json, which the panel's "Themes
+Generated" list reads. The gallery (archive_gallery.py) is rebuilt afterwards,
+so ~/.local/share/astro-arc/index.html always lists everything.
+
+Pages written before 2026-09-19 carried the image inline as base64, about 5 MB
+each; they still work, and astro-arc-migrate moved them here unchanged.
+
+Called by astro-arc-generate after every real run.
 """
 
 import argparse
-import base64
 import datetime
 import json
-import re
 import shutil
+import sys
 import tomllib
 import uuid
 from pathlib import Path
 
-REVIEWS_DIR = Path.home() / ".local/state/omarchy/astro-arc/reviews"
-INDEX_FILE = REVIEWS_DIR / "index.json"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import archive_gallery  # noqa: E402
+from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
+from paths import GENERATIONS_DIR, GENERATIONS_INDEX  # noqa: E402
+
+# The wallpaper's place inside a generation folder, relative to its page.
+IMAGE_REL = "theme/backgrounds/background.png"
+THUMB_REL = "thumb.jpg"
+THUMB_PX = 640
 STYLES_FILE = Path(__file__).resolve().parents[1] / "pipeline" / "styles.toml"
 
 # Same fixed palette this page always used, kept as the fallback for a
@@ -102,23 +102,8 @@ def _style_label(style_key):
     return style_key
 
 
-def _humanize_concept_tag(tag):
-    """"nature/rootedness" -> "Nature Rootedness" — mirrors Model.js's
-    humanizeConceptTag exactly, so the Save Theme button's suggested name
-    (computed here, in the static HTML) matches what the widget's own
-    Save Selected Theme prompt would have suggested for the same entry."""
-    words = [w for w in re.split(r"[/_-]+", str(tag or "")) if w]
-    return " ".join(w[:1].upper() + w[1:] for w in words)
-
-
-def _suggest_theme_name(concept_tags):
-    tags = [t for t in (concept_tags or []) if isinstance(t, str) and t.strip()]
-    if not tags:
-        return ""
-    return " ".join(_humanize_concept_tag(t) for t in tags[:2])
-
 PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
-<title>Astro-Arc Iteration — {escaped_label}</title>
+<title>Astro-Arc — {escaped_label}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
   /* This generation's actual colors.toml, not a fixed palette — the page
@@ -142,10 +127,8 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   .chip.tag {{ color: var(--accent); }}
   .fact-row {{ display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: baseline; }}
   .fact-row .label {{ font-size: 11.5px; color: var(--ink-dim); width: 70px; flex-shrink: 0; }}
-  .save-theme-row {{ display: flex; align-items: center; gap: 12px; margin-top: 4px; }}
-  .save-theme-btn {{ font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.02em; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 16px; cursor: pointer; }}
-  .save-theme-btn:hover {{ background: var(--accent); color: var(--bg); }}
-  .save-theme-status {{ font-size: 12px; color: var(--ink-dim); }}
+  .save-theme-note {{ font-size: 12.5px; color: var(--ink-dim); margin: 4px 0 0; }}
+  .archive-link {{ font-size: 12.5px; color: var(--accent); }}
   .layout {{ display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }}
   @media (max-width: 820px) {{ .layout {{ grid-template-columns: 1fr; }} }}
   .layout img {{ width: 100%; border-radius: 14px; border: 1px solid var(--border); cursor: zoom-in; display: block; }}
@@ -184,18 +167,15 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
 </style></head><body>
 <main>
   <header>
-    <span class="eyebrow">Astro-Arc &middot; iteration record</span>
+    <span class="eyebrow">Astro-Arc &middot; generation record &middot; <a class="archive-link" href="../../index.html">all generations</a></span>
     <h1>{escaped_label}</h1>
     <div class="fact-row"><span class="label">Natal</span>{natal_chips}</div>
     <div class="fact-row"><span class="label">This arc</span>{arc_chips}</div>
-    <div class="save-theme-row">
-      <button class="save-theme-btn" onclick="saveTheme()">Save Theme</button>
-      <span class="save-theme-status" id="save-theme-status"></span>
-    </div>
+    <p class="save-theme-note">To keep this theme, or share it, open Astro-Arc in the bar and choose it under Themes Generated.</p>
   </header>
 
   <div class="layout">
-    <img id="hero-image" src="data:image/png;base64,{image_b64}" alt="Generated image">
+    <img id="hero-image" src="{image_src}" alt="Generated image">
 
     <div class="panel">
       <span class="badge">{narrative_position}</span>
@@ -207,10 +187,10 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
         <div class="meta-row"><span class="label">Register</span><span class="chip">{register}</span>{secondary_register_chip}</div>
         <div class="meta-row"><span class="label">Constellation</span><span class="chip">{constellation}</span></div>
         <div class="meta-row"><span class="label">Objects</span>{amplification_chips}</div>
-        <div class="meta-row"><span class="label">Intrusion</span><span class="chip">{intrusion}</span></div>
+        <div class="meta-row"><span class="label">Anomaly</span><span class="chip">{intrusion}</span></div>
         <div class="meta-row"><span class="label">Concept tags</span>{concept_tag_chips}</div>
         <details class="avoided-details">
-          <summary><span class="toggle-icon"><span class="plus">+</span><span class="minus">&minus;</span></span><span class="label">Avoided (last 14)</span></summary>
+          <summary><span class="toggle-icon"><span class="plus">+</span><span class="minus">&minus;</span></span><span class="label">Avoided (recent)</span></summary>
           <div class="meta-row">{avoided_chips}</div>
         </details>
         <p class="signature">{visual_signature}</p>
@@ -247,25 +227,6 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
   lightbox.addEventListener("click", () => lightbox.classList.remove("open"));
   document.addEventListener("keydown", (e) => {{ if (e.key === "Escape") lightbox.classList.remove("open"); }});
 
-  // Save Theme: prompts for a name (native browser dialog, pre-filled
-  // with a suggestion from this generation's own concept tags — same
-  // suggestion the widget's own Save Selected Theme prompt would make),
-  // then navigates to a custom astroarc:// link. That's registered on
-  // this machine (by install.sh) to astro-arc-save-theme-handler, which
-  // actually runs astro-arc-save-theme and reports the result as a
-  // desktop notification — this static page has no server of its own to
-  // report back into, so the notification is the real confirmation, not
-  // the status line below (which can only ever say the link was opened).
-  // The browser will ask permission to open the link the first time;
-  // that's normal for any custom URI scheme, not a bug.
-  function saveTheme() {{
-    const suggested = {suggested_name_json};
-    const name = prompt("Save this theme as:", suggested);
-    if (!name) return;
-    const id = {review_id_json};
-    document.getElementById("save-theme-status").textContent = "Opening Astro-Arc…";
-    window.location.href = "astroarc://save-theme?id=" + encodeURIComponent(id) + "&name=" + encodeURIComponent(name);
-  }}
 </script>
 </body></html>
 """
@@ -358,8 +319,6 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
     avoided = meta.get("avoidedConcepts") or []
     theme_vars = _theme_css_vars(theme_dir)
 
-    # Computed before the HTML so the Save Theme button can embed them —
-    # review_id has to exist before the page that names it in a save link.
     created_at = datetime.datetime.now()
     review_id = f"{created_at.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
@@ -367,7 +326,7 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         escaped_label=_esc(label),
         natal_chips=natal_chips,
         arc_chips=arc_chips,
-        image_b64=base64.b64encode(Path(image_path).read_bytes()).decode("ascii"),
+        image_src=IMAGE_REL,
         narrative_position=_esc(meta.get("narrativePosition", "")),
         distillation=_esc(meta.get("distillation", "")),
         reading_text=_esc(meta.get("reading", "")),
@@ -405,11 +364,9 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         theme_bg=theme_vars["bg"], theme_surface=theme_vars["surface"], theme_surface2=theme_vars["surface2"],
         theme_ink=theme_vars["ink"], theme_ink_dim=theme_vars["inkDim"], theme_accent=theme_vars["accent"],
         theme_border=theme_vars["border"], theme_good=theme_vars["good"],
-        suggested_name_json=json.dumps(_suggest_theme_name(concept_tags)),
-        review_id_json=json.dumps(review_id),
     )
 
-    out_dir = REVIEWS_DIR / review_id
+    out_dir = GENERATIONS_DIR / review_id
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "index.html"
     out_path.write_text(html)
@@ -420,12 +377,23 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
     # to copy out — not just the HTML record. Astro-Arc's own theme dir is
     # wiped clean (except backgrounds/) at the start of every run, so
     # whatever's there when this runs is exactly and only that run's output.
-    theme_snapshot_dir = None
+    theme_snapshot_dir = out_dir / "theme"
     if theme_dir and Path(theme_dir).is_dir():
-        theme_snapshot_dir = out_dir / "theme"
         shutil.copytree(theme_dir, theme_snapshot_dir)
+    # The page shows the wallpaper by relative link, so it must be exactly
+    # there even if the theme dir held a different background or none.
+    image_dst = out_dir / IMAGE_REL
+    image_dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(image_path, image_dst)
 
-    index = json.loads(INDEX_FILE.read_text()) if INDEX_FILE.exists() else []
+    thumb = None
+    try:
+        thumbnail_jpeg(image_dst, out_dir / THUMB_REL, THUMB_PX, quality=82)
+        thumb = THUMB_REL
+    except ImageError:
+        pass  # the gallery shows a plain tile; never lose the entry over a thumbnail
+
+    index = json.loads(GENERATIONS_INDEX.read_text()) if GENERATIONS_INDEX.exists() else []
     index.insert(0, {
         "id": review_id,
         "label": label,
@@ -433,16 +401,20 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         "path": str(out_path),
         "cardCount": 1,
         "periodKey": period_key,
-        "hasThemeSnapshot": theme_snapshot_dir is not None,
-        # Real directory size, not an estimate — includes the theme
-        # snapshot above (the image itself lives only as base64 inside
-        # index.html, never duplicated on disk).
+        "hasThemeSnapshot": theme_dir is not None and theme_snapshot_dir.is_dir(),
         "sizeBytes": _dir_size(out_dir),
         # Carried through so Save Selected Theme can suggest a name from
         # this run's actual concept tags instead of a hash-looking id.
         "conceptTags": concept_tags,
+        # What the gallery shows for each generation without opening its page.
+        "thumb": thumb,
+        "distillation": meta.get("distillation") or "",
+        "narrativePosition": meta.get("narrativePosition") or "",
+        "artStyleLabel": _style_label(meta.get("artStyle")) or "",
     })
-    INDEX_FILE.write_text(json.dumps(index, indent=2))
+    GENERATIONS_INDEX.parent.mkdir(parents=True, exist_ok=True)
+    GENERATIONS_INDEX.write_text(json.dumps(index, indent=2))
+    archive_gallery.write_gallery()
 
     return out_path
 
@@ -456,7 +428,7 @@ def main():
     parser.add_argument("--cost-json", help="inline JSON: {stage1Cost, stage2Cost, signatureCost, imageCost, imageCostSource, totalCost}")
     parser.add_argument("--footer")
     parser.add_argument("--theme-dir", help="the live theme dir to snapshot (colors.toml, icons.theme, backgrounds/, ...) for later Save Selected Theme")
-    parser.add_argument("--period-key", help="this generation's periodKey, so pruning can also remove the matching history/<periodKey>.png")
+    parser.add_argument("--period-key", help="this generation's periodKey, recorded in generations.json")
     args = parser.parse_args()
 
     cost = json.loads(args.cost_json) if args.cost_json else None

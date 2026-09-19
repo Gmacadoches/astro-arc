@@ -1,8 +1,12 @@
 #!/bin/bash
 
-# Deletes "Themes Generated" entries (reviews/<id>/ — HTML page + theme
-# snapshot — and the matching history/<periodKey>.png) either past a given
-# age, or all of them. Never touches anything under
+# Deletes "Themes Generated" entries (the archive's generations/<id>/ — page,
+# theme snapshot, thumbnail — and the matching state history/<periodKey>.png)
+# either past a given age, or all of them. The NEWEST generation is never
+# deleted, by either mode: it is the wallpaper on screen and, unless
+# Background only is on, the live theme, and deleting it would leave the
+# desktop pointing at a file that no longer exists. The gallery is rewritten
+# afterwards so it never links to a deleted page. Never touches anything under
 # ~/.config/omarchy/themes/ — a theme astro-arc-save-theme exported is a
 # separate, permanent copy this script has no path to.
 #
@@ -20,9 +24,11 @@
 
 set -euo pipefail
 
-STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
-REVIEWS_DIR="$STATE_DIR/reviews"
-INDEX_FILE="$REVIEWS_DIR/index.json"
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"
+REVIEWS_DIR="$GENERATIONS_DIR"
+INDEX_FILE="$GENERATIONS_INDEX"
 HISTORY_DIR="$STATE_DIR/history"
 
 mode="${1:-}"
@@ -64,6 +70,9 @@ else
 fi
 
 drop_ids_json=$(jq -R -s 'split("\n") | map(select(length > 0))' <<<"$drop_ids_list")
+# Never the newest — see the header.
+newest_id=$(jq -r '.[0].id // empty' "$INDEX_FILE")
+drop_ids_json=$(jq --arg keep "$newest_id" 'map(select(. != $keep))' <<<"$drop_ids_json")
 keep=$(jq --argjson dropIds "$drop_ids_json" '[.[] | select((.id as $i | $dropIds | index($i)) | not)]' "$INDEX_FILE")
 drop=$(jq --argjson dropIds "$drop_ids_json" '[.[] | select(.id as $i | $dropIds | index($i))]' "$INDEX_FILE")
 
@@ -91,4 +100,5 @@ while IFS=$'\t' read -r id period_key; do
 done < <(jq -r '.[] | [.id, (.periodKey // "")] | @tsv' <<<"$drop")
 
 echo "$keep" >"$INDEX_FILE"
+python3 "$BIN_DIR/archive_gallery.py" >/dev/null 2>&1 || echo "astro-arc-prune-history: could not rewrite the gallery" >&2
 echo "$deleted_count $bytes_freed"
