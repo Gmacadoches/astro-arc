@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "garrett.astro-arc",
   "name": "Astro-Arc",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "license": "AGPL-3.0-or-later",
   "author": "Garrett McDaniel",
   "description": "Turns your natal chart into a desktop theme by way of psychology: the chart becomes a Jungian reading, written by a model forbidden any visual language, and only then a scene. The wallpaper's own colours become the palette.",
