@@ -6,12 +6,18 @@
 # release step as far as the widget is concerned.
 #
 # Prints one JSON object for Panel.qml:
-#   {"label": "v1.0.0", "tag": "v1.0.0", "ahead": 0, "commit": "6def866",
-#    "url": "https://github.com/<owner>/<repo>/releases/tag/v1.0.0"}
+#   {"label": "v1.0.1", "tag": "v1.0.1", "ahead": 0, "commit": "a3f9c21",
+#    "url": "https://github.com/<owner>/<repo>/releases/tag/v1.0.1"}
+# which the panel shows as "v1.0.1 (a3f9c21)", or "v1.0.1 +3 (a3f9c21)" when the
+# checkout is `ahead` commits past the release (a development copy).
 #
-# `ahead` is how many commits this checkout is past that release. The panel
-# shows it, because an update is a fast-forward to the branch head rather than
-# to the next tag, so running between releases is normal and should be said.
+# One case git alone gets wrong: `omarchy plugin update` fast-forwards to master
+# with `git fetch origin HEAD`, which does not fetch tags. A user updated that
+# way sits exactly on the new release commit but without its tag, so describe
+# would report the PREVIOUS tag plus N commits. The release commit is also where
+# bin/release bumps manifest.json, so when the manifest names a newer version
+# than the nearest tag, the manifest is believed and the copy is on that
+# release.
 #
 # Offline and read-only: no fetch, no writes. Only v-prefixed tags count, so the
 # old stable-YYYY-MM-DD bookmarks are never mistaken for releases.
@@ -45,6 +51,12 @@ if git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
   tag=$(git -C "$REPO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
   if [[ -n $tag ]]; then
     ahead=$(git -C "$REPO_DIR" rev-list --count "$tag..HEAD" 2>/dev/null || echo 0)
+  fi
+  manifest_version=$(jq -r '.version // empty' "$REPO_DIR/manifest.json" 2>/dev/null || true)
+  if [[ -n $manifest_version && "v$manifest_version" != "$tag" ]] \
+     && [[ $(printf '%s\n%s\n' "${tag#v}" "$manifest_version" | sort -V | tail -1) == "$manifest_version" ]]; then
+    tag="v$manifest_version"
+    ahead=0
   fi
   repo_url=$(github_url)
 else

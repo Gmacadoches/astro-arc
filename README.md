@@ -191,6 +191,8 @@ says which step each one changes:
   published as a page at [`docs/pipeline.html`](docs/pipeline.html), generated
   from that file by `backend/bin/build_pipeline_page.py` — edit the Markdown,
   run the script, never edit the HTML.
+- [`RELEASING.md`](RELEASING.md) — how a release is cut (`bin/release`), why
+  `master` only ever holds releases, and how updates find them.
 - [`docs/styles.md`](docs/styles.md) — all seven art styles, same reading and
   same objects in each, so the style is the only variable.
 

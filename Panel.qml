@@ -796,6 +796,7 @@ Panel {
   property string versionLabel: ""
   property string versionUrl: ""
   property int versionAhead: 0
+  property string versionCommit: ""
 
   function refreshVersion() {
     if (!versionProc.running) versionProc.running = true
@@ -812,6 +813,7 @@ Panel {
         root.versionLabel = parsed ? String(parsed.label || "") : ""
         root.versionUrl = parsed ? String(parsed.url || "") : ""
         root.versionAhead = parsed ? (parsed.ahead || 0) : 0
+        root.versionCommit = parsed ? String(parsed.commit || "") : ""
       }
     }
   }
@@ -1871,9 +1873,9 @@ Panel {
               }
 
               // The release this checkout is on, linked to its GitHub page.
-              // Past a release (the updater fast-forwards to the branch head,
-              // not to the next tag) it says how far. The row is too narrow to
-              // name the commit as well; the release link is what matters.
+              // "v1.0.1 (a3f9c21)" on a release; "v1.0.1 +3 (a3f9c21)" on a
+              // development copy that is 3 commits past it. Users update to
+              // release tags, so they only ever see the first form.
               Text {
                 id: versionText
                 anchors.left: updateLabel.right
@@ -1884,9 +1886,9 @@ Panel {
                 elide: Text.ElideRight
                 text: root.versionLabel === ""
                   ? ""
-                  : root.versionLabel + (root.versionAhead > 0
-                      ? " +" + root.versionAhead + " commit" + (root.versionAhead === 1 ? "" : "s")
-                      : "")
+                  : root.versionLabel
+                    + (root.versionAhead > 0 ? " +" + root.versionAhead : "")
+                    + (root.versionCommit !== "" ? " (" + root.versionCommit + ")" : "")
                 color: root.bar.foreground
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.bodySmall

@@ -1,0 +1,99 @@
+#!/bin/bash
+# Cut an Astro-Arc release. See RELEASING.md for the whole process.
+#
+#   bin/release 1.0.1            release v1.0.1 and push it
+#   bin/release --dry-run 1.0.1  run every check, print every command, change nothing
+#
+# From a clean `development`, it:
+#   1. bumps "version" in manifest.json and commits it on development
+#   2. merges development into master with a merge commit (--no-ff), so every
+#      release is one commit on master, which is what gets tagged
+#   3. tags that merge commit vX.Y.Z (annotated)
+#   4. fast-forwards development to it, so development's version row reads
+#      the release rather than the previous one plus N
+#   5. pushes master and the tag in ONE atomic push, so no one can ever update
+#      to a master whose tag has not arrived yet
+#
+# Every git command is printed before it runs, and the first failure stops the
+# script (set -e). Nothing before step 5 leaves this machine, so a failure
+# before the push is recoverable locally — RELEASING.md says how.
+
+set -euo pipefail
+
+DRY=0
+if [[ ${1:-} == --dry-run ]]; then
+  DRY=1
+  shift
+fi
+version=${1:-}
+
+die() { echo "release: $*" >&2; exit 1; }
+# Printed shell-quoted, so any line can be pasted back in to re-run that step.
+run() {
+  printf '+'; printf ' %q' "$@"; printf '\n'
+  (( DRY )) || "$@"
+}
+
+[[ -n $version ]] || die "usage: bin/release [--dry-run] X.Y.Z"
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "'$version' is not a version like 1.0.1"
+tag="v$version"
+
+cd "$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+command -v jq >/dev/null 2>&1 || die "needs jq"
+
+# ---- refuse unless everything is in order (read-only) ----------------------
+
+branch=$(git symbolic-ref --quiet --short HEAD || true)
+[[ $branch == development ]] || die "releases are cut from development, and you are on ${branch:-a detached HEAD}"
+[[ -z $(git status --porcelain) ]] || die "the working tree is not clean; commit or stash first:
+$(git status --short)"
+git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null && die "$tag already exists"
+
+run git fetch --tags origin
+
+git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1 \
+  && die "$tag already exists on origin"
+latest=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -1)
+if [[ -n $latest && $(printf '%s\n%s\n' "${latest#v}" "$version" | sort -V | tail -1) != "$version" ]] \
+   || [[ $tag == "$latest" ]]; then
+  die "$tag is not newer than the latest release, $latest"
+fi
+# A fresh clone has only origin/master; `git checkout master` below creates the
+# local branch from it. Where a local master exists, it must match origin's.
+master_ref=origin/master
+if git rev-parse --verify --quiet refs/heads/master >/dev/null; then
+  master_ref=master
+  if git rev-parse --verify --quiet origin/master >/dev/null \
+     && [[ $(git rev-parse master) != $(git rev-parse origin/master) ]]; then
+    die "local master and origin/master differ; bring master up to date first (git checkout master && git pull --ff-only)"
+  fi
+fi
+git rev-parse --verify --quiet "$master_ref" >/dev/null || die "no master branch here or on origin"
+# master only ever moves by release merges, so development must already hold
+# everything on it. If not, someone committed to master directly.
+git merge-base --is-ancestor "$master_ref" development \
+  || die "master has commits development lacks. Merge master into development first: git merge $master_ref"
+
+echo "Releasing $tag (previous: ${latest:-none}) from development $(git rev-parse --short HEAD)"
+
+# ---- the release -------------------------------------------------------------
+
+printf '+ %s\n' "jq --arg v $version '.version = \$v' manifest.json > manifest.json.tmp && mv manifest.json.tmp manifest.json"
+if (( ! DRY )); then
+  jq --arg v "$version" '.version = $v' manifest.json >manifest.json.tmp
+  mv manifest.json.tmp manifest.json
+fi
+run git add manifest.json
+run git commit --quiet -m "Release $tag"
+run git checkout --quiet master
+run git merge --no-ff --quiet development -m "Release $tag"
+run git tag -a "$tag" -m "Astro-Arc $tag"
+run git checkout --quiet development
+run git merge --ff-only --quiet master
+run git push --atomic origin master "$tag"
+
+if (( DRY )); then
+  echo "Dry run: nothing was changed."
+else
+  echo "Released $tag. Optional: publish release notes with  gh release create $tag --generate-notes"
+fi
