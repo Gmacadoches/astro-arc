@@ -44,7 +44,7 @@ code](#tweak-it-without-touching-code).
                                           │
   9  PALETTE     palette_extract.py                PNG → colors.toml
                                           │
- 10  APPLY       omarchy-theme-set                 wallpaper + palette go live
+ 10  APPLY       omarchy-theme-bg-set              wallpaper goes live (+ palette if opted in)
                                           │
  11  RECORD      build_review.py                   browsable entry + cost log
 ```
@@ -209,9 +209,12 @@ generator instead.
 
 ## 10. Apply
 
-**Runs:** `omarchy-theme-set` · **Cost:** free · **Cache:** — · **Knob:** —
+**Runs:** `omarchy-theme-bg-set`, or `omarchy-theme-set` · **Cost:** free · **Cache:** — · **Knob:** `backgroundOnly`
 
-Wallpaper and palette go live on the desktop.
+By default only the wallpaper changes, and whatever theme you already run keeps
+its colors. Turn `backgroundOnly` off and the palette from step 9 is applied as
+the `astro-arc` theme too. The palette is derived either way, so every review
+entry can still be saved or exported as a full theme.
 
 ## 11. Record
 
@@ -246,6 +249,7 @@ Everything else is one config file at
 | `stage1Model` / `stage2Model` | the writing models |
 | `openaiModel` / `openaiQuality` | the image model and tier |
 | `maxCostPerImage` | hides image models above this price from the picker; `0` disables |
+| `backgroundOnly` | `true` (default): change only the wallpaper. `false`: apply the palette as a theme too |
 | `themeGenerator` | `built-in` (palette from the image) or `aether` |
 | `historyRetentionDays` | how long generations are kept |
 

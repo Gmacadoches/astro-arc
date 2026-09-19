@@ -28,6 +28,10 @@ var DEFAULT_CONFIG = {
   backgroundSize: "auto",
   artStyle: "symbolist",
   themeGenerator: "built-in",
+  // true — change only the wallpaper and leave the user's theme colors alone.
+  // Most people already run a theme they chose, often several theme plugins;
+  // repainting all of it every day is the opt-in, not the default.
+  backgroundOnly: true,
   historyRetentionDays: 30,
   maxCostPerImage: 0,
   provider: "openai"
@@ -265,6 +269,8 @@ function parseConfig(raw) {
       backgroundSize: data.backgroundSize === "auto" || (typeof data.backgroundSize === "string" && SIZE_PATTERN.test(data.backgroundSize)) ? data.backgroundSize : "auto",
       artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist",
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
+      // Only an explicit false turns it off, matching astro-arc-generate.
+      backgroundOnly: data.backgroundOnly !== false,
       historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
         ? data.historyRetentionDays : 30,
       // 0 (or anything unparseable) means no ceiling.

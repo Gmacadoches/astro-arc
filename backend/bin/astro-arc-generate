@@ -304,7 +304,30 @@ if [[ $used_aether == 0 ]]; then
   "$VENV_PY" "$BIN_DIR/palette_extract.py" "$bg_file" "$THEME_DIR/colors.toml"
 fi
 
-omarchy-theme-set astro-arc >/dev/null 2>&1
+# backgroundOnly (default true): change the wallpaper and leave the user's own
+# theme — its colors and every app it themes — exactly as it was. The palette
+# above is still derived, because the review page's theme snapshot and Save
+# Selected Theme are built from it; it is just not applied.
+#
+# NOT `.backgroundOnly // true`: jq's // treats false as missing, so that would
+# turn an explicit "off" back into "on". Only a literal false turns it off.
+#
+# The wallpaper is copied to its own per-run filename rather than pointed at
+# history/<period>.png, for two reasons: history files are pruned on the
+# retention window and overwritten by a same-period rerun, and the shell's
+# background can miss a change of content at an unchanged path.
+background_only=$(cfg 'if .backgroundOnly == false then "false" else "true" end')
+if [[ $background_only == true ]]; then
+  wallpaper_dir="$STATE_DIR/wallpaper"
+  mkdir -p "$wallpaper_dir"
+  wallpaper="$wallpaper_dir/astro-arc-$(date +%Y%m%d-%H%M%S).png"
+  cp -f "$bg_file" "$wallpaper"
+  find "$wallpaper_dir" -maxdepth 1 -name 'astro-arc-*.png' ! -path "$wallpaper" -delete
+  omarchy-theme-bg-set "$wallpaper" >/dev/null 2>&1 \
+    || echo "Astro-Arc: warning — could not set the background" >&2
+else
+  omarchy-theme-set astro-arc >/dev/null 2>&1
+fi
 
 # Cost log: real token-based cost for the two chat calls (from
 # llm_pipeline.py's metadata) plus the image call (from the backend's

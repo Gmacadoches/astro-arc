@@ -886,6 +886,20 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
+  // ---- Background only (default on): each generation changes the wallpaper
+  // and nothing else. Off, it also applies the derived palette as the
+  // astro-arc theme — which repaints every app a theme touches, and replaces
+  // whatever theme the user was running. -----------------------------------
+  function commitBackgroundOnly(value) {
+    backgroundOnlyWriteProc.command = [root.configBin, "--set-background-only", value ? "true" : "false"]
+    backgroundOnlyWriteProc.running = true
+  }
+
+  Process {
+    id: backgroundOnlyWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
   // ---- History retention: how many days of "Themes Generated" entries
   // astro-arc-generate keeps before astro-arc-prune-history deletes them,
   // every run. Never affects a theme already exported via Save Selected
@@ -1374,6 +1388,18 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
             visible: root.showSettings
+
+            // First, because it decides what a generation does to the desktop
+            // at all — more consequential than any model choice below.
+            Toggle {
+              width: parent.width
+              label: "Background only"
+              description: "Do not update theme colors"
+              checked: root.configState.backgroundOnly
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              onClicked: root.commitBackgroundOnly(!root.configState.backgroundOnly)
+            }
 
             // ---- Provider: the global setting everything else is scoped
             // to. The key you paste, which models are offered, what they cost
