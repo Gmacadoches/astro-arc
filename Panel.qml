@@ -190,7 +190,7 @@ Panel {
       return
     }
     savingLocation = true
-    persistLocation(location.name, location.latitude, location.longitude)
+    persistLocation(location.name, location.latitude, location.longitude, location.timezone)
   }
 
   function clearLocation() {
@@ -201,12 +201,14 @@ Panel {
   function pickSuggestion(suggestion) {
     if (!suggestion) return
     savingLocation = true
-    persistLocation(suggestion.name, suggestion.latitude, suggestion.longitude)
+    persistLocation(suggestion.name, suggestion.latitude, suggestion.longitude, suggestion.timezone)
   }
 
-  function persistLocation(name, latitude, longitude) {
+  function persistLocation(name, latitude, longitude, timezone) {
     if (name && Model.isValidCoordinate(latitude, longitude))
-      locationWriteProc.command = [root.configBin, "--set-location", name, latitude + "," + longitude]
+      locationWriteProc.command = timezone
+        ? [root.configBin, "--set-location", name, latitude + "," + longitude, timezone]
+        : [root.configBin, "--set-location", name, latitude + "," + longitude]
     else if (name)
       locationWriteProc.command = [root.configBin, "--set-location", name]
     else

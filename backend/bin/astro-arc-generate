@@ -2,7 +2,7 @@
 
 # Orchestrates one full Astro-Arc generation cycle:
 #   astro_engine.py -> llm_pipeline.py (Stage 1 interpret, Stage 2 image
-#     prompt) -> (image_gen.py | openai_image_gen.py) -> theming (aether, or
+#     prompt) -> openai_image_gen.py -> theming (aether, or
 #     palette_extract.py as its default/fallback) -> Omarchy theme ->
 #     omarchy-theme-set -> build_review.py (logs it + snapshots the theme
 #     dir for astro-arc-save-theme) -> astro-arc-prune-history (deletes
@@ -72,11 +72,11 @@ cfg() { jq -r "$1" <<<"$config_json" 2>/dev/null; }
 
 frequency=$(cfg '.frequency // "manual"')
 # `provider` is the global setting now (see astro-arc-config --set-provider);
-# `imageBackend` is the legacy key it supersedes. Reading provider first and
-# falling back keeps an existing config working, including one that still says
-# "local" — that path is no longer offered in the UI but is still honored if it
-# is set by hand, since removing a working free backend from under someone by
-# changing a dropdown would be a surprise.
+# `imageBackend` is the legacy key it supersedes. OpenAI is the only renderer:
+# the local Stable Diffusion path (image_gen.py) was removed on 2026-09-19,
+# because it needed torch in a Python venv, and the plugin no longer installs
+# anything. A config still naming "local" is refused below with a clear message
+# rather than silently rendered somewhere the user did not choose.
 image_backend=$(cfg '.provider // .imageBackend // "openai"')
 # `// "default"` is NOT enough on these two. jq's // only substitutes for null
 # and false, and astro-arc-config DEFAULTS both of them to the empty string —
@@ -145,6 +145,12 @@ if [[ $if_due == 1 ]]; then
   fi
 fi
 
+if [[ $image_backend != openai ]]; then
+  echo "astro-arc-generate: the image provider is set to \"$image_backend\", but only OpenAI is supported." >&2
+  echo "  Choose OpenAI under Settings → Provider in the Astro-Arc widget." >&2
+  exit 1
+fi
+
 # Checked here rather than earlier so the --if-due no-ops above (nothing due,
 # or auto-generation off) stay quiet on an install that has not been set up.
 if [[ ! -x $VENV_PY ]]; then
@@ -168,6 +174,19 @@ reading_file="$STATE_DIR/reading-$period_key.json"
 bg_file="$HISTORY_DIR/$period_key.png"
 pipeline_meta_file="$STATE_DIR/pipeline-meta-$period_key.json"
 image_cost_file="$STATE_DIR/image-cost-$period_key.json"
+
+# A location saved before the config carried a timezone has coordinates but no
+# zone. Ask Open-Meteo for it once, from those coordinates — the same service
+# the location picker geocodes with — and store it, so this never runs again.
+# Failure is not fatal here: the engine refuses clearly on a missing zone.
+if [[ -z $(cfg '.timezone // ""') && -n $(cfg '.latitude // ""') && -n $(cfg '.longitude // ""') ]]; then
+  lookup_tz=$(curl -fsS --max-time 10 \
+    "https://api.open-meteo.com/v1/forecast?latitude=$(cfg '.latitude')&longitude=$(cfg '.longitude')&timezone=auto&forecast_days=1" \
+    2>/dev/null | jq -r '.timezone // empty' 2>/dev/null || true)
+  if [[ -n $lookup_tz ]] && "$BIN_DIR/astro-arc-config" --set-timezone "$lookup_tz" >/dev/null; then
+    echo "Astro-Arc: stored the birth place's timezone ($lookup_tz)" >&2
+  fi
+fi
 
 # The engine reports its own failures as {"error": "..."} on STDOUT, and stdout
 # here goes straight into the reading file — so a fresh install with no birth
@@ -231,14 +250,9 @@ prompt=$("$VENV_PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_f
 # `imageQualityUsed` survives in the metadata below, identical to `imageQuality`
 # now, because build_review.py reads it and every archived run carries it.
 
-if [[ $image_backend == openai ]]; then
-  "$VENV_PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
-    --model "$openai_model" --quality "$openai_quality" \
-    --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
-else
-  "$VENV_PY" "$BIN_DIR/image_gen.py" "$prompt" "$bg_file" --steps 8 \
-    --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
-fi
+"$VENV_PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
+  --model "$openai_model" --quality "$openai_quality" \
+  --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
 
 # Clean slate every run, not just an overwrite: whichever theme generator
 # ran last time (built-in or aether) may have left files the other one

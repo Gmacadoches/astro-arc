@@ -20,10 +20,9 @@ import math
 import os
 import sys
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import swisseph as swe
-from timezonefinder import TimezoneFinder
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from period_key import period_key  # noqa: E402  — see that file: one definition, called from everywhere
@@ -374,7 +373,7 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
 
     Local is the right choice rather than UTC because this generates a desktop
     background: "today" means the user's day. Note it is the *system* local zone,
-    not the birth-location zone TimezoneFinder derives in main() — someone born
+    not the birth-location zone stored with the location — someone born
     in Tokyo and living in Denver gets Denver days.
 
     Positions are still computed from `now_utc`; only the key is civil-local.
@@ -465,9 +464,20 @@ def main():
     birth_date = config["birthDate"]
     birth_time = "12:00" if birth_time_unknown else config.get("birthTime") or "12:00"
 
-    tf = TimezoneFinder()
-    tz_name = tf.timezone_at(lat=lat, lng=lon) or "UTC"
-    tz = ZoneInfo(tz_name)
+    # The birth place's zone, stored with the location. The location picker
+    # takes it from the geocoder, and astro-arc-generate fills it in once for a
+    # config saved before this field existed. It used to be derived here from
+    # the coordinates by the timezonefinder package, which carried a 63 MB
+    # polygon database to answer a question the geocoder had already answered.
+    #
+    # No silent UTC fallback: a wrong zone moves the birth time by hours, which
+    # moves the Moon by degrees and the Ascendant by whole signs. Refuse instead.
+    tz_name = config.get("timezone") or ""
+    try:
+        tz = ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        print(json.dumps({"error": "The birth place has no timezone yet — pick the location again in the Astro-Arc widget."}))
+        sys.exit(1)
 
     birth_naive = datetime.datetime.strptime(f"{birth_date} {birth_time}", "%Y-%m-%d %H:%M")
     birth_local = birth_naive.replace(tzinfo=tz)

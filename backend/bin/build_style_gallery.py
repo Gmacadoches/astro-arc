@@ -104,10 +104,8 @@ def main():
             png = OUT_IMAGES / ("%s.png" % key)
             _, info = openai_generate(final, png, image_model, quality, 1600, 900)
             total += info.get("cost") or 0.0
-            from PIL import Image
-            img = Image.open(png).convert("RGB")
-            img.thumbnail((THUMB_PX, THUMB_PX), Image.LANCZOS)
-            img.save(OUT_IMAGES / ("%s.jpg" % key), quality=86, optimize=True, progressive=True)
+            from image_fit import thumbnail_jpeg
+            thumbnail_jpeg(png, OUT_IMAGES / ("%s.jpg" % key), THUMB_PX, quality=86)
             png.unlink()
 
         rows.append({"key": key, "label": label, "prompt": prompt, "rel": rel,

@@ -10,9 +10,16 @@
 #   --set-birth <YYYY-MM-DD> <HH:MM|unknown>
 #                                          set birth date, and either a 24h
 #                                          birth time or the literal "unknown"
-#   --set-location <name> [lat,lon]       store a location; coordinates are
+#   --set-location <name> [lat,lon] [tz]  store a location; coordinates are
 #                                          optional but required for house/
-#                                          ascendant precision later
+#                                          ascendant precision later. tz is the
+#                                          IANA zone of the place (e.g.
+#                                          America/Chicago), which the location
+#                                          picker gets from the geocoder; the
+#                                          birth time is local to it
+#   --set-timezone <tz>                   set only the birth place's IANA zone
+#                                          (astro-arc-generate fills it in once
+#                                          for configs saved before it existed)
 #   --clear-location                      unset the location
 #   --set-frequency <hourly|daily|weekly|monthly|manual>
 #                                          "manual" means never generate on a
@@ -102,8 +109,11 @@ CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
 # that costs nothing is the only one safe to choose on a new user's behalf.
 # A frequency already written to CONFIG_FILE still wins — these are only the
 # values a missing key falls back to (see the jq merge in read_config).
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"frequency":"manual","imageBackend":"openai","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","backgroundOnly":true,"historyRetentionDays":30,"maxCostPerImage":0,"provider":"openai"}'
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"timezone":"","frequency":"manual","imageBackend":"openai","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","backgroundOnly":true,"historyRetentionDays":30,"maxCostPerImage":0,"provider":"openai"}'
 COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
+# IANA zone names: Area/Location[/Sub], plus the bare ones like UTC. Letters,
+# digits, _ + - only, so nothing a shell or jq could read as syntax.
+TZ_PATTERN='^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
 TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
 DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
 SIZE_PATTERN='^[0-9]{2,5}x[0-9]{2,5}$'
@@ -139,20 +149,28 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 --set-location)
-  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-location <name> [lat,lon]" >&2; exit 1; }
+  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-location <name> [lat,lon] [timezone]" >&2; exit 1; }
+  [[ -z ${4:-} || ${4:-} =~ $TZ_PATTERN ]] || { echo "Invalid timezone: $4 (expected an IANA name like America/Chicago)" >&2; exit 1; }
   current=$(read_config)
   if [[ -n ${3:-} ]]; then
     [[ $3 =~ $COORDS_PATTERN ]] || { echo "Invalid coordinates: $3 (expected lat,lon)" >&2; exit 1; }
     lat=${3%,*}; lon=${3#*,}
-    updated=$(jq --arg n "$2" --argjson lat "$lat" --argjson lon "$lon" '.locationName=$n | .latitude=$lat | .longitude=$lon' <<<"$current")
+    updated=$(jq --arg n "$2" --argjson lat "$lat" --argjson lon "$lon" --arg tz "${4:-}" \
+      '.locationName=$n | .latitude=$lat | .longitude=$lon | .timezone=$tz' <<<"$current")
   else
-    updated=$(jq --arg n "$2" '.locationName=$n | .latitude=null | .longitude=null' <<<"$current")
+    updated=$(jq --arg n "$2" '.locationName=$n | .latitude=null | .longitude=null | .timezone=""' <<<"$current")
   fi
+  write_config "$updated"
+  ;;
+--set-timezone)
+  [[ ${2:-} =~ $TZ_PATTERN ]] || { echo "Usage: astro-arc-config --set-timezone <IANA name, e.g. America/Chicago>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg tz "$2" '.timezone=$tz' <<<"$current")
   write_config "$updated"
   ;;
 --clear-location)
   current=$(read_config)
-  updated=$(jq '.locationName="" | .latitude=null | .longitude=null' <<<"$current")
+  updated=$(jq '.locationName="" | .latitude=null | .longitude=null | .timezone=""' <<<"$current")
   write_config "$updated"
   ;;
 --set-frequency)
@@ -235,7 +253,7 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 *)
-  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon]|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-background-only <true|false>|--set-history-retention-days <N>]" >&2
+  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon] [timezone]|--set-timezone <tz>|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-background-only <true|false>|--set-history-retention-days <N>]" >&2
   exit 1
   ;;
 esac

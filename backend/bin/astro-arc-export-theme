@@ -31,7 +31,6 @@ set -euo pipefail
 
 STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
 INDEX_FILE="$STATE_DIR/reviews/index.json"
-VENV_PY="$HOME/.local/share/omarchy/astro-arc/venv/bin/python3"
 
 review_id=""
 requested_name=""
@@ -90,15 +89,9 @@ shopt -u nullglob
 # are painterly full-colour images, so PNG stays large however far it is scaled;
 # JPEG lands near 100KB with no visible difference at the size it is drawn.
 first_bg=$(find "$repo_dir/backgrounds" -type f | head -1)
-if [[ -n $first_bg && -x $VENV_PY ]]; then
-  "$VENV_PY" - "$first_bg" "$repo_dir/preview.jpg" <<'PREVIEW' || echo "astro-arc-export-theme: could not build a preview (theme is still valid without one)" >&2
-import sys
-from PIL import Image
-src, dst = sys.argv[1], sys.argv[2]
-img = Image.open(src).convert("RGB")
-img.thumbnail((800, 800), Image.LANCZOS)
-img.save(dst, quality=88, optimize=True, progressive=True)
-PREVIEW
+if [[ -n $first_bg ]] && command -v magick >/dev/null 2>&1; then
+  magick "$first_bg" -resize '800x800>' -strip -interlace JPEG -quality 88 "$repo_dir/preview.jpg" \
+    || echo "astro-arc-export-theme: could not build a preview (theme is still valid without one)" >&2
 fi
 
 # Provenance, with the reading deliberately left out — see the header.

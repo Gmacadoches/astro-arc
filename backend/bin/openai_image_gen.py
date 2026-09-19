@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cost_estimate import image_call_cost  # noqa: E402
-from image_fit import closest_supported_size, fit_cover  # noqa: E402
+from image_fit import ImageError, closest_supported_size, fit_cover  # noqa: E402
 
 API_BASE = "https://api.openai.com/v1"
 
@@ -223,9 +223,6 @@ def validate_key(slot="image"):
 
 def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", target_width=1024, target_height=1024):
     import base64
-    import io
-
-    from PIL import Image
 
     # OpenAI can only render at OPENAI_IMAGE_SIZES, not the arbitrary
     # target the background is actually supposed to end up at — render at
@@ -242,13 +239,18 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
         payload["moderation"] = MODERATION_LEVEL
 
     result = _request("/images/generations", payload=payload, method="POST", slot="image")
-    b64_image = result["data"][0]["b64_json"]
-    rendered = Image.open(io.BytesIO(base64.b64decode(b64_image))).convert("RGB")
-    fitted = fit_cover(rendered, target_width, target_height)
 
+    # The API's PNG goes to disk as-is, then ImageMagick fits it to the screen.
+    # The raw render sits beside the output (same filesystem, so the fit never
+    # crosses devices) and is removed whether or not the fit succeeds.
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    fitted.save(output_path)
+    raw_path = output_path.with_name(output_path.stem + ".raw.png")
+    raw_path.write_bytes(base64.b64decode(result["data"][0]["b64_json"]))
+    try:
+        fit_cover(raw_path, output_path, target_width, target_height)
+    finally:
+        raw_path.unlink(missing_ok=True)
 
     # Real usage if the API reported one; otherwise fall back to the
     # quality-tier estimate — see cost_estimate.py and MODEL_COSTS' own
@@ -295,7 +297,7 @@ def main():
 
     try:
         out, cost_info = generate(args.prompt, args.output_path, args.model, args.quality, args.width, args.height)
-    except (ApiKeyError, RuntimeError) as exc:
+    except (ApiKeyError, RuntimeError, ImageError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 

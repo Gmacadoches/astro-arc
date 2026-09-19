@@ -10,6 +10,7 @@ var DEFAULT_CONFIG = {
   locationName: "",
   latitude: null,
   longitude: null,
+  timezone: "",
   // "manual" — a fresh install generates nothing until asked. Every
   // generation spends real money on an image API, so the cadence that
   // costs nothing is the only safe thing to pick on someone's behalf;
@@ -260,6 +261,7 @@ function parseConfig(raw) {
       locationName: typeof data.locationName === "string" ? data.locationName : "",
       latitude: hasCoords ? lat : null,
       longitude: hasCoords ? lon : null,
+      timezone: typeof data.timezone === "string" ? data.timezone : "",
       frequency: ["hourly", "daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
       imageBackend: data.imageBackend === "local" ? "local" : "openai",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
@@ -466,7 +468,11 @@ function parseGeocodingResults(raw) {
         name: String(r.name),
         description: region,
         latitude: r.latitude,
-        longitude: r.longitude
+        longitude: r.longitude,
+        // The place's IANA zone. The birth time is civil time THERE, so the
+        // chart needs it — and Open-Meteo already knows it, which is what let
+        // the timezonefinder package (and its 60 MB polygon database) go.
+        timezone: typeof r.timezone === "string" ? r.timezone : ""
       })
     }
     return out
@@ -477,14 +483,14 @@ function parseGeocodingResults(raw) {
 
 function locationCommit(text, suggestions, selectedIndex) {
   var name = String(text || "").replace(/^\s+|\s+$/g, "")
-  if (name === "") return { name: "", latitude: null, longitude: null }
+  if (name === "") return { name: "", latitude: null, longitude: null, timezone: "" }
 
   var choices = suggestions || []
   var index = Math.max(0, Math.min(parseInt(selectedIndex, 10) || 0, choices.length - 1))
   var suggestion = choices[index]
   if (suggestion) return suggestion
 
-  return { name: name, latitude: null, longitude: null }
+  return { name: name, latitude: null, longitude: null, timezone: "" }
 }
 
 // Digit-only input mask helpers: strip everything but digits, cap the

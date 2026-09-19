@@ -417,7 +417,7 @@ def render_size_for(width, height):
     target instead would leave record_usage and the catalog permanently
     disagreeing, and every row would read "not yet rendered" forever.
     """
-    from image_fit import closest_supported_size  # noqa: PLC0415 — pulls in PIL
+    from image_fit import closest_supported_size  # noqa: PLC0415
     from openai_image_gen import OPENAI_IMAGE_SIZES  # noqa: PLC0415
 
     return closest_supported_size(width, height, OPENAI_IMAGE_SIZES)
