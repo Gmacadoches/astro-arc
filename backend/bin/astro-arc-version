@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Which release this copy of Astro-Arc is, and where that release lives on
+# GitHub — read from git, so nothing has to be hand-edited per release. Tagging
+# a commit vX.Y.Z (and publishing the GitHub release for it) is the whole
+# release step as far as the widget is concerned.
+#
+# Prints one JSON object for Panel.qml:
+#   {"label": "v1.0.0", "tag": "v1.0.0", "ahead": 0, "commit": "6def866",
+#    "url": "https://github.com/<owner>/<repo>/releases/tag/v1.0.0"}
+#
+# `ahead` is how many commits this checkout is past that release. The panel
+# shows it, because an update is a fast-forward to the branch head rather than
+# to the next tag, so running between releases is normal and should be said.
+#
+# Offline and read-only: no fetch, no writes. Only v-prefixed tags count, so the
+# old stable-YYYY-MM-DD bookmarks are never mistaken for releases.
+#
+# Not a git checkout (a tarball or a copied folder): falls back to
+# manifest.json's version, which is the one number a release still has to bump
+# by hand, since the plugin registry reads it.
+
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Only for the non-git fallback, where there is no remote to ask.
+DEFAULT_REPO_URL="https://github.com/Gmacadoches/astro-arc"
+
+# origin as an https URL, whether it was cloned over https or ssh; empty if it
+# is not on GitHub, in which case the version shows without a link.
+github_url() {
+  local remote
+  remote=$(git -C "$REPO_DIR" remote get-url origin 2>/dev/null || true)
+  remote=${remote%.git}
+  case "$remote" in
+    https://github.com/*) echo "$remote" ;;
+    git@github.com:*) echo "https://github.com/${remote#git@github.com:}" ;;
+    ssh://git@github.com/*) echo "https://github.com/${remote#ssh://git@github.com/}" ;;
+  esac
+}
+
+tag="" ahead=0 commit="" repo_url=""
+if git -C "$REPO_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+  commit=$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || true)
+  tag=$(git -C "$REPO_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+  if [[ -n $tag ]]; then
+    ahead=$(git -C "$REPO_DIR" rev-list --count "$tag..HEAD" 2>/dev/null || echo 0)
+  fi
+  repo_url=$(github_url)
+else
+  version=$(jq -r '.version // empty' "$REPO_DIR/manifest.json" 2>/dev/null || true)
+  [[ -n $version ]] && tag="v$version"
+  repo_url=$DEFAULT_REPO_URL
+fi
+
+label=${tag:-unreleased}
+url=""
+[[ -n $repo_url && -n $tag ]] && url="$repo_url/releases/tag/$tag"
+
+jq -nc --arg label "$label" --arg tag "$tag" --argjson ahead "${ahead:-0}" \
+   --arg commit "$commit" --arg url "$url" \
+   '{label: $label, tag: $tag, ahead: $ahead, commit: $commit, url: $url}'

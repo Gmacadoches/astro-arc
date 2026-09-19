@@ -41,6 +41,7 @@ Panel {
     setCenterHoverRevealSuppressed(false)
     root.controller.show()
     syncDraftsFromConfig()
+    refreshVersion()
     configFile.reload()
     lastRunFile.reload()
     reviewsIndexFile.reload()
@@ -754,10 +755,42 @@ Panel {
         }
       }
     }
-    onExited: root.updateBusy = false
+    onExited: {
+      root.updateBusy = false
+      // An applied update fast-forwards the checkout, so the version moved.
+      root.refreshVersion()
+    }
   }
 
   Process { id: restartShellProc; command: ["omarchy-restart-shell"] }
+
+  // ---- Version: read from git by astro-arc-version, so a release is a tag
+  // and nothing in here is edited per release. Links to that release's GitHub
+  // page. Refreshed each time the panel opens and after an update, since
+  // either can find it moved while the shell keeps running. --------------------------------
+  readonly property string versionBin: binDir + "/astro-arc-version"
+  property string versionLabel: ""
+  property string versionUrl: ""
+  property int versionAhead: 0
+
+  function refreshVersion() {
+    if (!versionProc.running) versionProc.running = true
+  }
+
+  Process {
+    id: versionProc
+    command: [root.versionBin]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var parsed = null
+        try { parsed = JSON.parse(String(text || "")) } catch (e) { parsed = null }
+        root.versionLabel = parsed ? String(parsed.label || "") : ""
+        root.versionUrl = parsed ? String(parsed.url || "") : ""
+        root.versionAhead = parsed ? (parsed.ahead || 0) : 0
+      }
+    }
+  }
 
   // ---- Model catalog: which models this key can actually reach, what they
   // cost, and what they have been measured consuming. Replaces the hardcoded
@@ -1393,8 +1426,10 @@ Panel {
             // at all — more consequential than any model choice below.
             Toggle {
               width: parent.width
-              label: "Background only"
-              description: "Do not update theme colors"
+              label: root.configState.backgroundOnly ? "Background only (on)" : "Background only (off)"
+              description: root.configState.backgroundOnly
+                ? "Do not update theme colors"
+                : "Theme colors will update from the background's palette"
               checked: root.configState.backgroundOnly
               foreground: root.bar.foreground
               fontFamily: root.bar.fontFamily
@@ -1809,6 +1844,38 @@ Panel {
                 color: Qt.darker(root.bar.foreground, 1.3)
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.bodySmall
+              }
+
+              // The release this checkout is on, linked to its GitHub page.
+              // Past a release (the updater fast-forwards to the branch head,
+              // not to the next tag) it says how far. The row is too narrow to
+              // name the commit as well; the release link is what matters.
+              Text {
+                id: versionText
+                anchors.left: updateLabel.right
+                anchors.leftMargin: Style.space(8)
+                anchors.right: updateBtn.left
+                anchors.rightMargin: Style.space(8)
+                anchors.verticalCenter: parent.verticalCenter
+                elide: Text.ElideRight
+                text: root.versionLabel === ""
+                  ? ""
+                  : root.versionLabel + (root.versionAhead > 0
+                      ? " +" + root.versionAhead + " commit" + (root.versionAhead === 1 ? "" : "s")
+                      : "")
+                color: root.bar.foreground
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.underline: root.versionUrl !== "" && versionMouse.containsMouse
+
+                MouseArea {
+                  id: versionMouse
+                  anchors.fill: parent
+                  enabled: root.versionUrl !== ""
+                  hoverEnabled: true
+                  cursorShape: root.versionUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
+                  onClicked: Quickshell.execDetached(["xdg-open", root.versionUrl])
+                }
               }
 
               // One button with three jobs, because they are three steps of one
