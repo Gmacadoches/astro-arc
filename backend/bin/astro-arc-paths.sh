@@ -13,7 +13,7 @@
 #   CONFIG_FILE  the one settings file, where Omarchy keeps every plugin's.
 #
 # Before 2026-09-19 the archive lived in STATE_DIR/reviews, where tools that
-# treat state as disposable could clear it. astro-arc-migrate moves it.
+# treat state as disposable could clear it.
 
 ARCHIVE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/astro-arc"
 GENERATIONS_DIR="$ARCHIVE_DIR/generations"

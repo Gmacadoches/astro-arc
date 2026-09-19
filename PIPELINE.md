@@ -73,7 +73,6 @@ while you are logged out — see the Schedule caption in the panel.
 There used to be a systemd timer as well. On Omarchy the shell is the desktop,
 so it only ever covered a session with no shell running, and it outlived the
 plugin: after removal it fired into a deleted script every fifteen minutes.
-`astro-arc-migrate` removes it from installs that still have it.
 
 "Already generated?" is decided by re-keying `last-run.json`'s `generatedAt`
 under the frequency set **right now**, never by comparing its stored
@@ -303,7 +302,8 @@ user in seconds:
 
 ```sh
 FRESH=$(mktemp -d)
-git clone . $FRESH/.config/omarchy/plugins/garrett.astro-arc
+mkdir -p $FRESH/.config/omarchy/plugins
+cp -a . $FRESH/.config/omarchy/plugins/garrett.astro-arc
 HOME=$FRESH $FRESH/.config/omarchy/plugins/garrett.astro-arc/backend/bin/astro-arc-generate
 ```
 

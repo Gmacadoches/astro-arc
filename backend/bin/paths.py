@@ -11,6 +11,3 @@ GALLERY_FILE = ARCHIVE_DIR / "index.html"
 
 STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc"
 CONFIG_FILE = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
-
-# Where the archive lived until 2026-09-19. Only astro-arc-migrate reads it.
-LEGACY_REVIEWS_DIR = STATE_DIR / "reviews"

@@ -8,8 +8,8 @@ Astro-Arc has ever made. Every link is relative, so the page keeps working if
 the archive folder is copied or moved elsewhere, and it needs no server, no
 script and no network beyond the web fonts it asks for.
 
-Rewritten whole whenever the archive changes (a new generation, a prune, the
-migration), never edited in place.
+Rewritten whole whenever the archive changes (a new generation or a prune),
+never edited in place.
 
 Usage: archive_gallery.py        rebuild it now
 """
@@ -107,7 +107,7 @@ def _month(entry):
 
 def render(entries):
     if not entries:
-        sections = '<p class="empty">Nothing generated yet. Press Generate in the Astro-Arc panel.</p>'
+        sections = '<p class="empty">Nothing generated yet. Press Regenerate in the Astro-Arc panel.</p>'
         summary = "No generations yet."
     else:
         groups = {}

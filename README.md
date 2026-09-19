@@ -101,11 +101,6 @@ minutes of your being back rather than being skipped.
 **Remove:** `omarchy plugin remove garrett.astro-arc`. Your archive stays —
 see below.
 
-Upgrading from a version that had `install.sh`? Nothing to do: the widget
-removes the old timer and link handler on its own and moves your history into
-the archive. The old Python environment is no longer used, and you can delete
-it with `rm -rf ~/.local/share/omarchy/astro-arc`.
-
 ## Your archive
 
 Every generation is kept as a page of its own — the image, the reading, the

@@ -5,7 +5,7 @@
 #
 # This is not the same job as astro-arc-save-theme, which installs a generation
 # into ~/.config/omarchy/themes/ for use on THIS machine. Omarchy distributes
-# themes by git clone (`omarchy theme install <git-repo-url>`, see
+# themes as git repositories (`omarchy theme install <git-repo-url>`, see
 # omarchy-theme-install), so making a theme usable by anyone else means
 # producing a git repository, not a directory or a tarball. That is what this
 # does: a self-contained repo the recipient installs with one command.

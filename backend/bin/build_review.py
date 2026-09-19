@@ -17,7 +17,7 @@ Generated" list reads. The gallery (archive_gallery.py) is rebuilt afterwards,
 so ~/.local/share/astro-arc/index.html always lists everything.
 
 Pages written before 2026-09-19 carried the image inline as base64, about 5 MB
-each; they still work, and astro-arc-migrate moved them here unchanged.
+each; they still work.
 
 Called by astro-arc-generate after every real run.
 """

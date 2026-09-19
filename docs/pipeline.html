@@ -409,7 +409,7 @@
 <h3>Decide whether to run at all</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>astro-arc-generate --if-due</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>frequency</code></dd></div></dl>
 <p>The panel is the scheduler. The bar widget loads it with the shell, so its 5-minute poll runs from login whether or not the panel is ever opened, and it passes <code>--if-due</code>; a manual Regenerate does not. Both take the same <code>flock</code>, so a click can never double-render a period the poll just started. Nothing runs while you are logged out — see the Schedule caption in the panel.</p>
-<p>There used to be a systemd timer as well. On Omarchy the shell is the desktop, so it only ever covered a session with no shell running, and it outlived the plugin: after removal it fired into a deleted script every fifteen minutes. <code>astro-arc-migrate</code> removes it from installs that still have it.</p>
+<p>There used to be a systemd timer as well. On Omarchy the shell is the desktop, so it only ever covered a session with no shell running, and it outlived the plugin: after removal it fired into a deleted script every fifteen minutes.</p>
 <p>"Already generated?" is decided by re-keying <code>last-run.json</code>'s <code>generatedAt</code> under the frequency set <strong>right now</strong>, never by comparing its stored <code>periodKey</code>. That key was filed under whatever frequency was set at the time, so comparing it directly made switching Daily → Monthly start a paid render as the immediate consequence of changing a dropdown.</p>
 <p>Period keys: <code>YYYY-MM-DDTHH</code> · <code>YYYY-MM-DD</code> · ISO <code>%G-W%V</code> · <code>YYYY-MM</code>.</p>
 </li>
@@ -509,7 +509,8 @@ sweep.py --out wording --registers botanical --no-image  <span class="c"># promp
 <h3>Test a fresh install without touching your own</h3>
 <p>There is no install step, and every path derives from <code>$HOME</code> (the archive from <code>$XDG_DATA_HOME</code>, defaulting under it), so a throwaway home is a genuinely new user in seconds:</p>
 <pre>FRESH=$(mktemp -d)
-git clone . $FRESH/.config/omarchy/plugins/garrett.astro-arc
+mkdir -p $FRESH/.config/omarchy/plugins
+cp -a . $FRESH/.config/omarchy/plugins/garrett.astro-arc
 HOME=$FRESH $FRESH/.config/omarchy/plugins/garrett.astro-arc/backend/bin/astro-arc-generate</pre>
 <p>That exercises the real defaults a new user gets and the real first-run paths — no birth data, no archive, no caches — which is where fresh-install bugs live.</p>
 <p>Two things it cannot cover, because they are not <code>$HOME</code>-scoped: the QML widget needs the running shell, and <code>secret-tool</code> talks to your real keyring, so a throwaway home still finds your real API key.</p>

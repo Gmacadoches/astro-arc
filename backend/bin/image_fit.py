@@ -27,8 +27,8 @@ def _magick():
         path = shutil.which(name)
         if path:
             return path
-    raise ImageError("ImageMagick is not installed (need `magick`). "
-                     "On Omarchy: sudo pacman -S imagemagick")
+    raise ImageError("ImageMagick is not installed (need `magick`). It is part of "
+                     "Omarchy's base install, in the imagemagick package.")
 
 
 def run_magick(args):

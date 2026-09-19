@@ -56,11 +56,6 @@ if ! flock -n 9; then
   exit 0
 fi
 
-# Bring an install made with the old install.sh onto the current layout (timer
-# and URL handler removed, archive moved to ~/.local/share/astro-arc). A no-op
-# once done; never allowed to stop a generation.
-"$BIN_DIR/astro-arc-migrate" || true
-
 # One read, through astro-arc-config, so the defaults live in exactly one place.
 # Reading $CONFIG_FILE directly meant every value here carried a second copy of
 # a default, and the frequency copy had already drifted from DEFAULTS.
@@ -155,7 +150,7 @@ command -v python3 >/dev/null 2>&1 || missing+=(python)
 command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1 || missing+=(imagemagick)
 command -v curl >/dev/null 2>&1 || missing+=(curl)
 if (( ${#missing[@]} )); then
-  echo "astro-arc-generate: missing ${missing[*]}. Install with: sudo pacman -S ${missing[*]}" >&2
+  echo "astro-arc-generate: missing ${missing[*]}, which Omarchy normally ships. Reinstall that package, then try again." >&2
   exit 1
 fi
 if ! python3 -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then

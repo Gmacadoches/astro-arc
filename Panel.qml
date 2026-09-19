@@ -316,11 +316,10 @@ Panel {
   // `astro-arc-generate --if-due`, which does nothing unless the period is due
   // and holds a lock so a manual click can never double-render.
   //
-  // There used to be a systemd timer too, installed by install.sh as a
+  // There used to be a systemd timer too, installed by an install script as a
   // "backstop". On Omarchy the shell IS the desktop, so it only ever added
   // coverage for a logged-in session with no shell — and it outlived the
-  // plugin, firing into a deleted script after removal. astro-arc-migrate
-  // removes it from installs that still have it.
+  // plugin, firing into a deleted script after removal. Both are gone.
   //
   // "New period" is a plain string comparison against Model.currentPeriodKey
   // (which mirrors astro-arc-generate's own `date +%Y-%m-%d`/`+%G-W%V`/
@@ -773,17 +772,6 @@ Panel {
 
   Process { id: restartShellProc; command: ["omarchy-restart-shell"] }
 
-  // Once per shell start: brings an install made with the old install.sh onto
-  // the current layout — removes its systemd timer and astroarc:// handler,
-  // and moves the archive out of ~/.local/state. Silent, and a no-op once
-  // done. astro-arc-generate runs it too, for a generation started elsewhere.
-  Process {
-    id: migrateProc
-    command: [root.binDir + "/astro-arc-migrate"]
-    running: true
-    onExited: root.reviewsIndexFile.reload()
-  }
-
   function openArchive() {
     Quickshell.execDetached(["xdg-open", root.galleryFile])
   }
@@ -1129,7 +1117,7 @@ Panel {
 
   // ---- Export: package the selected generation as a shareable Omarchy theme
   // REPOSITORY, which is a different job from Save. Save installs a theme on
-  // THIS machine; Omarchy distributes themes by git clone
+  // THIS machine; Omarchy distributes themes as git repositories
   // (`omarchy theme install <url>`), so handing one to another user means
   // producing a git repo. astro-arc-export-theme builds that, preview and
   // README included, and prints where it put it.
