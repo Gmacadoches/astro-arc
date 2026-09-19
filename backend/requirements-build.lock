@@ -1,0 +1,21 @@
+# Build tools for the one package this project compiles from source
+# (pyswisseph — see requirements.lock). Installed BEFORE requirements.lock, and
+# that install runs with --no-build-isolation, so these exact files are what
+# builds it. Without that, pip's build isolation would fetch setuptools itself,
+# and setuptools would fetch pyswisseph's setup_requires (`wheel`) itself —
+# two downloads no hash in this repo would ever check.
+#
+# Installed by install.sh with --require-hashes --only-binary=:all:.
+# Every version is exact; every hash is the sha256 PyPI publishes for that file.
+
+# builds pyswisseph from source
+setuptools==84.0.0 \
+    --hash=sha256:51a52592b3b99e102b609654876bd65f19f999935166d1352678931132b0c670
+
+# pyswisseph's setup_requires; pre-installed so setuptools never fetches it itself
+wheel==0.48.0 \
+    --hash=sha256:3217dcc807155e45db462d7ef2431f5ddda0d7273b700d05a67b271ceb1287ab
+
+# via wheel
+packaging==26.3 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c

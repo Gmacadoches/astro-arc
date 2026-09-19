@@ -69,7 +69,10 @@ distance come through in every style. Light is the one that negotiates.
   run standalone.
 - **Python 3.11+** (uses stdlib `tomllib`; developed against 3.14). The chart
   maths comes from the [Swiss Ephemeris](https://www.astro.com/swisseph/) via
-  `pyswisseph`, installed by `install.sh`.
+  `pyswisseph`, installed by `install.sh` from a hash-checked lock
+  (`backend/requirements.lock`). pyswisseph publishes no wheel for Python
+  3.12+, so it compiles from source: that needs a C compiler
+  (`sudo pacman -S --needed base-devel`).
 - **System tools**: `jq`, `secret-tool` (libsecret), `hyprctl`, `xdg-mime` —
   all standard on an Omarchy install.
 - **An OpenAI API key.** Every stage is an API call, so a key is required
@@ -92,6 +95,7 @@ key anywhere — see **Your data** below.
 
 ```sh
 git -C ~/.config/omarchy/plugins/astro-arc pull       # update
+~/.config/omarchy/plugins/astro-arc/install.sh         # re-sync the venv if the lock changed
 ~/.config/omarchy/plugins/astro-arc/install.sh --uninstall
 ```
 

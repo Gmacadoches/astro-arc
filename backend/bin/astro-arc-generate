@@ -149,9 +149,9 @@ fi
 # or auto-generation off) stay quiet on an install that has not been set up.
 if [[ ! -x $VENV_PY ]]; then
   echo "astro-arc-generate: no Python venv at $VENV_PY" >&2
-  echo "  Create it once:" >&2
-  echo "    python3 -m venv \"$HOME/.local/share/omarchy/astro-arc/venv\"" >&2
-  echo "    \"$VENV_PY\" -m pip install pyswisseph timezonefinder pillow" >&2
+  echo "  Create it by running the installer, which builds it from the hash-checked" >&2
+  echo "  lock in backend/requirements.lock:" >&2
+  echo "    \"$BIN_DIR/../../install.sh\"" >&2
   exit 1
 fi
 
