@@ -106,9 +106,12 @@ see below.
 
 Every generation is kept as a page of its own — the image, the reading, the
 prompt and what it cost — together with its complete theme, in
-`~/.local/share/astro-arc/`. **Browse all generations** in the panel opens the
-gallery, `~/.local/share/astro-arc/index.html`: every generation, newest first,
-each linking to its page. Bookmark it.
+`~/.local/share/astro-arc/`. Under **Themes Generated** in the panel, pick a
+generation and then **Open** its page, **Browse** the whole gallery
+(`~/.local/share/astro-arc/index.html`: every generation, newest first — bookmark
+it), or **Set Theme** to put that generation's colours and wallpaper back on the
+desktop. Set Theme is temporary by design: the next generation replaces it, and
+**Save Selected Theme** is how one becomes a permanent Omarchy theme.
 
 Uninstalling the plugin leaves your archive untouched, because it was always
 just files in your home directory. Delete the folder when you no longer want

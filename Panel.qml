@@ -1022,6 +1022,7 @@ Panel {
   property string _saveThemeStdout: ""
   property string _saveThemeStderr: ""
   readonly property string saveThemeBin: binDir + "/astro-arc-save-theme"
+  readonly property string setThemeBin: binDir + "/astro-arc-set-theme"
   readonly property string pruneHistoryBin: binDir + "/astro-arc-prune-history"
 
   function reviewForId(id) {
@@ -1069,6 +1070,41 @@ Panel {
         root.themeActionStatusIsError = false
       } else {
         root.themeActionStatus = root._saveThemeStderr || "Save failed."
+        root.themeActionStatusIsError = true
+      }
+    }
+  }
+
+  // ---- Set Theme: put the selected generation's theme back on the desktop.
+  // Neighbour to Save and Export, and the odd one out: those two make a copy
+  // and leave the desktop alone, this one changes what you are looking at and
+  // leaves nothing behind — the live astro-arc theme is rebuilt by the next
+  // generation either way. It is the "I liked Tuesday's better" button, and
+  // the reason it is safe to press is that Tuesday's is still in the archive
+  // afterwards. ---------------------------------------------------------------
+  property string _setThemeStdout: ""
+  property string _setThemeStderr: ""
+
+  function setSelectedTheme() {
+    if (!root.selectedReviewId || setThemeProc.running) return
+    root.themeActionStatus = ""
+    root._setThemeStdout = ""
+    root._setThemeStderr = ""
+    setThemeProc.command = [root.setThemeBin, root.selectedReviewId]
+    setThemeProc.running = true
+  }
+
+  Process {
+    id: setThemeProc
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._setThemeStdout = String(text || "").trim() }
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._setThemeStderr = String(text || "").trim() }
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.themeActionStatus = "Desktop is now on “" + root._setThemeStdout
+          + "”. The next generation replaces it."
+        root.themeActionStatusIsError = false
+      } else {
+        root.themeActionStatus = root._setThemeStderr || "Could not set that theme."
         root.themeActionStatusIsError = true
       }
     }
@@ -2301,27 +2337,22 @@ Panel {
             PanelSeparator { foreground: root.bar.foreground }
             PanelSectionHeader { text: "THEMES GENERATED"; foreground: root.bar.foreground }
 
+            // The picker gets the whole row. It used to share it with a
+            // "History" label and the Open button, which left an entry like
+            // "Sep 19, 2:10 PM · Cyberpunk · 2.39 MB" elided in the middle —
+            // and the part that gets cut is the style, which is the part you
+            // are choosing by. The section header already says what this is,
+            // so the label column was pure cost; Open moved to the row below,
+            // where it sits with the other two things you can do to the
+            // entry you picked.
             Item {
               width: parent.width
-              height: Math.max(reviewsLabel.implicitHeight, reviewsDropdown.implicitHeight)
-
-              Text {
-                id: reviewsLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "History"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
+              height: reviewsDropdown.implicitHeight
 
               Dropdown {
                 id: reviewsDropdown
-                anchors.left: reviewsLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: openReviewBtn.left
-                anchors.rightMargin: Style.space(8)
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 showLabel: false
                 value: root.selectedReviewId
@@ -2337,35 +2368,53 @@ Panel {
                 foreground: root.bar.foreground
                 onChanged: function(value) { root.selectedReviewId = value }
               }
+            }
+
+            // What you can do with the entry above, left to right in the order
+            // you would reach for them: look at this one, look at all of them,
+            // put this one back on the desktop. Set Theme is the only one that
+            // changes anything, and what it changes is undone by the next
+            // generation — the permanent copies are Save and Export below.
+            Row {
+              width: parent.width
+              spacing: Style.space(8)
 
               Button {
                 id: openReviewBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
                 text: "Open"
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== ""
                 onClicked: root.openSelectedReview()
               }
-            }
 
-            // The whole history as one browsable page — the URL worth
-            // bookmarking. Plain files; opens in the default browser.
-            Item {
-              width: parent.width
-              height: archiveBtn.implicitHeight
-
+              // The whole history as one browsable page — the URL worth
+              // bookmarking. Plain files; opens in the default browser.
               Button {
                 id: archiveBtn
-                anchors.left: parent.left
-                anchors.leftMargin: root.labelColW + Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Browse all generations"
+                text: "Browse"
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 onClicked: root.openArchive()
+              }
+
+              Button {
+                id: setThemeBtn
+                text: setThemeProc.running ? "Setting…" : "Set Theme"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== "" && !setThemeProc.running
+                onClicked: root.setSelectedTheme()
+
+                // Same latch as Regenerate and Export: the label shortens
+                // while running, and a control that resizes under the cursor
+                // is what made that button feel wrong.
+                property real reservedWidth: 0
+                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
+                width: Math.max(implicitWidth, reservedWidth)
               }
             }
 
