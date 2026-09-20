@@ -75,26 +75,69 @@ def hits(text, needles):
     return sorted({n.strip() for n in needles if n in low})
 
 
+# The families must cover STAGE15_SYSTEM's whole offered vocabulary, not just
+# the ones that happened to show up in the first sample. An uncovered
+# constellation falls into a per-text "other:" bucket, and because that label
+# embeds the text, every uncovered day counts as its own family — which
+# silently inflates the distinct-family count that B0 is measured on. The first
+# run of replay_amplify.py scored the best arm 12/12 distinct for exactly that
+# reason; the real figure was 9. Add a family here rather than let the bucket
+# absorb it.
+#
+# Ordered most specific first, first match wins: "the child born and held" has
+# to be tested before the generic vessel words, and the alchemical stages
+# before "vessel", since nigredo is classically described as happening in one.
+_FAMILIES = (
+    ("world parents", "separation of the World Parents"),
+    ("night-sea", "night-sea journey"),
+    ("dragon-fight", "dragon-fight"),
+    ("hieros gamos", "hieros gamos"),
+    ("sacred marriage", "hieros gamos"),
+    ("coniunctio", "coniunctio"),
+    ("nigredo", "nigredo"),
+    ("albedo", "albedo"),
+    ("rubedo", "rubedo"),
+    ("prima materia", "prima materia"),
+    ("calcination", "calcination"),
+    ("dissolution", "dissolution"),
+    ("centroversion", "centroversion"),
+    ("child born", "the child born and held"),
+    ("child held", "the child born and held"),
+    ("dismember", "dismemberment"),
+    ("petrif", "petrification"),
+    ("captiv", "captivity"),
+    ("devouring", "the Great Mother devouring"),
+    ("great mother", "the Great Mother"),
+    ("uroboros", "uroboros"),
+    ("uroboric", "uroboros"),
+    ("treasure", "the treasure hard to attain"),
+    ("feast", "the feast"),
+    ("harvest", "harvest and ripening"),
+    ("ripening", "harvest and ripening"),
+    ("first light", "the first light"),
+    ("spring", "the found spring"),
+    ("threshold", "the threshold"),
+    ("hero", "the hero"),
+    # Last, because The Great Mother's vessel words are the widest net here and
+    # would otherwise swallow more specific archetypes that mention one.
+    ("vessel", "the vessel"),
+    ("loom", "the vessel"),
+    ("oven", "the vessel"),
+    ("granary", "the vessel"),
+    ("tomb", "the vessel"),
+    ("well", "the vessel"),
+    ("mill", "the vessel"),
+)
+
+
 def archetype_family(text):
     """The dominant named archetype, so near-identical constellations collapse
-    together. Ordered most specific first; the first match wins."""
+    together."""
     low = text.lower()
-    for key, label in (
-        ("world parents", "separation of the World Parents"),
-        ("night-sea", "night-sea journey"),
-        ("centroversion", "centroversion"),
-        ("great mother", "the Great Mother"),
-        ("dragon-fight", "dragon-fight"),
-        ("hieros gamos", "hieros gamos"),
-        ("nigredo", "nigredo"),
-        ("albedo", "albedo"),
-        ("rubedo", "rubedo"),
-        ("uroboros", "uroboros"),
-        ("child born", "the child born and held"),
-    ):
+    for key, label in _FAMILIES:
         if key in low:
             return label
-    return "other: " + " ".join(text.split()[:6])
+    return "unclassified: " + " ".join(text.split()[:6])
 
 
 def load_records():

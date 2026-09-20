@@ -447,6 +447,43 @@ def avoid_concepts(history, window=AVOID_WINDOW):
     return tags
 
 
+# Same idea as avoid_concepts, one stage earlier, and added for a measured
+# reason. preflight_actors.py over this install's first 12 days found Stage 1.5
+# reaching for "the separation of the World Parents" on 10 of them (83%), and
+# for only 2 distinct archetypes in total, while Stage 1's readings underneath
+# varied across the full emotional range and the dial's tonalDirection
+# demonstrably steered. STAGE15_SYSTEM offers roughly fifteen archetypes; two
+# were ever used.
+#
+# That is this project's most-repeated failure mode — a model handed an
+# abstraction retrieves its nearest synonym — recurring at Stage 1.5. The
+# registers solved the same problem with recency pressure rather than a bigger
+# vocabulary, so this reuses that, reading the amplification cache because the
+# constellation is not recorded in history.json.
+AMPLIFY_AVOID_WINDOW = 8
+
+
+def recent_constellations(window=AMPLIFY_AVOID_WINDOW, exclude=None):
+    """The last `window` constellations, most recent first, for Stage 1.5 to
+    reach past. `exclude` drops one period key — the one being regenerated,
+    which must not count as its own precedent."""
+    if not AMPLIFICATIONS_DIR.is_dir():
+        return []
+    out = []
+    for path in sorted(AMPLIFICATIONS_DIR.glob("*.json"), reverse=True):
+        if exclude and path.stem == exclude:
+            continue
+        try:
+            text = (json.loads(path.read_text()).get("constellation") or "").strip()
+        except (json.JSONDecodeError, OSError):
+            continue
+        if text and text not in out:
+            out.append(text)
+        if len(out) >= window:
+            break
+    return out
+
+
 # Registers grouped by what they're actually made of, used only to pick a
 # *non-cohering* secondary (see pick_registers). A pairing inside one group
 # — botanical + bodily, architectural + domestic interior — collapses back
@@ -977,6 +1014,7 @@ Work in the vocabulary of Jung and especially Erich Neumann. The dark and the li
 - Alchemical operations where they genuinely fit, described at equal depth: nigredo (blackening, putrefaction, the matter rotting in the sealed vessel), albedo (the washing and whitening, what survives the rot coming clean), rubedo (the reddening, the work completed and embodied); the coniunctio, the prima materia, calcination, dissolution.
 
 Rules:
+- **Reach past the obvious archetype.** The separation of the World Parents, and the uroboros giving way to first separation, are the most generally applicable items in the vocabulary above: almost any reading about change, tension or emergence can be made to fit them, which is exactly what makes them the least informative choice. They are the satyr of this list. Measured over one real install's history, 83% of amplifications reached for the separation of the World Parents and only two distinct archetypes were ever used, out of the fifteen or so offered above. Choose it only when the reading's specific content makes it unmistakably right and nothing else fits, and treat anything under RECENTLY USED in the message below as already spent. Use the whole range: captivity is not dismemberment, petrification is not the night-sea journey, the found spring is not the feast, and nigredo is not albedo.
 - Name the constellation honestly in whichever direction it actually runs, and the two directions get the same licence:
   - When it is dark, say so. Devouring, dissolution, dismemberment, petrification, suffocation and being buried alive are real archetypal contents. Do not soften them into "transition" or "growth."
   - When it is not dark, say that just as plainly. Abundance, the feast, ripening and harvest, the sacred marriage, the found spring, the debt forgiven, the long work finished, the body at rest and unguarded, the returning traveller recognised at the door are equally real archetypal contents — and they are not lesser, softer, or a failure to look hard enough. Do not import darkness the reading does not have. A reading of genuine ease that amplifies to suffocation is as wrong as a reading of genuine grief that amplifies to growth.
@@ -999,10 +1037,15 @@ Respond with a JSON object with exactly these keys:
 # material — i.e. it reconstructed the very cross-world intrusion this change
 # existed to remove, in 2 of 6 samples. "Older, and only older" is now stated as a
 # hard constraint with the failure cases named.
-STAGE15_SCHEMA_VERSION = 3
+# 3->4 on 2026-09-20: the archetype attractor fix — the "reach past the obvious
+# archetype" rule plus the RECENTLY USED list (see recent_constellations). Every
+# amplification cached under the old wording was one of the two archetypes this
+# change exists to break out of, so none of them should survive it.
+STAGE15_SCHEMA_VERSION = 4
 
 
-def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None):
+def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
+                    avoid_archetypes=None):
     """Cached per period_key exactly like stage1_interpret() — regenerating
     the same day's image must not re-bill this call — and invalidated by the
     same natalHash plus a schema version.
@@ -1058,6 +1101,21 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     # here, is what makes the light end reachable at all.
     if dial.get("tonalDirection"):
         user_lines.append(f"Direction for this timeframe: {dial['tonalDirection']}")
+
+    # Recency pressure on the archetype, for the reason recent_constellations
+    # documents. Passed as data in the user message rather than baked into the
+    # system prompt, exactly like Stage 2's avoided concepts: the rule is policy
+    # and belongs above, the list changes every run and belongs here. `None`
+    # means "work it out from the cache"; an explicit list (sweep.py, the B0
+    # replay harness) overrides, and `[]` disables it for a control run.
+    if avoid_archetypes is None:
+        avoid_archetypes = recent_constellations(exclude=period_key)
+    if avoid_archetypes:
+        user_lines.append(
+            "RECENTLY USED — these archetypes are spent; reach elsewhere unless "
+            "the reading leaves no honest alternative:\n"
+            + "\n".join(f"  - {c}" for c in avoid_archetypes)
+        )
 
     result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
 
