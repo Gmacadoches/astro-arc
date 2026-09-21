@@ -1408,11 +1408,37 @@ _CAPTION_SIDES = {
     "threatening", "sinister", "evil", "cruel",
 }
 
-CAPTION_CHECK_SYSTEM = """You are labelling an image for a stock picture library. You are given a description of a single image. Reply with the one short phrase a librarian would file it under, and nothing else.
+# Captioning alone was measured at 20/22 against a hand-labelled calibration
+# set, and both misses were the same failure: the judge paraphrases a loaded
+# scene into neutral language and the word list then has nothing to catch.
+# "one snarling toward the viewer, the other wide-eyed" came back as "men
+# wrestling with intense expressions"; "hands clasped, reaching toward someone
+# out of frame" came back as "a figure in prayer or supplication". Both are
+# melodrama and both passed.
+#
+# Enumerating more words cannot close that — "intense expressions" is not a
+# word-list problem. So the judge is now asked the three questions directly
+# and the lists stay as a cheap backstop for the cases it waves through.
+#
+# The examples below are drawn from the labelled set rather than invented,
+# because the hard part is not catching melodrama but NOT catching the
+# conflict scenes that are allowed: deadly wrestling, mass battle, an animal
+# on a man, a victor with a carcass behind him were all labelled pass.
+CAPTION_CHECK_SYSTEM = """You judge whether a described image STATES a feeling rather than showing an action. You are given a description of a single image.
 
-File it under what is HAPPENING if the image shows an activity — "stacking stones", "prising open a drum", "hauling a net". File it under the FEELING only if that is genuinely what the picture is about.
+The rule: an image may show FORCE but never MOTIVE. Violence, death, struggle, war and physical conflict are all perfectly acceptable and must not be flagged on their own. What is not acceptable is a picture that tells the viewer what to feel or whose side to take.
 
-Respond with a JSON object: {"caption": "a short phrase, at most 8 words"}"""
+Answer three questions about the image:
+
+1. motive — does it show WHY (vengeance, betrayal, protection, rescue, devotion) rather than only WHAT the bodies are doing (grip, weight, leverage, strain)?
+2. sides — could a stranger tell in one second who is the aggressor and who is the victim, or whom to root for?
+3. performed — is any face or pose there to be read as a feeling, rather than explained by the task? A face showing the effort or concentration of what it is doing is fine. A face weeping, snarling for the viewer, pleading, or gazing wistfully is not, and neither is a body arranged into an attitude of grief, supplication or triumph.
+
+Examples. "Two men locked in a mud-slick wrestle, faces set hard with the effort" — all three false; the faces show effort and no side is offered. "A wide field of hundreds in close combat" — all three false. "A large dog with its jaws on a man's forearm, both braced" — all three false. "Two men wrestling, one snarling toward the viewer, the other wide-eyed" — performed is TRUE; the faces perform hatred and fear for an audience. "A figure dragging another out of a burning doorway" — motive is TRUE; the image is about rescue. "A kneeling figure with hands clasped, reaching toward someone out of frame" — performed is TRUE; the pose is supplication.
+
+Also give the one short phrase a stock picture library would file the image under: what is HAPPENING where it is an activity, the feeling only where that is genuinely what the picture is about.
+
+Respond with a JSON object: {"caption": "a short phrase, at most 8 words", "motive": true or false, "sides": true or false, "performed": true or false}"""
 
 
 def caption_check(prompt, model):
@@ -1435,8 +1461,20 @@ def caption_check(prompt, model):
     if not caption:
         return "", [], None
 
-    low = caption.lower()
     hits = []
+    # The judge's own verdict first. It catches the paraphrase cases the word
+    # lists structurally cannot, and it is the part calibrated against the
+    # labelled set. Anything truthy counts, since a model asked for a boolean
+    # under json_object occasionally returns the string "true".
+    for key in ("motive", "sides", "performed"):
+        value = result.get(key)
+        if value is True or (isinstance(value, str) and value.strip().lower() == "true"):
+            hits.append(f"judge:{key}")
+
+    # The lists remain as a backstop over the caption, for the inverse failure:
+    # a judge that answers all three questions "false" and then files the image
+    # under "mourning at a gravesite" anyway.
+    low = caption.lower()
     for words, label in ((_CAPTION_EMOTION, "emotion"),
                          (_CAPTION_EXPRESSION, "expression"),
                          (_CAPTION_MOTIVE, "motive"),
