@@ -52,12 +52,18 @@ man-beast = """A figure that is part human and part animal, drawn from any mytho
 
 solitary = """Exactly one person, alone in the frame, and the world around them does the rest of the work — do not add a companion, a witness or a crowd to give them something to react to. They may be the viewer's way into the scene, and an ordinary, unidealised figure serves that better than a striking one."""
 
+# Widened 2026-09-20 (second pass): it said "two or more PEOPLE", so two
+# machines meshed in a shared task had nowhere correct to go -- `automaton` is
+# singular and unattended by its own definition. Stage 1.5 typed them
+# figures-in-relation anyway and was right; the taxonomy was too narrow. The
+# kind is about relation through shared work, which is species-agnostic.
+#
 # Reframed 2026-09-20. This was "figures in relation — People in the plural,
 # related to each other", which is precisely the two-person drama STAGE2_SYSTEM
 # forbids: a contradiction that sat live in the config. The plural is kept; what
 # changes is that the relation runs through a shared task or object rather than
 # between two faces.
-figures-in-relation = """Two or more people joined by one piece of work: carrying, hauling, hoisting, mending, handing over, holding something steady between them. The relation is through the thing, never between the faces — nobody is reacting to anybody. Physical struggle counts as shared work, so long as the image shows the force and not the reason for it."""
+figures-in-relation = """Two or more figures — people, creatures, machines, spirits, or a mix of them — joined by one piece of work: carrying, hauling, hoisting, mending, handing over, holding something steady between them. The relation is through the thing, never between the faces — nobody is reacting to anybody. Physical struggle counts as shared work, so long as the image shows the force and not the reason for it."""
 
 crowd = """Let the many carry cultural or social material, with one figure marked out from the rest. The crowd is one element, however many bodies are in it — do not reach a density requirement by multiplying faces."""
 
@@ -69,11 +75,11 @@ swarm = """Many bodies with one apparent will — insects, birds, fish, rodents.
 
 automaton = """A machine that keeps working, apparently of its own accord, with no one attending it. Agency without life and the coldest actor available: it is not a robot character and has no face to read, it simply has not stopped. Pre-electronic wherever the world allows — clockwork, weight-driven, water-driven, governed."""
 
-# Gated per style. Most worlds forbid the immaterial outright (Ghibli's "never
-# abstract energy-beings", and cyberpunk and ukiyo-e say the same), so this kind
-# is only eligible where the style's own world permits a body for it. Until the
-# world charters land it stays off everywhere — see the style-native registers
-# work for where that gate moves to.
+# Gated per style, and the gate is now live: `presence` is eligible only where
+# that style's charter has a `numinous` field describing how the numinous takes
+# a body (see presence_allowed). Silence is not permission, so an unchartered
+# style cannot have one. ghibli qualifies; the six styles still running on the
+# old `guidance` do not, until they are chartered.
 presence = """Something numinous that has a body. Not a glow, not a translucency, not a light — it is heavy, occupies space and is lit like everything else: a shape under cloth, a figure entirely wrapped, something the size of a building that is plainly alive. If it could be rendered as a light effect, it is wrong."""
 
 the-dead = """A body, a remnant, or something that was an actor and no longer is. It is acted upon rather than acting, and the relation still holds: something tends it, carries it, uncovers it, or has left it. Never gore; the fact of the body, not its injuries."""
