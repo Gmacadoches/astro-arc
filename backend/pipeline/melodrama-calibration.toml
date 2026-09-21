@@ -1,0 +1,169 @@
+# Calibration set for the melodrama caption check (llm_pipeline.caption_check).
+#
+# The rule the check enforces: an image may show FORCE but not MOTIVE. A scene
+# filed under an activity passes; one filed under a feeling, a reason, or a
+# side to take, fails. Physical struggle is explicitly allowed — war and a
+# deadly wrestle are native to the archetypal material — so an emotion-only
+# word list is not enough.
+#
+# More prose will not settle where that line falls. Labelled examples will.
+#
+# ---------------------------------------------------------------------------
+# HOW TO USE THIS FILE
+#
+# Set `label` on every scene to one of: "pass", "fail", "unsure".
+#   pass    -> this image is fine; the check must not flag it
+#   fail    -> this is melodrama; the check must catch it
+#   unsure  -> you cannot decide, which is the most useful answer of the three,
+#              because it marks where the line actually is rather than where
+#              it was guessed to be
+#
+# `machine` is what the check currently says, recorded 2026-09-20 so
+# disagreements are visible. Do not edit it — it is the thing being calibrated.
+# Where `label` and `machine` disagree, the word lists are wrong, not you.
+#
+# Five kinds of scene are on the line by construction and are marked
+# `borderline = true`: a rescue, a victor over a vanquished figure, a fight
+# with onlookers, an animal against a person, and mass battle. They are the
+# reason this file exists.
+# ---------------------------------------------------------------------------
+
+[[scene]]
+id = "stones"
+text = "A woman methodically stacking stones on a mound at dusk, more stones beside her than she can finish"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "drum"
+text = "A figure prising open a sealed iron drum with a bar, boots braced against its rim"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "grave"
+text = "A weeping woman kneeling beside a fresh grave, face in her hands"
+machine = "fail"
+label = ""
+
+[[scene]]
+id = "net"
+text = "Two people mending a long net stretched between them across a shingle beach"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "wrestle-effort"
+text = "Two men locked in a mud-slick wrestle at the edge of a ditch, faces set hard with the effort"
+machine = "pass"
+label = ""
+borderline = false
+
+[[scene]]
+id = "wrestle-snarl"
+text = "Two men wrestling, one snarling toward the viewer, the other wide-eyed"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "gun-haul"
+text = "A line of soldiers hauling a field gun through a flooded field, mud to the knee"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "fallen-comrade"
+text = "A soldier kneeling over a fallen comrade, head bowed"
+machine = "fail"
+label = ""
+
+[[scene]]
+id = "blade-raised"
+text = "A figure standing over a beaten one, blade raised"
+machine = "pass"
+label = ""
+borderline = true
+
+[[scene]]
+id = "victor-carrying"
+text = "A victor walking away from a carcass with the treasure on his back, turned from us"
+machine = "pass"
+label = ""
+borderline = true
+
+[[scene]]
+id = "pinning"
+text = "One figure pinning another to wet ground, both faces set with effort, outcome undecided"
+machine = "pass"
+label = ""
+borderline = true
+
+[[scene]]
+id = "rescue-fire"
+text = "A figure dragging another out of a burning doorway by the shoulders"
+machine = "fail"
+label = ""
+borderline = true
+
+[[scene]]
+id = "watched-fight"
+text = "Two figures fighting in a yard while a ring of others stands watching"
+machine = "pass"
+label = ""
+borderline = true
+
+[[scene]]
+id = "dog-and-man"
+text = "A large dog with its jaws on a man's forearm, both braced, neither giving"
+machine = "pass"
+label = ""
+borderline = true
+
+[[scene]]
+id = "mass-battle"
+text = "A wide field of hundreds of figures in close combat, none of them individually legible"
+machine = "pass"
+label = ""
+borderline = true
+
+[[scene]]
+id = "bellows"
+text = "A smith working a bellows with one foot, the forge throwing light across a low room"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "window-gaze"
+text = "A man standing at a window at first light, looking out, hands at his sides"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "child-held"
+text = "A woman carrying a sleeping child across a yard in the rain"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "swarm-hives"
+text = "A beekeeper lifting a frame from a hive, bees thick in the air around the hands"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "the-dead-uncovered"
+text = "Two people lifting a cloth from a body laid on a trestle, neither looking at the face"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "automaton-running"
+text = "A weight-driven mechanism still turning in an abandoned mill, no one attending it"
+machine = "pass"
+label = ""
+
+[[scene]]
+id = "pleading"
+text = "A kneeling figure with hands clasped, reaching toward someone out of frame"
+machine = "pass"
+label = ""

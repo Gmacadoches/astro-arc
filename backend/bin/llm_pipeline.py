@@ -1352,6 +1352,101 @@ Respond with a JSON object with exactly these keys:
 {"prompt": "the image-generation prompt, inside the word range THE COMPOSITION BRIEF gives you and never more than 140 words, describing only the imagery itself — no style or artist references, those are added separately", "conceptTags": ["2 to 3 short tags naming this image's register at an abstract level, e.g. water/submersion, figure amid a vast unknown, crowd with one marked apart, architectural interior, descent/threshold, geological/weight"], "hasPeople": "true if the prompt describes any human figure, pair, or crowd — however incidental — false if it's purely objects/places/materials with no person in it"}"""
 
 
+# ---------------------------------------------------------------------------
+# The caption check — the melodrama rule, enforced mechanically
+#
+# STAGE2_SYSTEM has always forbidden STATING a feeling, and the forbidden-words
+# list catches the explicit cases ("a sense of loss"). What it cannot catch is
+# a scene that states a feeling through a POSE: a figure with its head bowed
+# over a fallen one names no emotion and is pure melodrama. The old rule tried
+# to prevent that by limiting headcount, which misses in both directions — a
+# lone weeping figure passes it, two people hauling a beam fails it.
+#
+# So the check asks what the image would be FILED under. An image filed under
+# an activity (stacking stones, prising a drum) passes; one filed under an
+# emotion (grief, loneliness, hope) fails. That is a question a cheap model can
+# answer about a prompt, and answering it costs a fraction of the render it
+# saves.
+#
+# The three lists are separate because they catch different failures, and
+# because "conflict" is not an emotion: physical struggle is explicitly allowed
+# now, so an emotion-only list would pass a scene that takes sides.
+# ---------------------------------------------------------------------------
+
+_CAPTION_EMOTION = {
+    "grief", "grieving", "sorrow", "sorrowful", "mourning", "despair", "anguish",
+    "anguished", "loneliness", "lonely", "longing", "yearning", "hope", "hopeful",
+    "hopeless", "joy", "joyful", "fear", "fearful", "terror", "terrified", "dread",
+    "rage", "fury", "furious", "serenity", "peaceful", "melancholy", "nostalgia",
+    "wistful", "despondent", "forlorn", "heartbreak", "heartbroken", "suffering",
+    "triumph", "triumphant", "defeat", "defeated", "shame", "guilt", "pride",
+}
+
+# What a face is doing, as distinct from what a body is doing. Faces are
+# allowed now — they may show the effort of the task — so this catches only
+# expressions that would still read with the task taken away.
+_CAPTION_EXPRESSION = {
+    "weeping", "weeps", "crying", "cries", "sobbing", "tears", "tearful",
+    "snarling", "snarls", "scowling", "glaring", "smiling", "smiles", "grinning",
+    "laughing", "screaming", "wailing", "pleading", "beseeching", "imploring",
+    "gazing", "gazes", "staring wistfully", "downcast", "head bowed", "bowed head",
+    "clutching her chest", "clutching his chest", "hands clasped",
+}
+
+# Why, rather than what. The rule for conflict is force may be shown, motive
+# may not.
+_CAPTION_MOTIVE = {
+    "revenge", "vengeance", "betrayal", "betrayed", "rescue", "rescuing",
+    "saving", "protecting", "protect", "defending", "sacrifice", "sacrificing",
+    "mercy", "forgiveness", "punishing", "punishment", "avenging",
+}
+
+# Who to side with. A stranger should not be able to tell in a second.
+_CAPTION_SIDES = {
+    "attacker", "victim", "villain", "hero", "heroic", "innocent", "guilty",
+    "aggressor", "helpless", "defenceless", "defenseless", "menacing",
+    "threatening", "sinister", "evil", "cruel",
+}
+
+CAPTION_CHECK_SYSTEM = """You are labelling an image for a stock picture library. You are given a description of a single image. Reply with the one short phrase a librarian would file it under, and nothing else.
+
+File it under what is HAPPENING if the image shows an activity — "stacking stones", "prising open a drum", "hauling a net". File it under the FEELING only if that is genuinely what the picture is about.
+
+Respond with a JSON object: {"caption": "a short phrase, at most 8 words"}"""
+
+
+def caption_check(prompt, model):
+    """(caption, hits, passed) — would this image be filed under a feeling?
+
+    `hits` lists the matched words with their category, so a failure can be
+    read rather than guessed at, and so the lists can be tuned against a
+    labelled calibration set instead of by intuition.
+
+    Never raises. A judge that errors or times out returns passed=None, which
+    the caller treats as "not checked" rather than "failed": losing a paid
+    render because the cheap check fell over would be a bad trade.
+    """
+    try:
+        result, _ = _chat_json(model, CAPTION_CHECK_SYSTEM, prompt, "stage2",
+                               temperature=0.0, stage="caption")
+        caption = (result.get("caption") or "").strip()
+    except Exception:  # noqa: BLE001 — a failed check must never fail a generation
+        return "", [], None
+    if not caption:
+        return "", [], None
+
+    low = caption.lower()
+    hits = []
+    for words, label in ((_CAPTION_EMOTION, "emotion"),
+                         (_CAPTION_EXPRESSION, "expression"),
+                         (_CAPTION_MOTIVE, "motive"),
+                         (_CAPTION_SIDES, "sides")):
+        for w in sorted(words):
+            if re.search(rf"\b{re.escape(w)}\b", low):
+                hits.append(f"{label}:{w}")
+    return caption, hits, not hits
+
+
 def stage2_system():
     """STAGE2_SYSTEM as sent.
 
