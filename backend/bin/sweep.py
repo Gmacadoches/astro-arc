@@ -142,6 +142,9 @@ def main():
     # (and vice versa) — the two matrices that actually prove the dial works.
     ap.add_argument("--cell",
                     help="pin one dial cell: polarity/intensityBand/multiplicity/exposureBand (e.g. soft/lo/1/hi)")
+    ap.add_argument("--force-quality", action="store_true",
+                    help="use --quality for every sample, even ones with figures "
+                         "(for A/B fairness; production always upgrades)")
     ap.add_argument("--label", default="", help="one line recorded in the summary")
     args = ap.parse_args()
 
@@ -287,7 +290,11 @@ def main():
         suffix = lp.load_style_suffix(style_key, has_people)
         final_prompt = f"{prompt}, {suffix}" if suffix else prompt
 
-        quality = "high" if has_people else args.quality
+        # Production renders figures at the high tier because faces are where
+        # cheap tiers fail. In an A/B that would confound the comparison: an
+        # arm that puts people in every frame would also be rendering at a
+        # better tier than the arm that does not. --force-quality pins both.
+        quality = args.quality if args.force_quality else ("high" if has_people else args.quality)
         record = {
             "index": i,
             "primaryRegister": primary,
