@@ -37,7 +37,9 @@ Output goes to ~/.local/state/omarchy/astro-arc/verification/<name>/:
 """
 
 import argparse
+import csv
 import json
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -69,6 +71,57 @@ def latest_reading():
 
 def slug(text):
     return "".join(c if c.isalnum() else "_" for c in text.lower()).strip("_")
+
+
+# Words that carry none of an anomaly's identity. Most are the boilerplate the
+# "older, and only older" rule makes Stage 1.5 append to nearly every one
+# ("far older and more worn than everything around it"), so leaving them in
+# would score an anomaly as surviving on the strength of the word "older".
+_ANOMALY_STOPWORDS = {
+    "older", "oldest", "much", "more", "most", "worn", "wear", "than", "that",
+    "this", "with", "from", "into", "onto", "over", "under", "around", "about",
+    "other", "others", "objects", "object", "thing", "things", "everything",
+    "anything", "nearly", "almost", "still", "been", "being", "here", "there",
+    "present", "centuries", "century", "ages", "long", "longer", "smoothed",
+    "smooth", "featureless", "scale", "sized", "small", "large", "larger",
+    "kind", "same", "very", "deeply", "rough", "rougher", "surface", "erased",
+    "them", "they", "their", "which", "where", "what", "when", "all", "and",
+    "the", "for", "its", "it's", "far", "too", "not", "but",
+}
+
+
+def anomaly_tokens(anomaly):
+    """The words that actually identify an anomaly, for survival scoring.
+
+    An anomaly reads like "a Neolithic polished stone palette, surface worn
+    nearly smooth and all markings erased through centuries of handling". Only
+    a few of those words name the thing; the rest are the age boilerplate. Four
+    characters or more, not a stopword, deduped in order.
+    """
+    words = re.findall(r"[a-z]{4,}", (anomaly or "").lower())
+    out = []
+    for w in words:
+        if w not in _ANOMALY_STOPWORDS and w not in out:
+            out.append(w)
+    return out
+
+
+def anomaly_survival(anomaly, prompt):
+    """(hits, total, survived) — did the anomaly reach the final prompt?
+
+    STAGE2_SYSTEM makes the anomaly mandatory, and the composition brief also
+    forbids flagging it with "incongruously", "unmistakably" and the rest. Both
+    pressures push toward quietly dropping it, and until now nothing measured
+    whether it arrived. Matching is prefix-based so "menhirs" still counts as
+    "menhir"; `survived` is deliberately generous at a single hit, because one
+    identifying noun is enough to place the object in the scene.
+    """
+    tokens = anomaly_tokens(anomaly)
+    if not tokens:
+        return 0, 0, None
+    low = (prompt or "").lower()
+    hits = sum(1 for t in tokens if t[:5] in low)
+    return hits, len(tokens), hits >= 1
 
 
 def main():
@@ -248,6 +301,17 @@ def main():
             "stage2Cost": s2cost,
             "quality": quality,
         }
+
+        # Did the mandatory anomaly actually reach the prompt? Stage 2 is told
+        # it is mandatory and also told not to flag it with any of the words
+        # that would make it obvious, and both pressures push toward dropping
+        # it quietly. Recorded per sample so a sweep can show the rate.
+        if amplification is not None:
+            hits, total_tokens, survived = anomaly_survival(
+                amplification.get("anomaly"), prompt)
+            record["anomalyTokenHits"] = hits
+            record["anomalyTokens"] = total_tokens
+            record["anomalySurvived"] = survived
         total_cost += s2cost or 0.0
 
         if not args.no_image:
@@ -286,6 +350,36 @@ def main():
         "samples": results,
     }
     (out_dir / "00_sweep.json").write_text(json.dumps(summary, indent=2))
+
+    # Flat CSV beside the JSON. The JSON is the record; this is the thing you
+    # can actually diff two batches with, which 00_summary.md and a folder of
+    # per-sample JSON are not. One row per sample, the run's identity repeated
+    # on every row so several sweeps concatenate into one table.
+    csv_path = out_dir / "00_sweep.csv"
+    columns = [
+        "out", "label", "style", "index", "primaryRegister", "secondaryRegister",
+        "hasPeople", "promptWords", "conceptTags",
+        "anomalySurvived", "anomalyTokenHits", "anomalyTokens",
+        "quality", "stage2Cost", "imageCost", "imageError",
+    ]
+    with csv_path.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        for r in results:
+            row = dict(r)
+            row["out"] = args.out
+            row["label"] = args.label
+            row["conceptTags"] = "|".join(r.get("conceptTags") or [])
+            writer.writerow(row)
+
+    survived = [r.get("anomalySurvived") for r in results if r.get("anomalySurvived") is not None]
+    words = [r["promptWords"] for r in results]
+    if words:
+        print(f"prompt words: min {min(words)} / median "
+              f"{sorted(words)[len(words) // 2]} / max {max(words)}", file=sys.stderr)
+    if survived:
+        print(f"anomaly survived: {sum(survived)}/{len(survived)} "
+              f"({sum(survived) / len(survived):.0%})", file=sys.stderr)
 
     lines = [f"# Sweep: {args.out}", ""]
     if args.label:
