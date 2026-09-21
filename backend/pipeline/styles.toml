@@ -156,12 +156,12 @@ guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae,
 # The charter separates those, and `forbids` is the part that must survive
 # verbatim in substance -- if a register collapses again, look there first.
 [ghibli.world]
-era = "Early-industrial to mid-twentieth-century. Technology is hand-built, oversized for its job, and kept running by someone who loves it rather than by an industry."
-materials = "Timber, riveted iron, canvas, rope, poured concrete going green, glazed tile, enamelled metal, thatch, cut stone softened by moss."
-physics = "Ordinary physics and ordinary weight. Nothing glows of its own accord, nothing floats without a visible reason, and nothing is translucent or immaterial. A thing that could be rendered as a light effect does not belong here."
-society = "Small settlements where work is done by hand and people are known by name. Institutions are distant; the weather and the land are close."
+era = "Early-industrial in feeling, but its engineering is impossible and nobody minds. Machines walk, fly, breathe steam and have faces; a building may have legs; a vehicle may be an animal. They are hand-built, far oversized for their job, patched, and kept running by someone who loves them. Technology here is a character, not a backdrop."
+materials = "Timber, riveted iron, canvas, rope, poured concrete going green, glazed tile, enamelled metal, thatch, cut stone softened by moss. These ordinary materials are what the impossible things are built from: the flying machine is canvas and bicycle parts, the walking house is scavenged roofing and iron legs."
+physics = "Impossible things obey ordinary physics. They have weight, they cast shadows, they rust, they are lit like everything else, and the ground takes their load. Nothing glows of its own accord, nothing is translucent, and nothing floats without a visible reason — a thing that could be rendered as a light effect does not belong here. The wonder is that something enormous and impossible is also heavy and worn."
+society = "Small settlements where work is done by hand and people are known by name. Institutions are distant; the weather and the land are close. Spirits, gods and creatures share the place and hold jobs in it, and no one finds this worth remarking on."
 weather = "Weather is a presence and sometimes a threat. Wind moves through everything, cumulus towers with hard sunlit tops, rain that means it. Light is warm, naturalistic and low."
-inhabitants = "Children and the old; working people known by name; creatures with their own purposes and no interest in being watched; machines that someone tends."
+inhabitants = "Children and the old; working people known by name; creatures the size of houses with their own purposes and no interest in being watched; spirits that have taken a shape and a trade; machines that someone tends and that may be awake."
 strangeness = "The genuinely strange is completely unremarkable. Enormous unexplained machinery rusting in a meadow, a creature the size of a house asleep among ordinary trees, a derelict flying city, a shrine crowded with objects nobody living remembers the use of. Such things are heavy, weathered, physically solid and lit exactly like everything around them, and nobody in the frame is astonished by them."
 # `forbids` removed 2026-09-20 at Garrett's direction: a poorly introduced
 # control from too far back in the iteration process. A charter says what
@@ -179,8 +179,10 @@ strangeness = "The genuinely strange is completely unremarkable. Enormous unexpl
 label = "Studio Ghibli"
 suffix_base = "Studio Ghibli feature-film animation style. Lush layered greenery in deep saturated greens, towering cumulus clouds with hard-edged sunlit tops against a deep blue sky, warm naturalistic low sunlight, visible painterly brushwork in foliage and stonework, where the scene has depth, a clear separation between foreground, middle distance and horizon, rich and slightly heightened color rather than muted realism"
 suffix_figures = ", figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
-# guidance removed 2026-09-20: superseded by [ghibli.world] above.
-# Kept in git history; every prohibition it carried is in `forbids`.
+# guidance removed 2026-09-20: superseded by [ghibli.world] above. Its
+# world-description became the charter's fields; its prohibitions went to
+# `forbids`, which was itself removed later the same day -- see the note
+# in the charter block for where each one went. Both are in git history.
 
 [cyberpunk]
 label = "Cyberpunk"
