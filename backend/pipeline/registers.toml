@@ -13,8 +13,8 @@
 # HOW TO EDIT
 #
 #   Add a register  -> add its name under the family it is made of. That is
-#                      all. Family membership, the people gate and the
-#                      rotation all follow from where you put it.
+#                      all. Family membership and the rotation both follow
+#                      from where you put it.
 #   Remove one      -> delete the line. Anything in history that used it still
 #                      reads back fine.
 #   Rename one      -> treat it as remove + add; the rotation's recency scan
@@ -23,6 +23,7 @@
 # Until 2026-09-13 this took THREE edits in two files — the name here, a
 # family in llm_pipeline.py's REGISTER_FAMILIES, and membership of
 # PEOPLE_REGISTERS — and missing either of the last two failed silently.
+# PEOPLE_REGISTERS is gone as of 2026-09-20; see below.
 # ---------------------------------------------------------------------------
 #
 # FAMILIES are what "cohere" and "collide" are measured against. A secondary
@@ -30,12 +31,13 @@
 # different one, the friction between two materials is part of the picture.
 # Group by what a thing is actually made of, not by mood.
 #
-# The `human` family is special, and it is the only special case left: those
-# registers are the ones that put PEOPLE in the image. The primary register
-# alone decides that, and human registers are never eligible as a secondary —
-# otherwise a figure arrives through a side door into a scene that was meant
-# to be led by its materials. Add a register here and it is gated as people
-# automatically; there is no second list to remember.
+# There are no special cases left. Until 2026-09-20 there was one: a `human`
+# family whose members were the registers that put PEOPLE in the image, gated
+# on the primary alone and never eligible as a secondary. That conflated two
+# unrelated axes — what the scene is MADE OF, and WHO IS IN IT — so a solitary
+# figure in a mechanical world could not be expressed at all. Those five moved
+# to actors.toml, which is now the second axis; every register in this file is
+# a substance and nothing here decides whether a person appears.
 #
 # Order matters only for a cold start: an install with fewer than 10
 # generations cycles this list in order before the recency rotation takes
@@ -77,14 +79,6 @@ made = [
   "instrument and measure",
 ]
 
-human = [
-  "figures in relation",
-  "crowd / the collective",
-  "the solitary figure",
-  "hands and handwork",
-  "man-beast",
-]
-
 # Optional per-register steer, passed to Stage 2 alongside the register name.
 # Mirrors styles.toml's `guidance` field and exists for the same narrow reason:
 # a name whose obvious reading is much smaller than its real territory has to
@@ -103,8 +97,3 @@ human = [
 # keep it to a span and a principle rather than an inventory, and let anything
 # listed read as a starting point the model is expected to reach past.
 [guidance]
-"man-beast" = """A figure that is part human and part animal, drawn from any mythology and any era. The Greek ones — satyr, faun, centaur, minotaur — are the obvious reading and the least interesting; reach past them into the whole span: Mesopotamian lamassu, girtablullu and fish-cloaked apkallu; the jackal- and falcon-headed figures of Egyptian funerary art; the medieval bestiary's cynocephali, blemmyae, manticore and wodewose; Japanese tengu, kitsune and ushi-oni; Slavic leshy and volkodlak; Celtic selkie, pooka and the antlered horned-god figures; Norse wolf- and bear-skinned warriors; the Olmec were-jaguar; West African spider- and water-spirits; melusine, lamia, harpy, siren, sphinx, nagini, kinnara, and the foliate Green Man where the other half is plant rather than beast. Prefer the obscure and the regionally specific to the famous few. The hybrid is a fact of the figure's anatomy, rendered with the same weight and wear as everything else in the scene — never a costume, a mask, or a person wearing an animal. One or more part-human figures, with the hybrid anatomy as the subject rather than a detail."""
-"figures in relation" = """People in the plural, related to each other."""
-"the solitary figure" = """Exactly one person, alone in the frame, and the world around them does the rest of the work — do not add a companion, a witness or a crowd to give them something to react to."""
-"hands and handwork" = """The body at close range and mid-task: hands, forearms, a tool being used, the work in progress, with the face out of frame or incidental."""
-"crowd / the collective" = """Let the many carry cultural or social material, with one figure marked out from the rest."""

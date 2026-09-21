@@ -271,9 +271,10 @@ def _load_register_families():
     """{family: [register, ...]} straight from registers.toml.
 
     That file is the only place any of this is written down — see its header.
-    Everything below (the flat rotation list, the family lookup, which
-    registers put people in the image) is derived from it, so adding a register
-    is one edit in one file and cannot half-land."""
+    Everything below (the flat rotation list, the family lookup) is derived
+    from it, so adding a register is one edit in one file and cannot
+    half-land. Who appears in the image is actors.toml's job, not this
+    file's — see _load_actors()."""
     path = PIPELINE_DIR / "registers.toml"
     if not path.exists():
         return {}
@@ -302,12 +303,44 @@ def register_family(register):
     return None
 
 
-def people_registers():
-    """The registers that put PEOPLE in the image — the `human` family, and
-    nothing else. This used to be a second hand-maintained set beside the
-    families, which meant a new human register could be added and silently not
-    gated. One concept, one place."""
-    return set(_load_register_families().get(PEOPLE_FAMILY, []))
+def _load_actors():
+    """actors.toml as {"kinds": {...}, "exclude": {...}}, or empty on a
+    missing or malformed file."""
+    path = PIPELINE_DIR / "actors.toml"
+    if not path.exists():
+        return {}
+    try:
+        with path.open("rb") as fh:
+            return tomllib.load(fh)
+    except (tomllib.TOMLDecodeError, OSError) as exc:
+        print(f"llm_pipeline: actors.toml unreadable ({exc}); no actor will be set",
+              file=sys.stderr)
+        return {}
+
+
+def actor_kinds():
+    """Every actor kind, in file order — which is the order a cold-start
+    install cycles through before the recency rotation takes over, exactly as
+    the registers do."""
+    return list((_load_actors().get("kinds") or {}).keys())
+
+
+def actor_guidance(kind):
+    """How this kind is framed, or "" for `none` and for an unknown kind.
+
+    `none` is a real kind with an empty body: a purely material image is a
+    legitimate outcome, just no longer the default it was on ~88% of
+    generations.
+    """
+    return ((_load_actors().get("kinds") or {}).get(kind) or "").strip()
+
+
+def actor_excluded_for(register):
+    """Actor kinds that collapse into the substance when paired with this
+    register — `automaton` with `mechanical` makes the actor out of the same
+    material as the world. From actors.toml's [exclude] table, so the pairing
+    rule lives beside the kinds rather than in code."""
+    return set((_load_actors().get("exclude") or {}).get(register, []))
 
 
 def load_register_guidance(register):
@@ -494,14 +527,18 @@ def recent_constellations(window=AMPLIFY_AVOID_WINDOW, exclude=None):
 # secondary — a human register arriving as the secondary would inject figures
 # into a material-led scene through a side door. Named here rather than
 # hardcoded in three places; membership lives in registers.toml.
-PEOPLE_FAMILY = "human"
-
 # Backwards-compatible module-level views of registers.toml, for call sites
 # (sweep.py, this file) that read them as plain data. Computed at import, which
 # is fine because every generation is a fresh process — the file is still read
 # fresh on every run.
 REGISTER_FAMILIES = {r: fam for fam, regs in _load_register_families().items() for r in regs}
-PEOPLE_REGISTERS = people_registers()
+
+# Kept as an empty set, deliberately, rather than deleted. sweep.py reads it
+# through getattr with a default, but an older checkout of any caller that
+# reads it directly should get "no register puts people in the image" — which
+# is now true — instead of an AttributeError. The people gate is gone; who
+# appears is actors.toml's business. Remove once nothing references it.
+PEOPLE_REGISTERS = frozenset()
 
 if not REGISTER_FAMILIES:
     print("llm_pipeline: warning — registers.toml has no [families] table; "
@@ -851,12 +888,27 @@ def stage1_interpret(reading, stage1_model, period_key, config):
 # Fewer things means a shorter prompt, not a wordier one about fewer things.
 #
 # multiplicity -> (sites, stage15 object range, stage2 thing range, word range)
+# Object counts reduced by one at every tier but the lowest, 2026-09-20, when
+# the actor took a slot. The actor REPLACES an object rather than joining them:
+# fewer objects with one of them being someone is the whole thesis, and adding
+# a body on top of an unchanged object count would have made the strewn-objects
+# problem worse rather than better.
+#
+# The lowest tier is left alone deliberately. Dropping it to (1, 2) leaves
+# Stage 2 one or two objects plus an actor against a 3-4 thing count, and the
+# shortfall would be padded with the "connective things" the prompt permits —
+# which is unnamed filler, exactly what a low-density day is supposed to avoid.
+#
+# Measured before and after on the same hard/hi/3/lo cell: prompts came back at
+# 122-127 words against a 90-115 range with the actor added and the old counts,
+# i.e. the actor's words were being paid for on top of the objects instead of
+# instead of them.
 _DENSITY_BY_MULTIPLICITY = (
     # (max_hits, sites, objects,  things,  words)
     (1,         1,     (2, 3),    (3, 4),  (60, 80)),
-    (2,         1,     (3, 4),    (4, 5),  (75, 95)),
-    (3,         2,     (4, 5),    (5, 7),  (90, 115)),
-    (99,        3,     (5, 7),    (6, 10), (100, 130)),
+    (2,         1,     (2, 3),    (4, 5),  (75, 95)),
+    (3,         2,     (3, 4),    (5, 7),  (90, 115)),
+    (99,        3,     (4, 6),    (6, 10), (100, 130)),
 )
 
 # Verbs decide which relations get depicted, so this is shape, not flavor. The old
@@ -895,14 +947,71 @@ _LIGHT_BY_EXPOSURE = {
 # in use is a thing reacted to. That is a deliberate exchange of some charge for a
 # world that coheres on calm days, not an oversight — do not "restore" it without
 # reading this comment.
-_ANOMALY_RELATION = {
-    ("hard", "hi"): "It has arrived recently and is actively doing something — leaking, blocking, shading, displacing, pressing on what is next to it. Nothing and no one acknowledges it.",
-    ("hard", "mid"): "It is simply present, inert, and unremarked. Nothing reacts to it. No one looks at it.",
-    ("hard", "lo"): "It is simply present, inert, and unremarked. Nothing reacts to it. No one looks at it.",
-    ("soft", "hi"): "The world has absorbed it and put it to use — something is worked from it, grown on it, stored in it, or sheltered under it. It still goes unexplained.",
-    ("soft", "mid"): "The world has absorbed it and put it to use — something is worked from it, grown on it, stored in it, or sheltered under it. It still goes unexplained.",
-    ("soft", "lo"): "It has weathered almost into landscape — the oldest thing in frame, grown over, worn down, long since stopped being remarkable to anyone.",
+# Rewritten 2026-09-20, when the actor arrived. The old table said "nothing
+# reacts to it" in four of its six cells, which is not a description of an
+# unsettling object so much as an instruction to build a scene where nothing is
+# capable of noticing anything. With an actor in the frame that reads as an
+# object that was PLACED there, which is exactly the "meaningful objects strewn
+# about" complaint.
+#
+# The trade the old comment describes is still being made, just moved. The
+# charge used to come from unremarked wrongness; it now comes from someone
+# dealing with a thing they cannot account for, which is stranger and, unlike
+# the old version, legible as a picture rather than as a caption. `hard/lo`
+# keeps the original behaviour intact — the actor has their back to it — so the
+# unremarked mode survives where it was always strongest.
+#
+# Every cell keeps the invariant: nothing in the scene explains why it is here.
+_ACTOR_ANOMALY_RELATION = {
+    ("hard", "hi"): "It is acting on the actor — displacing them, blocking the way, pressing on what they are doing, forcing them to work around it. They cannot move it and cannot ignore it. Nothing explains why it is here.",
+    ("hard", "mid"): "The actor is working against it — prising at it, digging it out, dismantling it, hauling at it — and is not winning yet. Nothing explains why it is here.",
+    ("hard", "lo"): "The actor has not seen it. It is behind them, above them, or under their feet, and it is doing something. Nothing explains why it is here.",
+    ("soft", "hi"): "The actor has put it to use — works from it, shelters under it, draws from it, stores in it. Entirely unbothered, and it still goes unexplained.",
+    ("soft", "mid"): "The actor tends it — cleaning, mending, feeding, oiling or watering it, as though it were theirs to look after. Nothing explains why it is here.",
+    ("soft", "lo"): "It has been here longer than the actor has. They live alongside it without thought; it has weathered almost into landscape and stopped being remarkable to anyone.",
 }
+
+# NEW 2026-09-20, and the layer that most directly answers "museum objects
+# strewn about". The old pipeline said what the objects WERE and never what
+# anyone did with them, so they arrived as a list and were painted as a list.
+# Keyed on the same (polarity, intensity) the rest of the dial uses, so no new
+# axis is invented and no new astrology is needed.
+_ACTOR_OBJECT_RELATION = {
+    ("hard", "hi"): "The objects are in the actor's way or on top of them: being shoved aside, climbed over, dug out from under, or carried when there are too many to carry.",
+    ("hard", "mid"): "The actor is working the objects and the work is going badly — one is stuck, one is broken, one will not fit, and the effort shows in the body.",
+    ("hard", "lo"): "The objects are not the actor's business. They belong to the place and the actor is passing among them, using one absently at most.",
+    ("soft", "hi"): "The actor is using the objects for exactly what they are for, competently, mid-task, with more of them to hand than are needed.",
+    ("soft", "mid"): "The actor is putting the objects in order — sorting, stacking, cleaning, mending, laying them out, packing them away.",
+    ("soft", "lo"): "The objects are at rest and so is the actor. They have been used and set down, and nobody is reaching for them.",
+}
+
+# NEW 2026-09-20. Where the actor stands in relation to the PLACE, which is a
+# different question from what they do with the things in it. Without this the
+# actor tends to be dropped into the middle of the frame facing out.
+_ACTOR_SITE_RELATION = {
+    ("hard", "hi"): "The actor is caught in the site — down inside it, under it, hemmed by it, or on the part of it that is failing.",
+    ("hard", "mid"): "The actor is crossing the site and it is resisting them: the ground, the weather or the structure is making the crossing hard.",
+    ("hard", "lo"): "The actor is at the edge of the site, arriving or about to leave, with most of the place still ahead of or behind them.",
+    ("soft", "hi"): "The actor is working the site and it is theirs to work — they know where everything is and the place is answering.",
+    ("soft", "mid"): "The actor is somewhere they have been many times. Nothing about the place needs their attention.",
+    ("soft", "lo"): "The actor is at rest in the site, or asleep in it, and the place continues around them without them.",
+}
+
+# Actors do different things from materials, and the existing tables are almost
+# entirely agentless: eroding, spilling, settling and ripening are processes, and
+# only "being mended" and "being carried" imply a hand, both passively and
+# off-stage. The one genuinely conscious verb in the whole codebase was
+# "watching", reachable only from the deprecated NO_TEXTURE_DIAL.
+#
+# Two constraints from the melodrama audit are baked in here rather than left to
+# the prompt: "fleeing" is out of the hard list, because it is the most
+# reaction-shaped verb there is and would contradict the rule that no figure's
+# job is to react; and "watching"/"listening to" are kept only in the sense of
+# attending to a thing at work, never to a face.
+_ACTOR_VERBS_HARD = ("hauling, prising, bracing against, digging out, striking, "
+                     "shouldering, forcing, being pinned by, being carried off by")
+_ACTOR_VERBS_SOFT = ("tending, mending, feeding, washing, harvesting, carrying, "
+                     "watching something at work, listening to, sleeping beside")
 
 # What a reading with NO texture block degrades to — an old reading-*.json from
 # before the texture existed, or a hand-pinned input. These are the pre-dial
@@ -922,10 +1031,17 @@ NO_TEXTURE_DIAL = {
     "thingRange": (6, 10),
     "wordRange": (90, 130),
     "verbs": "feeding, binding, eroding, sheltering, crushing, spilling into, growing through, watching",
+    # The actor layers have no pre-dial equivalent to degrade to, so the
+    # fallback gets the most neutral cell of each rather than nothing: a
+    # missing texture must not also mean a missing actor, or the degraded path
+    # quietly reverts to the object-strewn output this work exists to fix.
+    "actorVerbs": _ACTOR_VERBS_SOFT,
     "registerCohesion": "collide",
     "spatial": None,
     "light": None,
-    "anomalyRelation": "It is simply present, inert, and unremarked. Nothing reacts to it. No one looks at it.",
+    "anomalyRelation": _ACTOR_ANOMALY_RELATION[("soft", "mid")],
+    "objectRelation": _ACTOR_OBJECT_RELATION[("soft", "mid")],
+    "siteRelation": _ACTOR_SITE_RELATION[("soft", "mid")],
     "anomalyTypes": "scale (far too large or small for its kind), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
     "tonalDirection": None,
 }
@@ -960,10 +1076,13 @@ def dial_from_texture(texture):
         "thingRange": things,
         "wordRange": words,
         "verbs": _VERBS_HARD if polarity == "hard" else _VERBS_SOFT,
+        "actorVerbs": _ACTOR_VERBS_HARD if polarity == "hard" else _ACTOR_VERBS_SOFT,
         "registerCohesion": "collide" if polarity == "hard" else "cohere",
         "spatial": _SPATIAL_BY_INTENSITY[intensity_band],
         "light": _LIGHT_BY_EXPOSURE[exposure_band],
-        "anomalyRelation": _ANOMALY_RELATION[(polarity, intensity_band)],
+        "anomalyRelation": _ACTOR_ANOMALY_RELATION[(polarity, intensity_band)],
+        "objectRelation": _ACTOR_OBJECT_RELATION[(polarity, intensity_band)],
+        "siteRelation": _ACTOR_SITE_RELATION[(polarity, intensity_band)],
         # Out-of-place needs knowledge of the world, which Stage 1.5 deliberately
         # does not have; scale and age are both nameable blind, and they are also
         # the two qualities a rendering style cannot sand down into charm.
@@ -993,7 +1112,7 @@ def dial_from_texture(texture):
 # the two wrongnesses a style cannot sand down into charm. What is lost is the
 # category error; what is gained is that the image coheres as one world, and the
 # charge now varies instead of being constant. Stage 2 owns the relation (see
-# _ANOMALY_RELATION); this stage still authors it BLIND to the scene and the style,
+# _ACTOR_ANOMALY_RELATION); this stage still authors it BLIND to the scene and the style,
 # which is exactly why it cannot be pre-reconciled.
 #
 # The firewall here is the same one Stage 1 has and for the same reason: if
@@ -1024,9 +1143,11 @@ Rules:
 - Do not draw every object from one culture, one century, or one material. Reach across traditions and across the material world: bone, wax, lead, cloth, grain, glass, iron, salt.
 - Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
 - **Use no visual or compositional language at all.** Do not say where anything sits, how it is lit, what color it is, what it looks like, or how any two things are arranged relative to each other. You are not staging a picture. If you begin composing, you have failed this task.
+- **Name the actor the constellation already contains.** Every archetypal situation has a cast: the night-sea journey has someone inside the monster, the dragon-fight has whoever won it, the child born and held has a child and whoever holds it, captivity has a captive. Say who is in this situation, as a concrete living thing rather than a role label — "a woman who has been walking since before light", not "the seeker". Then classify that actor as exactly one of the available kinds. Do not invent an actor the constellation does not imply, and do not reach for a person when the situation belongs to an animal, a swarm, or something that was alive and is not.
+- **`none` is for the constellations that genuinely have nobody in them** — petrification, the sealed vessel, the tomb, the long aftermath. It is the exception, not the safe default. If you can name who is there, name them.
 
 Respond with a JSON object with exactly these keys:
-{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object that belongs to the SAME world as the others — same kind of place, same order of reality, same or earlier technology — but is wrong in one specific way: either far out of {{ANOMALY_TYPES}}. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE means far too large or far too small for its own kind, while still being the kind of thing this world contains. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'"}"""
+{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object that belongs to the SAME world as the others — same kind of place, same order of reality, same or earlier technology — but is wrong in one specific way: either far out of {{ANOMALY_TYPES}}. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE means far too large or far too small for its own kind, while still being the kind of thing this world contains. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
 # every cached amplification, for the same reason SIGNATURE_SCHEMA_VERSION
@@ -1041,7 +1162,9 @@ Respond with a JSON object with exactly these keys:
 # archetype" rule plus the RECENTLY USED list (see recent_constellations). Every
 # amplification cached under the old wording was one of the two archetypes this
 # change exists to break out of, so none of them should survive it.
-STAGE15_SCHEMA_VERSION = 4
+# 4->5 on 2026-09-20: Stage 1.5 now names the actor and its kind. Every
+# cached amplification predates those fields, so none can supply one.
+STAGE15_SCHEMA_VERSION = 5
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
@@ -1082,10 +1205,15 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
             pass
 
     object_lo, object_hi = dial["objectRange"]
+    kinds = actor_kinds()
     system_prompt = (
         STAGE15_SYSTEM
         .replace("{{OBJECT_RANGE}}", f"{object_lo} to {object_hi}")
         .replace("{{ANOMALY_TYPES}}", dial["anomalyTypes"])
+        # Injected rather than written into the prompt, so the enum cannot fall
+        # out of step with actors.toml — the same reason the people-register
+        # list used to be injected into STAGE2_SYSTEM.
+        .replace("{{ACTOR_KINDS}}", ", ".join(kinds) or "none")
     )
 
     user_lines = [
@@ -1128,6 +1256,21 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     # a missing enum is not worth losing a paid call over.
     if result.get("anomalyType") not in ("scale", "time", "place"):
         result["anomalyType"] = "time"
+
+    # actorKind is validated but never fatal, for the same reason anomalyType
+    # is not: a bad enum is not worth losing a paid call over. It does NOT
+    # default to "none" on a miss, though — "none" is the behaviour this whole
+    # change exists to stop being the default, so an unrecognised kind falls
+    # back to the most broadly usable one instead and keeps a body in the
+    # frame.
+    if result.get("actorKind") not in kinds:
+        result["actorKind"] = "solitary" if "solitary" in kinds else (kinds[0] if kinds else "none")
+    if result["actorKind"] == "none":
+        result["actor"] = ""
+    elif not (result.get("actor") or "").strip():
+        # A kind with no actor named is a half-answer; the kind alone still
+        # tells Stage 2 who is there, so keep it rather than failing.
+        result["actor"] = ""
 
     result["dial"] = {k: v for k, v in dial.items() if k in ("mode", "objectRange", "anomalyTypes", "tonalDirection")}
     result["generatedAt"] = datetime.now(timezone.utc).isoformat()
@@ -1187,9 +1330,11 @@ HOW TO WRITE IT
 
 PEOPLE
 
-- Let the primary register decide whether people belong. If it is one of the people registers (__PEOPLE_REGISTERS__), lean fully into human presence, in whatever shape that register's own description calls for. If it is a material or place register, let the material carry the image — the objects and place are the protagonists — unless the reading's content makes a person unmistakably necessary.
-- When people do appear, make them participants in something larger, not a two-person drama. Two figures visibly in conflict, or one distressed while another looks on, explains the tension in literal human terms instead of embodying it — a failure.
-- People are not a way to reach the density requirement. A crowd counts as ONE element no matter how many bodies are in it. Reach the six-to-ten count with objects, structures and materials, never by multiplying faces.
+- THE ACTOR IS GIVEN TO YOU, and it is not optional. THE COMPOSITION BRIEF names who or what is in this scene — a person, a crowd, an animal, a swarm, a part-human figure, a machine that has not stopped, a body — along with how that actor is framed. Put them in the frame and give them something to do. The register says what the world is MADE OF; the actor says WHO IS IN IT. They are independent: a mechanical world with one person in it is a normal image, not a contradiction.
+- The only exception is an actor of "none", which THE COMPOSITION BRIEF will state explicitly. Then the materials carry the image alone, as the place and its objects.
+- INTERACTION WITH THE ACTOR IS THE POINT. A scene where the actor merely stands among the objects is the same failure as a still-life. The brief gives you the actor's relation to the anomaly, to the objects and to the site: use all three. Something is being hauled, prised, tended, mended, fled, watched, carried, worked. Meaning comes from what passes between the actor and the world, not from their sharing a frame.
+- Figures act; they do not emote. Give each figure a task and a thing to attend to, and let the task explain the posture. Faces are fine: let them show the effort or attention of the task, and no expression that would still read if the task were taken away. Never a pose that exists to be read as a feeling, and never a figure whose job is to react to another figure or to the scene. Two or more figures may share a frame in a shared task or a physical struggle: show what their bodies are doing — grip, weight, strain — never why they do it, and never which of them to side with. Physical, never graphic: no wounds, blood or gore. This holds for people, animals and machines alike.
+- The actor is not a way to reach the density requirement, and neither are people. A crowd or a swarm counts as ONE element no matter how many bodies are in it. Reach the thing count with objects, structures and materials, never by multiplying faces.
 
 STYLE
 
@@ -1208,21 +1353,19 @@ Respond with a JSON object with exactly these keys:
 
 
 def stage2_system():
-    """STAGE2_SYSTEM with the people-register list filled in from
-    registers.toml, so the prompt cannot fall out of step with the file.
+    """STAGE2_SYSTEM as sent.
 
-    It used to name all five registers literally, which made adding a human
-    register a three-file edit where the third was easy to miss and failed
-    silently — the register would be gated as people everywhere except in the
-    sentence that tells Stage 2 what to do about it. Per-register shape ("one
-    person, alone", "hands mid-task") moved to that file's [guidance] table,
-    beside everything else about a register.
+    Until 2026-09-20 this filled in a list of people-registers, because the
+    register decided whether a person appeared. It no longer does: the
+    substance and the inhabitant are separate axes now, the actor arrives from
+    Stage 1.5 with the amplification, and no register gates anybody. The
+    placeholder is gone with the sentence that used it.
 
-    Reads the module global at call time so a caller can still patch
-    STAGE2_SYSTEM for a verification run.
+    Kept as a function rather than inlining the global, because it reads the
+    module global at call time and callers (sweep.py, replay_amplify.py) patch
+    STAGE2_SYSTEM for verification runs.
     """
-    names = ", ".join('"%s"' % r for r in sorted(people_registers()))
-    return STAGE2_SYSTEM.replace("__PEOPLE_REGISTERS__", names or "none configured")
+    return STAGE2_SYSTEM
 
 
 def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
@@ -1273,6 +1416,19 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
     # named things, 60-80 words" is obeyed; "today is a calm day" is not.
     if dial is None:
         dial = dict(NO_TEXTURE_DIAL)
+    # Who is in the scene, from Stage 1.5. An amplification written before the
+    # actor existed has neither field, and rather than defaulting to "none" —
+    # which is the behaviour this change exists to stop being the default — an
+    # actorless amplification falls back to `solitary`, keeping a body in the
+    # frame. Excluded pairings (automaton in a mechanical world) are vetoed
+    # here, where the register is known and Stage 1.5's is not.
+    actor = (amplification or {}).get("actor") or ""
+    actor_kind = (amplification or {}).get("actorKind") or ""
+    if amplification and not actor_kind:
+        actor_kind = "solitary" if "solitary" in actor_kinds() else "none"
+    if actor_kind in actor_excluded_for(register):
+        actor_kind = "solitary" if "solitary" in actor_kinds() else "none"
+        actor = ""
     thing_lo, thing_hi = dial["thingRange"]
     word_lo, word_hi = dial["wordRange"]
     sites = dial["sites"]
@@ -1295,8 +1451,28 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         f"  Verbs of interaction to draw on: {dial['verbs']}.",
         f"  The two registers: {'COLLIDE' if dial['registerCohesion'] == 'collide' else 'COHERE — build one continuous material world, not two things meeting'}.",
         f"  REQUIRED: the primary register ({register}) must put at least one substantial thing of its own in the frame, named explicitly, beyond the objects you were given. A scene that merely takes place near that material does not count — if the register is \"mechanical\" an actual mechanism with working parts is visible; if \"aquatic\", real water; if \"bodily and anatomical\", actual anatomy as material rather than a person standing there.",
-        f"  The anomaly, and how the world treats it: {dial['anomalyRelation']}",
+        f"  The anomaly, and how the actor treats it: {dial['anomalyRelation']}",
     ]
+    # The actor goes in the brief rather than STAGE2_SYSTEM for the reason the
+    # register-contribution and openness rules did: the brief is demonstrably
+    # the part that gets obeyed. Three relations, not one — the anomaly line
+    # above has always existed, and the objects and the site are the two that
+    # were missing, which is where "objects strewn about" actually lived.
+    if actor_kind and actor_kind != "none":
+        who = f"{actor} ({actor_kind})" if actor else actor_kind
+        brief += [
+            f"  THE ACTOR — required, and not an extra: {who}.",
+            f"    How this kind is framed: {actor_guidance(actor_kind) or 'no further framing.'}",
+            f"    Toward the objects: {dial['objectRelation']}",
+            f"    Toward the place: {dial['siteRelation']}",
+            f"    Verbs for what the actor does: {dial['actorVerbs']}.",
+            "    The actor counts as ONE of the discrete things above, not an addition to them.",
+        ]
+    else:
+        brief.append(
+            "  THE ACTOR: none. This is one of the few constellations with nobody in it — "
+            "the materials and the place carry the image alone. Do not add a figure."
+        )
     # Unconditional, appended to EVERY brief whatever the dial says, and placed
     # here rather than in STAGE2_SYSTEM because the brief is demonstrably the
     # part that gets obeyed (see the register-contribution requirement above,
@@ -1365,9 +1541,11 @@ def build(reading, config):
         secondary_register=secondary_register,
         amplification=amplification,
         dial=dial,
-        # Primary only: the secondary is a supporting material, and the one
-        # register with guidance today can never be a secondary anyway (it is
-        # in PEOPLE_REGISTERS).
+        # Primary only: the secondary is a supporting material. As of
+        # 2026-09-20 registers.toml's [guidance] table is empty — its five
+        # entries were inhabitant configurations and moved to actors.toml —
+        # so this passes "" today and exists for the next register that
+        # earns a steer.
         register_guidance=load_register_guidance(register),
     )
 
