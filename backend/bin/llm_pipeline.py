@@ -465,6 +465,8 @@ _CHARTER_FIELDS = (
     ("inhabitants", "Who or what acts in this world"),
     ("strangeness", "How the strange is treated"),
     ("numinous", "How the numinous appears, and whether it has a body"),
+    ("dread", "How this world goes dark"),
+    ("favoured_actors", "Who this world is richest in"),
     ("forbids", "Never in this world"),
 )
 
@@ -1065,6 +1067,31 @@ _SPATIAL_BY_INTENSITY = {
     "lo": "The event is far off or peripheral — small in frame, off to one side, or partly out of view. Most of the frame is world, not event.",
 }
 
+# How much of the frame the impossible occupies. Keyed on intensity, mirroring
+# _SPATIAL_BY_INTENSITY, because the alternative — a constant level of wonder —
+# is exactly the invariant the texture work exists to break. An image that is
+# always astonishing stops being astonishing.
+_WONDER_BY_INTENSITY = {
+    "lo": "ONE impossible thing, and it is quiet: off to a side, half-seen, or so settled into the place that it reads as furniture. The scene would still make sense without noticing it.",
+    "mid": "ONE impossible thing, plainly present and plainly impossible, at the scale of a building or a large animal. It is part of the day's business, not the event of the day.",
+    "hi": "The impossible DOMINATES. Two or more of them, or one so enormous it sets the shape of the whole frame. The ordinary things are small against it and the actor is smaller still.",
+}
+
+# Valence. The same world, at its two tempers — and the reason this is split
+# from magnitude is that dark and wondrous are not opposites here. Mononoke is
+# that world at full strangeness and full dread simultaneously: a god the
+# length of a hillside writhing with curse-worms is not less magical than a
+# forest spirit, it is the same magic with the other face turned out.
+#
+# Without this the impossible mandate reads as "be whimsical", and a
+# grief-shaped reading would come back as a friendly creature, which is the
+# tonal falseness STAGE1_SYSTEM and the dial's tonalDirection both exist to
+# prevent.
+_WONDER_BY_POLARITY = {
+    "hard": "It is not charming. This world's strangeness turns dangerous, diseased or grieving: things that are sickened, possessed, boiling with something under the skin, maimed, enormous and enraged, or dying slowly and taking the place with them. Nobody is reassured by it and nobody is safe from it, and it is still ordinary enough that the work continues around it.",
+    "soft": "It is at peace, which is not the same as friendly. It is occupied with its own business and indifferent to being watched: working, resting, feeding, travelling, or simply long settled where it is.",
+}
+
 _LIGHT_BY_EXPOSURE = {
     "lo": "Most of the frame is unlit or obscured. What is happening is only partly visible; things are lost in shadow, fog, depth or distance rather than described.",
     "mid": "Raking, partial light — lit and unlit areas both substantial, with a clear direction to the light.",
@@ -1175,6 +1202,8 @@ NO_TEXTURE_DIAL = {
     "registerCohesion": "collide",
     "spatial": None,
     "light": None,
+    "wonder": _WONDER_BY_INTENSITY["mid"],
+    "wonderTone": _WONDER_BY_POLARITY["soft"],
     "anomalyRelation": _ACTOR_ANOMALY_RELATION[("soft", "mid")],
     "objectRelation": _ACTOR_OBJECT_RELATION[("soft", "mid")],
     "siteRelation": _ACTOR_SITE_RELATION[("soft", "mid")],
@@ -1215,6 +1244,8 @@ def dial_from_texture(texture):
         "actorVerbs": _ACTOR_VERBS_HARD if polarity == "hard" else _ACTOR_VERBS_SOFT,
         "registerCohesion": "collide" if polarity == "hard" else "cohere",
         "spatial": _SPATIAL_BY_INTENSITY[intensity_band],
+        "wonder": _WONDER_BY_INTENSITY[intensity_band],
+        "wonderTone": _WONDER_BY_POLARITY["hard" if polarity == "hard" else "soft"],
         "light": _LIGHT_BY_EXPOSURE[exposure_band],
         "anomalyRelation": _ACTOR_ANOMALY_RELATION[(polarity, intensity_band)],
         "objectRelation": _ACTOR_OBJECT_RELATION[(polarity, intensity_band)],
@@ -1339,7 +1370,9 @@ Respond with a JSON object with exactly these keys:
 # standing beside it. Everything cached is ethnographic.
 # 8->9 on 2026-09-20: the anomaly may be a creature or a being, and `presence`
 # is eligible wherever a charter describes how the numinous takes a body.
-STAGE15_SCHEMA_VERSION = 9
+# 9->10 on 2026-09-20: the charter gains a dark register (`dread`) and an
+# actor preference (`favoured_actors`), both of which Stage 1.5 reads.
+STAGE15_SCHEMA_VERSION = 10
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
@@ -1857,7 +1890,12 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         "structure that walks or floats or grew where it stands, a being that is plainly not a "
         "person. Build it from this world's own materials, give it real weight and wear, light it "
         "like everything else, and let the actor work around it the way they would a wall. An image "
-        "in which everything could exist is a failed response."
+        "in which everything could exist is a failed response.\n"
+        f"    How much of the frame it takes: {dial['wonder']}\n"
+        f"    What temper it is in: {dial['wonderTone']}\n"
+        "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
+        "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
+        "is just a texture; it only becomes huge beside something that is not."
     )
     brief.append(
         "  OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."

@@ -160,10 +160,12 @@ era = "Early-industrial in feeling, but its engineering is impossible and nobody
 materials = "Timber, riveted iron, canvas, rope, poured concrete going green, glazed tile, enamelled metal, thatch, cut stone softened by moss. These ordinary materials are what the impossible things are built from: the flying machine is canvas and bicycle parts, the walking house is scavenged roofing and iron legs."
 physics = "Impossible things obey ordinary physics. They have weight, they cast shadows, they rust, they are lit like everything else, and the ground takes their load. Nothing glows of its own accord, nothing is translucent, and nothing floats without a visible reason — a thing that could be rendered as a light effect does not belong here. The wonder is that something enormous and impossible is also heavy and worn."
 society = "Small settlements where work is done by hand and people are known by name. Institutions are distant; the weather and the land are close. Spirits, gods and creatures share the place and hold jobs in it, and no one finds this worth remarking on."
-weather = "Weather is a presence and sometimes a threat. Wind moves through everything, cumulus towers with hard sunlit tops, rain that means it. Light is warm, naturalistic and low."
+weather = "Weather is a presence and often a threat, and it runs the whole range: hard-edged cumulus over a deep blue sky, flat grey overcast, fog that hides the far side of a field, rain that means it, snow, dusk, full night. Wind moves through everything. Pick the weather the day calls for rather than defaulting to fine — this world is at least as itself in bad weather as in good."
 inhabitants = "Children and the old; working people known by name; creatures the size of houses with their own purposes and no interest in being watched; spirits that have taken a shape and a trade; machines that someone tends and that may be awake."
 strangeness = "The genuinely strange is completely unremarkable. Enormous unexplained machinery rusting in a meadow, a creature the size of a house asleep among ordinary trees, a derelict flying city, a shrine crowded with objects nobody living remembers the use of. Such things are heavy, weathered, physically solid and lit exactly like everything around them, and nobody in the frame is astonished by them."
 numinous = "Spirits are ordinary residents. They take a body, a size and a job — a bathhouse worker, a river that is also somebody, a soot-coloured swarm that carries coal, a boar the length of a field, a forest thing that turns its head. They are solid, they displace air, they leave prints, and they are lit like everything else. People greet them, avoid them, or work alongside them without comment. Never a glow, a mist or a translucency — if it could be painted as a light effect it is not one of these."
+dread = "This world at its darkest is not a different world, it is this one with the other face turned out. Gods and creatures are maimed, sickened, or boiling with something under the skin; a thing the length of a hillside can be in agony and destroying everything it crosses. Industry eats the forest and the people doing the eating have good reasons. Violence is sudden, physical and costly — an arm taken off, a wound that will not close, a curse spreading up a limb — and it is never relished by the frame. Nobody here is simply good or simply bad, and the image should not tell you whom to side with."
+favoured_actors = "This world is richest in creatures with their own purposes, part-human figures, spirits holding a trade, swarms, and machines that may be awake. A lone ordinary person is the least interesting inhabitant available and should not be the default — reach for the others first where the constellation allows one."
 # `forbids` removed 2026-09-20 at Garrett's direction: a poorly introduced
 # control from too far back in the iteration process. A charter says what
 # a world IS; it should not need a list of what it is not.
@@ -178,7 +180,30 @@ numinous = "Spirits are ordinary residents. They take a body, a size and a job �
 
 [ghibli]
 label = "Studio Ghibli"
-suffix_base = "Studio Ghibli feature-film animation style. Lush layered greenery in deep saturated greens, towering cumulus clouds with hard-edged sunlit tops against a deep blue sky, warm naturalistic low sunlight, visible painterly brushwork in foliage and stonework, where the scene has depth, a clear separation between foreground, middle distance and horizon, rich and slightly heightened color rather than muted realism"
+# suffix_base split 2026-09-20: TECHNIQUE ONLY. It used to also mandate
+# "towering cumulus clouds with hard-edged sunlit tops against a deep blue sky"
+# and "warm naturalistic low sunlight" on EVERY ghibli image, which made it the
+# last fixed instruction overriding a variable one. Measured: on the darkest
+# cell available (hard/hi, exposure lo) the dial asked for "most of the frame
+# unlit or obscured" and a strangeness that is "dangerous, diseased or
+# grieving", and the render came back a sunny meadow with a friendly turtle.
+# The suffix was vetoing both the light axis and the wonder tone, and probably
+# always had been.
+#
+# Weather, palette and time of day now come from the dial (light, wonderTone)
+# and from the charter's `weather`, which describes a RANGE rather than one
+# state. What stays here is what is true of a ghibli frame at any hour: layered
+# opaque paint, visible brushwork, heightened colour, and -- added explicitly,
+# because this is what stops a dark day going grey and grimdark -- saturation
+# that survives shadow. Mononoke's night forest is dark and still richly
+# coloured.
+#
+# RISK, stated plainly: the cumulus-against-blue clause was one of the
+# strongest recognisability cues, and the 2026-09-08 sweep put ghibli at 12/12.
+# If recognisability drops, this is the change that did it, and the fix is to
+# move that clause into the charter's `weather` as a bright-day option rather
+# than back into the suffix.
+suffix_base = "Studio Ghibli feature-film animation style. Hand-painted backgrounds in layered opaque paint with visible brushwork in foliage, stone, cloth and water; forms built from stacked paint rather than smooth digital gradients; colour heightened rather than muted, and still saturated in shadow, in rain and at night rather than draining to grey; fine detail held even in the darkest parts of the frame."
 suffix_figures = ", figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
 # guidance removed 2026-09-20: superseded by [ghibli.world] above. Its
 # world-description became the charter's fields; its prohibitions went to
