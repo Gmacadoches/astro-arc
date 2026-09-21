@@ -431,18 +431,62 @@ def load_style_suffix(style_key, has_people=False):
     return preset.get("suffix", "")
 
 
+# The order the charter's fields are read out to Stage 2. Fixed here rather
+# than taken from the file so every style presents its world the same way, and
+# so adding a field to one charter does not silently change another's shape.
+_CHARTER_FIELDS = (
+    ("era", "Era and technology"),
+    ("materials", "What things are made of"),
+    ("physics", "How this world behaves"),
+    ("society", "Who lives here and how"),
+    ("weather", "Weather and light as presence"),
+    ("inhabitants", "Who or what acts in this world"),
+    ("strangeness", "How the strange is treated"),
+    ("forbids", "Never in this world"),
+)
+
+
+def load_style_world(style_key):
+    """The `[<style>.world]` charter as a block of prose, or "" if this style
+    has not been chartered yet.
+
+    Charters replace the old free-text `guidance` field, which had to carry a
+    world, a set of prohibitions and a plea not to default to a cottage kitchen
+    all in one paragraph — and only ghibli ever got a good one. The fields are
+    fixed so that every style answers the same questions.
+
+    Returns "" rather than raising for an unchartered style, which is what
+    makes the migration incremental: load_style_info() falls back to that
+    style's `guidance` until its charter is approved.
+    """
+    styles = load_styles()
+    world = (styles.get(style_key) or {}).get("world") or {}
+    if not isinstance(world, dict):
+        return ""
+    parts = [f"{label}: {str(world[key]).strip()}"
+             for key, label in _CHARTER_FIELDS
+             if world.get(key) and str(world[key]).strip()]
+    return "\n".join(parts)
+
+
 def load_style_info(style_key):
-    """(label, guidance) for the configured style — guidance tells Stage 2
-    what kind of imagery this style can actually depict (see styles.toml's
-    header comment), so it doesn't invent imagery outside the style's own
-    visual vocabulary. Same fallback-to-symbolist behavior as
-    load_style_suffix(); guidance is optional per-preset, defaults to ""
-    for an older preset that hasn't been given one yet."""
+    """(label, world) for the configured style — what Stage 2 is told about
+    the world it is painting in, so it does not invent imagery the style has
+    no vocabulary for and can take content from the style rather than only
+    rendering.
+
+    The charter wins where one exists; otherwise the old free-text `guidance`
+    stands in. That fallback is the whole migration strategy: charters are
+    authored and approved one style at a time, and an unchartered style keeps
+    working exactly as it did. Same fallback-to-symbolist behaviour as
+    load_style_suffix() for an unknown key.
+    """
     styles = load_styles()
     preset = styles.get(style_key) or styles.get("symbolist")
     if not preset:
         return "", ""
-    return preset.get("label", ""), preset.get("guidance", "")
+    key = style_key if style_key in styles else "symbolist"
+    return preset.get("label", ""), load_style_world(key) or preset.get("guidance", "")
 
 
 # ---------------------------------------------------------------------------
