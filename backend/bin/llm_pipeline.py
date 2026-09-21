@@ -335,6 +335,28 @@ def actor_guidance(kind):
     return ((_load_actors().get("kinds") or {}).get(kind) or "").strip()
 
 
+def presence_allowed(style_key):
+    """Whether the `presence` actor kind is eligible in this world.
+
+    It shipped ineligible everywhere because most styles forbid the
+    immaterial outright and the prohibitions it needed to read lived in
+    `guidance`, which the charters replace. So it becomes what the actors
+    brief proposed: a question each charter answers. A world that describes
+    how the numinous takes a body can have one; a world that says nothing
+    cannot, because silence is not permission.
+    """
+    world = (load_styles().get(style_key) or {}).get("world") or {}
+    return bool(isinstance(world, dict) and str(world.get("numinous") or "").strip())
+
+
+def eligible_actor_kinds(style_key):
+    """The kinds Stage 1.5 may choose from in this world."""
+    kinds = actor_kinds()
+    if not presence_allowed(style_key):
+        kinds = [k for k in kinds if k != "presence"]
+    return kinds
+
+
 def actor_excluded_for(register):
     """Actor kinds that collapse into the substance when paired with this
     register — `automaton` with `mechanical` makes the actor out of the same
@@ -442,6 +464,7 @@ _CHARTER_FIELDS = (
     ("weather", "Weather and light as presence"),
     ("inhabitants", "Who or what acts in this world"),
     ("strangeness", "How the strange is treated"),
+    ("numinous", "How the numinous appears, and whether it has a body"),
     ("forbids", "Never in this world"),
 )
 
@@ -1285,7 +1308,7 @@ Rules:
 - **`none` is for the constellations that genuinely have nobody in them** — petrification, the sealed vessel, the tomb, the long aftermath. It is the exception, not the safe default. If you can name who is there, name them.
 
 Respond with a JSON object with exactly these keys:
-{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} pieces of the myth itself \u2014 beings, creatures, places, remains, workings or things \u2014 each named concretely enough to picture, each unmistakably part of THIS story rather than generally suggestive of it"], "anomaly": "exactly one further object, made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE MEANS LARGER, AND ALMOST ALWAYS LARGER: monumentally oversized for its own kind, the size of a barn or a hillside where its kind is the size of a hand or a room, while still being the kind of thing this world contains and still made of its materials. A too-SMALL version is a much weaker reading and is a failure unless the reading leaves no other honest option — reach for the enormous first. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
+{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} pieces of the myth itself \u2014 beings, creatures, places, remains, workings or things \u2014 each named concretely enough to picture, each unmistakably part of THIS story rather than generally suggestive of it"], "anomaly": "exactly one further presence — an object, a creature or a being, and a living one wherever the story allows — made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE MEANS LARGER, AND ALMOST ALWAYS LARGER: monumentally oversized for its own kind, the size of a barn or a hillside where its kind is the size of a hand or a room, while still being the kind of thing this world contains and still made of its materials. A too-SMALL version is a much weaker reading and is a failure unless the reading leaves no other honest option — reach for the enormous first. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
 # every cached amplification, for the same reason SIGNATURE_SCHEMA_VERSION
@@ -1314,7 +1337,9 @@ Respond with a JSON object with exactly these keys:
 # curator-grade artifact instruction was muddying it. Stage 1.5 now names the
 # furniture of the myth the constellation already named, not domestic objects
 # standing beside it. Everything cached is ethnographic.
-STAGE15_SCHEMA_VERSION = 8
+# 8->9 on 2026-09-20: the anomaly may be a creature or a being, and `presence`
+# is eligible wherever a charter describes how the numinous takes a body.
+STAGE15_SCHEMA_VERSION = 9
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
@@ -1363,7 +1388,7 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
             pass
 
     object_lo, object_hi = dial["objectRange"]
-    kinds = actor_kinds()
+    kinds = eligible_actor_kinds(style_key)
     system_prompt = (
         STAGE15_SYSTEM
         .replace("{{OBJECT_RANGE}}", f"{object_lo} to {object_hi}")
@@ -1816,6 +1841,24 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
     # however good its content is. Phrased as a countable share of frame and a
     # failure condition, matching the word-count rule, because "make it feel
     # open" is a mood word and mood words are not obeyed.
+    # Unconditional, like OPENNESS below, and placed here for the same reason:
+    # the brief is demonstrably the part that gets obeyed. Until now wonder was
+    # only DESCRIBED, in the style charter, and nothing anywhere required it —
+    # so a world of walking machines reliably produced a plausible flour mill.
+    # A charter says what MAY exist; only the brief makes something appear.
+    #
+    # Phrased as a count and a failure condition, matching the openness and
+    # word-count rules, because "make it wondrous" is a mood word and mood
+    # words are not obeyed.
+    brief.append(
+        "  THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, "
+        "and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary "
+        "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
+        "structure that walks or floats or grew where it stands, a being that is plainly not a "
+        "person. Build it from this world's own materials, give it real weight and wear, light it "
+        "like everything else, and let the actor work around it the way they would a wall. An image "
+        "in which everything could exist is a failed response."
+    )
     brief.append(
         "  OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
     )
