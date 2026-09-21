@@ -164,6 +164,19 @@ def main():
             "polarity": (dial.get("tonalDirection") or "")[:14],
             "hasPeople": has_people, "promptWords": len(prompt.split()),
             "conceptTags": "|".join(tags), "imagePrompt": prompt,
+            # The whole amplification and the final prompt, so a batch can be
+            # filed into the archive afterwards without re-rendering. The first
+            # run of this harness saved neither, and the renders were good, so
+            # those eight entries carry reconstructed metadata with the
+            # constellation and object list blank.
+            "finalPrompt": final,
+            "constellation": amp.get("constellation", ""),
+            "movement": amp.get("movement", ""),
+            "affect": amp.get("affect", ""),
+            "amplificationObjects": amp.get("objects") or [],
+            "visualSignature": signature,
+            "stage1Model": stage1_model, "stage2Model": stage2_model,
+            "artStyle": style_key,
         }
 
         if not args.no_image:
