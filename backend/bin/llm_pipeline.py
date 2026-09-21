@@ -1155,7 +1155,7 @@ NO_TEXTURE_DIAL = {
     "anomalyRelation": _ACTOR_ANOMALY_RELATION[("soft", "mid")],
     "objectRelation": _ACTOR_OBJECT_RELATION[("soft", "mid")],
     "siteRelation": _ACTOR_SITE_RELATION[("soft", "mid")],
-    "anomalyTypes": "scale (far too large or small for its kind), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
+    "anomalyTypes": "scale (far too LARGE for its kind — the size of a building where it should be the size of a hand), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
     "tonalDirection": None,
 }
 
@@ -1199,7 +1199,7 @@ def dial_from_texture(texture):
         # Out-of-place needs knowledge of the world, which Stage 1.5 deliberately
         # does not have; scale and age are both nameable blind, and they are also
         # the two qualities a rendering style cannot sand down into charm.
-        "anomalyTypes": "scale (far too large or small for its kind), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
+        "anomalyTypes": "scale (far too LARGE for its kind — the size of a building where it should be the size of a hand), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
         "tonalDirection": (
             "This timeframe is under strain. Do not soften it."
             if polarity == "hard" else
@@ -1282,7 +1282,7 @@ Rules:
 - **`none` is for the constellations that genuinely have nobody in them** — petrification, the sealed vessel, the tomb, the long aftermath. It is the exception, not the safe default. If you can name who is there, name them.
 
 Respond with a JSON object with exactly these keys:
-{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object, made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE means far too large or far too small for its own kind, while still being the kind of thing this world contains. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
+{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object, made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE MEANS LARGER, AND ALMOST ALWAYS LARGER: monumentally oversized for its own kind, the size of a barn or a hillside where its kind is the size of a hand or a room, while still being the kind of thing this world contains and still made of its materials. A too-SMALL version is a much weaker reading and is a failure unless the reading leaves no other honest option — reach for the enormous first. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
 # every cached amplification, for the same reason SIGNATURE_SCHEMA_VERSION
@@ -1302,7 +1302,11 @@ Respond with a JSON object with exactly these keys:
 # 5->6 on 2026-09-20: Stage 1.5 is style-aware. Objects and the anomaly are
 # now named in the terms of the style's world charter, so nothing cached
 # under a style-blind prompt is usable.
-STAGE15_SCHEMA_VERSION = 6
+# 6->7 on 2026-09-20: scale anomalies biased large. 'Far too large or small'
+# was being read as small — a millstone too small to have worked — which is
+# quiet strangeness where the charters describe enormous unexplained
+# machinery. Anything cached under the old wording may carry a miniature.
+STAGE15_SCHEMA_VERSION = 7
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
@@ -1757,6 +1761,25 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         f"  REQUIRED: the primary register ({register}) must put at least one substantial thing of its own in the frame, named explicitly, beyond the objects you were given. A scene that merely takes place near that material does not count — if the register is \"mechanical\" an actual mechanism with working parts is visible; if \"aquatic\", real water; if \"bodily and anatomical\", actual anatomy as material rather than a person standing there.",
         f"  The anomaly, and how the actor treats it: {dial['anomalyRelation']}",
     ]
+    # A scale anomaly is now monumentally oversized (see STAGE15_SYSTEM), and
+    # that collides with the spatial axis: on a "conversational distance" day
+    # a barn-sized object simply will not fit, so the renderer drops it. It
+    # did, twice out of two, in the first ghibli batch after the change — the
+    # silo reached the prompt and never reached the image, which is also why
+    # anomalySurvived cannot be trusted alone: it reads the prompt, not the
+    # render.
+    #
+    # The fix is the one that world uses for anything enormous: put PART of it
+    # in frame. A thing too big for the shot is more unsettling cropped than
+    # centred, and it costs no extra distance.
+    if (amplification or {}).get("anomalyType") == "scale":
+        brief.append(
+            "  THE ANOMALY IS ENORMOUS, and it must be visibly in this frame. If it does not "
+            "fit the vantage above, do not shrink it, move it to the background, or leave it "
+            "out — put PART of it in shot, close, so its size is unmistakable: the foot of it, "
+            "one edge, the shadow it throws across everything else. The viewer should be unable "
+            "to see all of it at once."
+        )
     # The actor goes in the brief rather than STAGE2_SYSTEM for the reason the
     # register-contribution and openness rules did: the brief is demonstrably
     # the part that gets obeyed. Three relations, not one — the anomaly line
