@@ -1225,8 +1225,30 @@ def dial_from_texture(texture):
 # the two wrongnesses a style cannot sand down into charm. What is lost is the
 # category error; what is gained is that the image coheres as one world, and the
 # charge now varies instead of being constant. Stage 2 owns the relation (see
-# _ACTOR_ANOMALY_RELATION); this stage still authors it BLIND to the scene and the style,
-# which is exactly why it cannot be pre-reconciled.
+# _ACTOR_ANOMALY_RELATION). REVERSED 2026-09-20: this stage used to author the
+# anomaly blind to the scene and the style, on the argument that blindness was
+# exactly why it could not be pre-reconciled.
+#
+# That argument turned out to be answering the wrong question, and the rewrite
+# above is what shows it. Stage 2 is already told the anomaly "BELONGS to this
+# world: do not import an object from another century, another technology or
+# another order of reality" — but Stage 1.5 had no idea what the world was, so
+# it could not comply. It returned a Roman amphora for a pastoral Japanese
+# world and Stage 2 was instructed to render that as native. The two stages
+# contradicted each other, and the blindness is what made the contradiction
+# unavoidable.
+#
+# Measured on the ghibli charter sweep: with the objects also style-blind, the
+# anomaly had nothing to be anomalous AGAINST. An Italian astrolabe, an English
+# beehive oven and a Mongolian prayer scroll are as foreign to that world as
+# the amphora is, so the one object that is supposed to be wrong was
+# indistinguishable from the three that are not.
+#
+# So the world now goes to Stage 1.5. The anomaly stays unexplained and stays
+# typed (out of scale, or out of time and ONLY older) — what changes is that it
+# is made of this world's materials, which is what the 2026-09-12 rewrite asked
+# for and could not get. The guard against pre-reconciliation moves into the
+# typing: native material, extreme wrongness.
 #
 # The firewall here is the same one Stage 1 has and for the same reason: if
 # this stage starts composing a scene, Stage 2 inherits its framing and the
@@ -1251,7 +1273,7 @@ Rules:
   - When it is dark, say so. Devouring, dissolution, dismemberment, petrification, suffocation and being buried alive are real archetypal contents. Do not soften them into "transition" or "growth."
   - When it is not dark, say that just as plainly. Abundance, the feast, ripening and harvest, the sacred marriage, the found spring, the debt forgiven, the long work finished, the body at rest and unguarded, the returning traveller recognised at the door are equally real archetypal contents — and they are not lesser, softer, or a failure to look hard enough. Do not import darkness the reading does not have. A reading of genuine ease that amplifies to suffocation is as wrong as a reading of genuine grief that amplifies to growth.
 - You will be told which direction this timeframe actually runs in. Follow it.
-- Your objects must be **specific things with a use** — the kind a museum labels with a place and a date. A swaddling band. A beehive oven, still warm. A knotted red cord. A threshing floor. A votive eye of hammered tin. An apiary smoker. A lead curse tablet. A mourning brooch woven from hair. An ex-voto silver leg. A bone flute. A sin-eater's plate. A wax anatomical model. A plague doctor's beak stuffed with rue. A scold's bridle. A dowsing rod. A reliquary holding a tooth.
+- Your objects must be **specific things with a use, and they must belong to THE WORLD described below**. Not museum pieces: things the people of that world own, made of its materials, of its era, that they would recognise and use without comment. A swaddling band, a knotted red cord, a threshing floor, a votive eye of hammered tin, an apiary smoker, a mourning brooch woven from hair, a bone flute, a sin-eater's plate, a dowsing rod — that is the LEVEL of specificity to reach for, not the list to pick from, and every one of them must be translated into the world you are given. A scene set in a neon city does not contain a votive eye of hammered tin; it contains that world's equivalent, named just as concretely.
 - NEVER return a generic category or a stock prop. A door, a mirror, a key, a candle, a chain, a scale, a mask, a book, a clock, a lantern, a rope, a bridge, a tapestry, a gear, a tree with visible roots — these and anything similarly available are failures. If an object could illustrate any reading whatsoever, it is the wrong object.
 - Do not draw every object from one culture, one century, or one material. Reach across traditions and across the material world: bone, wax, lead, cloth, grain, glass, iron, salt.
 - Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
@@ -1260,7 +1282,7 @@ Rules:
 - **`none` is for the constellations that genuinely have nobody in them** — petrification, the sealed vessel, the tomb, the long aftermath. It is the exception, not the safe default. If you can name who is there, name them.
 
 Respond with a JSON object with exactly these keys:
-{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object that belongs to the SAME world as the others — same kind of place, same order of reality, same or earlier technology — but is wrong in one specific way: either far out of {{ANOMALY_TYPES}}. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE means far too large or far too small for its own kind, while still being the kind of thing this world contains. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
+{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} specific ritual, domestic, or ethnographic objects, each named concretely enough that a curator could find one"], "anomaly": "exactly one further object, made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE means far too large or far too small for its own kind, while still being the kind of thing this world contains. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
 # every cached amplification, for the same reason SIGNATURE_SCHEMA_VERSION
@@ -1277,11 +1299,15 @@ Respond with a JSON object with exactly these keys:
 # change exists to break out of, so none of them should survive it.
 # 4->5 on 2026-09-20: Stage 1.5 now names the actor and its kind. Every
 # cached amplification predates those fields, so none can supply one.
-STAGE15_SCHEMA_VERSION = 5
+# 5->6 on 2026-09-20: Stage 1.5 is style-aware. Objects and the anomaly are
+# now named in the terms of the style's world charter, so nothing cached
+# under a style-blind prompt is usable.
+STAGE15_SCHEMA_VERSION = 6
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
-                    avoid_archetypes=None, avoid_kinds=None):
+                    avoid_archetypes=None, avoid_kinds=None, style_key=None,
+                    style_world=""):
     """Cached per period_key exactly like stage1_interpret() — regenerating
     the same day's image must not re-bill this call — and invalidated by the
     same natalHash plus a schema version.
@@ -1310,8 +1336,15 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     if cache and cache_path.exists():
         try:
             cached = json.loads(cache_path.read_text())
+            # styleKey joins natalHash and the schema version as a cache
+            # input, because as of 2026-09-20 the style is one: a ghibli
+            # amplification handed to a cyberpunk render would be exactly the
+            # foreign-object problem this change exists to remove. Switching
+            # style mid-period now re-bills Stage 1.5, which is correct and
+            # costs about $0.003.
             if (cached.get("constellation") and cached.get("objects")
                     and cached.get("natalHash") == natal_hash
+                    and cached.get("styleKey") == style_key
                     and cached.get("schemaVersion") == STAGE15_SCHEMA_VERSION):
                 return cached, None
         except (json.JSONDecodeError, OSError):
@@ -1329,7 +1362,13 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
         .replace("{{ACTOR_KINDS}}", ", ".join(kinds) or "none")
     )
 
-    user_lines = [
+    user_lines = []
+    if style_world:
+        user_lines.append(
+            "THE WORLD — every object you name, and the anomaly, must belong to it:\n"
+            + style_world
+        )
+    user_lines += [
         f"Reading: {stage1_result['reading']}",
         f"Distillation: {stage1_result['distillation']}",
         f"Narrative position: {stage1_result['narrativePosition']}",
@@ -1406,6 +1445,7 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     result["dial"] = {k: v for k, v in dial.items() if k in ("mode", "objectRange", "anomalyTypes", "tonalDirection")}
     result["generatedAt"] = datetime.now(timezone.utc).isoformat()
     result["natalHash"] = natal_hash
+    result["styleKey"] = style_key
     result["schemaVersion"] = STAGE15_SCHEMA_VERSION
     if cache:
         AMPLIFICATIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1784,7 +1824,10 @@ def build(reading, config):
 
     visual_signature, signature_cost = get_visual_signature(reading["natal"], config, stage2_model)
     stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config)
-    amplification, stage15_cost = stage15_amplify(stage1, stage1_model, period_key, config, dial=dial)
+    amplification, stage15_cost = stage15_amplify(
+        stage1, stage1_model, period_key, config, dial=dial,
+        style_key=style_key, style_world=load_style_world(style_key),
+    )
     # A cache hit returns the dial the objects were actually written for, which may
     # differ from the one just computed if the Moon has moved since. Trust the
     # stored one — the object list and the density have to agree.

@@ -78,8 +78,21 @@ def main():
     dial = lp.dial_from_texture(reading["arc"].get("texture"))
     stage1, _ = lp.stage1_interpret(reading, stage1_model, period_key, config)
     signature, _ = lp.get_visual_signature(reading["natal"], config, stage2_model)
-    amplification, _ = lp.stage15_amplify(stage1, stage1_model, period_key, config, dial=dial)
     cliches = lp.load_cliches()
+
+    # The amplification used to be pinned here, beside Stage 1 and the
+    # signature, on the premise that everything except the style should be
+    # held constant. That premise died on 2026-09-20: the style is now a
+    # Stage 1.5 input, because the objects and the anomaly are named in the
+    # world's own terms. Pinning one amplification across styles would show
+    # every world holding the same foreign objects, which is precisely the
+    # failure this gallery would be used to check for.
+    #
+    # So it moves into the loop, one per style. What the gallery compares is
+    # now "same reading and signature, different world" rather than "same
+    # objects, different rendering" — which is the honest comparison, and the
+    # only one that can show a world doing its job. Costs one extra Stage 1.5
+    # call per style, about $0.003.
 
     OUT_IMAGES.mkdir(parents=True, exist_ok=True)
     rows, total = [], 0.0
@@ -87,6 +100,12 @@ def main():
     for i, key in enumerate(wanted, start=1):
         label, guidance = lp.load_style_info(key)
         print("[%d/%d] %s" % (i, len(wanted), label), file=sys.stderr)
+
+        amplification, amp_cost = lp.stage15_amplify(
+            stage1, stage1_model, period_key, config, cache=False, dial=dial,
+            style_key=key, style_world=lp.load_style_world(key),
+        )
+        total += amp_cost or 0.0
 
         prompt, tags, has_people, cost = lp.stage2_image_prompt(
             stage1, signature, args.register, [], cliches, stage2_model,

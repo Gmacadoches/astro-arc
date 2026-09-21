@@ -203,6 +203,13 @@ def main():
         amp_kwargs = {"cache": False}
         if dial is not None:
             amp_kwargs["dial"] = dial
+        # The style is a Stage 1.5 input as of 2026-09-20 — objects and the
+        # anomaly are named in the world's terms — so a sweep that omits it
+        # would measure a pipeline production never runs. Guarded by hasattr
+        # so the harness still works against an older checkout.
+        if hasattr(lp, "load_style_world"):
+            amp_kwargs["style_key"] = style_key
+            amp_kwargs["style_world"] = lp.load_style_world(style_key)
         try:
             amplification, amp_cost = lp.stage15_amplify(
                 stage1, stage1_model, reading["arc"]["periodKey"], config, **amp_kwargs

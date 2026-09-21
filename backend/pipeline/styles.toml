@@ -163,7 +163,17 @@ society = "Small settlements where work is done by hand and people are known by 
 weather = "Weather is a presence and sometimes a threat. Wind moves through everything, cumulus towers with hard sunlit tops, rain that means it. Light is warm, naturalistic and low."
 inhabitants = "Children and the old; working people known by name; creatures with their own purposes and no interest in being watched; machines that someone tends."
 strangeness = "The genuinely strange is completely unremarkable. Enormous unexplained machinery rusting in a meadow, a creature the size of a house asleep among ordinary trees, a derelict flying city, a shrine crowded with objects nobody living remembers the use of. Such things are heavy, weathered, physically solid and lit exactly like everything around them, and nobody in the frame is astonished by them."
-forbids = "Never abstract energy-beings, geometric abstraction, immaterial or glowing forms. Never default to a cottage kitchen or a domestic interior because it sits comfortably in this world -- whatever the register is made of stays the actual subject, and the version of these qualities belonging to THAT material is the one to find. Never a bare isolated subject on an empty field. Scenes here are not obliged to be warm or pleasant: this world also holds real dread, decay, blight, abandonment and weather that means harm, rendered with the same solidity."
+# `forbids` removed 2026-09-20 at Garrett's direction: a poorly introduced
+# control from too far back in the iteration process. A charter says what
+# a world IS; it should not need a list of what it is not.
+#
+# What went with it, so the history is not lost: the no-energy-beings ban
+# (now carried by `physics`, which says a thing renderable as a light
+# effect does not belong here), the 2026-09-08 cottage-kitchen rule, and a
+# clause that was permission rather than prohibition -- that scenes here
+# are not obliged to be warm and may hold dread, decay and blight. Some of
+# that permission survives in `weather`. If ghibli drifts pleasant, or if a
+# register collapses into a kitchen again, this is the change that did it.
 
 [ghibli]
 label = "Studio Ghibli"

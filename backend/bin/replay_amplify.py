@@ -113,9 +113,11 @@ def run_arm(arm, days, model, config, out_dir, axis="archetype", seed=0):
         avoid_k = None
         if axis == "actor-kind" and arm == "D-constrained":
             avoid_k = list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW]
+        style_key = config.get("artStyle") or "symbolist"
         result, cost = lp.stage15_amplify(
             reading, model, key, config, cache=False, dial=dial,
             avoid_archetypes=avoid, avoid_kinds=avoid_k,
+            style_key=style_key, style_world=lp.load_style_world(style_key),
         )
         total += cost or 0.0
         constellation = result.get("constellation", "")
