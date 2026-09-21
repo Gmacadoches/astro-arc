@@ -325,6 +325,24 @@ def actor_kinds():
     return list((_load_actors().get("kinds") or {}).keys())
 
 
+def actor_kind_summary(kind):
+    """The first sentence of a kind's guidance — enough for Stage 1.5 to
+    CHOOSE between kinds, without spending the whole paragraph Stage 2 needs
+    in order to RENDER one.
+
+    Stage 1.5 used to receive a bare list of names. `solitary` reads as itself
+    and `presence` does not, so a spirit with a body and a trade was
+    consistently typed `solitary`, and the guidance attached to the kind it
+    should have had never fired. The descriptions already existed in
+    actors.toml and only the stage that renders could see them.
+    """
+    text = actor_guidance(kind)
+    if not text:
+        return ""
+    head = text.split(". ")[0].strip().rstrip(".")
+    return head
+
+
 def actor_guidance(kind):
     """How this kind is framed, or "" for `none` and for an unknown kind.
 
@@ -1336,6 +1354,9 @@ Rules:
 - Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
 - **Use no visual or compositional language at all.** Do not say where anything sits, how it is lit, what color it is, what it looks like, or how any two things are arranged relative to each other. You are not staging a picture. If you begin composing, you have failed this task.
 - **Name the actor the constellation already contains.** Every archetypal situation has a cast: the night-sea journey has someone inside the monster, the dragon-fight has whoever won it, the child born and held has a child and whoever holds it, captivity has a captive. Say who is in this situation, as a concrete living thing rather than a role label — "a woman who has been walking since before light", not "the seeker". Then classify that actor as exactly one of the available kinds. Do not invent an actor the constellation does not imply, and do not reach for a person when the situation belongs to an animal, a swarm, or something that was alive and is not.
+- **Classify the actor by WHAT IT IS, not by how many there are.** These are the kinds available, and one of them is exactly right:
+{{ACTOR_KIND_TABLE}}
+  `solitary` means an ORDINARY HUMAN BEING alone — nothing else. A single spirit is `presence`, not `solitary`. A single part-human figure is `man-beast`. A single creature is `animal`. A single machine working by itself is `automaton`. A single corpse or remnant is `the-dead`. Being one of something is not what makes an actor `solitary`; being an unremarkable person is. This is the most common misclassification, so check it before you answer.
 - **`none` is for the constellations that genuinely have nobody in them** — petrification, the sealed vessel, the tomb, the long aftermath. It is the exception, not the safe default. If you can name who is there, name them.
 
 Respond with a JSON object with exactly these keys:
@@ -1372,7 +1393,9 @@ Respond with a JSON object with exactly these keys:
 # is eligible wherever a charter describes how the numinous takes a body.
 # 9->10 on 2026-09-20: the charter gains a dark register (`dread`) and an
 # actor preference (`favoured_actors`), both of which Stage 1.5 reads.
-STAGE15_SCHEMA_VERSION = 10
+# 10->11 on 2026-09-20: Stage 1.5 now sees what each actor kind MEANS, not
+# just its name, and is told to classify by kind rather than by count.
+STAGE15_SCHEMA_VERSION = 11
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
@@ -1430,6 +1453,10 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
         # out of step with actors.toml — the same reason the people-register
         # list used to be injected into STAGE2_SYSTEM.
         .replace("{{ACTOR_KINDS}}", ", ".join(kinds) or "none")
+        .replace("{{ACTOR_KIND_TABLE}}", "\n".join(
+            f"    {k} — {actor_kind_summary(k)}" if actor_kind_summary(k)
+            else f"    {k} — no one at all; the materials and the place carry the image alone"
+            for k in kinds) or "    none")
     )
 
     user_lines = []
