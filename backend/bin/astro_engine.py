@@ -50,9 +50,19 @@ SIGNS = [
     ("Pisces", "water", "mutable"),
 ]
 
-# Classical + modern planets only — nodes/Chiron/asteroids can be added once
-# the symbolic model needs them. (name, None) pairs, kept in this shape because
-# callers iterate `for n, _ in BODIES`; ephemeris.BODIES maps the names.
+# Classical + modern planets only. This set is now capped by the ephemeris
+# rather than by taste: Astronomy Engine's Body enum stops at Pluto, so unlike
+# pyswisseph, extra bodies are no longer a matter of naming one.
+#   - Chiron and the asteroids are not reachable at all and would need a new
+#     data source. Worth knowing, since Chiron is close to a signature body of
+#     the archetypal school STAGE1_SYSTEM works in.
+#   - The lunar nodes are reachable but need an adapter: SearchMoonNode /
+#     NextMoonNode find node *crossing events in time*, not a longitude at an
+#     instant, where pyswisseph exposed SE_TRUE_NODE directly.
+#   - Black Moon Lilith would have to be derived from lunar apogee events via
+#     SearchLunarApsis; the library has no Lilith of its own.
+# (name, None) pairs, kept in this shape because callers iterate
+# `for n, _ in BODIES`; ephemeris.BODIES maps the names.
 BODIES = [(name, None) for name in ephemeris.BODIES]
 OUTER_BODIES = {"mars", "jupiter", "saturn", "uranus", "neptune", "pluto"}
 

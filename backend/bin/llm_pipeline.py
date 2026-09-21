@@ -496,6 +496,49 @@ def avoid_concepts(history, window=AVOID_WINDOW):
 AMPLIFY_AVOID_WINDOW = 8
 
 
+# How many of the immediately preceding days block a repeat of the same actor
+# kind. Two, matching the `none` rule (never on consecutive days), and kept
+# small deliberately: a large veto window stops being a tie-breaker and starts
+# being the chooser, which is arm B wearing arm C's clothes.
+# Four, measured. At 2 the constrained arm cycled among four favourites (4
+# distinct kinds over 12 days, top share 33%); at 4 it reached 7 distinct and
+# 25%, matching the unconstrained random arm's variety while staying coherent.
+ACTOR_VETO_WINDOW = 4
+
+
+def veto_overused_kind(proposed, recent_kinds, kinds):
+    """Arm C of the B6 test: Stage 1.5 proposes, recency vetoes afterwards.
+
+    NOT the production path, and kept only so replay_amplify.py can still
+    reproduce that arm. It lost for a reason worth remembering: a post-hoc
+    veto changes the kind and leaves the actor DESCRIPTION contradicting it,
+    which the replay showed plainly — "swarm" attached to "a child resting in
+    the crook of a woman's arm". Production constrains the kind up front
+    instead (see avoid_kinds), so one call writes both fields and they cannot
+    desync.
+
+    The proposal stands unless it repeats one of the last ACTOR_VETO_WINDOW
+    kinds, in which case the least-recently-used eligible kind replaces it.
+    `none` is never substituted IN — a purely material image has to be chosen
+    on the constellation's merits, never as a rotation artifact — but a
+    proposed `none` is left alone, since its own recency rule is separate.
+
+    Deterministic, so a replay is reproducible: where several kinds are
+    equally stale, file order breaks the tie.
+    """
+    if not proposed or not kinds:
+        return proposed
+    blocked = set(recent_kinds[:ACTOR_VETO_WINDOW])
+    if proposed not in blocked:
+        return proposed
+    staleness = {k: recent_kinds.index(k) if k in recent_kinds else len(recent_kinds)
+                 for k in kinds}
+    eligible = [k for k in kinds if k not in blocked and k != "none"]
+    if not eligible:
+        return proposed
+    return max(eligible, key=lambda k: (staleness[k], -kinds.index(k)))
+
+
 def recent_constellations(window=AMPLIFY_AVOID_WINDOW, exclude=None):
     """The last `window` constellations, most recent first, for Stage 1.5 to
     reach past. `exclude` drops one period key — the one being regenerated,
@@ -512,6 +555,32 @@ def recent_constellations(window=AMPLIFY_AVOID_WINDOW, exclude=None):
             continue
         if text and text not in out:
             out.append(text)
+        if len(out) >= window:
+            break
+    return out
+
+
+def recent_actor_kinds(window=ACTOR_VETO_WINDOW, exclude=None):
+    """The last `window` actor kinds, most recent first, for Stage 1.5 to pick
+    around. Same source and same shape as recent_constellations, because it is
+    the same mechanism applied to the other field the model over-uses.
+
+    `none` is skipped: it has its own recency rule (never two days running, at
+    most twice in seven) and blocking a kind that is meant to be rare would
+    invert that.
+    """
+    if not AMPLIFICATIONS_DIR.is_dir():
+        return []
+    out = []
+    for path in sorted(AMPLIFICATIONS_DIR.glob("*.json"), reverse=True):
+        if exclude and path.stem == exclude:
+            continue
+        try:
+            kind = (json.loads(path.read_text()).get("actorKind") or "").strip()
+        except (json.JSONDecodeError, OSError):
+            continue
+        if kind and kind != "none" and kind not in out:
+            out.append(kind)
         if len(out) >= window:
             break
     return out
@@ -1168,7 +1237,7 @@ STAGE15_SCHEMA_VERSION = 5
 
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
-                    avoid_archetypes=None):
+                    avoid_archetypes=None, avoid_kinds=None):
     """Cached per period_key exactly like stage1_interpret() — regenerating
     the same day's image must not re-bill this call — and invalidated by the
     same natalHash plus a schema version.
@@ -1238,11 +1307,29 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     # replay harness) overrides, and `[]` disables it for a control run.
     if avoid_archetypes is None:
         avoid_archetypes = recent_constellations(exclude=period_key)
+    if avoid_kinds is None:
+        avoid_kinds = recent_actor_kinds(exclude=period_key)
     if avoid_archetypes:
         user_lines.append(
             "RECENTLY USED — these archetypes are spent; reach elsewhere unless "
             "the reading leaves no honest alternative:\n"
             + "\n".join(f"  - {c}" for c in avoid_archetypes)
+        )
+
+    # The actor kind gets the same treatment as the archetype, and for the same
+    # measured reason: left alone, Stage 1.5 returns `solitary` on 83% of days,
+    # which is the archetype attractor again one level down.
+    #
+    # Constraining it HERE rather than vetoing the answer afterwards is the
+    # whole point. A post-hoc veto changes the label and leaves the actor
+    # description contradicting it — measured on the B6 replay, where "swarm"
+    # came back attached to "a child resting in the crook of a woman's arm".
+    # Blocking the kind up front costs nothing extra and cannot desync, because
+    # the same call writes both fields.
+    if avoid_kinds:
+        user_lines.append(
+            "ACTOR KINDS JUST USED — do not choose these; pick a kind that fits "
+            "the constellation from the rest: " + ", ".join(avoid_kinds)
         )
 
     result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")

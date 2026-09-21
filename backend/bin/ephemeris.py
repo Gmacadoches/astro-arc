@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Where the planets are: the only astronomy Astro-Arc does, on Astronomy Engine.
 
 astro_engine.py needs three things from an ephemeris, and this module is all of
@@ -19,7 +18,9 @@ justified the switch, 1900-2100 and four birth charts:
     the dial differed on 1-2 days a year per chart (an aspect within an
     arcminute of its orb limit), and weekly/monthly named a different dominant
     transit on at most 4 days (two aspects tied to within an arcminute)
-Re-run that comparison before trusting a newer astronomy.py.
+Re-run that comparison before trusting a newer astronomy.py. Note it is
+described here and nowhere else: no script in this repository implements it, so
+"re-run it" means writing it again, not invoking something.
 
 Astronomy Engine has no house systems, so Placidus is computed below from its
 sidereal time and obliquity, by the standard semi-arc iteration.
@@ -74,13 +75,28 @@ def positions(dt_utc):
     return out
 
 
+# Because Astronomy Engine ships no house systems, the house system is this
+# project's own code for the first time, and so it is now a real choice rather
+# than a library default. Whole Sign is the obvious alternative and is about one
+# line off the Ascendant this function already computes:
+#
+#     cusps = [(30.0 * (int(asc // 30) + i)) % 360.0 for i in range(12)]
+#
+# It also stays defined at the polar latitudes where placidus() returns None.
+# Not implemented, and not a free switch: it moves most planets into different
+# houses, which changes describe_natal()'s Ascendant line and every house number
+# fed to Stage 1, so it needs a config knob beside `frequency` in
+# astro-arc.json and a STAGE1_SCHEMA_VERSION bump to invalidate cached readings.
 def placidus(dt_utc, lat, lon):
     """(cusps, ascendant, midheaven) in degrees, cusps[0] being the 1st house,
     or None where Placidus is undefined (near the poles, where part of the
     ecliptic never rises or sets). `lon` is east-positive."""
     t = _time(dt_utc)
-    # True obliquity of date. A private accessor, used deliberately: the file is
-    # vendored at a pinned version, so it cannot change underneath this.
+    # True obliquity of date. A private accessor, used deliberately: Astronomy
+    # Engine exposes no public one, and the file is vendored at a pinned
+    # version, so it cannot change underneath this. It is also the only private
+    # call in this module, which makes it the one thing a vendor bump can break
+    # outright rather than merely shift — check it first when updating.
     eps = math.radians(t._etilt().tobl)
     ramc = (ae.SiderealTime(t) * 15.0 + lon) % 360.0
     phi = math.radians(lat)

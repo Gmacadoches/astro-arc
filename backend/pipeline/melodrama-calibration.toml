@@ -81,7 +81,9 @@ label = "fail"
 id = "blade-raised"
 text = "A figure standing over a beaten one, blade raised"
 machine = "pass"
-label = "unsure"
+label = "fail"
+# Resolved from "unsure" 2026-09-20: shows intent to kill too plainly.
+# The check agrees, on motive and sides.
 borderline = true
 
 [[scene]]
