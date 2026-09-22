@@ -1152,6 +1152,47 @@ Panel {
     }
   }
 
+  // ---- Share Record: the selected generation as ONE self-contained .html —
+  // image, reading, prompt and costs in a single file that opens anywhere.
+  // Neighbour to Export and easy to confuse with it: Export packages the
+  // THEME for a stranger to install and leaves the reading out,
+  // astro-arc-share-record sends the RECORD to someone you chose, to read.
+  // No name prompt here, unlike Save: the script opens a save dialog, so the
+  // file gets named and filed in the same gesture that says where it goes.
+  readonly property string shareRecordBin: binDir + "/astro-arc-share-record"
+  property string _shareStdout: ""
+  property string _shareStderr: ""
+
+  function shareSelectedRecord() {
+    if (root.selectedReviewId === "" || shareRecordProc.running) return
+    root.themeActionStatus = ""
+    root._shareStdout = ""
+    root._shareStderr = ""
+    shareRecordProc.command = [root.shareRecordBin, root.selectedReviewId]
+    shareRecordProc.running = true
+  }
+
+  Process {
+    id: shareRecordProc
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._shareStdout = String(text || "").trim() }
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._shareStderr = String(text || "").trim() }
+    onExited: function(exitCode) {
+      // 2 is the save dialog being cancelled. Nothing was written and nothing
+      // went wrong, so it must not come back red like a failure.
+      if (exitCode === 2) {
+        root.themeActionStatus = "Share cancelled."
+        root.themeActionStatusIsError = false
+      } else if (exitCode === 0) {
+        root.themeActionStatus = "Saved to " + root._shareStdout
+          + " — the image is inside the file, so it opens anywhere you send it."
+        root.themeActionStatusIsError = false
+      } else {
+        root.themeActionStatus = root._shareStderr || "Could not build the record."
+        root.themeActionStatusIsError = true
+      }
+    }
+  }
+
   // ---- Clear History: deletes every "Themes Generated" entry right now
   // (astro-arc-prune-history --all), regardless of age. Two-click confirm
   // — arms on the first click, reverts on its own after 4s if not
@@ -2418,21 +2459,47 @@ Panel {
               }
             }
 
+            // The three ways to make a permanent copy of the selected
+            // generation, and what each copy is for: keep the theme here, send
+            // the record to a person, hand the theme to a stranger. Labels are
+            // short because all three have to fit one row.
             Item {
               width: parent.width
-              height: Math.max(saveThemeBtn.implicitHeight, exportThemeBtn.implicitHeight)
+              height: Math.max(saveThemeBtn.implicitHeight,
+                               shareRecordBtn.implicitHeight,
+                               exportThemeBtn.implicitHeight)
               visible: !root.themeNamePromptOpen
 
               Button {
                 id: saveThemeBtn
                 anchors.left: parent.left
                 anchors.verticalCenter: parent.verticalCenter
-                text: "Save Selected Theme"
+                text: "Save Theme"
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 enabled: root.selectedReviewId !== ""
                 onClicked: root.openSaveThemePrompt()
+              }
+
+              // The odd one out between its neighbours: they both copy the
+              // THEME, this one copies the RECORD — one .html with the image
+              // in it, made to be read rather than installed.
+              Button {
+                id: shareRecordBtn
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                text: shareRecordProc.running ? "Sharing…" : "Share Record"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== "" && !shareRecordProc.running
+                onClicked: root.shareSelectedRecord()
+
+                // Same latch as Export beside it.
+                property real reservedWidth: 0
+                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
+                width: Math.max(implicitWidth, reservedWidth)
               }
 
               // Save installs it here; Export packages it for someone else.

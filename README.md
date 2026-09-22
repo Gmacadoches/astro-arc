@@ -111,7 +111,13 @@ generation and then **Open** its page, **Browse** the whole gallery
 (`~/.local/share/astro-arc/index.html`: every generation, newest first — bookmark
 it), or **Set Theme** to put that generation's colours and wallpaper back on the
 desktop. Set Theme is temporary by design: the next generation replaces it, and
-**Save Selected Theme** is how one becomes a permanent Omarchy theme.
+**Save Theme** is how one becomes a permanent Omarchy theme.
+
+To send one to someone, **Share Record** writes that generation as a single
+`.html` file — the image, the reading, the prompt and the costs, all inside the
+one file, so it opens anywhere with no folder around it. It asks where to save.
+(**Export** is the other direction: it packages the *theme* as a git repo
+someone can install with `omarchy theme install`, and leaves the reading out.)
 
 Uninstalling the plugin leaves your archive untouched, because it was always
 just files in your home directory. Delete the folder when you no longer want
