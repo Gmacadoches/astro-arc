@@ -796,6 +796,31 @@ Panel {
     loadModelCatalog(root.modelCatalog.everFetched === true && root.modelCatalog.stale === true)
   }
 
+  // The settings model_catalog.py's `nextRun` cost is computed FROM (see its
+  // main(), which reads openaiQuality, openaiModel, the two chat models and
+  // the background size straight out of the config). Those are inputs to the
+  // number, so the number has to be recomputed when any of them changes.
+  //
+  // Without this, picking a different quality in Settings wrote the config,
+  // updated the "Image model: ... · high" readout right next to it, and left
+  // "per full run" showing the cost of the tier you just moved away from —
+  // which is the one figure the choice is being made on.
+  //
+  // A reload here is a disk read of the cached catalog, not a network call:
+  // loadModelCatalog(false) re-runs model_catalog.py, which recomputes the
+  // cost against the settings as they now stand without hitting /v1/models.
+  readonly property string costInputsKey: [
+    root.configState.openaiModel, root.configState.openaiQuality,
+    root.configState.stage1Model, root.configState.stage2Model,
+    root.configState.backgroundSize
+  ].join("|")
+
+  onCostInputsKeyChanged: {
+    // Skip the first evaluation, which fires while configState is still the
+    // defaults and would run a second catalog load on every panel open.
+    if (root.modelCatalog.everFetched === true) root.loadModelCatalog(false)
+  }
+
   Process {
     id: modelCatalogProc
     stdout: StdioCollector {
@@ -2411,30 +2436,45 @@ Panel {
               }
             }
 
-            // What you can do with the entry above, left to right in the order
-            // you would reach for them: look at this one, look at all of them,
-            // put this one back on the desktop. Set Theme is the only one that
-            // changes anything, and what it changes is undone by the next
-            // generation — the permanent copies are Save and Export below.
-            Row {
+            // ---- One action bar for the selected generation. -------------
+            //
+            // Was two rows with different rules: Open/Browse/Set in a left-
+            // packed Row, then Save/Share/Export anchored left/centre/right in
+            // an Item. Two layout idioms, two orders, and the pair that
+            // actually changes something (Set) sat next to the pair that only
+            // looks (Open/Browse).
+            //
+            // Now one Grid in a single stated order, equal column widths, and
+            // it wraps to two rows only when one will not fit. `columns` is
+            // the whole layout rule: all of them across if the row can hold
+            // them at a sane width, otherwise half each row. Widths are set
+            // from the column count rather than from each label, so the row
+            // stays put when a label shortens to "Setting…" — which is what
+            // the per-button reservedWidth latches used to do one at a time.
+            Grid {
+              id: reviewActions
               width: parent.width
+              visible: !root.themeNamePromptOpen
               spacing: Style.space(8)
 
-              Button {
-                id: openReviewBtn
-                text: "Open"
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: root.selectedReviewId !== ""
-                onClicked: root.openSelectedReview()
-              }
+              readonly property int count: 6
+              // The narrowest a button may get before wrapping is better than
+              // cramming. Below this the labels start eliding, which is worse
+              // than a second row.
+              readonly property int minButtonWidth: 84
+              readonly property bool fitsOneRow:
+                (width - spacing * (count - 1)) / count >= minButtonWidth
+              columns: fitsOneRow ? count : Math.ceil(count / 2)
+              readonly property real cellWidth:
+                (width - spacing * (columns - 1)) / columns
 
               // The whole history as one browsable page — the URL worth
-              // bookmarking. Plain files; opens in the default browser.
+              // bookmarking. Plain files; opens in the default browser. First
+              // because it is the way in to everything, not just this entry.
               Button {
                 id: archiveBtn
-                text: "Browse"
+                text: "Browse All"
+                width: reviewActions.cellWidth
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
@@ -2442,39 +2482,36 @@ Panel {
               }
 
               Button {
+                id: openReviewBtn
+                text: "Open"
+                width: reviewActions.cellWidth
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== ""
+                onClicked: root.openSelectedReview()
+              }
+
+              // The only one here that changes what you are looking at, and
+              // the next generation undoes it — the permanent copies are Save
+              // and Export.
+              Button {
                 id: setThemeBtn
-                text: setThemeProc.running ? "Setting…" : "Set Theme"
+                text: setThemeProc.running ? "Setting…" : "Set"
+                width: reviewActions.cellWidth
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 enabled: root.selectedReviewId !== "" && !setThemeProc.running
                 onClicked: root.setSelectedTheme()
-
-                // Same latch as Regenerate and Export: the label shortens
-                // while running, and a control that resizes under the cursor
-                // is what made that button feel wrong.
-                property real reservedWidth: 0
-                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
-                width: Math.max(implicitWidth, reservedWidth)
               }
-            }
 
-            // The three ways to make a permanent copy of the selected
-            // generation, and what each copy is for: keep the theme here, send
-            // the record to a person, hand the theme to a stranger. Labels are
-            // short because all three have to fit one row.
-            Item {
-              width: parent.width
-              height: Math.max(saveThemeBtn.implicitHeight,
-                               shareRecordBtn.implicitHeight,
-                               exportThemeBtn.implicitHeight)
-              visible: !root.themeNamePromptOpen
-
+              // Save installs the theme here; Export packages it for someone
+              // else.
               Button {
                 id: saveThemeBtn
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Save Theme"
+                text: "Save"
+                width: reviewActions.cellWidth
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
@@ -2482,44 +2519,32 @@ Panel {
                 onClicked: root.openSaveThemePrompt()
               }
 
-              // The odd one out between its neighbours: they both copy the
-              // THEME, this one copies the RECORD — one .html with the image
-              // in it, made to be read rather than installed.
-              Button {
-                id: shareRecordBtn
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-                text: shareRecordProc.running ? "Sharing…" : "Share Record"
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: root.selectedReviewId !== "" && !shareRecordProc.running
-                onClicked: root.shareSelectedRecord()
-
-                // Same latch as Export beside it.
-                property real reservedWidth: 0
-                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
-                width: Math.max(implicitWidth, reservedWidth)
-              }
-
-              // Save installs it here; Export packages it for someone else.
               Button {
                 id: exportThemeBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
                 text: exportThemeProc.running ? "Exporting…" : "Export"
+                width: reviewActions.cellWidth
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 enabled: root.selectedReviewId !== "" && !exportThemeProc.running
                 onClicked: root.exportSelectedTheme()
+              }
 
-                // Same latch as the Regenerate button: the label shortens while
-                // running, and a control that resizes under the cursor is what
-                // made that button feel wrong.
-                property real reservedWidth: 0
-                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
-                width: Math.max(implicitWidth, reservedWidth)
+              // The odd one out between its neighbours: they copy the THEME,
+              // this copies the RECORD — one .html with the image in it, made
+              // to be read rather than installed. Last because it is the only
+              // one that is not about the desktop, and NOT dropped: it was
+              // absent from the requested order, but removing a working
+              // feature is a different decision from reordering the bar.
+              Button {
+                id: shareRecordBtn
+                text: shareRecordProc.running ? "Sharing…" : "Share"
+                width: reviewActions.cellWidth
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== "" && !shareRecordProc.running
+                onClicked: root.shareSelectedRecord()
               }
             }
 
