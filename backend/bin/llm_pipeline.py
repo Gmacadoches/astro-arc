@@ -1889,6 +1889,14 @@ Also give the one short phrase a stock picture library would file the image unde
 Respond with a JSON object: {"caption": "a short phrase, at most 8 words", "motive": true or false, "sides": true or false, "performed": true or false}"""
 
 
+# The judge model the calibration set was scored on (score_melodrama.py's
+# default); `captionModel` in the config overrides it. Two resamples before
+# giving up: enough to escape an unlucky draw, not enough to loop on a reading
+# whose honest content Stage 2 keeps rendering the same way.
+CAPTION_MODEL = "gpt-4o-mini"
+CAPTION_RESAMPLES = 2
+
+
 def caption_check(prompt, model):
     """(caption, hits, passed) — would this image be filed under a feeling?
 
@@ -2157,21 +2165,33 @@ def build(reading, config):
     avoid = avoid_concepts(history)
     style_label, style_guidance = load_style_info(style_key)
 
-    image_prompt, concept_tags, has_people, stage2_cost = stage2_image_prompt(
-        stage1, visual_signature, register, avoid, cliches, stage2_model,
-        style_label, style_guidance,
-        secondary_register=secondary_register,
-        amplification=amplification,
-        dial=dial,
-        # Primary only: the secondary is a supporting material. As of
-        # 2026-09-20 registers.toml's [guidance] table is empty — its five
-        # entries were inhabitant configurations and moved to actors.toml —
-        # so this passes "" today and exists for the next register that
-        # earns a steer.
-        register_guidance=load_register_line(style_key, register),
-        secondary_register_guidance=load_register_line(style_key, secondary_register),
-        style_brief=load_style_brief(style_key),
-    )
+    # The melodrama rule, enforced before the image call as B4 specified. It was
+    # built and calibrated on 2026-09-20 (21/21 against Garrett's labels) but
+    # never called from here until 2026-09-28, so no generation was checked.
+    # A failed check resamples Stage 2, which costs a chat call rather than a
+    # render. If every attempt fails, the last prompt ships anyway and the
+    # failure is recorded: a strict judge must never cost the day its image.
+    # passed=None (the judge errored) counts as "not checked", per
+    # caption_check's own contract.
+    caption_model = config.get("captionModel") or CAPTION_MODEL
+    caption_attempts = []
+    stage2_cost = 0.0
+    for _attempt in range(1 + CAPTION_RESAMPLES):
+        image_prompt, concept_tags, has_people, attempt_cost = stage2_image_prompt(
+            stage1, visual_signature, register, avoid, cliches, stage2_model,
+            style_label, style_guidance,
+            secondary_register=secondary_register,
+            amplification=amplification,
+            dial=dial,
+            register_guidance=load_register_line(style_key, register),
+            secondary_register_guidance=load_register_line(style_key, secondary_register),
+            style_brief=load_style_brief(style_key),
+        )
+        stage2_cost += attempt_cost or 0.0
+        caption, hits, passed = caption_check(image_prompt, caption_model)
+        caption_attempts.append({"caption": caption, "hits": hits, "passed": passed})
+        if passed is not False:
+            break
 
     # has_people is already known by this point (stage2_image_prompt above
     # returned it) — no call-ordering change needed, just threading the
@@ -2214,6 +2234,10 @@ def build(reading, config):
         "secondaryRegister": secondary_register,
         "conceptTags": concept_tags,
         "hasPeople": has_people,
+        # One row per Stage 2 attempt; more than one means the melodrama check
+        # caught something and Stage 2 was resampled.
+        "captionCheck": {"model": caption_model, "attempts": caption_attempts,
+                         "passed": caption_attempts[-1]["passed"]},
         # Which model actually ran each stage. Previously only the COSTS were
         # recorded, so a review page could show what a stage cost but not what
         # produced it — and with the models now freely switchable from the

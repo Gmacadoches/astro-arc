@@ -346,6 +346,15 @@ def main():
             "stage2Cost": s2cost,
             "quality": quality,
         }
+        if hasattr(lp, "caption_check"):
+            # Record-only: production resamples Stage 2 on a failure (see
+            # build()), but a sweep records the verdict on the first draw so it
+            # measures how often production WOULD resample, instead of hiding it.
+            caption, hits, passed = lp.caption_check(
+                prompt, config.get("captionModel") or getattr(lp, "CAPTION_MODEL", "gpt-4o-mini"))
+            record["caption"] = caption
+            record["captionHits"] = hits
+            record["captionPassed"] = passed
         if sample_amp is not None:
             # Per sample, because the objects and the anomaly now differ per
             # register; the constellation is recorded too so a sweep shows it.
@@ -413,6 +422,7 @@ def main():
         "out", "label", "style", "index", "primaryRegister", "secondaryRegister",
         "hasPeople", "promptWords", "conceptTags",
         "anomalySurvived", "anomalyTokenHits", "anomalyTokens",
+        "caption", "captionPassed", "captionHits",
         "quality", "stage2Cost", "imageCost", "imageError",
     ]
     with csv_path.open("w", newline="") as fh:
@@ -423,6 +433,7 @@ def main():
             row["out"] = args.out
             row["label"] = args.label
             row["conceptTags"] = "|".join(r.get("conceptTags") or [])
+            row["captionHits"] = "|".join(r.get("captionHits") or [])
             writer.writerow(row)
 
     survived = [r.get("anomalySurvived") for r in results if r.get("anomalySurvived") is not None]
