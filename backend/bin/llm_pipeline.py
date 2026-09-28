@@ -489,6 +489,54 @@ _CHARTER_FIELDS = (
 )
 
 
+class _BriefValues(dict):
+    """format_map source for brief rules: the dial's values by key, with an
+    unknown or missing key left visible as "{key}" rather than raising, so a
+    typo in styles.toml shows up in the prompt instead of crashing a run."""
+    def __init__(self, dial):
+        super().__init__({k: v for k, v in (dial or {}).items() if isinstance(v, str)})
+
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
+# The brief rules every style ran on until 2026-09-26, verbatim, with the dial
+# values as {placeholders}. They were written for ghibli and now live in
+# [ghibli.brief]; this copy is only the fallback for styles that have not been
+# chartered yet (symbolist, engraving, cosmic, ukiyoe, illuminated), so their
+# output does not change until someone decides what theirs should be -- the
+# same migration strategy as `guidance` standing in for a missing charter.
+DEFAULT_STAGE2_BRIEF = (
+    "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, "
+    "and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary "
+    "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
+    "structure that walks or floats or grew where it stands, a being that is plainly not a "
+    "person. Build it from this world's own materials, give it real weight and wear, light it "
+    "like everything else, and let the actor work around it the way they would a wall. An image "
+    "in which everything could exist is a failed response.\n"
+    "    How much of the frame it takes: {wonder}\n"
+    "    What temper it is in: {wonderTone}\n"
+    "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
+    "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
+    "is just a texture; it only becomes huge beside something that is not.",
+    "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out.",
+)
+
+
+def load_style_brief(style_key):
+    """The rules Stage 2's brief carries for this style, in file order, or
+    None for a style with no `[<style>.brief]` table -- which stage2_image_prompt
+    reads as "use DEFAULT_STAGE2_BRIEF". An empty table is a real answer (no
+    style-specific rules) and returns [], not None.
+
+    Rule text may use the dial's string values as {placeholders} ({wonder},
+    {wonderTone}, {light}, ...)."""
+    brief = (load_styles().get(style_key) or {}).get("brief")
+    if not isinstance(brief, dict):
+        return None
+    return [str(v).strip() for v in brief.values() if str(v).strip()]
+
+
 def load_style_world(style_key):
     """The `[<style>.world]` charter as a block of prose, or "" if this style
     has not been chartered yet.
@@ -1111,9 +1159,16 @@ _WONDER_BY_POLARITY = {
 }
 
 _LIGHT_BY_EXPOSURE = {
-    "lo": "Most of the frame is unlit or obscured. What is happening is only partly visible; things are lost in shadow, fog, depth or distance rather than described.",
+    # Rewritten 2026-09-26 as a count and a failure condition. The old line was
+    # a mood ("most of the frame is unlit or obscured") and mood words are not
+    # obeyed: across the cyberpunk (a) sweeps and ghibli's darkest cell, lo
+    # cells came back overcast day, sunset, or full sun.
+    "lo": "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response.",
     "mid": "Raking, partial light — lit and unlit areas both substantial, with a clear direction to the light.",
-    "hi": "Everything is visible in flat, even light. Nothing is hidden, nothing is dramatised by shadow; the image has nowhere to conceal anything.",
+    # Rewritten 2026-09-26 to match "lo": a count and a failure condition. Once
+    # lo was fixed, cyberpunk's rain-and-neon pulled hi cells to dusk and sunset
+    # (cp-a4-*), because a mood line gives nothing to push back with.
+    "hi": "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response.",
 }
 
 # The anomaly is present EVERY day; what varies is how the world treats it. A
@@ -1771,7 +1826,8 @@ def stage2_system():
 
 def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
                          style_label=None, style_guidance=None, secondary_register=None,
-                         amplification=None, dial=None, register_guidance=None):
+                         amplification=None, dial=None, register_guidance=None,
+                         style_brief=None):
     """`amplification` is Stage 1.5's output (see stage15_amplify). It is
     passed last and defaults to None so the function still works without a
     Stage 1.5 result — sweep.py relies on that to produce a pre-Stage-1.5
@@ -1910,23 +1966,14 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
     # Phrased as a count and a failure condition, matching the openness and
     # word-count rules, because "make it wondrous" is a mood word and mood
     # words are not obeyed.
-    brief.append(
-        "  THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, "
-        "and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary "
-        "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
-        "structure that walks or floats or grew where it stands, a being that is plainly not a "
-        "person. Build it from this world's own materials, give it real weight and wear, light it "
-        "like everything else, and let the actor work around it the way they would a wall. An image "
-        "in which everything could exist is a failed response.\n"
-        f"    How much of the frame it takes: {dial['wonder']}\n"
-        f"    What temper it is in: {dial['wonderTone']}\n"
-        "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
-        "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
-        "is just a texture; it only becomes huge beside something that is not."
-    )
-    brief.append(
-        "  OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
-    )
+    # Style-specific rules, each phrased as a count and a failure condition
+    # because mood words are not obeyed. Until 2026-09-26 THE IMPOSSIBLE and
+    # OPENNESS were hardcoded here for every style; both were written for
+    # ghibli's world, and cyberpunk is defined by different things (depth
+    # rather than sky, neon, the tended). They now come from the style's
+    # `[<style>.brief]` table -- see load_style_brief().
+    for rule in (DEFAULT_STAGE2_BRIEF if style_brief is None else style_brief):
+        brief.append("  " + rule.format_map(_BriefValues(dial)))
     if dial.get("spatial"):
         brief.append(f"  Where the event sits: {dial['spatial']}")
     if dial.get("light"):
@@ -1993,6 +2040,7 @@ def build(reading, config):
         # so this passes "" today and exists for the next register that
         # earns a steer.
         register_guidance=load_register_guidance(register),
+        style_brief=load_style_brief(style_key),
     )
 
     # has_people is already known by this point (stage2_image_prompt above

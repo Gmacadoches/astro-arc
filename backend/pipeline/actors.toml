@@ -78,8 +78,8 @@ automaton = """A machine that keeps working, apparently of its own accord, with 
 # Gated per style, and the gate is now live: `presence` is eligible only where
 # that style's charter has a `numinous` field describing how the numinous takes
 # a body (see presence_allowed). Silence is not permission, so an unchartered
-# style cannot have one. ghibli qualifies; the six styles still running on the
-# old `guidance` do not, until they are chartered.
+# style cannot have one. ghibli and cyberpunk qualify; the five styles still
+# running on the old `guidance` do not, until they are chartered.
 presence = """Something numinous that has a body. Not a glow, not a translucency, not a light — it is heavy, occupies space and is lit like everything else: a shape under cloth, a figure entirely wrapped, something the size of a building that is plainly alive. If it could be rendered as a light effect, it is wrong."""
 
 the-dead = """A body, a remnant, or something that was an actor and no longer is. It is acted upon rather than acting, and the relation still holds: something tends it, carries it, uncovers it, or has left it. Never gore; the fact of the body, not its injuries."""
@@ -91,8 +91,13 @@ the-dead = """A body, a remnant, or something that was an actor and no longer is
 none = ""
 
 # Pairings that collapse into one thing, skipped when the substance register on
-# the left is chosen. `automaton` + `mechanical` makes the actor out of the same
-# material as the world, which is the all-one-thing risk; revisit once the
-# automaton can draw on a style charter's physics instead of the register.
+# the left is chosen. Format: register = ["kind", ...].
+#
+# Empty since 2026-09-26. It held `mechanical = ["automaton"]` (the actor made
+# of the same material as the world, the all-one-thing risk) with a note to
+# revisit once the automaton could draw on a style charter's physics instead of
+# the register. Removed globally at Garrett's direction while chartering
+# cyberpunk, where a machine among machines is the world working as intended.
+# If a style starts collapsing into "a machine made of machine", this is the
+# change that did it.
 [exclude]
-mechanical = ["automaton"]

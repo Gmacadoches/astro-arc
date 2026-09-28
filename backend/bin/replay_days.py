@@ -143,7 +143,8 @@ def main():
         avoid_tags = lp.avoid_concepts(history)
 
         kwargs = {"amplification": amp, "dial": dial,
-                  "register_guidance": lp.load_register_guidance(primary)}
+                  "register_guidance": lp.load_register_guidance(primary),
+                  "style_brief": lp.load_style_brief(style_key)}
         if secondary:
             kwargs["secondary_register"] = secondary
         prompt, tags, has_people, c2 = lp.stage2_image_prompt(

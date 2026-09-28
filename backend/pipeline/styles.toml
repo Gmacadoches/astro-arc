@@ -178,6 +178,24 @@ favoured_actors = "This world is richest in creatures with their own purposes, p
 # that permission survives in `weather`. If ghibli drifts pleasant, or if a
 # register collapses into a kitchen again, this is the change that did it.
 
+# BRIEF, 2026-09-26. Stage 2's style-specific rules, moved here verbatim from
+# stage2_image_prompt, where they were hardcoded for every style. They were
+# written for this world. Each is phrased as a count and a failure condition
+# because the brief is the part Stage 2 obeys, and mood words are not obeyed.
+#
+# THE IMPOSSIBLE: until it existed wonder was only DESCRIBED in the charter
+# and nothing required it, so a world of walking machines reliably produced a
+# plausible flour mill. A charter says what MAY exist; only the brief makes
+# something appear. {wonder}/{wonderTone} are filled from the dial.
+#
+# OPENNESS: these are wallpapers; an enclosed room reads as claustrophobic at
+# desktop size however good its content. "Open means depth, not daylight" was
+# added 2026-09-26: without it, dark cells resolved "half the frame open" as
+# a lit sky.
+[ghibli.brief]
+impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary thing: a machine that is clearly alive or awake, a creature far too large for its kind, a structure that walks or floats or grew where it stands, a being that is plainly not a person. Build it from this world's own materials, give it real weight and wear, light it like everything else, and let the actor work around it the way they would a wall. An image in which everything could exist is a failed response.\n    How much of the frame it takes: {wonder}\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
+openness = "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
+
 [ghibli]
 label = "Studio Ghibli"
 # suffix_base split 2026-09-20: TECHNIQUE ONLY. It used to also mandate
@@ -204,16 +222,158 @@ label = "Studio Ghibli"
 # move that clause into the charter's `weather` as a bright-day option rather
 # than back into the suffix.
 suffix_base = "Studio Ghibli feature-film animation style. Hand-painted backgrounds in layered opaque paint with visible brushwork in foliage, stone, cloth and water; forms built from stacked paint rather than smooth digital gradients; colour heightened rather than muted, and still saturated in shadow, in rain and at night rather than draining to grey; fine detail held even in the darkest parts of the frame."
-suffix_figures = ", figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
+suffix_figures = " Figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
 # guidance removed 2026-09-20: superseded by [ghibli.world] above. Its
 # world-description became the charter's fields; its prohibitions went to
 # `forbids`, which was itself removed later the same day -- see the note
 # in the charter block for where each one went. Both are in git history.
 
+# CHARTER, 2026-09-26. Written from scratch in one grilling session with
+# Garrett rather than retrofitted, so all ten fields were decided together.
+# The old `guidance` and bare `suffix` are both deleted below; nothing in them
+# was carried across on purpose.
+#
+# The decisions, so the reasoning survives the prose:
+#   - USED FUTURE, not chrome and not the matrix. Heavy, analog, patched. It is
+#     the only cyberpunk that obeys the rule that impossible things are heavy
+#     and worn; chrome runs on glow and the matrix puts its wonder somewhere
+#     that cannot be painted.
+#   - EVERY LIGHT HAS A HOUSING (physics). Ghibli could say "nothing glows";
+#     here light is the main material, so the rule is that light is hardware.
+#     No holograms. This is what shuts out the glowing AI, and it is why the
+#     old "avoid abstract energy-beings" ban no longer needs saying.
+#   - NUMINOUS = whatever has grown past its makers (infrastructure or
+#     flesh-machine, any scale) AND old gods moved into hardware. Both are
+#     tended with offerings. The numinous field also carries the
+#     automaton/presence boundary: still doing its designed job = automaton;
+#     outgrown it and being fed = presence.
+#   - STRANGENESS points elsewhere on purpose -- older or more alive than the
+#     city, and never worshipped -- or it collapses into the numinous.
+#   - The DIAL RUNS BOTH WAYS. Ghibli's bug was refusing to go dark; this
+#     genre's is refusing to go light, so `weather` names daylight explicitly
+#     and `dread` must be darker than the rain-and-night baseline.
+#   - favoured_actors demotes the lone figure in the rain, this genre's
+#     equivalent of Ghibli's lone ordinary person.
+# REVISED 2026-09-26, same day, after the first six-cell (a) sweep (cp-a-*):
+# the technique held but the world read as dieselpunk harbour, not cyberpunk.
+# No neon in 12/12 (physics only described light as a housing rule, never said
+# the city is saturated with it); harbour in 12/12 ("port city" + "dock hands"
+# collapsed every register into a waterfront -- the cottage-kitchen bug again);
+# the lo-exposure cells came back overcast or sunset (weather's "rain at night
+# is not the default" argued with the dial); and charter phrases came back as
+# lettered slogans. Fixes: physics/materials make lit signage and exposed
+# electricity the city's main light; society adds verticality and demotes the
+# port to one district; weather gives darkness a home (night, lower levels);
+# strangeness and society lose their example lists; suffix_base asks for
+# mostly unreadable lettering.
+# REVISED again 2026-09-26 after cp-a3-*: neon was absent in 36/36 renders,
+# and every sign that did appear was crowded with generated words, which come
+# out as nonsense. physics now makes neon the after-dark light and says it is
+# mostly SHAPE (pictogram, single character, arrow, border) seen from below,
+# edge-on or blurred; society only allows scripts "where lettering shows at
+# all"; suffix_base turns unreadable lettering into a depth-of-field
+# instruction, which image models obey better than "do not write text".
+[cyberpunk.world]
+era = "A future that arrived decades ago and has been patched ever since. Nothing is new: machines are retrofitted onto older machines, towers are built over the roofs of earlier towers, and every system runs on parts from three generations of manufacturers. The technology is powerful and it is old, and most of it is kept alive by people who were never meant to maintain it."
+materials = "Stained concrete, sheet steel, corrugated plastic, rack steel, ribbed conduit, bent glass tube, enamel, tin, tarpaulin, rust and grease — and electricity everywhere and exposed: cable bundled, taped and hanging in swags between buildings, junction boxes, transformers humming on brackets, neon and lit panels stacked up every facade. Repairs are visible and never match what they repair."
+physics = "The city is lit by its own hardware, and after dark and in the lower levels at any hour that light is neon: bent glass tube in every colour, packed so densely that it tints the air, the haze and every wet surface. Most of it is shape rather than words — a pictogram, a single character, an arrow, a border, a bowl or a fish or a cross traced in tube — and it is seen the way you see it in a crowded street: from below, edge-on, from behind, or blurred by rain and distance. Every light has a body: the tube sits on brackets with a transformer behind it, a screen has a bezel and a cable, a sign has a back you could walk behind. Light never floats free, never forms a figure and never stands in for one — there are no holograms. Impossible things here are heavy, bolted down, dripping, and lit like everything around them."
+society = "A city built upward because it has nowhere else to go: towers packed so close their walls touch, walkways and cables strung between them, lower levels that have not seen the sky in decades. It belongs to no single culture — migrant districts layered over each other, and where lettering shows at all it is in many scripts and not only East Asian ones. Institutions are distant, sealed behind glass high above the street, and deny that anything below them is alive; the street feeds it anyway. Life is markets, stairwells, workshops, housing blocks, clinics and transit, and most work is done by hand. There is a port, and it is one district among many."
+weather = "Weather runs the whole range: flat white overcast, smog-orange dawn, dry heat haze off concrete, drizzle, fog, downpour, full night. Daylight reaches the roofs and the upper streets; below them it is always dusk under the signs. When the day calls for darkness, this city's darkness is night, or the lower levels, lit only by its own signs and screens. When it calls for light, it is the same city by day, and just as much itself."
+inhabitants = "Working people whose bodies have been repaired: bolted prosthetics, scar lines where something was fitted, ports taped at the edges, secondhand parts that do not match the rest of the body and need oiling. Hawkers, riggers, cooks, couriers, repair techs, the old and the very young. Old gods walk here too, in hardware bodies, and a figure that is part animal is more often one of those — a mythological hybrid whose other half is beast and salvaged machine at once — than anything grown in a lab."
+strangeness = "Things older or more alive than the city, left where they are and unremarked — an animal, a living thing, a relic of some earlier age of the world, lodged among the machinery as if it had always been there. Nobody explains them and nobody worships them; offerings are what mark the numinous, and these have none."
+numinous = "The numinous is whatever has grown past its makers, and the old gods who have moved into hardware. The first can be any size: a vending machine that answers back, a server hall that has grown into a cathedral, a transit line running trains nobody scheduled, a mass of flesh and machine fused beyond anyone's ownership that is plainly alive and plainly someone. The second are loa, kami, saints and spirits who have taken a salvaged body — a shrine built around a robot torso, a river god living in a storm drain. Both are physical, heavy and tended: candles, stickers, food, grease-pencil prayers, a technician who is also a priest. A machine still doing the job it was built for is not one of these; one that has outgrown its job and is being fed is. Never a glow, a projection or a voice from nowhere — it has a body you could put your hand on."
+dread = "This city at its darkest is not simply this city at night in the rain. It is the body failing — a prosthetic rejected, flesh grown around metal that should have come out; infrastructure giving way — a tower leaning, water rising through the lower levels, a district going dark; a person owned, collateral in someone else's contract; and the numinous fenced off, leased and metered, its shrine behind a turnstile. Violence is sudden, mechanical and costly, never glamorous, and the frame does not admire the corporation or the gun."
+favoured_actors = "This world is richest in hands at repair work, crowds at the market, the platform and the stairwell, the numinous in its tended bodies, figures joined by hauling or mending the same thing, the dead and the decommissioned, and swarms — rats, pigeons, physical drones. A lone figure standing in the rain under a sign is this genre's most worn image and should not be the default — reach for the others first where the constellation allows one."
+
+# BRIEF, 2026-09-26. Cyberpunk's own rules in place of ghibli's (see
+# [ghibli.brief]); decided in the chartering session.
+#   depth  -- replaces OPENNESS. Keeps the wallpaper from being claustrophobic,
+#             which was OPENNESS's real job, without demanding sky: this world
+#             is enclosed density, and "half the frame open" argued with it.
+#   neon   -- the charter's neon was optional and was skipped in 36/36 renders.
+#             Shape, not words: generated lettering comes out as nonsense.
+#   tended -- care amid decay: street religion and maintained bodies.
+#   temper -- NOT one of the three chosen rules; added because dropping THE
+#             IMPOSSIBLE also dropped the only place {wonderTone} reached
+#             Stage 2, so hard and soft days would lose their temper. Delete it
+#             if polarity should not reach this world that way.
+# THE IMPOSSIBLE is deliberately absent: strangeness arrives through presence
+# and the mandatory anomaly, and the risk observed in the (a) renders ran
+# toward fantasy, not toward the plausible.
+[cyberpunk.brief]
+depth = "DEPTH — applies to every image: the eye must travel a long way into the frame. Down a canyon between towers, along a walkway or a platform, through layer behind layer of cable, tube, stair and facade, each smaller and hazier than the last. It does not need sky. At least three distinct layers of distance must be visible behind the nearest subject. A shallow scene with a wall close behind the subject is a failed response, and so is a close-up that crops the city out."
+neon = "NEON AFTER DARK — whenever the light line below puts the scene at night or below where daylight reaches, the main light in the frame is neon: bent glass tube in colour, on its brackets, tinting the haze and every wet surface. Name at least two neon fixtures and say what shape each one traces — a pictogram, a single character, an arrow, a border — never what words it spells. A dark frame lit only by lamps, bulbs or candles is a failed response, and so is a sign made mostly of words. By day the tube may still be there, unlit."
+tended = "THE TENDED — applies to every image: something in the frame is being kept going by hand. A repair in progress, an offering being set down, a machine being fed, oiled or patched, a body being fixed. Show the hands or the tools, or the fresh evidence of the work — new tape over old, a candle still burning, a panel left open. If there is an actor this is their business; if there is none, the evidence is enough. A frame in which everything is simply abandoned is a failed response."
+temper = "TEMPER — the anomaly, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+# REGISTERS, 2026-09-26. How this world realises each substance register, one
+# span-and-principle line per register -- never an inventory (see
+# registers.toml's [guidance] header): anything listed marks the range and is
+# a starting point to reach past. Drafted family by family with Garrett.
+#
+# NOT YET READ BY ANY CODE. The pipeline picks the register after Stage 1.5
+# has already cast the scene, so a register line would be painted over (a
+# 20-register sweep collapsed to one scene: cp-reg20-base, and ghibli the same
+# in gh-reg20-dry). The agreed fix is to pick the register first and hand
+# Stage 1.5 and Stage 2 the day's line only; that pipeline work comes next.
+[cyberpunk.registers]
+"botanical" = "What grows here grows in spite of the city, or because someone had nowhere else to grow it: weeds in gutters and stair cracks, roots splitting a ramp, vines riding the cable swags, and the deliberate kind (racks under grow-lamps, balcony pots, a rooftop plot fenced with scrap). The plant is the subject and the city is what it grows through; it is either tended or slowly winning."
+"bodily and anatomical" = "The body as a thing that is maintained, bought and failing: the seam where flesh meets steel, sutures and scar lines, a port opened for service, a prosthetic laid out on a back-clinic table, parts kept cold in jars. At the far end, flesh grown around metal until neither can be separated. Clinical and unsentimental, never gore."
+"fungal and decaying" = "Rot is the city's other maintenance crew. It spreads along the city's own wet paths (condensation, leaks, drains, flooded basements): mould blooming across ductwork, rust eating through a stair, fungus furring a dead server rack, insulation gone soft. It is slow, specific and patient, and it is winning somewhere nobody looks."
+"animal and creaturely" = "The animals that live off the city: rats, pigeons, crows, feral cats, eels in the drains, fish in market tanks, a working animal wherever no machine was cheaper, and cheap engineered pets gone feral. They use the infrastructure as their own terrain (cable runs as paths, vents as dens, neon as warmth), and nobody is sentimental about them."
+"geological" = "The city is a geological layer too. Poured concrete stacks in strata, each decade's over the last, spalling to show its aggregate; in the deepest levels the older ground finally shows through (bedrock sweating in a sub-basement, a cliff the towers are bolted to, a sinkhole that swallowed a street, landfill cut open in section). Stone here is either the city pretending to be permanent or the thing underneath that actually is."
+"metallic and ore" = "Metal is the city's money. It is stripped from walls, sold by weight, melted in a backroom crucible and poured again: copper wire in coils, sheet steel, rebar pulled from ruins, scrap sorted by hand into heaps by colour and grade, patina and rust worn like a record of every owner. Nothing metal is new; everything has already been something else."
+"glass and ceramic" = "Glass divides this city. Above, it is sealed and clean, the windows of the institutions. Below, it is bent, cracked and reused: neon tube being heated and shaped in a workshop, porcelain insulators the size of barrels, crazed screens, bottle glass set into walls, glazed tile in a noodle shop or a bathhouse worn through to the clay. The substance is both what the powerful hide behind and what the street makes its light from."
+"architectural" = "Architecture here is accretion, not design. No building is one building: the original frame is a skeleton under decades of unauthorised additions (rooms cantilevered off a balcony, a floor added in sheet metal, a stair bolted to the outside, a bridge two neighbours built between their windows). Look at the joins, where one owner's work meets the next."
+"domestic interior" = "A home is one small room doing every job: bunk and kitchen and shrine and workbench at once, a rice cooker beside a soldering iron, laundry hung across a window unit, a family's whole life on one shelf. Neon comes in through the curtain. It is crowded and cared for, never squalid for its own sake."
+"mechanical" = "Every machine has been opened, fixed and closed again by someone who is not its maker: a lift's cable drum rebuilt with parts from a motorbike, a generator on its third engine, a vending machine with its guts on the pavement, a repair stall's bench stacked with disassembled things. The machine is legible as a machine, with its casing off."
+"industrial and infrastructural" = "The city's nervous system, exposed and overloaded: substations humming in stairwells, cable trays packed past capacity, water mains sweating along a corridor ceiling, ventilation shafts, transit tunnels, the pumps that keep the lower levels dry. It is patched rather than maintained, and one failure takes a district dark."
+"agricultural and cultivated" = "Food grown in the city's leftover space by labour, measured by yield: hydroponic trays in a dead parking structure, mushroom beds in a basement, fish farmed in drums, chickens on a balcony, algae vats, a rooftop terraced for rice. Unlike botanical, the subject here is the system and the work: rows, irrigation lines, harvests, someone tending it."
+"aquatic" = "Water is inside the city: either too much of it or sold. It floods the lower levels, sheets off awnings into gutters, sweats through ceilings, runs black in drainage channels, stands in cisterns and coolant tanks, and clean water comes in bottles and jerrycans with a price on them. The sea is rarely in frame; this is the water the city could not keep out or had to buy."
+"atmospheric" = "The air here is thick enough to hold light. Steam venting from grates, smog, kitchen smoke rolling out of a stall, air-conditioner exhaust, dust, rain in the air. It is where the neon becomes visible as colour, and it always comes from somewhere you could point to."
+"glacial and frozen" = "Cold here is always made by a machine, and it is paid for. Freezer lockers at the fish market, frost furring the coolant lines of a server hall, a morgue drawer, ice delivered in blocks on a hand cart, a refrigeration plant's condensers roaring on a roof. It exists to keep something from rotting (food, bodies, data), and a power cut means a thaw."
+"fire and ember" = "Fire is the oldest technology still running here. It belongs to the street (woks roaring on a stall, an oil drum burning for warmth, a backroom smelter, candles at a shrine, a welder's arc) and it is also the street's worst danger: a cable tray smouldering, a transformer on fire in a stairwell. Every flame has a fuel and a vessel."
+"textile and fiber" = "Cloth is the city's cheapest wall and roof. Half of it is held up by tarpaulin, awning, rope and tape: tarps lashed over a gap in a facade, curtains dividing one room into three, work clothes patched until nothing original is left, rag wrapped around a hot pipe, a sweatshop's rows of machines under strip lights. Fiber here is always doing a structural job."
+"ritual object" = "The street religion's hardware, made from the city's waste and worn smooth with use: offering bowls cut from cans, candles in bottle glass, stickers layered on a rack cabinet, circuit boards strung as amulets, incense stuck in a cable tray, a shrine box built into a junction box. The subject is the object and the handling it has had, not the god it is for."
+"paper and inscription" = "Paper is where the street keeps what it will not trust to a screen: receipts, tickets, handbills pasted over handbills until the wall is inches thick, ledgers, service manuals swollen with damp, paper prayers, maps corrected in grease pencil. Writing appears as marks and layers (torn, stamped, pasted over, too small or too close to read), never as words anyone could quote."
+"instrument and measure" = "Everything here is metered, and the instrument is how the city charges you. Electricity meters spinning in a stairwell bank, water gauges, the scrap dealer's scale, a market's weights and balances, coin slots, turnstiles, a clinic's monitors, a surveyor's rig marking a building for demolition. To measure something here is to put a price on it."
+
 [cyberpunk]
 label = "Cyberpunk"
-suffix = "cyberpunk digital art, neon-lit rain-slicked streets, holographic signage, chrome and glass megastructures, moody blue and magenta lighting, high-tech-low-life atmosphere in the tradition of Blade Runner and Ghost in the Shell"
-guidance = "A grounded science-fiction tradition — real people, streets, machinery, and architecture in a neon-lit future. Avoid abstract energy-beings or pure geometric abstraction; ground the symbolism in a concrete piece of tech, signage, or urban space instead."
+# Technique only, per the ghibli lesson of 2026-09-20: the old suffix mandated
+# "neon-lit rain-slicked streets" and "moody blue and magenta lighting" on
+# every image, which vetoed the light axis and the wonder tone exactly as the
+# cumulus clause did for ghibli. Setting, weather and palette are the
+# charter's and the dial's now.
+#
+# MEDIUM (a): 35mm practical-effects film. Chosen over hand-painted anime
+# backgrounds because that is the same technique family as ghibli's (painted
+# backgrounds, cel figures) and the two styles would drift together; and
+# because physical miniatures with visible light fixtures are the physics
+# rule restated as technique. No film is named: a title would pull hard
+# toward one city at night in the rain, which is the attractor. If the style
+# reads generic, naming one is the first lever to try.
+#
+# MEDIUM (b), held for the A/B test, not live:
+#   "Hand-painted 1980s theatrical anime background art: dense cityscapes
+#   painted in opaque colour with every pipe, sign, cable and window drawn,
+#   deep saturated shadows, light sources painted as physical fixtures rather
+#   than glows."
+#   (with suffix_figures: " Figures in flat cel shading with one hard-edged
+#   shadow tone and crisp ink outlines; only the nearest one or two have fully
+#   drawn faces.")
+# Test protocol: one fixed reading/signature, six dial cells (light hi/lo x
+# wonder tone, including the darkest cell), each rendered under (a), (b) and
+# the ghibli suffix side by side; check (a) stands alone first, faces
+# included. (b) fails if it cannot be told from ghibli at thumbnail size or
+# drifts pastoral -- then (a) stays the default.
+#
+# suffix_base ends in a period, so suffix_figures leads with a space (see
+# load_style_suffix: concatenation is raw).
+suffix_base = "A still frame from a 35mm practical-effects science-fiction film: the world built as physical sets and detailed miniatures, real haze and smoke catching the light, every light source a visible physical fixture — tube, lamp, panel, bulb — with its reflection on whatever surface is near it. Fine film grain, the soft falloff and flare of an anamorphic lens, shadows that are deep but still hold detail. Shallow depth of field: any lettering on signs is out of focus, distant or seen edge-on, never crisp readable words. No digital gloss, no clean computer-generated surfaces, no floating or holographic light."
+suffix_figures = " Figures are real people photographed on film: unretouched skin, practical costume and makeup, prosthetics and implants built as physical props with weight and wear. Only the nearest one or two are in sharp focus with readable faces; anyone further back is soft, turned away, or lost in the haze."
+# guidance removed 2026-09-26: superseded by [cyberpunk.world] above. Its one
+# prohibition (no abstract energy-beings) is carried by `physics`. In git.
 
 # Added 2026-09-07 from a user-supplied reference guide
 # (~/Downloads/art-style-guides.md), cross-checked against independent

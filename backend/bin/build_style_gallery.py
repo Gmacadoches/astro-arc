@@ -114,6 +114,7 @@ def main():
             amplification=amplification,
             dial=dial,
             register_guidance=lp.load_register_guidance(args.register),
+            style_brief=lp.load_style_brief(key),
         )
         total += cost or 0.0
         final = prompt + ", " + lp.load_style_suffix(key, has_people)
