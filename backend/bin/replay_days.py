@@ -129,21 +129,23 @@ def main():
     for i, (key, stage1, dial) in enumerate(days, start=1):
         avoid_arch = list(reversed(used_constellations))[:lp.AMPLIFY_AVOID_WINDOW]
         avoid_kind = list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW]
+        # Registers first: as of 2026-09-26 they are a Stage 1.5 input.
+        primary, secondary = lp.pick_registers(
+            history, registers, dial.get("registerCohesion", "collide"))
         amp, c1 = lp.stage15_amplify(
             stage1, stage1_model, key, config, cache=False, dial=dial,
             avoid_archetypes=avoid_arch, avoid_kinds=avoid_kind,
             style_key=style_key, style_world=lp.load_style_world(style_key),
+            register=primary, secondary_register=secondary,
         )
         total += c1 or 0.0
         used_constellations.append(amp.get("constellation", ""))
         used_kinds.append(amp.get("actorKind", ""))
-
-        primary, secondary = lp.pick_registers(
-            history, registers, dial.get("registerCohesion", "collide"))
         avoid_tags = lp.avoid_concepts(history)
 
         kwargs = {"amplification": amp, "dial": dial,
-                  "register_guidance": lp.load_register_guidance(primary),
+                  "register_guidance": lp.load_register_line(style_key, primary),
+                  "secondary_register_guidance": lp.load_register_line(style_key, secondary),
                   "style_brief": lp.load_style_brief(style_key)}
         if secondary:
             kwargs["secondary_register"] = secondary

@@ -199,7 +199,19 @@ def main():
     # --- Stage 1.5, if this build of the pipeline has one -------------
     amplification = None
     amp_cost = None
-    if hasattr(lp, "stage15_amplify"):
+    # As of 2026-09-26 Stage 1.5 is two calls: the MEANING, fixed per day, and
+    # the MATERIAL, fresh per register. A sweep mirrors production exactly by
+    # drawing the meaning ONCE (below) and the material per register (in the
+    # loop) -- which is also what isolates the register as the only variable.
+    # Recency lists are off (`[]`): production history must not steer a sweep.
+    split = hasattr(lp, "stage15_material")
+    if split:
+        amplification, amp_cost = lp.stage15_meaning(
+            stage1, stage1_model, reading["arc"]["periodKey"], config, cache=False,
+            dial=dial, avoid_archetypes=[], avoid_kinds=[],
+            style_key=style_key, style_world=lp.load_style_world(style_key))
+        (out_dir / "00_amplification.json").write_text(json.dumps(amplification, indent=2))
+    elif hasattr(lp, "stage15_amplify"):
         amp_kwargs = {"cache": False}
         if dial is not None:
             amp_kwargs["dial"] = dial
@@ -268,8 +280,17 @@ def main():
         kwargs = {}
         if secondary is not None:
             kwargs["secondary_register"] = secondary
-        if amplification is not None:
-            kwargs["amplification"] = amplification
+        sample_amp = amplification
+        material_cost = None
+        if split and amplification is not None:
+            material, material_cost = lp.stage15_material(
+                stage1, amplification, stage1_model, config, dial=dial,
+                style_key=style_key, style_world=lp.load_style_world(style_key),
+                register=primary, secondary_register=secondary)
+            sample_amp = {**amplification, **material}
+            total_cost += material_cost or 0.0
+        if sample_amp is not None:
+            kwargs["amplification"] = sample_amp
         if dial is not None:
             kwargs["dial"] = dial
         if hasattr(lp, "load_register_guidance"):
@@ -277,7 +298,13 @@ def main():
             # of a register that HAS guidance measures a prompt production never
             # sends. Guarded by hasattr so the harness still runs against a
             # pre-guidance build of the pipeline, same as the kwargs above.
-            guidance = lp.load_register_guidance(primary)
+            if hasattr(lp, "load_register_line"):
+                guidance = lp.load_register_line(style_key, primary)
+                sec_guidance = lp.load_register_line(style_key, secondary)
+                if sec_guidance:
+                    kwargs["secondary_register_guidance"] = sec_guidance
+            else:
+                guidance = lp.load_register_guidance(primary)
             if guidance:
                 kwargs["register_guidance"] = guidance
         if hasattr(lp, "load_style_brief"):
@@ -319,14 +346,22 @@ def main():
             "stage2Cost": s2cost,
             "quality": quality,
         }
+        if sample_amp is not None:
+            # Per sample, because the objects and the anomaly now differ per
+            # register; the constellation is recorded too so a sweep shows it.
+            record["constellation"] = sample_amp.get("constellation")
+            record["actorKind"] = sample_amp.get("actorKind")
+            record["objects"] = sample_amp.get("objects")
+            record["anomaly"] = sample_amp.get("anomaly")
+            record["materialCost"] = material_cost
 
         # Did the mandatory anomaly actually reach the prompt? Stage 2 is told
         # it is mandatory and also told not to flag it with any of the words
         # that would make it obvious, and both pressures push toward dropping
         # it quietly. Recorded per sample so a sweep can show the rate.
-        if amplification is not None:
+        if sample_amp is not None:
             hits, total_tokens, survived = anomaly_survival(
-                amplification.get("anomaly"), prompt)
+                sample_amp.get("anomaly"), prompt)
             record["anomalyTokenHits"] = hits
             record["anomalyTokens"] = total_tokens
             record["anomalySurvived"] = survived

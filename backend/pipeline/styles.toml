@@ -311,11 +311,11 @@ temper = "TEMPER — the anomaly, and anything numinous in the frame, is in this
 # registers.toml's [guidance] header): anything listed marks the range and is
 # a starting point to reach past. Drafted family by family with Garrett.
 #
-# NOT YET READ BY ANY CODE. The pipeline picks the register after Stage 1.5
-# has already cast the scene, so a register line would be painted over (a
-# 20-register sweep collapsed to one scene: cp-reg20-base, and ghibli the same
-# in gh-reg20-dry). The agreed fix is to pick the register first and hand
-# Stage 1.5 and Stage 2 the day's line only; that pipeline work comes next.
+# Read by load_register_line() since the 2026-09-26 Stage 1.5 split: the
+# day's line (primary and secondary) goes to the material call, which builds
+# the objects and the anomaly from it, and to Stage 2. Before the split the
+# register was picked after Stage 1.5 had cast the scene, and a 20-register
+# sweep collapsed to one scene (cp-reg20-base; ghibli the same, gh-reg20-dry).
 [cyberpunk.registers]
 "botanical" = "What grows here grows in spite of the city, or because someone had nowhere else to grow it: weeds in gutters and stair cracks, roots splitting a ramp, vines riding the cable swags, and the deliberate kind (racks under grow-lamps, balcony pots, a rooftop plot fenced with scrap). The plant is the subject and the city is what it grows through; it is either tended or slowly winning."
 "bodily and anatomical" = "The body as a thing that is maintained, bought and failing: the seam where flesh meets steel, sutures and scar lines, a port opened for service, a prosthetic laid out on a back-clinic table, parts kept cold in jars. At the far end, flesh grown around metal until neither can be separated. Clinical and unsentimental, never gore."

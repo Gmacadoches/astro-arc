@@ -104,6 +104,7 @@ def main():
         amplification, amp_cost = lp.stage15_amplify(
             stage1, stage1_model, period_key, config, cache=False, dial=dial,
             style_key=key, style_world=lp.load_style_world(key),
+            register=args.register, secondary_register=args.secondary,
         )
         total += amp_cost or 0.0
 
@@ -113,7 +114,8 @@ def main():
             secondary_register=args.secondary,
             amplification=amplification,
             dial=dial,
-            register_guidance=lp.load_register_guidance(args.register),
+            register_guidance=lp.load_register_line(key, args.register),
+            secondary_register_guidance=lp.load_register_line(key, args.secondary),
             style_brief=lp.load_style_brief(key),
         )
         total += cost or 0.0

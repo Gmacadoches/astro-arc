@@ -1386,7 +1386,7 @@ def dial_from_texture(texture):
 # available metaphor) is precisely a pull toward those objects.
 STAGE15_SYSTEM = """You are a Jungian analyst performing amplification on a psychological reading. Amplification is Jung's own method: you set beside a psychic situation the mythological and folkloric material that shares its structure. Reach for MYTH first \u2014 the stories, beings and events \u2014 and use alchemical or ethnographic material only where it is genuinely the closest thing — not to explain the situation, but to give it images with far more weight than ordinary description carries.
 
-You are given a reading of one person's inner life for a specific timeframe. Produce the symbolic material that belongs to it.
+You are given a reading of one person's inner life for a specific timeframe. Name the archetypal situation that belongs to it, and who is in it. The material of the myth — its objects and its anomaly — is named in a separate step, once the day's material register is known; do not name it here.
 
 Work in the vocabulary of Jung and especially Erich Neumann. The dark and the light contents below carry equal weight — neither list is the default:
 - From *The Origins and History of Consciousness*, under strain: the uroboros (undifferentiated wholeness before an ego exists), the Great Mother in her devouring aspect, the separation of the World Parents (the wrenching birth of consciousness out of unity), the night-sea journey through the belly of the monster, captivity, dismemberment, petrification.
@@ -1400,12 +1400,6 @@ Rules:
   - When it is dark, say so. Devouring, dissolution, dismemberment, petrification, suffocation and being buried alive are real archetypal contents. Do not soften them into "transition" or "growth."
   - When it is not dark, say that just as plainly. Abundance, the feast, ripening and harvest, the sacred marriage, the found spring, the debt forgiven, the long work finished, the body at rest and unguarded, the returning traveller recognised at the door are equally real archetypal contents — and they are not lesser, softer, or a failure to look hard enough. Do not import darkness the reading does not have. A reading of genuine ease that amplifies to suffocation is as wrong as a reading of genuine grief that amplifies to growth.
 - You will be told which direction this timeframe actually runs in. Follow it.
-- **The material you name is the FURNITURE OF THE MYTH you just named, not objects standing beside it.** If the constellation is the night-sea journey through the belly of the monster, then the material is the monster's ribs arching overhead, the swallowed boat still upright inside it, the lamp that has stayed lit — NOT a thermos and a logbook belonging to someone who happens to be nearby. If it is the dragon-fight won, the material includes the dragon. Whatever the constellation put in the story, put it in the material. This is the single most important rule here: myth is the content, and a scene of ordinary possessions adjacent to a myth is a failure of this task.
-- It need not be an object at all. Name **beings, creatures, places, remains, weather and workings** as freely as things: the thing that was swallowed, the thing that does the swallowing, the door in the hillside, the bones of the last one, the water that will not drain. What matters is that each is concrete enough to picture and specific enough that it could only belong to this story.
-- **It must belong to THE WORLD described below**, made of its materials and possible within its physics. The myth is the content; the world decides what the content is made of. A neon city and a river valley get the same monster and build it differently.
-- Keep the specificity of a curator and drop the inventory of one. Not "a vessel" but "the iron cauldron they lower the dead into"; not "a tool" but "the pole the ferryman leans on, worn to a bend."
-- NEVER return a generic category or a stock prop. A door, a mirror, a key, a candle, a chain, a scale, a mask, a book, a clock, a lantern, a rope, a bridge, a tapestry, a gear, a tree with visible roots — these and anything similarly available are failures. If an object could illustrate any reading whatsoever, it is the wrong object.
-- Do not draw every object from one culture, one century, or one material. Reach across traditions and across the material world: bone, wax, lead, cloth, grain, glass, iron, salt.
 - Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
 - **Use no visual or compositional language at all.** Do not say where anything sits, how it is lit, what color it is, what it looks like, or how any two things are arranged relative to each other. You are not staging a picture. If you begin composing, you have failed this task.
 - **Name the actor the constellation already contains.** Every archetypal situation has a cast: the night-sea journey has someone inside the monster, the dragon-fight has whoever won it, the child born and held has a child and whoever holds it, captivity has a captive. Say who is in this situation, as a concrete living thing rather than a role label — "a woman who has been walking since before light", not "the seeker". Then classify that actor as exactly one of the available kinds. Do not invent an actor the constellation does not imply, and do not reach for a person when the situation belongs to an animal, a swarm, or something that was alive and is not.
@@ -1415,7 +1409,25 @@ Rules:
 - **`none` is for the constellations that genuinely have nobody in them** — petrification, the sealed vessel, the tomb, the long aftermath. It is the exception, not the safe default. If you can name who is there, name them.
 
 Respond with a JSON object with exactly these keys:
-{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "objects": ["{{OBJECT_RANGE}} pieces of the myth itself \u2014 beings, creatures, places, remains, workings or things \u2014 each named concretely enough to picture, each unmistakably part of THIS story rather than generally suggestive of it"], "anomaly": "exactly one further presence — an object, a creature or a being, and a living one wherever the story allows — made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE MEANS LARGER, AND ALMOST ALWAYS LARGER: monumentally oversized for its own kind, the size of a barn or a hillside where its kind is the size of a hand or a room, while still being the kind of thing this world contains and still made of its materials. A too-SMALL version is a much weaker reading and is a failure unless the reading leaves no other honest option — reach for the enormous first. Nothing in the rest of the material explains why it is here.", "anomalyType": "which single way it is wrong: 'scale' or 'time'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
+{"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
+
+# The second half of Stage 1.5, split out 2026-09-26 -- see stage15_material.
+STAGE15_MATERIAL_SYSTEM = """You are completing a Jungian amplification. The archetypal situation has already been named, and so has who is in it; you are given both, with the reading they came from. Your job is to name the MATERIAL of that myth — the beings, places, remains, workings and things the story contains — and one anomaly, all built from the day's material register.
+
+Rules:
+- **The material you name is the FURNITURE OF THE MYTH already named, not objects standing beside it.** If the constellation is the night-sea journey through the belly of the monster, then the material is the monster's ribs arching overhead, the swallowed boat still upright inside it, the lamp that has stayed lit — NOT a thermos and a logbook belonging to someone who happens to be nearby. If it is the dragon-fight won, the material includes the dragon. Whatever the constellation put in the story, put it in the material. This is the single most important rule here: myth is the content, and a scene of ordinary possessions adjacent to a myth is a failure of this task.
+- It need not be an object at all. Name **beings, creatures, places, remains, weather and workings** as freely as things: the thing that was swallowed, the thing that does the swallowing, the door in the hillside, the bones of the last one, the water that will not drain. What matters is that each is concrete enough to picture and specific enough that it could only belong to this story.
+- **It must belong to THE WORLD described below**, made of its materials and possible within its physics. The myth is the content; the world decides what the content is made of. A neon city and a river valley get the same monster and build it differently.
+- **THE REGISTER decides what the material is made of.** You are given a primary material register, possibly a secondary one, and where available a description of how this world realises each. At least half of the pieces you name, and the anomaly, must be made of the primary register's substance or belong to its territory; the secondary register may supply one or two. The myth decides what the pieces ARE; the register decides what they are MADE OF — a glacial day and a botanical day get the same monster, built once from ice and once from roots. A list made mostly of other materials is a failed response.
+- Keep the specificity of a curator and drop the inventory of one. Not "a vessel" but "the iron cauldron they lower the dead into"; not "a tool" but "the pole the ferryman leans on, worn to a bend."
+- NEVER return a generic category or a stock prop. A door, a mirror, a key, a candle, a chain, a scale, a mask, a book, a clock, a lantern, a rope, a bridge, a tapestry, a gear, a tree with visible roots — these and anything similarly available are failures. If an object could illustrate any reading whatsoever, it is the wrong object.
+- **Vary everything the register leaves open.** Within the register's substance, reach across traditions, centuries and forms; whatever is not drawn from the register reaches across the material world — bone, wax, lead, cloth, grain, glass, iron, salt.
+- Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
+- **Use no visual or compositional language at all.** Do not say where anything sits, how it is lit, what color it is, what it looks like, or how any two things are arranged relative to each other. You are not staging a picture. If you begin composing, you have failed this task.
+- **The actor is already named and is not one of your pieces.** Do not restate it; name what belongs around it in this story.
+
+Respond with a JSON object with exactly these keys:
+{"objects": ["{{OBJECT_RANGE}} pieces of the myth itself \u2014 beings, creatures, places, remains, workings or things \u2014 each named concretely enough to picture, each unmistakably part of THIS story rather than generally suggestive of it, at least half of them made of the primary register"], "anomaly": "exactly one further presence — an object, a creature or a being, and a living one wherever the story allows — made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE MEANS LARGER, AND ALMOST ALWAYS LARGER: monumentally oversized for its own kind, the size of a barn or a hillside where its kind is the size of a hand or a room, while still being the kind of thing this world contains and still made of its materials. A too-SMALL version is a much weaker reading and is a failure unless the reading leaves no other honest option — reach for the enormous first. Nothing in the rest of the material explains why it is here. It is made of the primary register's substance.", "anomalyType": "which single way it is wrong: 'scale' or 'time'"}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
 # every cached amplification, for the same reason SIGNATURE_SCHEMA_VERSION
@@ -1450,13 +1462,22 @@ Respond with a JSON object with exactly these keys:
 # actor preference (`favoured_actors`), both of which Stage 1.5 reads.
 # 10->11 on 2026-09-20: Stage 1.5 now sees what each actor kind MEANS, not
 # just its name, and is told to classify by kind rather than by count.
-STAGE15_SCHEMA_VERSION = 11
+# 11->12 on 2026-09-26: Stage 1.5 split in two. The cache now holds only the
+# MEANING (constellation, movement, affect, actor, actorKind); objects and the
+# anomaly come from a separate per-generation call that knows the day's
+# register (see stage15_material). Old entries carry objects this code would
+# ignore and were made blind to the register, so none should survive.
+STAGE15_SCHEMA_VERSION = 12
 
 
-def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
+def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=None,
                     avoid_archetypes=None, avoid_kinds=None, style_key=None,
                     style_world=""):
-    """Cached per period_key exactly like stage1_interpret() — regenerating
+    """The MEANING half of Stage 1.5: constellation, movement, affect, actor and
+    actorKind. Split from the material half on 2026-09-26 (see stage15_amplify)
+    so that the day's meaning is fixed while its material is not.
+
+    Cached per period_key exactly like stage1_interpret() — regenerating
     the same day's image must not re-bill this call — and invalidated by the
     same natalHash plus a schema version.
 
@@ -1490,7 +1511,7 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
             # foreign-object problem this change exists to remove. Switching
             # style mid-period now re-bills Stage 1.5, which is correct and
             # costs about $0.003.
-            if (cached.get("constellation") and cached.get("objects")
+            if (cached.get("constellation")
                     and cached.get("natalHash") == natal_hash
                     and cached.get("styleKey") == style_key
                     and cached.get("schemaVersion") == STAGE15_SCHEMA_VERSION):
@@ -1498,12 +1519,9 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
         except (json.JSONDecodeError, OSError):
             pass
 
-    object_lo, object_hi = dial["objectRange"]
     kinds = eligible_actor_kinds(style_key)
     system_prompt = (
         STAGE15_SYSTEM
-        .replace("{{OBJECT_RANGE}}", f"{object_lo} to {object_hi}")
-        .replace("{{ANOMALY_TYPES}}", dial["anomalyTypes"])
         # Injected rather than written into the prompt, so the enum cannot fall
         # out of step with actors.toml — the same reason the people-register
         # list used to be injected into STAGE2_SYSTEM.
@@ -1569,16 +1587,9 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
 
     result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
 
-    for key in ("constellation", "movement", "objects", "anomaly", "affect"):
+    for key in ("constellation", "movement", "affect"):
         if not result.get(key):
             raise PipelineError(f"Stage 1.5 response missing '{key}': {result!r}")
-    if not isinstance(result["objects"], list):
-        raise PipelineError(f"Stage 1.5 'objects' is not a list: {result['objects']!r}")
-    # anomalyType steers Stage 2's rendering of it; default rather than fail, since
-    # a missing enum is not worth losing a paid call over.
-    if result.get("anomalyType") not in ("scale", "time", "place"):
-        result["anomalyType"] = "time"
-
     # actorKind is validated but never fatal, for the same reason anomalyType
     # is not: a bad enum is not worth losing a paid call over. It does NOT
     # default to "none" on a miss, though — "none" is the behaviour this whole
@@ -1594,7 +1605,7 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
         # tells Stage 2 who is there, so keep it rather than failing.
         result["actor"] = ""
 
-    result["dial"] = {k: v for k, v in dial.items() if k in ("mode", "objectRange", "anomalyTypes", "tonalDirection")}
+    result["dial"] = {k: v for k, v in dial.items() if k in ("mode", "tonalDirection")}
     result["generatedAt"] = datetime.now(timezone.utc).isoformat()
     result["natalHash"] = natal_hash
     result["styleKey"] = style_key
@@ -1603,6 +1614,120 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
         AMPLIFICATIONS_DIR.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(result, indent=2))
     return result, chat_call_cost(model, usage)
+
+
+def load_register_line(style_key, register):
+    """What this register means in this style's world: the style's own
+    `[<style>.registers]` line when it has one, else registers.toml's generic
+    [guidance] entry, else "". The style line REPLACES the generic one rather
+    than adding to it, because it is the more specific answer to the same
+    question."""
+    if not register:
+        return ""
+    lines = (load_styles().get(style_key) or {}).get("registers")
+    if isinstance(lines, dict) and str(lines.get(register) or "").strip():
+        return str(lines[register]).strip()
+    return load_register_guidance(register)
+
+
+def stage15_material(stage1_result, meaning, model, config, dial=None, style_key=None,
+                     style_world="", register=None, secondary_register=None):
+    """The MATERIAL half of Stage 1.5: objects, anomaly and anomalyType, built
+    from the day's register. Never cached -- every generation, regenerates
+    included, gets fresh material, which is the point of the split: the same
+    meaning, a new register, new objects.
+
+    Until 2026-09-26 the register was picked AFTER Stage 1.5 had already named
+    every object, so it could only reach Stage 2 as a surface adjective: a
+    20-register sweep came back as one scene (cyberpunk 20/20, ghibli 18/20).
+
+    `meaning` is stage15_meaning's result. Its stored tonalDirection is used
+    rather than the current dial's, so the material runs in the same direction
+    as the meaning it was written for even when the Moon has moved since.
+
+    Returns (result_dict, cost)."""
+    if dial is None:
+        dial = dict(NO_TEXTURE_DIAL)
+    object_lo, object_hi = dial["objectRange"]
+    system_prompt = (
+        STAGE15_MATERIAL_SYSTEM
+        .replace("{{OBJECT_RANGE}}", f"{object_lo} to {object_hi}")
+        .replace("{{ANOMALY_TYPES}}", dial["anomalyTypes"])
+    )
+
+    user_lines = []
+    if style_world:
+        user_lines.append(
+            "THE WORLD — every piece you name, and the anomaly, must belong to it:\n"
+            + style_world
+        )
+    if register:
+        line = load_register_line(style_key, register)
+        user_lines.append(f"PRIMARY REGISTER — at least half the pieces, and the anomaly, are made of this: {register}"
+                          + (f"\n  In this world: {line}" if line else ""))
+    if secondary_register:
+        line = load_register_line(style_key, secondary_register)
+        user_lines.append(f"SECONDARY REGISTER — may supply one or two pieces: {secondary_register}"
+                          + (f"\n  In this world: {line}" if line else ""))
+    user_lines += [
+        f"Reading: {stage1_result['reading']}",
+        f"Distillation: {stage1_result['distillation']}",
+        f"Narrative position: {stage1_result['narrativePosition']}",
+        "THE MYTH, ALREADY NAMED:",
+        f"  Archetypal constellation: {meaning.get('constellation', '')}",
+        f"  Movement: {meaning.get('movement', '')}",
+        f"  Felt quality: {meaning.get('affect', '')}",
+        f"  Who is in it ({meaning.get('actorKind', '')}): {meaning.get('actor') or 'no one'}",
+    ]
+    direction = (meaning.get("dial") or {}).get("tonalDirection") or dial.get("tonalDirection")
+    if direction:
+        user_lines.append(f"Direction for this timeframe: {direction}")
+
+    result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1",
+                               temperature=0.95, stage="stage15")
+    for key in ("objects", "anomaly"):
+        if not result.get(key):
+            raise PipelineError(f"Stage 1.5 material response missing '{key}': {result!r}")
+    if not isinstance(result["objects"], list):
+        raise PipelineError(f"Stage 1.5 'objects' is not a list: {result['objects']!r}")
+    # anomalyType steers Stage 2's rendering of it; default rather than fail, since
+    # a missing enum is not worth losing a paid call over.
+    if result.get("anomalyType") not in ("scale", "time", "place"):
+        result["anomalyType"] = "time"
+    return {
+        "objects": result["objects"],
+        "anomaly": result["anomaly"],
+        "anomalyType": result["anomalyType"],
+        "register": register,
+        "secondaryRegister": secondary_register,
+        "materialDial": {k: v for k, v in dial.items() if k in ("objectRange", "anomalyTypes")},
+    }, chat_call_cost(model, usage)
+
+
+def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
+                    avoid_archetypes=None, avoid_kinds=None, style_key=None,
+                    style_world="", register=None, secondary_register=None, material=True):
+    """Stage 1.5, both halves: the day's MEANING (cached per period, see
+    stage15_meaning) and fresh MATERIAL for this register (never cached, see
+    stage15_material), merged into the one dict Stage 2 and the records have
+    always taken. Pick the registers BEFORE calling this -- they are an input.
+
+    `material=False` returns the meaning alone, for harnesses that only
+    measure the archetype and actor (replay_amplify.py).
+
+    Returns (result_dict, cost); cost is None only when the meaning was a cache
+    hit and no material was asked for."""
+    meaning, meaning_cost = stage15_meaning(
+        stage1_result, model, period_key, config, cache=cache, dial=dial,
+        avoid_archetypes=avoid_archetypes, avoid_kinds=avoid_kinds,
+        style_key=style_key, style_world=style_world)
+    if not material:
+        return meaning, meaning_cost
+    mat, material_cost = stage15_material(
+        stage1_result, meaning, model, config, dial=dial, style_key=style_key,
+        style_world=style_world, register=register, secondary_register=secondary_register)
+    cost = (meaning_cost or 0.0) + (material_cost or 0.0)
+    return {**meaning, **mat}, cost
 
 
 # ---------------------------------------------------------------------------
@@ -1827,7 +1952,7 @@ def stage2_system():
 def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
                          style_label=None, style_guidance=None, secondary_register=None,
                          amplification=None, dial=None, register_guidance=None,
-                         style_brief=None):
+                         style_brief=None, secondary_register_guidance=None):
     """`amplification` is Stage 1.5's output (see stage15_amplify). It is
     passed last and defaults to None so the function still works without a
     Stage 1.5 result — sweep.py relies on that to produce a pre-Stage-1.5
@@ -1861,6 +1986,8 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
         user_lines.append(f"  What that register covers: {register_guidance}")
     if secondary_register:
         user_lines.append(f"Secondary material register (must be physically present in the frame as real matter): {secondary_register}")
+        if secondary_register_guidance:
+            user_lines.append(f"  What that register covers: {secondary_register_guidance}")
     if avoid_tags:
         user_lines.append(f"Avoid these concepts/registers (used recently): {', '.join(avoid_tags)}")
     if cliches:
@@ -2010,21 +2137,23 @@ def build(reading, config):
 
     visual_signature, signature_cost = get_visual_signature(reading["natal"], config, stage2_model)
     stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config)
-    amplification, stage15_cost = stage15_amplify(
-        stage1, stage1_model, period_key, config, dial=dial,
-        style_key=style_key, style_world=load_style_world(style_key),
-    )
-    # A cache hit returns the dial the objects were actually written for, which may
-    # differ from the one just computed if the Moon has moved since. Trust the
-    # stored one — the object list and the density have to agree.
-    cached_dial = amplification.get("dial") or {}
-    if cached_dial.get("objectRange"):
-        dial["objectRange"] = tuple(cached_dial["objectRange"])
-
+    # Registers are picked BEFORE Stage 1.5 as of 2026-09-26, because they are
+    # now one of its inputs: the material half builds the objects and the
+    # anomaly out of the primary register. Picked after, the register could
+    # only reach Stage 2 as an adjective on a scene already cast without it.
+    #
+    # The "cached dial" workaround that used to follow this call is gone: it
+    # kept a cached object list paired with the object count it was written
+    # for, and objects are no longer cached.
     history = load_history()
     registers = load_registers()
     cliches = load_cliches()
     register, secondary_register = pick_registers(history, registers, dial["registerCohesion"])
+    amplification, stage15_cost = stage15_amplify(
+        stage1, stage1_model, period_key, config, dial=dial,
+        style_key=style_key, style_world=load_style_world(style_key),
+        register=register, secondary_register=secondary_register,
+    )
     avoid = avoid_concepts(history)
     style_label, style_guidance = load_style_info(style_key)
 
@@ -2039,7 +2168,8 @@ def build(reading, config):
         # entries were inhabitant configurations and moved to actors.toml —
         # so this passes "" today and exists for the next register that
         # earns a steer.
-        register_guidance=load_register_guidance(register),
+        register_guidance=load_register_line(style_key, register),
+        secondary_register_guidance=load_register_line(style_key, secondary_register),
         style_brief=load_style_brief(style_key),
     )
 

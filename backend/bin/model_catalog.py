@@ -357,7 +357,8 @@ def run_cost(chat_model, image_model, quality, size, rates=None, learned=None):
         cost, st = stage_cost(stage, chat_model, rates, learned)
         if cost is None:
             return None, None
-        total += cost
+        # Stage 1.5 is two calls (meaning + material), see above.
+        total += cost * (2 if stage == "stage15" else 1)
         if st != "actual":
             source = "est"
     image, image_source = image_cost(image_model, quality, size, rates, learned)
@@ -524,10 +525,17 @@ def next_run_cost(width=1024, height=1024, settings=None):
             source = None
             continue
         if next_total is not None:
+            # Stage 1.5 is two calls as of 2026-09-26 -- the meaning (cached per
+            # period) and the material (never cached) -- both logged under
+            # "stage15", so `cost` is the per-call average. A full run pays two;
+            # a cached meaning still pays one.
+            calls = 2 if name == "stage15" else 1
             # Signature excluded from `full` — see the docstring.
             if name != "signature":
-                full_total += cost
+                full_total += cost * calls
             if not is_cached:
+                next_total += cost * calls
+            elif name == "stage15":
                 next_total += cost
             if src != "actual":
                 source = "est"

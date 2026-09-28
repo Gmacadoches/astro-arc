@@ -118,6 +118,9 @@ def run_arm(arm, days, model, config, out_dir, axis="archetype", seed=0):
             reading, model, key, config, cache=False, dial=dial,
             avoid_archetypes=avoid, avoid_kinds=avoid_k,
             style_key=style_key, style_world=lp.load_style_world(style_key),
+            # Archetype and actor only: the material half is not what this
+            # harness measures, and skipping it halves the cost of a replay.
+            material=False,
         )
         total += cost or 0.0
         constellation = result.get("constellation", "")
