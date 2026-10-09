@@ -150,7 +150,7 @@ def main():
         if secondary:
             kwargs["secondary_register"] = secondary
         prompt, tags, has_people, c2 = lp.stage2_image_prompt(
-            stage1, signature, primary, avoid_tags, cliches, stage2_model,
+            stage1, signature if lp.style_uses_signature(style_key) else "", primary, avoid_tags, cliches, stage2_model,
             style_label, style_world, **kwargs)
         total += c2 or 0.0
 

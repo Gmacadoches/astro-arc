@@ -109,7 +109,7 @@ def main():
         total += amp_cost or 0.0
 
         prompt, tags, has_people, cost = lp.stage2_image_prompt(
-            stage1, signature, args.register, [], cliches, stage2_model,
+            stage1, signature if lp.style_uses_signature(key) else "", args.register, [], cliches, stage2_model,
             label, guidance,
             secondary_register=args.secondary,
             amplification=amplification,

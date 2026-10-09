@@ -523,6 +523,18 @@ DEFAULT_STAGE2_BRIEF = (
 )
 
 
+def style_uses_signature(style_key):
+    """Whether Stage 2 is given the natal visual signature for this style.
+    True unless the style sets `signature = false` in styles.toml.
+
+    Added 2026-10-08 for cyberpunk. The signature is one fixed description of
+    palette, light and contrast, made once per natal chart and sent with every
+    style; for this install it reads "muted earth tones... diffuse, softly
+    scattered daylight... moderate contrast", which argued with a neon world
+    in every frame even though Stage 2 is told to ignore its colour words."""
+    return (load_styles().get(style_key) or {}).get("signature", True) is not False
+
+
 def load_style_brief(style_key):
     """The rules Stage 2's brief carries for this style, in file order, or
     None for a style with no `[<style>.brief]` table -- which stage2_image_prompt
@@ -1984,7 +1996,8 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
             "",
         ]
 
-    user_lines.append(f"Visual signature for this series (honor light and contrast only — composition comes from the brief below; do NOT copy its color words): {visual_signature}")
+    if visual_signature:
+        user_lines.append(f"Visual signature for this series (honor light and contrast only — composition comes from the brief below; do NOT copy its color words): {visual_signature}")
 
     if style_label and style_guidance:
         user_lines.append(f"Rendering style for this image: {style_label} — {style_guidance}")
@@ -2178,7 +2191,7 @@ def build(reading, config):
     stage2_cost = 0.0
     for _attempt in range(1 + CAPTION_RESAMPLES):
         image_prompt, concept_tags, has_people, attempt_cost = stage2_image_prompt(
-            stage1, visual_signature, register, avoid, cliches, stage2_model,
+            stage1, visual_signature if style_uses_signature(style_key) else "", register, avoid, cliches, stage2_model,
             style_label, style_guidance,
             secondary_register=secondary_register,
             amplification=amplification,

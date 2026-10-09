@@ -195,6 +195,10 @@ def main():
 
     # --- pin the signature -------------------------------------------
     signature, signature_cost = lp.get_visual_signature(reading["natal"], config, stage2_model)
+    # A style can opt out of the signature (styles.toml `signature = false`);
+    # production then never sends it, so neither does a sweep.
+    if hasattr(lp, "style_uses_signature") and not lp.style_uses_signature(style_key):
+        signature = ""
 
     # --- Stage 1.5, if this build of the pipeline has one -------------
     amplification = None

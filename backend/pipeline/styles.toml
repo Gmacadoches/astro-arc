@@ -275,8 +275,8 @@ suffix_figures = " Figures rendered in flat cel-shaded color with a single hard-
 # instruction, which image models obey better than "do not write text".
 [cyberpunk.world]
 era = "A future that arrived decades ago and has been patched ever since. Nothing is new: machines are retrofitted onto older machines, towers are built over the roofs of earlier towers, and every system runs on parts from three generations of manufacturers. The technology is powerful and it is old, and most of it is kept alive by people who were never meant to maintain it."
-materials = "Stained concrete, sheet steel, corrugated plastic, rack steel, ribbed conduit, bent glass tube, enamel, tin, tarpaulin, rust and grease — and electricity everywhere and exposed: cable bundled, taped and hanging in swags between buildings, junction boxes, transformers humming on brackets, neon and lit panels stacked up every facade. Repairs are visible and never match what they repair."
-physics = "The city is lit by its own hardware, and after dark and in the lower levels at any hour that light is neon: bent glass tube in every colour, packed so densely that it tints the air, the haze and every wet surface. Most of it is shape rather than words — a pictogram, a single character, an arrow, a border, a bowl or a fish or a cross traced in tube — and it is seen the way you see it in a crowded street: from below, edge-on, from behind, or blurred by rain and distance. Every light has a body: the tube sits on brackets with a transformer behind it, a screen has a bezel and a cable, a sign has a back you could walk behind. Light never floats free, never forms a figure and never stands in for one — there are no holograms. Impossible things here are heavy, bolted down, dripping, and lit like everything around them."
+materials = "Concrete, sheet steel, corrugated plastic, rack steel, ribbed conduit, bent glass tube, enamel, tin, tarpaulin — and electricity everywhere and exposed: cable bundled, taped and hanging in swags between buildings, junction boxes, transformers on brackets, neon, screens and holographic signs stacked up every facade. Surfaces are worn and patched, but under the city's light they read as colour — teal, magenta and orange in every reflection — never as brown grime. Repairs are visible and never match what they repair."
+physics = "The city is lit by its own signs. After dark, and in the lower levels at any hour, neon and screen light is everywhere — bent tube in every colour, lit panels, holographic advertising hanging over the street — all of it blooming into the haze and streaking across every wet surface. Most of it is shape rather than words: a pictogram, a single character, an arrow, a border, a fish or a bowl or a cross traced in light, seen from below, edge-on, or blurred by rain and distance. Holograms are signage and nothing more — an advert, a route arrow, a dancing figure selling something. The numinous is never a hologram or a glow; it always has a body you could put your hand on. Impossible things here are heavy, bolted down, dripping, and lit by the colour around them."
 society = "A city built upward because it has nowhere else to go: towers packed so close their walls touch, walkways and cables strung between them, lower levels that have not seen the sky in decades. It belongs to no single culture — migrant districts layered over each other, and where lettering shows at all it is in many scripts and not only East Asian ones. Institutions are distant, sealed behind glass high above the street, and deny that anything below them is alive; the street feeds it anyway. Life is markets, stairwells, workshops, housing blocks, clinics and transit, and most work is done by hand. There is a port, and it is one district among many."
 weather = "Weather runs the whole range: flat white overcast, smog-orange dawn, dry heat haze off concrete, drizzle, fog, downpour, full night. Daylight reaches the roofs and the upper streets; below them it is always dusk under the signs. When the day calls for darkness, this city's darkness is night, or the lower levels, lit only by its own signs and screens. When it calls for light, it is the same city by day, and just as much itself."
 inhabitants = "Working people whose trade is whatever the day's material calls for, and never by default a repair tech: a cook over a wok, a dock hand, a nurse in a back clinic, a sign-bender heating tube, a scrap sorter, a courier, a launderer, a fishmonger, a hawker, a transit guard, the old and the very young. Most bodies here have been repaired at some point (a bolted prosthetic, a scar where something was fitted, a port taped at the edges, a secondhand part that does not match), and that is a fact about the body, not the person's job. Old gods walk here too, in hardware bodies, and a figure that is part animal is more often one of those — a mythological hybrid whose other half is beast and salvaged machine at once — than anything grown in a lab."
@@ -347,38 +347,30 @@ temper = "TEMPER — the anomaly, and anything numinous in the frame, is in this
 
 [cyberpunk]
 label = "Cyberpunk"
-# Technique only, per the ghibli lesson of 2026-09-20: the old suffix mandated
-# "neon-lit rain-slicked streets" and "moody blue and magenta lighting" on
-# every image, which vetoed the light axis and the wonder tone exactly as the
-# cumulus clause did for ghibli. Setting, weather and palette are the
-# charter's and the dial's now.
+# REWRITTEN 2026-10-08 against Garrett's reference images
+# (~/Pictures/astro-arc-tests/Reference Cyberpunk: painterly anime city scenes,
+# flat graphic anime portraits, glowing concept painting). The 35mm
+# practical-effects suffix (Q7 (a), 2026-09-26) produced the same dark brown wet
+# industrial town every time: it, the rust-and-grease materials, the no-glow
+# physics and the series visual signature ("muted earth tones... diffuse
+# daylight... moderate contrast") all pulled to brown at once.
 #
-# MEDIUM (a): 35mm practical-effects film. Chosen over hand-painted anime
-# backgrounds because that is the same technique family as ghibli's (painted
-# backgrounds, cel figures) and the two styles would drift together; and
-# because physical miniatures with visible light fixtures are the physics
-# rule restated as technique. No film is named: a title would pull hard
-# toward one city at night in the rain, which is the attractor. If the style
-# reads generic, naming one is the first lever to try.
+# The palette now lives HERE, in the technique. The 2026-09-20 rule that kept
+# palette out of suffixes was about time of day vetoing the dial; a palette is
+# not a time of day, and in the references the palette is the style. Light
+# level still comes from the dial -- "by day or night" is deliberate.
 #
-# MEDIUM (b), held for the A/B test, not live:
-#   "Hand-painted 1980s theatrical anime background art: dense cityscapes
-#   painted in opaque colour with every pipe, sign, cable and window drawn,
-#   deep saturated shadows, light sources painted as physical fixtures rather
-#   than glows."
-#   (with suffix_figures: " Figures in flat cel shading with one hard-edged
-#   shadow tone and crisp ink outlines; only the nearest one or two have fully
-#   drawn faces.")
-# Test protocol: one fixed reading/signature, six dial cells (light hi/lo x
-# wonder tone, including the darkest cell), each rendered under (a), (b) and
-# the ghibli suffix side by side; check (a) stands alone first, faces
-# included. (b) fails if it cannot be told from ghibli at thumbnail size or
-# drifts pastoral -- then (a) stays the default.
+# Medium is Q54 (a): painterly anime illustration with concept painting's
+# colour and glow. The old film/anime A/B is moot. Figures take the colour, line
+# and gear detail of the portrait references (Q59), but frames stay scenes:
+# DEPTH still requires distance.
 #
-# suffix_base ends in a period, so suffix_figures leads with a space (see
-# load_style_suffix: concatenation is raw).
-suffix_base = "A still frame from a 35mm practical-effects science-fiction film: the world built as physical sets and detailed miniatures, real haze and smoke catching the light, every light source a visible physical fixture — tube, lamp, panel, bulb — with its reflection on whatever surface is near it. Fine film grain, the soft falloff and flare of an anamorphic lens, shadows that are deep but still hold detail. Shallow depth of field: any lettering on signs is out of focus, distant or seen edge-on, never crisp readable words. No digital gloss, no clean computer-generated surfaces, no floating or holographic light."
-suffix_figures = " Figures are real people photographed on film: unretouched skin, practical costume and makeup, prosthetics and implants built as physical props with weight and wear. Only the nearest one or two are in sharp focus with readable faces; anyone further back is soft, turned away, or lost in the haze."
+# signature = false (Q57): this style does not receive the natal visual
+# signature, whose muted earth palette and diffuse light argue with neon in
+# every frame. See style_uses_signature() in llm_pipeline.py.
+signature = false
+suffix_base = "Digital illustration in the tradition of contemporary anime background art and cyberpunk concept painting: painterly brushwork, crisp detail where the eye lands, soft atmospheric haze between the layers of distance. A saturated neon palette carries every frame, by day or night: electric cyan and teal against hot magenta and pink, with accents of sodium orange and acid yellow; shadows fall into deep blue and violet, never black, brown or grey. Light glows: signs and screens bloom into the haze, wet surfaces mirror the colour in long streaks, rain and steam catch it. Any lettering is soft, distant or abstract, never crisp readable words."
+suffix_figures = " Figures are drawn as anime illustration: cel-shaded with clean ink linework, saturated colour on clothing and gear, dense mechanical detail on prosthetics, helmets and rigs. Only the nearest one or two have fully drawn faces; figures further back are silhouettes or simple shapes lit by the neon."
 # guidance removed 2026-09-26: superseded by [cyberpunk.world] above. Its one
 # prohibition (no abstract energy-beings) is carried by `physics`. In git.
 
