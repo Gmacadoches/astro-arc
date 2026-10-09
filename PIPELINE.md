@@ -1,16 +1,20 @@
 # How one image gets made
 
 One generation turns a birth chart and today's sky into a wallpaper and a
-matching desktop palette. A fresh one costs about $0.028 at the High preset; a
-same-day re-run is about $0.019, because the reading is cached and only the
-picture is remade. The render is the slow part.
+matching desktop palette. At the High preset (`gpt-5.4` for writing,
+`gpt-image-2.5-sunburst` at `high`) a fresh day costs about $0.073 and a
+same-day re-run about $0.062: the reading and the day's meaning are cached, the
+material, the prompt and the picture are remade. The render is most of the cost
+and most of the time. The panel's cost line projects the real figure for
+whatever preset is set.
 
-**At a glance:** $0.028 fresh run · $0.019 same-day re-run · ~40s render · 25 registers
+**At a glance:** $0.073 fresh run · $0.062 same-day re-run · ~40s render · 20 registers · 7 styles
 
-Eleven steps. Three of them call a language model: the reading, the objects and the prompt. This document walks the whole path
-in order, and every step names the file that runs it, what it reads, what it
-writes, whether it is cached, and **the one knob that changes it** — so you can
-retune this thing without reading any Python.
+Thirteen steps. Five of them call a language model: the reading, the meaning,
+the material, the prompt and the melodrama check. This document walks the
+whole path in order, and every step names the file that runs it, what it reads,
+what it writes, whether it is cached, and **the one knob that changes it** — so
+you can retune this thing without reading any Python.
 
 If you only read one section, read [Tweak it without touching
 code](#tweak-it-without-touching-code).
@@ -33,29 +37,31 @@ code](#tweak-it-without-touching-code).
                                           │
   ╭───────────────── llm_pipeline.py ──────────────────────────────────╮
   │ 2  READING     Stage 1      what the sky means for this person     │  cached / day
-  │ 3  DIAL        (no LLM)     how dense, how lit, how many objects   │  free
-  │ 4  OBJECTS     Stage 1.5    4–7 concrete things to build from      │  cached / day
-  │ 5  REGISTERS   (no LLM)     what the scene is MADE of              │  free
-  │ 6  PROMPT      Stage 2      the actual image prompt                │  never cached
+  │ 3  DIAL        (no LLM)     density, light, how the actor behaves  │  free
+  │ 4  REGISTERS   (no LLM)     what the scene is MADE of              │  free
+  │ 5  MEANING     Stage 1.5    the myth, and who is in it             │  cached / day
+  │ 6  MATERIAL    Stage 1.5    objects + anomaly, from the register   │  every run
+  │ 7  PROMPT      Stage 2      the actual image prompt                │  every run
+  │ 8  CHECK       caption      would it be filed under a feeling?     │  every run
   ╰────────────────────────────────────────────────────────────────────╯
                                           │
-  7  RENDER      openai_image_gen.py               prompt → PNG
+  9  RENDER      openai_image_gen.py               prompt + style suffix → PNG
                                           │
-  8  PALETTE     palette_extract.py                PNG → colors.toml
+ 10  PALETTE     palette_extract.py                PNG → colors.toml
                                           │
-  9  RECORD      build_review.py                   archive entry + gallery + cost log
+ 11  RECORD      build_review.py                   history + archive + gallery + cost log
                                           │
- 10  APPLY       omarchy-theme-bg-set              wallpaper goes live (+ palette if opted in)
+ 12  APPLY       omarchy-theme-bg-set              wallpaper goes live (+ palette if opted in)
 ```
 
-Steps 2–6 are the interesting part and all live in one file. Steps 0, 1 and
-7–10 are plumbing.
+Steps 2–8 are the interesting part and all live in one file. Steps 0, 1 and
+9–12 are plumbing.
 
 ---
 
 ## The pipeline
 
-Steps 2–6 all live in one file, `llm_pipeline.py`, and are where the picture is
+Steps 2–8 all live in one file, `llm_pipeline.py`, and are where the picture is
 actually decided. Everything else is plumbing. The steps that spend money are
 marked.
 
@@ -94,11 +100,12 @@ and phase, the dominant transit, and a **texture** block — polarity,
 intensity, exposure, multiplicity — which is the raw material for step 3.
 
 Hourly has no branch here on purpose: transits barely move in an hour, so an
-hourly schedule shares the daily arc and re-rolls only the picture.
+hourly schedule shares the daily arc, and the day's reading and meaning, and
+re-rolls only the material and the picture.
 
 ## 2. Stage 1 — the reading
 
-**Runs:** `llm_pipeline.stage1_interpret` · **Cost:** ~$0.0031 · **Cache:** per period + chart · **Knob:** `stage1Model`
+**Runs:** `llm_pipeline.stage1_interpret` · **Cost:** ~$0.0050 · **Cache:** per period + chart · **Knob:** `stage1Model`
 
 One LLM call turns the chart into a psychological reading in a Jungian frame,
 plus a one-line distillation and a narrative position. It is told, forcefully,
@@ -113,89 +120,132 @@ bump the schema version, or you will test yesterday's output.
 
 **Runs:** `llm_pipeline.dial_from_texture` · **Cost:** free · **Cache:** — · **Knob:** — always follows the chart
 
-The day's texture becomes hard numbers: how many sites, how many objects, the
-word budget, which verbs, whether the two registers **collide** or **cohere**,
-how much spatial pressure, how much light. These used to be constants, which
-is why every image once carried the same implicit meaning however the chart
-moved.
+The day's texture becomes hard numbers and fixed sentences: how many sites
+(1–3), how many objects (2–3 on a quiet day, 4–6 on a crowded one), the word
+budget (60–130), which verbs, whether the two registers **collide** (hard days)
+or **cohere** (soft ones), how much of the frame the strange takes and in what
+temper, and how the actor treats the anomaly, the objects and the place.
 
-The dial always follows the chart. A `pipelineMode: "legacy"` setting used to
-pin it back to fixed constants — an option to switch off the mechanism this
-whole project is built on, and it was the default. Removed 2026-09-13. The
-constants survive as `NO_TEXTURE_DIAL`, the fallback for a reading that has
-no texture block at all.
+The **light** comes from here too, from the exposure band, and it is written
+as a failure condition rather than a mood: a low-exposure day must be night or
+somewhere daylight does not reach, with at least two thirds of the frame dark;
+a high-exposure day must be full, even daylight. As moods ("most of the frame
+is unlit"), neither was obeyed. Mood words are not obeyed; counts and failure
+conditions are.
 
-## 4. Stage 1.5 — amplification
+The constants survive as `NO_TEXTURE_DIAL`, the fallback for a reading with no
+texture block at all. (A `pipelineMode: "legacy"` setting that pinned the dial
+back to them was removed on 2026-09-13.)
 
-**Runs:** `llm_pipeline.stage15_amplify` · **Cost:** ~$0.0051 · **Cache:** per period + chart · **Knob:** `stage1Model`
-
-Turns the reading into an archetypal constellation, a movement, **4–7 concrete
-objects**, a felt quality, and an **anomaly** — one thing that belongs to the
-scene's world but is wrong in exactly one way (far out of scale, or far older
-and more ruined than everything around it). The anomaly is mandatory and must
-never be flagged as strange in the prompt; naming the wrongness out loud is
-what made it read as a bolted-on item.
-
-These objects are **what is in the scene**.
-
-## 5. Registers — what the scene is made of
+## 4. Registers — what the scene is made of
 
 **Runs:** `llm_pipeline.pick_registers` · **Cost:** free · **Cache:** — · **Knob:** `registers.toml`
 
 Each image gets a **primary** register (the protagonist material) and usually
-a **secondary**. The dial decides whether they collide or cohere. Registers
-rotate by recency across a 5-day window, so the series moves between regions
-of image-space rather than merely avoiding recent words.
+a **secondary**, from 20 registers in five families: living, mineral, built,
+fluid, made. On a collide day the secondary comes from a different family; on a
+cohere day, from the same one. The primary rotates away from anything used in
+the last 5 days (the first 10 runs simply cycle the list, for coverage).
 
-The amplification objects are what is *in* the scene; the registers are what
-the scene is *made of*.
+Registers are picked **before** Stage 1.5, because they are one of its inputs.
+Until 2026-09-26 they were picked after the scene had already been cast, so a
+register could only reach the prompt as an adjective: with the reading pinned,
+20 registers came back as one scene.
 
-Five of the 25 registers are people registers, and they alone decide whether
-figures appear. This is gated on the **primary** only — a human register
-arriving as a secondary would inject people into a material-led scene through
-a side door.
+A style can say what each register means in its world, in its
+`[<style>.registers]` table; that line goes to steps 6 and 7. A style without
+one falls back to `registers.toml`'s `[guidance]`, which is empty by design.
 
-## 6. Stage 2 — the image prompt
+## 5. Stage 1.5 — the meaning
 
-**Runs:** `llm_pipeline.stage2_image_prompt` · **Cost:** ~$0.0087 · **Cache:** never (temp 0.95) · **Knob:** `stage2Model`, `artStyle`
+**Runs:** `llm_pipeline.stage15_meaning` · **Cost:** ~$0.0059 · **Cache:** per period + chart + style · **Knob:** `stage1Model`
 
-Everything above converges here: reading, objects, anomaly, both
-registers, the dial's composition brief, the art style's guidance, the concept
-tags of the last 8 generations to avoid, and any hard-blocked terms.
+The day's myth. Turns the reading into an archetypal constellation, a
+movement, a felt quality, and the **actor** the constellation already contains
+— who is in this situation, and which of the 11 kinds in `actors.toml` it is
+(solitary, crowd, animal, swarm, presence, the dead, none and so on).
 
-This is the only stage that runs every time, which is why two generations an
-hour apart produce different pictures from the same reading.
+The constellations an install has used recently are passed in as already
+spent, and so are the last 4 actor kinds. Without that pressure, 83% of days
+reached for the same archetype and most actors were `solitary`.
+
+Cached in `pipeline/amplifications/<periodKey>.json`, invalidated by
+`STAGE15_SCHEMA_VERSION`, so **a regenerate never changes the day's meaning**.
+`presence` is only eligible in a style whose charter says how the numinous
+takes a body.
+
+## 6. Stage 1.5 — the material
+
+**Runs:** `llm_pipeline.stage15_material` · **Cost:** ~$0.0059 · **Cache:** never · **Knob:** `stage1Model`
+
+The furniture of that myth, built from the day's register: **2–6 concrete
+objects** and an **anomaly** — one thing that belongs to the world but is wrong
+in exactly one way, far larger than its kind or far older than everything
+around it. At least half the objects, and the anomaly, must be made of the
+primary register's substance.
+
+Never cached, so every run, regenerates included, gets a new register and new
+objects for the same meaning. That is what keeps same-day regenerates from all
+looking alike. The anomaly is mandatory and must never be flagged as strange in
+the prompt; naming the wrongness out loud made it read as a bolted-on item.
+
+## 7. Stage 2 — the image prompt
+
+**Runs:** `llm_pipeline.stage2_image_prompt` · **Cost:** ~$0.0139 · **Cache:** never (temp 0.95) · **Knob:** `stage2Model`, `artStyle`
+
+Everything above converges here: the reading, the meaning and its actor, the
+objects and anomaly, both registers with their style lines, the dial's
+composition brief, the style's world, the concept tags of the last 8
+generations to avoid, and any hard-blocked terms.
 
 Its rules, in short: describe only what is physically there, never what it
 means; concrete and oddly specific over generically mystical; things must be
 doing something to each other; each register must contribute a substantial
-named thing of its own.
+named thing of its own. Colour comes from each scene's own materials and light
+from the dial — there is no fixed palette for the series. (A natal "visual
+signature" that tried to fix one was removed on 2026-10-08: with and without
+it, the prompts differed no more than two draws with it.)
 
-**And every image must be open.** At least half the frame is sky, horizon,
-landscape, sea or a distance that keeps going, and the viewpoint is pulled back
-far enough for that to be true. An interior is allowed only if it opens onto
-that distance through a large window, a doorway, a missing wall. A sealed room
-is a failed response.
+**The style decides more than the look.** A *world* style (ghibli, cyberpunk)
+has a charter in `styles.toml` — era, materials, physics, society, weather,
+inhabitants, strangeness, the numinous, dread, favoured actors — and its own
+**brief rules**, phrased as failure conditions because that is what Stage 2
+obeys. Ghibli's are THE IMPOSSIBLE (something in frame could not exist) and
+OPENNESS (half the frame is open distance); cyberpunk's are DEPTH, NEON AFTER
+DARK and TEMPER. A *technique* style (engraving, ukiyo-e and the rest) has only
+a `guidance` line and gets ghibli's two rules as a fallback, until it is
+chartered.
 
-These are wallpapers — they sit behind windows all day, and an enclosed room
-reads as claustrophobic at that size however good its contents are. The rule
-lives in the composition brief rather than the system prompt because the brief
-is the part that gets obeyed, and it is stated as a share of the frame because
-"make it feel open" is a mood word, and mood words are not obeyed.
+## 8. The melodrama check
 
-## 7. Render
+**Runs:** `llm_pipeline.caption_check` · **Cost:** ~$0.0001 · **Cache:** never · **Knob:** `captionModel` (default `gpt-4o-mini`)
 
-**Runs:** `openai_image_gen.py` · **Cost:** ~$0.0058 · **Cache:** — · **Knob:** `openaiModel`, `openaiQuality`
+A cheap judge files the prompt the way a stock library would and answers three
+questions: does it show **motive**, does it take **sides**, is any face or pose
+**performed** for the viewer. Force, struggle and death are allowed; telling the
+viewer what to feel is not. It was tuned against 22 hand-labelled scenes
+(`melodrama-calibration.toml`, 21/21 agreement).
 
-The style suffix is appended after Stage 2, then the prompt is rendered at the
-configured tier — every image, people or not. A bump to `high` for people
-images was removed on 2026-09-13: the bakeoff found this model *more*
-prompt-faithful at `low` than at `high`, for a seventh of the price.
+A failure resamples step 7, up to twice, which costs a chat call rather than a
+render. If every attempt fails the last prompt ships anyway and the failure is
+recorded in the run's `pipeline-meta` (`captionCheck`, one row per attempt) — a
+strict judge must never cost the day its image.
 
-A refusal from the safety classifier is retried. That is not wasted spend:
-identical prompts have been refused once and accepted on a later attempt.
+## 9. Render
 
-## 8. Palette
+**Runs:** `openai_image_gen.py` · **Cost:** ~$0.042 · **Cache:** — · **Knob:** `openaiModel`, `openaiQuality`
+
+The style suffix is appended — its technique, plus, in the styles that define
+`suffix_figures` (ghibli, cyberpunk), how that style draws people when a figure
+is in frame — and the prompt is rendered at the
+configured tier, every image, people or not.
+
+The model is sent `moderation: "low"` where it accepts it, and a **safety
+refusal is retried** up to twice with the identical request. Refusals are not
+deterministic — the same prompt has been refused twice and accepted once — and
+a refused request is not billed. Any other error fails at once.
+
+## 10. Palette
 
 **Runs:** `palette_extract.py` · **Cost:** free · **Cache:** — · **Knob:** `themeGenerator`
 
@@ -203,39 +253,46 @@ Derives `colors.toml` from the rendered image, so the colors and the wallpaper
 always agree. Set `themeGenerator: "aether"` to hand this to Omarchy's own
 generator instead.
 
-## 9. Record
+## 11. Record
 
 **Runs:** `build_review.py` · **Cost:** free · **Cache:** — · **Knob:** `historyRetentionDays`
 
-Files the generation in the archive, `~/.local/share/astro-arc/`: a page with
-the image, the reading and every dial value, the complete theme (so it can be
-saved or exported later), and a thumbnail. Then rewrites the gallery,
-`index.html`, which lists every generation newest first. The archive is the
-user's data, not state, so it lives where removing the plugin cannot touch it.
+The run enters `history.json` only now, after the image exists: a refused or
+failed render no longer moves the register rotation or the avoided-concepts
+window on.
+
+Then it is filed in the archive, `~/.local/share/astro-arc/`: a page with the
+image, the reading and every dial value, the complete theme (so it can be saved or exported later), and a thumbnail. Then the
+gallery, `index.html`, is rewritten, newest first. The archive is the user's
+data, not state, so it lives where removing the plugin cannot touch it.
 `astro-arc-prune-history` then drops entries past the retention window, never
 the newest.
 
-## 10. Apply
+## 12. Apply
 
 **Runs:** `omarchy-theme-bg-set`, or `omarchy-theme-set` · **Cost:** free · **Cache:** — · **Knob:** `backgroundOnly`
 
 By default only the wallpaper changes, and whatever theme you already run keeps
 its colors. The wallpaper is the archived file itself, which is why this runs
-after step 9. Turn `backgroundOnly` off and the palette from step 8 is applied
-as the `astro-arc` theme too.
+after step 11. Turn `backgroundOnly` off and the palette from step 10 is
+applied as the `astro-arc` theme too.
 
 ---
 
 ## Tweak it without touching code
 
-Four TOML files, read fresh on every run. No restart, no reinstall.
+Five TOML files, read fresh on every run. No restart, no reinstall.
 
 | File | What it controls | Try this |
 | --- | --- | --- |
-| `pipeline/registers.toml` | the 25 materials a scene is built from | add one; drop one that never lands |
-| `pipeline/styles.toml` | the 7 art styles | add a preset with `label`, `suffix`, `guidance` |
+| `pipeline/registers.toml` | the 20 materials a scene is built from, in five families | add one under the family it is made of |
+| `pipeline/styles.toml` | the 7 styles: `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules and `registers` lines, or a `guidance` line | edit a charter field, then sweep it |
+| `pipeline/actors.toml` | the 11 actor kinds Stage 1.5 casts from, and register/actor pairs to exclude | reword a kind; keep it a span and a principle, never a list |
 | `pipeline/cliches.toml` | hard-blocked exact terms | add a word **only after** you see it repeat |
 | `pipeline/model-rates.toml` | model prices and the quality presets | add a model, or retune a preset |
+
+`pipeline/melodrama-calibration.toml` is the hand-labelled set the melodrama
+check is scored against (`score_melodrama.py`); generation never reads it.
 
 Everything else is one config file at
 `~/.local/state/omarchy/settings/astro-arc.json`, all of it settable through
@@ -245,40 +302,53 @@ Everything else is one config file at
 | --- | --- |
 | `frequency` | `hourly` / `daily` / `weekly` / `monthly` / `manual` |
 | `artStyle` | which styles.toml preset |
-| `stage1Model` / `stage2Model` | the writing models |
+| `stage1Model` / `stage2Model` | the writing models (Stage 1.5 runs on `stage1Model`) |
 | `openaiModel` / `openaiQuality` | the image model and tier |
+| `captionModel` | the melodrama judge; unset means `gpt-4o-mini`, the model it was calibrated on |
 | `maxCostPerImage` | hides image models above this price from the picker; `0` disables |
 | `backgroundOnly` | `true` (default): change only the wallpaper. `false`: apply the palette as a theme too |
 | `themeGenerator` | `built-in` (palette from the image) or `aether` |
 | `historyRetentionDays` | how long generations are kept |
 
-### One trap, and one thing that used to be one
+### Two traps
 
 #### Editing a stage prompt does not invalidate its cache
 
-Stage 1 and Stage 1.5 are cached by period and chart. Bump the
+Stage 1 and Stage 1.5's meaning are cached by period and chart. Bump the
 matching `*_SCHEMA_VERSION` when you change a prompt, or you will be reading
-yesterday's answer and concluding your edit did nothing.
+yesterday's answer and concluding your edit did nothing. The material is never
+cached, so a material-prompt edit shows up on the next run.
 
-#### Adding a register is now one line in one file
+#### A sweep that pins one dial cell overstates a template
+
+`sweep.py --cell` holds one cell for every sample. That is right for isolating
+a register, but the cell's own sentences (a soft/mid cell says the actor
+*tends* things, in a familiar place) then repeat across every sample and read as
+a style problem. Production rotates cells daily. When judging variety, rotate
+cells across registers.
+
+### Adding a register is one line in one file
 
 Put its name under the family it is made of in `registers.toml` and you are
-done — the rotation list, the family lookup, the people gate and the sentence
-Stage 2 reads are all derived from that. Put it under `human` and it is gated
-as people automatically. This used to take three edits across two files, two of
-which failed silently.
+done — the rotation list and the family lookup are derived from that. For a
+world style, add a line for it under `[<style>.registers]` too, or it reaches
+that world by name alone.
 
 ### Change something and measure it
 
 ```sh
-sweep.py --out my-test --registers all --pairs        # every register, one fixed reading
-sweep.py --out wording --registers botanical --no-image  # prompts only, free
+sweep.py --out my-test --registers all --pairs           # every register, one fixed reading
+sweep.py --out wording --registers botanical --no-image  # prompts only, cents
+sweep.py --out dark --cell hard/hi/4/lo --style cyberpunk # pin one dial cell
 ```
 
-`sweep.py` pins the reading and the dial so the only thing
-varying is the thing under test, and it touches no production state — your
-history, caches, last run and live theme are left alone. Output lands in
-`state/verification/<name>/` with every prompt, cost and render.
+`sweep.py` pins the reading and the dial so the only thing varying is the thing
+under test. Like production, it draws the day's meaning once and the material
+per register, renders at the configured tier, and records the melodrama
+verdict (without resampling, so it shows how often production would). It
+touches no production state — your history, caches, last run, archive and live
+theme are left alone. Output lands in `state/verification/<name>/` with every
+prompt, cost, render and a CSV.
 
 Use it. This project's own history records that 2–4-sample spot checks let the
 same content bug ship three times, and that the one comparison batch which

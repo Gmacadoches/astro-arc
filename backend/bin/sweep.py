@@ -132,7 +132,8 @@ def main():
     ap.add_argument("--stage1", default=None, help="pre-baked Stage 1 JSON to pin instead of computing one")
     ap.add_argument("--stage1-model", default=None)
     ap.add_argument("--stage2-model", default=None)
-    ap.add_argument("--quality", default="medium")
+    ap.add_argument("--quality", default=None,
+                    help="image tier for every sample (default: the config's openaiQuality, as production)")
     ap.add_argument("--image-model", default=None)
     ap.add_argument("--size", default=None, help="WxH, defaults to config backgroundSize")
     ap.add_argument("--no-image", action="store_true", help="prompts only — free, for wording iteration")
@@ -141,8 +142,7 @@ def main():
     ap.add_argument("--cell",
                     help="pin one dial cell: polarity/intensityBand/multiplicity/exposureBand (e.g. soft/lo/1/hi)")
     ap.add_argument("--force-quality", action="store_true",
-                    help="use --quality for every sample, even ones with figures "
-                         "(for A/B fairness; production always upgrades)")
+                    help="no-op since 2026-10-08; every sample already uses one tier")
     ap.add_argument("--label", default="", help="one line recorded in the summary")
     args = ap.parse_args()
 
@@ -323,11 +323,14 @@ def main():
         suffix = lp.load_style_suffix(style_key, has_people)
         final_prompt = f"{prompt}, {suffix}" if suffix else prompt
 
-        # Production renders figures at the high tier because faces are where
-        # cheap tiers fail. In an A/B that would confound the comparison: an
-        # arm that puts people in every frame would also be rendering at a
-        # better tier than the arm that does not. --force-quality pins both.
-        quality = args.quality if args.force_quality else ("high" if has_people else args.quality)
+        # One tier for every sample, the same one production uses. This used to
+        # bump figures to "high" and default everything else to "medium", on the
+        # premise that "production renders figures at the high tier" -- true
+        # until 2026-09-13, when that bump was removed from production. Since
+        # then sweeps rendered figure and non-figure frames at different tiers
+        # from each other AND from production. --force-quality is kept so old
+        # command lines still parse; it no longer changes anything.
+        quality = args.quality or config.get("openaiQuality") or "medium"
         record = {
             "index": i,
             "primaryRegister": primary,
