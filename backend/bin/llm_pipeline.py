@@ -2214,7 +2214,12 @@ def build(reading, config):
         "register": register,
         "secondaryRegister": secondary_register,
     }
-    save_history_entry(entry, history)
+    # NOT saved here as of 2026-10-08. build() runs before the image call, so
+    # saving the entry now meant a render refused by the provider still counted
+    # as a generation: the register rotation and the avoided-concepts window
+    # both moved on for a day that produced no image. The entry rides in the
+    # metadata instead, and astro-arc-generate commits it with
+    # `llm_pipeline.py --commit-history` once the image exists.
 
     metadata = {
         "reading": stage1["reading"],
@@ -2234,6 +2239,7 @@ def build(reading, config):
         "secondaryRegister": secondary_register,
         "conceptTags": concept_tags,
         "hasPeople": has_people,
+        "historyEntry": entry,
         # One row per Stage 2 attempt; more than one means the melodrama check
         # caught something and Stage 2 was resampled.
         "captionCheck": {"model": caption_model, "attempts": caption_attempts,
@@ -2269,7 +2275,21 @@ def build(reading, config):
     return final_prompt, metadata
 
 
+def commit_history(metadata_path):
+    """Append the history entry build() left in a run's metadata. Called by
+    astro-arc-generate only after the image has rendered, so a refused or
+    failed render never advances the rotation. A metadata file with no entry
+    (written before 2026-10-08) is a no-op rather than an error."""
+    metadata = json.loads(Path(metadata_path).read_text())
+    entry = metadata.get("historyEntry")
+    if entry:
+        save_history_entry(entry, load_history())
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--commit-history":
+        commit_history(sys.argv[2])
+        return
     if len(sys.argv) != 3:
         print("Usage: llm_pipeline.py <reading.json> <metadata_out.json>", file=sys.stderr)
         sys.exit(1)

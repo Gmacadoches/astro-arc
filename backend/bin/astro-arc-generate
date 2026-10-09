@@ -254,6 +254,11 @@ prompt=$("$PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
   --model "$openai_model" --quality "$openai_quality" \
   --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
 
+# The image exists, so this run counts: only now does it enter history.json.
+# build() used to save it before the render, so a refused image still moved
+# the register rotation and the avoided-concepts window on (2026-10-08).
+"$PY" "$BIN_DIR/llm_pipeline.py" --commit-history "$pipeline_meta_file"
+
 # Clean slate every run, not just an overwrite: whichever theme generator
 # ran last time (built-in or aether) may have left files the other one
 # doesn't produce (e.g. aether's mako.ini, or a stale alacritty.toml that
