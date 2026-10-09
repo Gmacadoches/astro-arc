@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Verification sweep harness — runs the prompt pipeline across every
-register (or register pair) against a *fixed* Stage 1 reading and a *fixed*
-visual signature, so the only thing varying between samples is the thing
-under test.
+register (or register pair) against a *fixed* Stage 1 reading, so the only
+thing varying between samples is the thing under test.
 
 Why this exists as a committed script rather than an ad-hoc run: this
 project's own history (see CONTEXT.md, "A style is either a technique or a
@@ -15,7 +14,6 @@ It deliberately does NOT go through astro-arc-generate or llm_pipeline's
 own build(): it calls the stage functions directly so it can
   - pin Stage 1 (one reading shared by every sample — otherwise register
     differences are confounded with reading differences),
-  - pin the visual signature the same way,
   - neutralize the avoid_concepts window so register coverage is actually
     even instead of being steered by whatever ran recently,
   - and, most importantly, touch none of the production state:
@@ -168,8 +166,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # --- pin the dial ------------------------------------------------
-    # Pinned once and shared by every sample, for the same reason Stage 1 and the
-    # signature are: otherwise register differences are confounded with dial
+    # Pinned once and shared by every sample, for the same reason Stage 1 is: otherwise register differences are confounded with dial
     # differences and the sweep proves nothing.
     dial = None
     if hasattr(lp, "dial_from_texture"):
@@ -193,12 +190,6 @@ def main():
         stage1, stage1_cost = lp.stage1_interpret(reading, stage1_model, period_key, config)
     (out_dir / "00_stage1.json").write_text(json.dumps(stage1, indent=2))
 
-    # --- pin the signature -------------------------------------------
-    signature, signature_cost = lp.get_visual_signature(reading["natal"], config, stage2_model)
-    # A style can opt out of the signature (styles.toml `signature = false`);
-    # production then never sends it, so neither does a sweep.
-    if hasattr(lp, "style_uses_signature") and not lp.style_uses_signature(style_key):
-        signature = ""
 
     # --- Stage 1.5, if this build of the pipeline has one -------------
     amplification = None
@@ -318,14 +309,14 @@ def main():
 
         try:
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
-                stage1, signature, primary, [], cliches, stage2_model,
+                stage1, primary, [], cliches, stage2_model,
                 style_label, style_guidance, **kwargs
             )
         except TypeError:
             # Older pipeline signature (pre-Task 3/4) — fall back so the
             # harness can still produce a baseline on unmodified code.
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
-                stage1, signature, primary, [], cliches, stage2_model,
+                stage1, primary, [], cliches, stage2_model,
                 style_label, style_guidance,
             )
 
@@ -407,10 +398,8 @@ def main():
         "readingSource": str(reading_path),
         "pairs": args.pairs,
         "stage1": stage1,
-        "visualSignature": signature,
         "amplification": amplification,
         "stage1Cost": stage1_cost,
-        "signatureCost": signature_cost,
         "stage15Cost": amp_cost,
         "totalCost": round(total_cost, 4),
         "samples": results,

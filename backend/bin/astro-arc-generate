@@ -333,7 +333,6 @@ generated_at="$(date -Iseconds)"
 stage1_cost=$(jq -r '.stage1Cost // "null"' "$pipeline_meta_file")
 stage15_cost=$(jq -r '.stage15Cost // "null"' "$pipeline_meta_file")
 stage2_cost=$(jq -r '.stage2Cost // "null"' "$pipeline_meta_file")
-signature_cost=$(jq -r '.signatureCost // "null"' "$pipeline_meta_file")
 image_cost=$(jq -r '.cost // "null"' "$image_cost_file" 2>/dev/null || echo "null")
 image_cost_source=$(jq -r '.costSource // "unknown"' "$image_cost_file" 2>/dev/null || echo "unknown")
 
@@ -343,13 +342,13 @@ cost_entry=$(jq -n \
   --arg imageModel "$openai_model" --arg imageQualityUsed "$openai_quality" \
   --argjson stage1Cost "$stage1_cost" --argjson stage15Cost "$stage15_cost" \
   --argjson stage2Cost "$stage2_cost" \
-  --argjson signatureCost "$signature_cost" --argjson imageCost "$image_cost" \
+  --argjson imageCost "$image_cost" \
   '{
     timestamp: $timestamp, periodKey: $periodKey, frequency: $frequency, imageBackend: $backend,
-    stage1Cost: $stage1Cost, stage15Cost: $stage15Cost, stage2Cost: $stage2Cost, signatureCost: $signatureCost,
+    stage1Cost: $stage1Cost, stage15Cost: $stage15Cost, stage2Cost: $stage2Cost,
     imageCost: $imageCost, imageCostSource: $imageCostSource,
     imageModel: $imageModel, imageQualityUsed: $imageQualityUsed,
-    totalCost: ([$stage1Cost, $stage15Cost, $stage2Cost, $signatureCost, $imageCost] | map(select(. != null)) | add)
+    totalCost: ([$stage1Cost, $stage15Cost, $stage2Cost, $imageCost] | map(select(. != null)) | add)
   }')
 
 if [[ -f $COSTS_FILE ]]; then

@@ -89,11 +89,9 @@ def meta_for(row, day, config, scratch, style_override=None):
         "hasPeople": row.get("hasPeople"),
         "imagePrompt": row.get("imagePrompt") or "",
         "finalPrompt": row.get("finalPrompt") or row.get("imagePrompt") or "",
-        "visualSignature": row.get("visualSignature") or "",
         "stage1Model": row.get("stage1Model") or config.get("stage1Model") or "",
         "stage15Model": row.get("stage1Model") or config.get("stage1Model") or "",
         "stage2Model": row.get("stage2Model") or config.get("stage2Model") or "",
-        "signatureModel": config.get("stage2Model") or "",
         "pipelineMode": "replay",
     }
     path = scratch / f"meta-{day}.json"

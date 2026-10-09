@@ -2,7 +2,7 @@
 """Renders one sample per art style and writes docs/styles.md — the gallery the
 README points at.
 
-Everything except the style is PINNED: one reading, one visual signature, one
+Everything except the style is PINNED: one reading, one
 Stage 1.5 amplification, one dial cell, one register pair. So the seven images
 differ by style and nothing else, which is the only way a style gallery is
 honest — otherwise you are comparing seven different scenes and calling it a
@@ -77,11 +77,9 @@ def main():
     # --- pin everything that is not the style ------------------------------
     dial = lp.dial_from_texture(reading["arc"].get("texture"))
     stage1, _ = lp.stage1_interpret(reading, stage1_model, period_key, config)
-    signature, _ = lp.get_visual_signature(reading["natal"], config, stage2_model)
     cliches = lp.load_cliches()
 
-    # The amplification used to be pinned here, beside Stage 1 and the
-    # signature, on the premise that everything except the style should be
+    # The amplification used to be pinned here, beside Stage 1, on the premise that everything except the style should be
     # held constant. That premise died on 2026-09-20: the style is now a
     # Stage 1.5 input, because the objects and the anomaly are named in the
     # world's own terms. Pinning one amplification across styles would show
@@ -89,7 +87,7 @@ def main():
     # failure this gallery would be used to check for.
     #
     # So it moves into the loop, one per style. What the gallery compares is
-    # now "same reading and signature, different world" rather than "same
+    # now "same reading, different world" rather than "same
     # objects, different rendering" — which is the honest comparison, and the
     # only one that can show a world doing its job. Costs one extra Stage 1.5
     # call per style, about $0.003.
@@ -109,7 +107,7 @@ def main():
         total += amp_cost or 0.0
 
         prompt, tags, has_people, cost = lp.stage2_image_prompt(
-            stage1, signature if lp.style_uses_signature(key) else "", args.register, [], cliches, stage2_model,
+            stage1, args.register, [], cliches, stage2_model,
             label, guidance,
             secondary_register=args.secondary,
             amplification=amplification,
@@ -139,7 +137,7 @@ def main():
         "",
         "One sample per preset in [`backend/pipeline/styles.toml`](../backend/pipeline/styles.toml).",
         "",
-        "Every one of these is the **same** reading, the same visual signature, the",
+        "Every one of these is the **same** reading, the",
         "same Stage 1.5 objects, the same dial cell and the same two material",
         "registers (`%s` + `%s`). Only the style differs — otherwise this would be" % (args.register, args.secondary),
         "seven different scenes rather than a comparison of styles.",

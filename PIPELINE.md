@@ -7,7 +7,7 @@ picture is remade. The render is the slow part.
 
 **At a glance:** $0.028 fresh run · $0.019 same-day re-run · ~40s render · 25 registers
 
-Twelve steps. Four of them call a language model: the reading, the objects, the visual signature and the prompt. The signature is computed once per chart, so a typical day makes three of those calls, not four. This document walks the whole path
+Eleven steps. Three of them call a language model: the reading, the objects and the prompt. This document walks the whole path
 in order, and every step names the file that runs it, what it reads, what it
 writes, whether it is cached, and **the one knob that changes it** — so you can
 retune this thing without reading any Python.
@@ -35,28 +35,27 @@ code](#tweak-it-without-touching-code).
   │ 2  READING     Stage 1      what the sky means for this person     │  cached / day
   │ 3  DIAL        (no LLM)     how dense, how lit, how many objects   │  free
   │ 4  OBJECTS     Stage 1.5    4–7 concrete things to build from      │  cached / day
-  │ 5  SIGNATURE   one-off      the series' light and contrast         │  cached / chart
-  │ 6  REGISTERS   (no LLM)     what the scene is MADE of              │  free
-  │ 7  PROMPT      Stage 2      the actual image prompt                │  never cached
+  │ 5  REGISTERS   (no LLM)     what the scene is MADE of              │  free
+  │ 6  PROMPT      Stage 2      the actual image prompt                │  never cached
   ╰────────────────────────────────────────────────────────────────────╯
                                           │
-  8  RENDER      openai_image_gen.py               prompt → PNG
+  7  RENDER      openai_image_gen.py               prompt → PNG
                                           │
-  9  PALETTE     palette_extract.py                PNG → colors.toml
+  8  PALETTE     palette_extract.py                PNG → colors.toml
                                           │
- 10  RECORD      build_review.py                   archive entry + gallery + cost log
+  9  RECORD      build_review.py                   archive entry + gallery + cost log
                                           │
- 11  APPLY       omarchy-theme-bg-set              wallpaper goes live (+ palette if opted in)
+ 10  APPLY       omarchy-theme-bg-set              wallpaper goes live (+ palette if opted in)
 ```
 
-Steps 2–7 are the interesting part and all live in one file. Steps 0, 1 and
-8–11 are plumbing.
+Steps 2–6 are the interesting part and all live in one file. Steps 0, 1 and
+7–10 are plumbing.
 
 ---
 
 ## The pipeline
 
-Steps 2–7 all live in one file, `llm_pipeline.py`, and are where the picture is
+Steps 2–6 all live in one file, `llm_pipeline.py`, and are where the picture is
 actually decided. Everything else is plumbing. The steps that spend money are
 marked.
 
@@ -139,16 +138,7 @@ what made it read as a bolted-on item.
 
 These objects are **what is in the scene**.
 
-## 5. The visual signature
-
-**Runs:** `llm_pipeline.get_visual_signature` · **Cost:** ~$0.0087 · **Cache:** per chart, ~forever · **Knob:** `stage2Model`
-
-One description of light and contrast for the whole series, so every image
-reads as the same hand. Stage 2 is explicitly told to honor its light and
-contrast and **not** to copy its color words — naming the same palette every
-time is what made the series monotonous.
-
-## 6. Registers — what the scene is made of
+## 5. Registers — what the scene is made of
 
 **Runs:** `llm_pipeline.pick_registers` · **Cost:** free · **Cache:** — · **Knob:** `registers.toml`
 
@@ -165,11 +155,11 @@ figures appear. This is gated on the **primary** only — a human register
 arriving as a secondary would inject people into a material-led scene through
 a side door.
 
-## 7. Stage 2 — the image prompt
+## 6. Stage 2 — the image prompt
 
 **Runs:** `llm_pipeline.stage2_image_prompt` · **Cost:** ~$0.0087 · **Cache:** never (temp 0.95) · **Knob:** `stage2Model`, `artStyle`
 
-Everything above converges here: reading, objects, anomaly, signature, both
+Everything above converges here: reading, objects, anomaly, both
 registers, the dial's composition brief, the art style's guidance, the concept
 tags of the last 8 generations to avoid, and any hard-blocked terms.
 
@@ -193,7 +183,7 @@ lives in the composition brief rather than the system prompt because the brief
 is the part that gets obeyed, and it is stated as a share of the frame because
 "make it feel open" is a mood word, and mood words are not obeyed.
 
-## 8. Render
+## 7. Render
 
 **Runs:** `openai_image_gen.py` · **Cost:** ~$0.0058 · **Cache:** — · **Knob:** `openaiModel`, `openaiQuality`
 
@@ -205,7 +195,7 @@ prompt-faithful at `low` than at `high`, for a seventh of the price.
 A refusal from the safety classifier is retried. That is not wasted spend:
 identical prompts have been refused once and accepted on a later attempt.
 
-## 9. Palette
+## 8. Palette
 
 **Runs:** `palette_extract.py` · **Cost:** free · **Cache:** — · **Knob:** `themeGenerator`
 
@@ -213,7 +203,7 @@ Derives `colors.toml` from the rendered image, so the colors and the wallpaper
 always agree. Set `themeGenerator: "aether"` to hand this to Omarchy's own
 generator instead.
 
-## 10. Record
+## 9. Record
 
 **Runs:** `build_review.py` · **Cost:** free · **Cache:** — · **Knob:** `historyRetentionDays`
 
@@ -225,13 +215,13 @@ user's data, not state, so it lives where removing the plugin cannot touch it.
 `astro-arc-prune-history` then drops entries past the retention window, never
 the newest.
 
-## 11. Apply
+## 10. Apply
 
 **Runs:** `omarchy-theme-bg-set`, or `omarchy-theme-set` · **Cost:** free · **Cache:** — · **Knob:** `backgroundOnly`
 
 By default only the wallpaper changes, and whatever theme you already run keeps
 its colors. The wallpaper is the archived file itself, which is why this runs
-after step 10. Turn `backgroundOnly` off and the palette from step 9 is applied
+after step 9. Turn `backgroundOnly` off and the palette from step 8 is applied
 as the `astro-arc` theme too.
 
 ---
@@ -266,7 +256,7 @@ Everything else is one config file at
 
 #### Editing a stage prompt does not invalidate its cache
 
-Stage 1, Stage 1.5 and the signature are cached by period and chart. Bump the
+Stage 1 and Stage 1.5 are cached by period and chart. Bump the
 matching `*_SCHEMA_VERSION` when you change a prompt, or you will be reading
 yesterday's answer and concluding your edit did nothing.
 
@@ -285,7 +275,7 @@ sweep.py --out my-test --registers all --pairs        # every register, one fixe
 sweep.py --out wording --registers botanical --no-image  # prompts only, free
 ```
 
-`sweep.py` pins the reading, the signature and the dial so the only thing
+`sweep.py` pins the reading and the dial so the only thing
 varying is the thing under test, and it touches no production state — your
 history, caches, last run and live theme are left alone. Output lands in
 `state/verification/<name>/` with every prompt, cost and render.

@@ -79,8 +79,8 @@ def cache_key(frequency, when=None):
     scheduler uses.
 
     "hourly" is about how often a new image appears, not about the sky:
-    astro_engine has no hourly arc, so the reading, Stage 1, Stage 1.5 and the
-    signature all stay keyed by date however often the schedule fires, while
+    astro_engine has no hourly arc, so the reading, Stage 1 and Stage 1.5's
+    meaning all stay keyed by date however often the schedule fires, while
     astro-arc-generate keys its own output files by the hour. This function is
     where that rule lives; without it the mapping sits implicitly in two files
     that have to agree.

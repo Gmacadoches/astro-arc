@@ -2,7 +2,7 @@
 
 One sample per preset in [`backend/pipeline/styles.toml`](../backend/pipeline/styles.toml).
 
-Every one of these is the **same** reading, the same visual signature, the
+Every one of these is the **same** reading, the
 same Stage 1.5 objects, the same dial cell and the same two material
 registers (`man-beast` + `geological`). Only the style differs — otherwise this would be
 seven different scenes rather than a comparison of styles.

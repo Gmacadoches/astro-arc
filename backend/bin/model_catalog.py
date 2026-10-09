@@ -204,7 +204,7 @@ def record_usage(model, quality, size, usage):
 #              same prompt, so this is a real projection, not a guess.
 #   None     — nobody has ever run this stage, or this model has no rate.
 
-STAGES = ("stage1", "stage15", "stage2", "signature")
+STAGES = ("stage1", "stage15", "stage2", "caption")
 
 
 def record_stage_usage(stage, model, usage):
@@ -461,8 +461,8 @@ def next_run_cost(width=1024, height=1024, settings=None):
     when nothing is cached.
 
     These are different numbers and conflating them is what made the panel's
-    figures misleading. Stage 1 and Stage 1.5 are cached per period and the
-    visual signature per birth chart, so re-running the same day charges for
+    figures misleading. Stage 1 and Stage 1.5's meaning are cached per period,
+    so re-running the same day charges for
     Stage 2 and the render only — which is why the last run came in at $0.069
     while a fresh day of the same settings costs nearly three times that. The
     cost log averages real runs, so with several same-day regenerations in it,
@@ -471,11 +471,10 @@ def next_run_cost(width=1024, height=1024, settings=None):
     Returns both: `next` for the Regenerate button, `full` for anything
     projecting a daily/weekly/monthly spend.
 
-    `full` deliberately EXCLUDES the visual signature. The signature is cached
-    per birth chart rather than per period, so it is paid once in the life of a
-    chart and never again by a new day — counting it in a daily projection
-    inflates every recurring figure. It is still reported in `stages` (and in
-    `oneTime`) so it is visible rather than silently dropped.
+    The visual signature, a one-time call per birth chart that used to be
+    reported here under `oneTime`, was removed from the pipeline on 2026-10-08.
+    The caption check (one cheap judge call per Stage 2 attempt, since
+    2026-09-28) is counted instead, as always running.
     """
     settings = settings if settings is not None else load_settings()
     rates, learned = load_rates(), load_learned_usage()
@@ -491,7 +490,7 @@ def next_run_cost(width=1024, height=1024, settings=None):
     # a top-level import of llm_pipeline would close the loop.
     try:
         from llm_pipeline import (  # noqa: PLC0415
-            SIGNATURE_SCHEMA_VERSION, STAGE1_SCHEMA_VERSION,
+            CAPTION_MODEL, STAGE1_SCHEMA_VERSION,
             STAGE15_SCHEMA_VERSION, _natal_hash,
         )
         natal_hash = _natal_hash(settings)
@@ -501,12 +500,11 @@ def next_run_cost(width=1024, height=1024, settings=None):
         cached_stage15 = _cache_is_valid(
             STATE_DIR / "pipeline/amplifications" / f"{period_key}.json",
             natal_hash, STAGE15_SCHEMA_VERSION, "constellation")
-        cached_signature = _cache_is_valid(
-            STATE_DIR / "pipeline/visual_signature.json",
-            natal_hash, SIGNATURE_SCHEMA_VERSION, "signature")
+        caption_model = settings.get("captionModel") or CAPTION_MODEL
         cache_known = True
     except Exception:  # noqa: BLE001 — a cost readout must not break on this
-        cached_stage1 = cached_stage15 = cached_signature = False
+        cached_stage1 = cached_stage15 = False
+        caption_model = settings.get("captionModel") or "gpt-4o-mini"
         cache_known = False
 
     image, image_source = image_cost(image_model, quality, size, rates, learned)
@@ -516,9 +514,9 @@ def next_run_cost(width=1024, height=1024, settings=None):
         ("stage1", chat_stage1, cached_stage1),
         ("stage15", chat_stage1, cached_stage15),   # Stage 1.5 runs on Stage 1's model
         ("stage2", chat_stage2, False),             # always runs
-        ("signature", chat_stage2, cached_signature),
+        ("caption", caption_model, False),          # always runs, at least once
     ):
-        cost, src = stage_cost(name if name != "signature" else "signature", model, rates, learned)
+        cost, src = stage_cost(name, model, rates, learned)
         parts[name] = {"model": model, "cached": is_cached, "cost": cost, "source": src}
         if cost is None:
             next_total = full_total = None
@@ -530,9 +528,7 @@ def next_run_cost(width=1024, height=1024, settings=None):
             # "stage15", so `cost` is the per-call average. A full run pays two;
             # a cached meaning still pays one.
             calls = 2 if name == "stage15" else 1
-            # Signature excluded from `full` — see the docstring.
-            if name != "signature":
-                full_total += cost * calls
+            full_total += cost * calls
             if not is_cached:
                 next_total += cost * calls
             elif name == "stage15":
@@ -549,14 +545,10 @@ def next_run_cost(width=1024, height=1024, settings=None):
         next_total = full_total = None
         source = None
 
-    signature_cost = (parts.get("signature") or {}).get("cost")
     return {
         "periodKey": period_key,
         "cacheKnown": cache_known,
         "stages": parts,
-        # One-time per birth chart, not per period. Broken out so a projection
-        # can exclude it without pretending it doesn't exist.
-        "oneTime": {"signature": signature_cost, "paid": cached_signature},
         "image": {"model": image_model, "quality": quality, "cost": image, "source": image_source},
         "next": None if next_total is None else round(next_total, 6),
         "full": None if full_total is None else round(full_total, 6),

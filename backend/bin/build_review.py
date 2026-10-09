@@ -193,7 +193,7 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
           <summary><span class="toggle-icon"><span class="plus">+</span><span class="minus">&minus;</span></span><span class="label">Avoided (recent)</span></summary>
           <div class="meta-row">{avoided_chips}</div>
         </details>
-        <p class="signature">{visual_signature}</p>
+        {visual_signature_block}
       </div>
     </div>
   </div>
@@ -208,7 +208,7 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
     <div class="cost-row"><span>Stage 1 (interpretation) <span class="cost-model">{stage1_model}</span></span><span>{stage1_cost}</span></div>
     <div class="cost-row"><span>Stage 1.5 (amplification) <span class="cost-model">{stage15_model}</span></span><span>{stage15_cost}</span></div>
     <div class="cost-row"><span>Stage 2 (image prompt) <span class="cost-model">{stage2_model}</span></span><span>{stage2_cost}</span></div>
-    <div class="cost-row"><span>Visual signature <span class="cost-model">{signature_model}</span></span><span>{signature_cost}</span></div>
+    {signature_cost_row}
     <div class="cost-row"><span>Image render <span class="cost-model">{image_model}{image_quality_note}</span></span><span>{image_cost}</span></div>
     <div class="cost-row total"><span>Total charged this run</span><span>{total_cost}</span></div>
     <div class="cost-note">{cost_note}</div>
@@ -275,8 +275,8 @@ def natal_and_arc_chips(reading):
 
 def _fmt_stage_cost(value):
     """A stage cost of None does NOT mean "unknown" — it means that stage did not
-    run, because Stage 1 and Stage 1.5 are cached per period and the visual
-    signature is cached per birth chart. Rendering it as a bare dash read as
+    run, because Stage 1 and Stage 1.5's meaning are cached per period (and,
+    on runs before 2026-10-08, the visual signature per birth chart). Rendering it as a bare dash read as
     missing data and made the total look wrong; "cached" says what actually
     happened."""
     return "cached" if value is None else _fmt_cost(value)
@@ -288,15 +288,16 @@ def _cost_note(cost):
     cached = [
         name for name, key in (
             ("Stage 1", "stage1Cost"), ("Stage 1.5", "stage15Cost"),
+            # Only runs from before 2026-10-08 carry a signature at all.
             ("the visual signature", "signatureCost"),
-        ) if cost.get(key) is None
+        ) if cost.get(key) is None and (key != "signatureCost" or key in cost)
     ]
     if not cached:
         return "Every stage ran and is billed above."
     joined = cached[0] if len(cached) == 1 else ", ".join(cached[:-1]) + " and " + cached[-1]
     return (
-        f"{joined} were reused from cache, so nothing was charged for them on this run — "
-        "Stage 1 and Stage 1.5 are cached per period, the signature per birth chart. "
+        f"{joined} {'was' if len(cached) == 1 else 'were'} reused from cache, so nothing was charged for them on this run — "
+        "Stage 1 and Stage 1.5's meaning are cached per period. "
         "Regenerating the same day is cheap for that reason; a first run of a new day "
         "pays for them again."
     )
@@ -342,16 +343,22 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         intrusion=_esc(meta.get("intrusion") or "—"),
         concept_tag_chips="".join(_chip(t, "tag") for t in concept_tags) or '<span class="chip">none</span>',
         avoided_chips="".join(_chip(t) for t in avoided) or '<span class="chip">none yet</span>',
-        visual_signature=_esc(meta.get("visualSignature", "")),
+        # The natal visual signature was removed on 2026-10-08; older runs keep
+        # showing theirs, newer runs have none and show nothing.
+        visual_signature_block=(f'<p class="signature">{_esc(meta["visualSignature"])}</p>'
+                                if meta.get("visualSignature") else ""),
         final_prompt=_esc(meta.get("finalPrompt", "")),
         stage1_cost=_fmt_stage_cost(cost.get("stage1Cost")),
         stage15_cost=_fmt_stage_cost(cost.get("stage15Cost")),
         stage2_cost=_fmt_stage_cost(cost.get("stage2Cost")),
-        signature_cost=_fmt_stage_cost(cost.get("signatureCost")),
+        signature_cost_row=(
+            '<div class="cost-row"><span>Visual signature <span class="cost-model">'
+            f'{_esc(meta.get("signatureModel") or "")}</span></span>'
+            f'<span>{_fmt_stage_cost(cost.get("signatureCost"))}</span></div>'
+            if meta.get("visualSignature") or "signatureCost" in cost else ""),
         stage1_model=meta.get("stage1Model") or "",
         stage15_model=meta.get("stage15Model") or "",
         stage2_model=meta.get("stage2Model") or "",
-        signature_model=meta.get("signatureModel") or "",
         image_model=cost.get("imageModel") or "",
         image_quality_note=(
             f" · {cost['imageQualityUsed']}" if cost.get("imageQualityUsed") else ""

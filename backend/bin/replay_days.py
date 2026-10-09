@@ -19,13 +19,8 @@ same recency pressure a real run would:
   - the register pair, from the real rotation against an accumulating history
   - the avoided concept tags, from that same history
 
-Only the visual signature is shared, which is correct: it is one per natal
-chart by design, and the series is supposed to read as one hand.
-
 Nothing production owns is written. cache=False on every stage, output goes to
-verification/<name>/, and history is synthetic and in-memory. The one exception
-is the signature, which is cached on a hash of the birth data and will hit that
-cache rather than regenerate.
+verification/<name>/, and history is synthetic and in-memory.
 
 Costs real money (about $0.025 a day with renders). Prints a projection and
 needs --yes.
@@ -116,12 +111,6 @@ def main():
     registers = lp.load_registers()
     style_label, style_world = lp.load_style_info(style_key)
     cliches = lp.load_cliches()
-    # The signature needs a natal block, which the per-day reading cache does
-    # not hold — that file is Stage 1's output, not the chart. Take it from the
-    # newest full reading-*.json, which is the chart itself.
-    full = sorted(STATE_DIR.glob("reading-*.json"))
-    signature, _ = lp.get_visual_signature(
-        json.loads(full[-1].read_text())["natal"], config, stage2_model)
 
     history, rows, total = [], [], 0.0
     used_constellations, used_kinds = [], []
@@ -150,7 +139,7 @@ def main():
         if secondary:
             kwargs["secondary_register"] = secondary
         prompt, tags, has_people, c2 = lp.stage2_image_prompt(
-            stage1, signature if lp.style_uses_signature(style_key) else "", primary, avoid_tags, cliches, stage2_model,
+            stage1, primary, avoid_tags, cliches, stage2_model,
             style_label, style_world, **kwargs)
         total += c2 or 0.0
 
@@ -177,7 +166,6 @@ def main():
             "movement": amp.get("movement", ""),
             "affect": amp.get("affect", ""),
             "amplificationObjects": amp.get("objects") or [],
-            "visualSignature": signature,
             "stage1Model": stage1_model, "stage2Model": stage2_model,
             "artStyle": style_key,
         }

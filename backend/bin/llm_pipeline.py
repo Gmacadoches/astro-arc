@@ -25,17 +25,11 @@ Anti-repetition is concept-level (tags stored per generation in
 history.json), not string-level, plus positive pressure via a rotating
 material register — see pick_register()/avoid_concepts() below for why.
 
-A one-time "visual signature" derived from the natal chart (cached in
-state, regenerated only if the birth data changes) gives the series a
-persistent identity across every reading, on top of which each cycle's
-register/imagery varies.
-
 All three stages need a real OpenAI API key (see astro-arc-apikey)
 regardless of which backend (local SD or OpenAI) ends up rendering the
 final image — Stages 1, 1.5 and 2 are themselves OpenAI chat completions.
 Stage 1 and Stage 1.5 share the `stage1` key slot and model (both are
-meaning-work); Stage 2 and the one-time signature call share `stage2`
-(both are imagery-work).
+meaning-work); Stage 2 uses `stage2` (imagery-work).
 
 Model choice is not incidental here. Stage 1.5's whole job — naming an
 archetypal constellation in Neumann's actual vocabulary and producing
@@ -78,7 +72,6 @@ import urllib.request
 PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
 STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc/pipeline"
 HISTORY_FILE = STATE_DIR / "history.json"
-SIGNATURE_FILE = STATE_DIR / "visual_signature.json"
 READINGS_DIR = STATE_DIR / "readings"
 AMPLIFICATIONS_DIR = STATE_DIR / "amplifications"
 
@@ -86,7 +79,7 @@ HISTORY_MAX = 30
 # Narrowed from 14 to 8 on 2026-09-09. At 14 this was handing Stage 2 a
 # 40-item "avoid all of this" list on every call — a very large negative-
 # constraint load on a model that also has to honor two registers, a style
-# world, a signature and a set of amplification objects. Anti-repetition
+# world and a set of amplification objects. Anti-repetition
 # now has positive pressure from two colliding registers plus per-cycle
 # amplification material, so it no longer has to carry variety on its own.
 AVOID_WINDOW = 8
@@ -106,8 +99,7 @@ class PipelineError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# Chat completion helper — both stages and the one-time signature call go
-# through this. The key is fetched fresh (via get_api_key(), a single
+# Chat completion helper — every stage goes through this. The key is fetched fresh (via get_api_key(), a single
 # secret-tool subprocess call) and used only inline in this one header dict;
 # nothing here stores it, logs it, or returns it.
 # ---------------------------------------------------------------------------
@@ -118,7 +110,7 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
     Stage 1 and Stage 2 use separate keys/models by design, since they're
     different tasks that may call for different accounts.
 
-    `stage` names the PIPELINE stage (stage1/stage15/stage2/signature), which is
+    `stage` names the PIPELINE stage (stage1/stage15/stage2/caption), which is
     not the same thing as `slot` — Stage 1.5 runs on Stage 1's key. It exists
     only to record how many tokens that stage actually consumes, which is what
     lets the widget price a model that has never been run: measured tokens for
@@ -523,18 +515,6 @@ DEFAULT_STAGE2_BRIEF = (
 )
 
 
-def style_uses_signature(style_key):
-    """Whether Stage 2 is given the natal visual signature for this style.
-    True unless the style sets `signature = false` in styles.toml.
-
-    Added 2026-10-08 for cyberpunk. The signature is one fixed description of
-    palette, light and contrast, made once per natal chart and sent with every
-    style; for this install it reads "muted earth tones... diffuse, softly
-    scattered daylight... moderate contrast", which argued with a neon world
-    in every frame even though Stage 2 is told to ignore its colour words."""
-    return (load_styles().get(style_key) or {}).get("signature", True) is not False
-
-
 def load_style_brief(style_key):
     """The rules Stage 2's brief carries for this style, in file order, or
     None for a style with no `[<style>.brief]` table -- which stage2_image_prompt
@@ -912,90 +892,26 @@ def describe_arc(arc):
 
 
 # ---------------------------------------------------------------------------
-# Stage 0: the natal-derived visual signature, generated once and cached
+# The natal visual signature -- REMOVED 2026-10-08
+#
+# A paragraph of palette, light and contrast, generated once per natal chart
+# and sent to Stage 2 on every generation of every style, meant to make the
+# series read as "the same hand". Measured (verification/signature-ab):
+# its words reached 0 of 36 Stage 2 prompts, and prompts with and without it
+# differed no more than two draws WITH it (word overlap 0.44 vs 0.46 noise
+# floor). The image model only sees Stage 2's prompt and the suffix, so it
+# changed nothing -- while telling every brief "diffuse, softly scattered
+# daylight, moderate contrast" against a dial that now owns light. Garrett
+# chose removal over a redesign (Q60 a). The cached visual_signature.json is
+# left on disk, unread. Continuity now comes from the reading, the dial and
+# the style.
 # ---------------------------------------------------------------------------
-
-# Style-neutral on purpose (fixed 2026-09-08, see CHANGELOG.md/CONTEXT.md):
-# an earlier version of this prompt named a tradition and specific artists
-# ("painterly, visionary/symbolist tradition (Redon, af Klint, Carrington)"),
-# which meant every generation carried symbolist-flavored steering language
-# regardless of which art style the user actually selected — it fought
-# ghibli/cyberpunk/etc.'s own guidance, and content-invention consistently
-# lost to it (see the `ghibli` "architectural" register failure, which read
-# as symbolist rather than Ghibli). This signature's only job is palette/
-# light/contrast/composition continuity across a series — that job needs no
-# named tradition, and naming one hijacks style selection instead.
-SIGNATURE_SYSTEM = """You are establishing a persistent visual identity for a series of paintings depicting one person's psychological life over time, based on their natal astrological chart. Given their natal placements, invent a fixed visual signature for the series: a dominant palette, a quality and direction of light, a contrast level, and a compositional tendency. This signature is reused across every painting in the series regardless of subject matter *and* regardless of which rendering style is applied to it — so describe only style-neutral visual qualities, never an art movement, tradition, or artist by name, so it can be painted in any style without fighting that style's own visual world.
-
-Cover all three:
-- Palette: which colors dominate and in what balance.
-- Light: warm or cool, and its quality (soft and diffuse, hard and directional, low and raking, etc).
-- Contrast: high-contrast/dramatic vs. low-contrast/gentle.
-
-Do NOT describe composition, density, or vantage point. Say nothing about whether images are crowded or sparse, centered or off-balance, near or distant, busy or still. Those vary per image by design and are decided elsewhere; a fixed compositional habit here would override that variation on every single image in the series.
-
-Respond with a JSON object: {"signature": "2 to 3 sentences covering the palette, light and contrast only — no composition or density, and no art movement, tradition, or artist names"}"""
-
-# Bumped whenever SIGNATURE_SYSTEM's actual content changes in a way that
-# should invalidate every previously-cached signature (not just this one
-# rewrite) — natalHash alone only catches a birth-data edit, not a prompt
-# rewrite, so without this a fixed prompt would silently keep serving the
-# old cached (tradition-naming) signature forever on any existing install.
-# Bumped 2→3 on 2026-09-12: the signature used to fix a "compositional tendency"
-# for the whole series, and the one this install actually generated asked for
-# "composition tends to be slightly off-balance and crowded, drawing the viewer
-# into a close, intimate exploration." That was injected into EVERY Stage 2 call,
-# forever, independently of the density mandate — a second, invisible source of
-# the crowded look that would have silently overridden the per-day dial. The
-# signature now covers palette, light and contrast only; composition belongs to
-# the dial, which varies it per image.
-SIGNATURE_SCHEMA_VERSION = 3
 
 
 def _natal_hash(config):
     key = f"{config.get('birthDate','')}|{config.get('birthTime','')}|{config.get('latitude','')}|{config.get('longitude','')}"
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
-
-def get_visual_signature(natal, config, stage2_model):
-    """Cached by a hash of the birth data, so the (single, cheap) API call
-    only happens once per natal chart — the whole point is that this
-    *doesn't* change cycle to cycle. Returns (signature, cost) — cost is
-    None on a cache hit, since no call was actually made.
-
-    Also invalidated by SIGNATURE_SCHEMA_VERSION (see above) — a cache
-    written under an older prompt version is treated as a miss even if the
-    birth data hasn't changed, so a SIGNATURE_SYSTEM rewrite takes effect
-    on every install's next generation, not just a fresh one.
-
-    Uses Stage 2's model/key, not Stage 1's: this call is explicitly about
-    inventing painterly/visual language (palette, light, composition),
-    which is exactly what Stage 1's system prompt forbids its model from
-    doing at all — Stage 2's imagery skillset is the relevant one here.
-    """
-    natal_hash = _natal_hash(config)
-    if SIGNATURE_FILE.exists():
-        try:
-            cached = json.loads(SIGNATURE_FILE.read_text())
-            if (cached.get("natalHash") == natal_hash and cached.get("signature")
-                    and cached.get("schemaVersion") == SIGNATURE_SCHEMA_VERSION):
-                return cached["signature"], None
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    result, usage = _chat_json(stage2_model, SIGNATURE_SYSTEM, describe_natal(natal), "stage2", temperature=0.9, stage="signature")
-    signature = result.get("signature", "").strip()
-    if not signature:
-        raise PipelineError("Signature generation returned no signature.")
-
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    SIGNATURE_FILE.write_text(json.dumps({
-        "natalHash": natal_hash,
-        "schemaVersion": SIGNATURE_SCHEMA_VERSION,
-        "signature": signature,
-        "generatedAt": datetime.now(timezone.utc).isoformat(),
-    }, indent=2))
-    return signature, chat_call_cost(stage2_model, usage)
 
 
 # ---------------------------------------------------------------------------
@@ -1018,8 +934,7 @@ Respond with a JSON object with exactly these keys:
 {"reading": "3 to 5 sentences of interpretation", "distillation": "one line distilling the core emotional truth of this reading", "narrativePosition": "a short phrase naming the narrative position, e.g. opening, peak, release, threshold, arrival, celebration, rest"}"""
 
 
-# Same role SIGNATURE_SCHEMA_VERSION plays for the signature cache: a
-# STAGE1_SYSTEM rewrite must invalidate readings cached under the old
+# A STAGE1_SYSTEM rewrite must invalidate readings cached under the old
 # wording, or the fix silently does nothing for every period already
 # generated. Bumped 2026-09-09 for the tone-floor rules above.
 STAGE1_SCHEMA_VERSION = 3
@@ -1031,8 +946,7 @@ def stage1_interpret(reading, stage1_model, period_key, config):
     comparing style variants) shouldn't re-run Stage 1, but editing the
     birth date/time/location must invalidate the cache even within the same
     period, since Ascendant and transit-house placements feed straight into
-    describe_natal()/describe_arc()'s prompt text below. Mirrors the same
-    hash check get_visual_signature already does. Returns (result_dict,
+    describe_natal()/describe_arc()'s prompt text below. Returns (result_dict,
     cost) — cost is None on a cache hit."""
     READINGS_DIR.mkdir(parents=True, exist_ok=True)
     cache_path = READINGS_DIR / f"{period_key}.json"
@@ -1442,8 +1356,8 @@ Respond with a JSON object with exactly these keys:
 {"objects": ["{{OBJECT_RANGE}} pieces of the myth itself \u2014 beings, creatures, places, remains, workings or things \u2014 each named concretely enough to picture, each unmistakably part of THIS story rather than generally suggestive of it, at least half of them made of the primary register"], "anomaly": "exactly one further presence — an object, a creature or a being, and a living one wherever the story allows — made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE MEANS LARGER, AND ALMOST ALWAYS LARGER: monumentally oversized for its own kind, the size of a barn or a hillside where its kind is the size of a hand or a room, while still being the kind of thing this world contains and still made of its materials. A too-SMALL version is a much weaker reading and is a failure unless the reading leaves no other honest option — reach for the enormous first. Nothing in the rest of the material explains why it is here. It is made of the primary register's substance.", "anomalyType": "which single way it is wrong: 'scale' or 'time'"}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
-# every cached amplification, for the same reason SIGNATURE_SCHEMA_VERSION
-# exists.
+# every cached amplification, or a prompt fix silently does nothing for
+# every period already generated.
 # 2->3 on 2026-09-12: the first run of the anomaly rewrite had Stage 1.5 reading
 # "out of time" as "from a different century", which produced a disposable paper
 # party horn and a swollen early-2000s laptop battery among Roman and Byzantine
@@ -1494,9 +1408,7 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     same natalHash plus a schema version.
 
     Uses Stage 1's model and key slot, not Stage 2's: this is meaning-work,
-    not imagery-work. (get_visual_signature deliberately does the opposite,
-    for the mirror-image reason — it exists to invent painterly language,
-    which is exactly what Stage 1's prompt forbids.)
+    not imagery-work.
 
     `cache=False` is for sweep.py, which needs a fresh amplification per run
     and must never write into the production cache.
@@ -1802,9 +1714,9 @@ STYLE
 - The registers still name the actual subject. The style's world supplies texture, mood and recurring qualities for rendering that subject — never a replacement for it. A style whose world leans pastoral does not turn every register into a cottage garden: "geological" in that world is still fundamentally stone; "mechanical" is still a mechanism. If you notice yourself reaching for the same handful of style-world subjects regardless of the registers you were given, the registers are being overridden — don't let that happen.
 - A grounded style is not an obstacle to the intrusion. Every authored world contains the genuinely strange treated as completely ordinary. Render the intrusion with that world's own physical solidity rather than softening it, and never drop it because it seems not to fit — not fitting is its entire function.
 
-SIGNATURE, REGISTERS, AVOIDANCE
+COLOR, REGISTERS, AVOIDANCE
 
-You are given a fixed visual signature for the series. Honor its quality of light and its contrast level, so this reads as the same hand as the rest of the series. Do NOT copy its color words into your prompt — naming the same palette every time is what has made this series' images monotonous. The signature deliberately says nothing about composition, density or vantage: those come from THE COMPOSITION BRIEF and change per image. Let light and contrast carry the continuity; let each scene's own materials decide its colors and the brief decide its shape.
+Let each scene's own materials decide its colors, the light line in THE COMPOSITION BRIEF decide its light, and the brief decide its shape. Do not reach for the same palette from image to image — naming one palette every time is what made this series monotonous.
 
 You are also given concepts to avoid because they were used recently — avoid that whole territory, not just the exact words. If a blocklist of specific terms is given, never use those exact words or close synonyms.
 
@@ -1969,7 +1881,7 @@ def stage2_system():
     return STAGE2_SYSTEM
 
 
-def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, cliches, stage2_model,
+def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_model,
                          style_label=None, style_guidance=None, secondary_register=None,
                          amplification=None, dial=None, register_guidance=None,
                          style_brief=None, secondary_register_guidance=None):
@@ -1996,8 +1908,6 @@ def stage2_image_prompt(stage1_result, visual_signature, register, avoid_tags, c
             "",
         ]
 
-    if visual_signature:
-        user_lines.append(f"Visual signature for this series (honor light and contrast only — composition comes from the brief below; do NOT copy its color words): {visual_signature}")
 
     if style_label and style_guidance:
         user_lines.append(f"Rendering style for this image: {style_label} — {style_guidance}")
@@ -2156,7 +2066,6 @@ def build(reading, config):
     # ask for and gets stored in that stage's cache entry.
     dial = dial_from_texture(reading["arc"].get("texture"))
 
-    visual_signature, signature_cost = get_visual_signature(reading["natal"], config, stage2_model)
     stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config)
     # Registers are picked BEFORE Stage 1.5 as of 2026-09-26, because they are
     # now one of its inputs: the material half builds the objects and the
@@ -2191,7 +2100,7 @@ def build(reading, config):
     stage2_cost = 0.0
     for _attempt in range(1 + CAPTION_RESAMPLES):
         image_prompt, concept_tags, has_people, attempt_cost = stage2_image_prompt(
-            stage1, visual_signature if style_uses_signature(style_key) else "", register, avoid, cliches, stage2_model,
+            stage1, register, avoid, cliches, stage2_model,
             style_label, style_guidance,
             secondary_register=secondary_register,
             amplification=amplification,
@@ -2238,7 +2147,6 @@ def build(reading, config):
         "reading": stage1["reading"],
         "distillation": stage1["distillation"],
         "narrativePosition": stage1["narrativePosition"],
-        "visualSignature": visual_signature,
         "constellation": amplification.get("constellation"),
         "movement": amplification.get("movement"),
         "amplificationObjects": amplification.get("objects"),
@@ -2264,7 +2172,6 @@ def build(reading, config):
         "stage1Model": stage1_model,
         "stage15Model": stage1_model,  # Stage 1.5 deliberately runs on Stage 1's model
         "stage2Model": stage2_model,
-        "signatureModel": stage2_model,
         "pipelineMode": dial["mode"],
         "texture": reading["arc"].get("texture"),
         "dial": {k: v for k, v in dial.items() if k != "mode"},
@@ -2278,12 +2185,11 @@ def build(reading, config):
         "imagePrompt": image_prompt,
         "finalPrompt": final_prompt,
         # Cost of the chat calls this run actually made — None means
-        # "cached, no call made" (stage1/stage1.5/signature) or "model not
+        # "cached, no call made" (stage1/stage1.5) or "model not
         # in cost_estimate.py's rate table" (unknown, not zero).
         "stage1Cost": stage1_cost,
         "stage15Cost": stage15_cost,
         "stage2Cost": stage2_cost,
-        "signatureCost": signature_cost,
     }
     return final_prompt, metadata
 

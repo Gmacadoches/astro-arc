@@ -365,10 +365,9 @@ label = "Cyberpunk"
 # and gear detail of the portrait references (Q59), but frames stay scenes:
 # DEPTH still requires distance.
 #
-# signature = false (Q57): this style does not receive the natal visual
-# signature, whose muted earth palette and diffuse light argue with neon in
-# every frame. See style_uses_signature() in llm_pipeline.py.
-signature = false
+# The `signature = false` switch set here on 2026-10-08 (Q57) is gone: the
+# natal visual signature was removed from the pipeline for every style the
+# same day, after a with/without test showed it changed nothing measurable.
 suffix_base = "Digital illustration in the tradition of contemporary anime background art and cyberpunk concept painting: painterly brushwork, crisp detail where the eye lands, soft atmospheric haze between the layers of distance. A saturated neon palette carries every frame, by day or night: electric cyan and teal against hot magenta and pink, with accents of sodium orange and acid yellow; shadows fall into deep blue and violet, never black, brown or grey. Light glows: signs and screens bloom into the haze, wet surfaces mirror the colour in long streaks, rain and steam catch it. Any lettering is soft, distant or abstract, never crisp readable words."
 suffix_figures = " Figures are drawn as anime illustration: cel-shaded with clean ink linework, saturated colour on clothing and gear, dense mechanical detail on prosthetics, helmets and rigs. Only the nearest one or two have fully drawn faces; figures further back are silhouettes or simple shapes lit by the neon."
 # guidance removed 2026-09-26: superseded by [cyberpunk.world] above. Its one

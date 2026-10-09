@@ -396,14 +396,14 @@
 <div class="eyebrow">Astro-Arc · generation pipeline</div>
 <h1>How one image gets made</h1>
 <p class="standfirst">One generation turns a birth chart and today's sky into a wallpaper and a matching desktop palette. A fresh one costs about $0.028 at the High preset; a same-day re-run is about $0.019, because the reading is cached and only the picture is remade. The render is the slow part.</p>
-<p class="standfirst sub">Twelve steps. Four of them call a language model: the reading, the objects, the visual signature and the prompt. The signature is computed once per chart, so a typical day makes three of those calls, not four. This document walks the whole path in order, and every step names the file that runs it, what it reads, what it writes, whether it is cached, and <strong>the one knob that changes it</strong> — so you can retune this thing without reading any Python.</p>
+<p class="standfirst sub">Eleven steps. Three of them call a language model: the reading, the objects and the prompt. This document walks the whole path in order, and every step names the file that runs it, what it reads, what it writes, whether it is cached, and <strong>the one knob that changes it</strong> — so you can retune this thing without reading any Python.</p>
 <p class="standfirst sub">If you only read one section, read <a href="#tweak-it-without-touching-code">Tweak it without touching code</a>.</p>
 <p class="standfirst sub">&gt; This file is the source. <code>docs/pipeline.html</code> is generated from it by &gt; <code>backend/bin/build_pipeline_page.py</code> — edit here, run that, never edit the &gt; HTML. <code>build_pipeline_page.py --check</code> fails if the two have drifted.</p>
 <dl class="ledger"><div><dt>fresh run</dt><dd>$0.028</dd></div><div><dt>same-day re-run</dt><dd>$0.019</dd></div><div><dt>render</dt><dd>~40s</dd></div><div><dt>registers</dt><dd>25</dd></div></dl>
 </header>
 <section class="section" id="the-pipeline">
 <h2>The pipeline</h2>
-<p>Steps 2–7 all live in one file, <code>llm_pipeline.py</code>, and are where the picture is actually decided. Everything else is plumbing. The steps that spend money are marked.</p>
+<p>Steps 2–6 all live in one file, <code>llm_pipeline.py</code>, and are where the picture is actually decided. Everything else is plumbing. The steps that spend money are marked.</p>
 <ol class="flow"><li class="step">
 <div class="marker"><span>00</span></div>
 <h3>Decide whether to run at all</h3>
@@ -441,14 +441,8 @@
 <p>Turns the reading into an archetypal constellation, a movement, <strong>4–7 concrete objects</strong>, a felt quality, and an <strong>anomaly</strong> — one thing that belongs to the scene's world but is wrong in exactly one way (far out of scale, or far older and more ruined than everything around it). The anomaly is mandatory and must never be flagged as strange in the prompt; naming the wrongness out loud is what made it read as a bolted-on item.</p>
 <p>These objects are <strong>what is in the scene</strong>.</p>
 </li>
-<li class="step llm">
-<div class="marker"><span>05</span></div>
-<h3>The visual signature</h3>
-<dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.get_visual_signature</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0087</dd></div><div class="cache"><dt>Cache</dt><dd>per chart, ~forever</dd></div><div class=""><dt>Knob</dt><dd><code>stage2Model</code></dd></div></dl>
-<p>One description of light and contrast for the whole series, so every image reads as the same hand. Stage 2 is explicitly told to honor its light and contrast and <strong>not</strong> to copy its color words — naming the same palette every time is what made the series monotonous.</p>
-</li>
 <li class="step">
-<div class="marker"><span>06</span></div>
+<div class="marker"><span>05</span></div>
 <h3>Registers — what the scene is made of</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.pick_registers</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>registers.toml</code></dd></div></dl>
 <p>Each image gets a <strong>primary</strong> register (the protagonist material) and usually a <strong>secondary</strong>. The dial decides whether they collide or cohere. Registers rotate by recency across a 5-day window, so the series moves between regions of image-space rather than merely avoiding recent words.</p>
@@ -456,39 +450,39 @@
 <p>Five of the 25 registers are people registers, and they alone decide whether figures appear. This is gated on the <strong>primary</strong> only — a human register arriving as a secondary would inject people into a material-led scene through a side door.</p>
 </li>
 <li class="step llm">
-<div class="marker"><span>07</span></div>
+<div class="marker"><span>06</span></div>
 <h3><span class="stage">Stage 2</span>the image prompt</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>llm_pipeline.stage2_image_prompt</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0087</dd></div><div class="cache"><dt>Cache</dt><dd>never (temp 0.95)</dd></div><div class=""><dt>Knob</dt><dd><code>stage2Model</code>, <code>artStyle</code></dd></div></dl>
-<p>Everything above converges here: reading, objects, anomaly, signature, both registers, the dial's composition brief, the art style's guidance, the concept tags of the last 8 generations to avoid, and any hard-blocked terms.</p>
+<p>Everything above converges here: reading, objects, anomaly, both registers, the dial's composition brief, the art style's guidance, the concept tags of the last 8 generations to avoid, and any hard-blocked terms.</p>
 <p>This is the only stage that runs every time, which is why two generations an hour apart produce different pictures from the same reading.</p>
 <p>Its rules, in short: describe only what is physically there, never what it means; concrete and oddly specific over generically mystical; things must be doing something to each other; each register must contribute a substantial named thing of its own.</p>
 <p><strong>And every image must be open.</strong> At least half the frame is sky, horizon, landscape, sea or a distance that keeps going, and the viewpoint is pulled back far enough for that to be true. An interior is allowed only if it opens onto that distance through a large window, a doorway, a missing wall. A sealed room is a failed response.</p>
 <p>These are wallpapers — they sit behind windows all day, and an enclosed room reads as claustrophobic at that size however good its contents are. The rule lives in the composition brief rather than the system prompt because the brief is the part that gets obeyed, and it is stated as a share of the frame because "make it feel open" is a mood word, and mood words are not obeyed.</p>
 </li>
 <li class="step llm">
-<div class="marker"><span>08</span></div>
+<div class="marker"><span>07</span></div>
 <h3>Render</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>openai_image_gen.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>~$0.0058</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>openaiModel</code>, <code>openaiQuality</code></dd></div></dl>
 <p>The style suffix is appended after Stage 2, then the prompt is rendered at the configured tier — every image, people or not. A bump to <code>high</code> for people images was removed on 2026-09-13: the bakeoff found this model <em>more</em> prompt-faithful at <code>low</code> than at <code>high</code>, for a seventh of the price.</p>
 <p>A refusal from the safety classifier is retried. That is not wasted spend: identical prompts have been refused once and accepted on a later attempt.</p>
 </li>
 <li class="step">
-<div class="marker"><span>09</span></div>
+<div class="marker"><span>08</span></div>
 <h3>Palette</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>palette_extract.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>themeGenerator</code></dd></div></dl>
 <p>Derives <code>colors.toml</code> from the rendered image, so the colors and the wallpaper always agree. Set <code>themeGenerator: "aether"</code> to hand this to Omarchy's own generator instead.</p>
 </li>
 <li class="step">
-<div class="marker"><span>10</span></div>
+<div class="marker"><span>09</span></div>
 <h3>Record</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>build_review.py</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>historyRetentionDays</code></dd></div></dl>
 <p>Files the generation in the archive, <code>~/.local/share/astro-arc/</code>: a page with the image, the reading and every dial value, the complete theme (so it can be saved or exported later), and a thumbnail. Then rewrites the gallery, <code>index.html</code>, which lists every generation newest first. The archive is the user's data, not state, so it lives where removing the plugin cannot touch it. <code>astro-arc-prune-history</code> then drops entries past the retention window, never the newest.</p>
 </li>
 <li class="step">
-<div class="marker"><span>11</span></div>
+<div class="marker"><span>10</span></div>
 <h3>Apply</h3>
 <dl class="meta"><div class=""><dt>Runs</dt><dd><code>omarchy-theme-bg-set</code>, or <code>omarchy-theme-set</code></dd></div><div class="cost"><dt>Cost</dt><dd>free</dd></div><div class="cache"><dt>Cache</dt><dd>—</dd></div><div class=""><dt>Knob</dt><dd><code>backgroundOnly</code></dd></div></dl>
-<p>By default only the wallpaper changes, and whatever theme you already run keeps its colors. The wallpaper is the archived file itself, which is why this runs after step 10. Turn <code>backgroundOnly</code> off and the palette from step 9 is applied as the <code>astro-arc</code> theme too.</p>
+<p>By default only the wallpaper changes, and whatever theme you already run keeps its colors. The wallpaper is the archived file itself, which is why this runs after step 9. Turn <code>backgroundOnly</code> off and the palette from step 8 is applied as the <code>astro-arc</code> theme too.</p>
 </li></ol>
 </section>
 <section class="section" id="tweak-it-without-touching-code">
@@ -499,12 +493,12 @@
 <div class="tablewrap"><table><thead><tr><th>Knob</th><th>Does what</th></tr></thead><tbody><tr><td><code>frequency</code></td><td><code>hourly</code> / <code>daily</code> / <code>weekly</code> / <code>monthly</code> / <code>manual</code></td></tr><tr><td><code>artStyle</code></td><td>which styles.toml preset</td></tr><tr><td><code>stage1Model</code> / <code>stage2Model</code></td><td>the writing models</td></tr><tr><td><code>openaiModel</code> / <code>openaiQuality</code></td><td>the image model and tier</td></tr><tr><td><code>maxCostPerImage</code></td><td>hides image models above this price from the picker; <code>0</code> disables</td></tr><tr><td><code>backgroundOnly</code></td><td><code>true</code> (default): change only the wallpaper. <code>false</code>: apply the palette as a theme too</td></tr><tr><td><code>themeGenerator</code></td><td><code>built-in</code> (palette from the image) or <code>aether</code></td></tr><tr><td><code>historyRetentionDays</code></td><td>how long generations are kept</td></tr></tbody></table></div>
 <h3>One trap, and one thing that used to be one</h3>
 
-<div class="trap"><h4>Editing a stage prompt does not invalidate its cache</h4><p>Stage 1, Stage 1.5 and the signature are cached by period and chart. Bump the matching <code>*_SCHEMA_VERSION</code> when you change a prompt, or you will be reading yesterday's answer and concluding your edit did nothing.</p></div>
+<div class="trap"><h4>Editing a stage prompt does not invalidate its cache</h4><p>Stage 1 and Stage 1.5 are cached by period and chart. Bump the matching <code>*_SCHEMA_VERSION</code> when you change a prompt, or you will be reading yesterday's answer and concluding your edit did nothing.</p></div>
 <div class="trap fixed-trap"><h4>Adding a register is now one line in one file</h4><p>Put its name under the family it is made of in <code>registers.toml</code> and you are done — the rotation list, the family lookup, the people gate and the sentence Stage 2 reads are all derived from that. Put it under <code>human</code> and it is gated as people automatically. This used to take three edits across two files, two of which failed silently.</p></div>
 <h3>Change something and measure it</h3>
 <pre>sweep.py --out my-test --registers all --pairs        <span class="c"># every register, one fixed reading</span>
 sweep.py --out wording --registers botanical --no-image  <span class="c"># prompts only, free</span></pre>
-<p><code>sweep.py</code> pins the reading, the signature and the dial so the only thing varying is the thing under test, and it touches no production state — your history, caches, last run and live theme are left alone. Output lands in <code>state/verification/&lt;name&gt;/</code> with every prompt, cost and render.</p>
+<p><code>sweep.py</code> pins the reading and the dial so the only thing varying is the thing under test, and it touches no production state — your history, caches, last run and live theme are left alone. Output lands in <code>state/verification/&lt;name&gt;/</code> with every prompt, cost and render.</p>
 <p>Use it. This project's own history records that 2–4-sample spot checks let the same content bug ship three times, and that the one comparison batch which would have caught it was never saved.</p>
 <h3>Test a fresh install without touching your own</h3>
 <p>There is no install step, and every path derives from <code>$HOME</code> (the archive from <code>$XDG_DATA_HOME</code>, defaulting under it), so a throwaway home is a genuinely new user in seconds:</p>
