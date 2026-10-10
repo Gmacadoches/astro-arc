@@ -244,6 +244,23 @@ actor_soft = [
 
 [ghibli]
 label = "Studio Ghibli"
+# SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1). One recipe is drawn per run,
+# never one of this style's last 2, and replaces OPENNESS in the brief together
+# with the WALLPAPER rule every [space] style shares (see
+# llm_pipeline.WALLPAPER_RULE). OPENNESS stays in [ghibli.brief] for the
+# record and is skipped while this array exists. One fixed recipe, "half the
+# frame open distance", put far off / distance / beyond into 29 of 33 days.
+space = [
+  "a wide low horizon under an enormous sky, the near ground filling the bottom third",
+  "looking up a steep slope or terraced hillside toward its crest",
+  "from a ridge or rooftop down into a valley or town",
+  "under a forest canopy with one break opening onto light beyond",
+  "across water — a lake, a flooded field, the sea — to a far shore",
+  "from the air, out of a flying machine or a high tower, the land laid out below",
+  "one close place — a streambed, a doorway, the foot of a tree — with a single gap showing what lies past it",
+  "along a road, rail line or river running away into the land",
+]
+
 # suffix_base split 2026-09-20: TECHNIQUE ONLY. It used to also mandate
 # "towering cumulus clouds with hard-edged sunlit tops against a deep blue sky"
 # and "warm naturalistic low sunlight" on EVERY ghibli image, which made it the
@@ -439,6 +456,22 @@ actor_soft = [
 
 [cyberpunk]
 label = "Cyberpunk"
+# SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1) -- see [ghibli] space. Replaces
+# DEPTH, which is kept in [cyberpunk.brief] for the record and skipped while
+# this array exists. DEPTH's 2026-10-08 rewording already found that naming one
+# depth source first made it the default; a draw makes every source the
+# default in turn.
+space = [
+  "down a market aisle under layered awnings",
+  "straight up a canyon between towers to a slot of sky",
+  "along a flooded underpass to a lit far end",
+  "across a rooftop run of tanks and antennas to the skyline",
+  "along a platform and its tracks into a tunnel",
+  "down a stairwell falling away floor after floor",
+  "along a corridor of doors",
+  "from an overpass down onto stacked levels of traffic",
+]
+
 # REWRITTEN 2026-10-08 against Garrett's reference images
 # (~/Pictures/astro-arc-tests/Reference Cyberpunk: painterly anime city scenes,
 # flat graphic anime portraits, glowing concept painting). The 35mm

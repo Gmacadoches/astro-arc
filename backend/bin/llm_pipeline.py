@@ -554,7 +554,12 @@ def load_style_brief(style_key):
     brief = (load_styles().get(style_key) or {}).get("brief")
     if not isinstance(brief, dict):
         return None
-    return [str(v).strip() for v in brief.values() if str(v).strip()]
+    # A style with a [space] array gets today's drawn space line and the
+    # WALLPAPER rule instead of its own fixed depth rule (see
+    # draw_style_choices); keeping both would hand Stage 2 the old fixed
+    # distance on top of the new one.
+    skip = SPACE_REPLACES_BRIEF if load_style_space(style_key) else ()
+    return [str(v).strip() for k, v in brief.items() if k not in skip and str(v).strip()]
 
 
 def load_style_world(style_key):
@@ -1081,10 +1086,16 @@ _VERBS_SOFT = "holding, drying, ripening, settling, leaning against, warming, be
 # moves where the pressure sits INSIDE an open frame: close and pressing, or far
 # and peripheral, with the distance visible either way. See the OPENNESS line in
 # the composition brief for why that is invariant.
+#
+# {deep} since 2026-10-10 (STYLE-OVERHAUL Prompt 1): these and the site lines
+# hard-coded "a far distance", and "far off / distance / beyond" was in 29 of
+# 33 days' prompts in every style. stage2_image_prompt fills {deep} with the
+# deepest layer today's space line provides, or of the frame for a style with
+# no [space] array.
 _SPATIAL_BY_INTENSITY = {
-    "hi": "The event is close and large, pressing into the foreground — the viewer is inside it rather than observing it. The pressure comes from its scale and nearness, not from being shut in: the world still continues past it to a far distance.",
-    "mid": "The event sits at conversational distance, with one clear middle ground and a real but untroubled far distance.",
-    "lo": "The event is far off or peripheral — small in frame, off to one side, or partly out of view. Most of the frame is world, not event.",
+    "hi": "The event is close and large, pressing into the foreground — the viewer is inside it rather than observing it. The pressure comes from its scale and nearness, not from being shut in: the world still continues past it to {deep}.",
+    "mid": "The event sits a few paces from the viewer, with one clear middle ground and {deep} behind it, real but untroubled.",
+    "lo": "The event is small and peripheral — off to one side, or partly out of view. Most of the frame is world, not event.",
 }
 
 # How much of the frame the impossible occupies. Keyed on intensity, mirroring
@@ -1357,6 +1368,30 @@ def load_style_verbs(style_key):
     return out
 
 
+# The brief rules a [space] array replaces, by their key in [<style>.brief].
+SPACE_REPLACES_BRIEF = ("openness", "depth")
+
+# Invariant, the same for every style with a [space] array: it keeps what
+# OPENNESS and DEPTH were for (a wallpaper must not be claustrophobic) without
+# fixing where the depth is.
+WALLPAPER_RULE = ("WALLPAPER — The frame always has somewhere for the eye to go past the subject; "
+                  "today's space line says where. A sealed close-up with nothing past the subject "
+                  "is a failed response.")
+
+
+def load_style_space(style_key):
+    """`[<style>.space]`: 6-8 one-sentence depth recipes, or None for a style
+    without one, which keeps its OPENNESS or DEPTH brief rule."""
+    values = _style_table(style_key, "space")
+    if values is None:
+        return None
+    lo, hi = SPACE_ARRAY_LEN
+    values = [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
+    if not lo <= len(values) <= hi:
+        raise PipelineError(f"styles.toml [{style_key}.space] has {len(values)} recipes; it needs {lo} to {hi}")
+    return values
+
+
 def _style_history(history, style_key):
     return [e for e in history if e.get("artStyle") == style_key]
 
@@ -1405,6 +1440,11 @@ def draw_style_choices(style_key, dial, history, period_key):
         draws["actorVerbs"] = _draw(rng, actor, _recent_draws(history, style_key, "actorVerbs"), VERB_DRAW)
         dial["verbs"] = ", ".join(draws["processVerbs"])
         dial["actorVerbs"] = ", ".join(draws["actorVerbs"])
+
+    space = load_style_space(style_key)
+    if space:
+        draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
+        dial["space"] = draws["space"]
 
     return dial, draws
 
@@ -2095,10 +2135,13 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
     thing_lo, thing_hi = dial["thingRange"]
     word_lo, word_hi = dial["wordRange"]
     sites = dial["sites"]
+    space = dial.get("space")
+    deep = ("the deepest layer today's space line provides" if space
+            else "the deepest layer of the frame")
     site_text = {
-        1: "ONE site. A single place, one thing happening in it. Do not split the frame into near/middle/far stations with a separate event at each — the single place still opens onto distance, it just does not stage a second scene out there.",
-        2: "TWO sites — one near, one far — and nothing in between competing with them.",
-        3: "THREE depths: something close to the viewer, a situation in the middle distance, and a far distance that keeps going.",
+        1: f"ONE site. A single place, one thing happening in it. Do not split the frame into near/middle/far stations with a separate event at each — the single place still opens onto {deep}, it just does not stage a second scene out there.",
+        2: f"TWO sites — one near, one at {deep} — and nothing in between competing with them.",
+        3: f"THREE depths: something close to the viewer, a situation in the middle ground, and {deep}.",
     }.get(sites, f"{sites} sites.")
 
     brief = [
@@ -2166,8 +2209,10 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
     # `[<style>.brief]` table -- see load_style_brief().
     for rule in (DEFAULT_STAGE2_BRIEF if style_brief is None else style_brief):
         brief.append("  " + rule.format_map(_BriefValues(dial)))
+    if space:
+        brief += [f"  SPACE — today's depth: {space.rstrip('.')}.", f"  {WALLPAPER_RULE}"]
     if dial.get("spatial"):
-        brief.append(f"  Where the event sits: {dial['spatial']}")
+        brief.append(f"  Where the event sits: {dial['spatial'].replace('{deep}', deep)}")
     if dial.get("light"):
         brief.append(f"  Light and concealment: {dial['light']}")
     user_lines += brief
