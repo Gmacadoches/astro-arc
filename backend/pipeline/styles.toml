@@ -202,7 +202,45 @@ highlight = "One thing, native to this world and made of its own materials, that
 # a lit sky.
 [ghibli.brief]
 impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary thing: a machine that is clearly alive or awake, a creature far too large for its kind, a structure that walks or floats or grew where it stands, a being that is plainly not a person. Build it from this world's own materials, give it real weight and wear, light it like everything else, and let the actor work around it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
-openness = "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
+openness ="OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
+
+# VERBS, 2026-10-10 (STYLE-OVERHAUL Prompt 1). Each run draws 3 process verbs
+# and 3 actor verbs from the day's polarity, never one this style drew in its
+# last 2 runs (llm_pipeline.draw_style_choices). They replace the global
+# _VERBS_* and _ACTOR_VERBS_* lists, which every style shared and which put
+# spill, feed and bear down into a third to a half of all prompts.
+#   process_*: things happening to things, with no one doing them.
+#   actor_*:   what the actor does. Each array spans work, rest, play or
+#              ritual, and travel, because a chore in every frame is part of
+#              the shared scene skeleton the review found.
+# 20-30 entries per array, validated on load. No verb is shared with
+# cyberpunk's same array unless it is native to both (flooding, steaming,
+# cooking).
+[ghibli.verbs]
+process_hard = ["flooding", "silting up", "rusting through", "buckling", "sagging under", "splitting", "scorching", "smothering", "choking", "tearing loose", "swallowing", "toppling", "gnawing at", "rotting through", "washing out", "burying", "souring", "cracking open", "overgrowing", "scouring", "flattening", "boiling over"]
+process_soft = ["drying", "steaming", "sprouting through", "ripening", "swaying", "trickling", "warming", "settling", "drifting", "bobbing", "filling", "draining clear", "shading", "sheltering", "rustling", "cooling", "rising", "flowering", "nesting in", "gathering dew", "rippling", "unfurling"]
+actor_hard = [
+  # work
+  "hauling", "bailing", "shoring up", "chopping free", "dragging", "wrestling with", "cranking", "hammering", "beating back", "holding down", "cutting loose", "pumping", "shovelling", "shouldering", "roping", "digging out", "damming", "carrying off",
+  # rest
+  "sheltering under", "huddling in", "waiting out",
+  # play or ritual
+  "racing", "ringing", "scattering salt over",
+  # travel
+  "fording", "scrambling up", "pushing through", "poling across",
+]
+actor_soft = [
+  # work
+  "cooking", "hanging out washing", "polishing", "sweeping", "oiling", "picking", "tying", "kneading", "airing out", "stacking",
+  # rest
+  "napping beside", "sharing food with", "dozing against", "eating lunch on", "sitting out",
+  # play
+  "sketching", "fishing", "whittling", "splashing in", "playing tag around", "flying a kite from",
+  # ritual
+  "leaving an offering at", "hanging a paper charm on", "lighting a lantern for",
+  # travel
+  "riding", "leading by the hand", "cycling past", "wading across", "walking home past",
+]
 
 [ghibli]
 label = "Studio Ghibli"
@@ -329,6 +367,38 @@ highlight = "The living point of the frame, which the eye finds first, and it be
 depth = "DEPTH — applies to every image: the eye must travel a long way into the frame, along whatever this place offers — a market aisle running back under awnings, a flooded underpass, a run of rooftops and water tanks, a platform and its tracks, a corridor of doors, a stair falling away, or a canyon between towers. The canyon is one source of depth among many, not the default. Layer behind layer, each smaller and hazier than the last. It does not need sky. At least three distinct layers of distance must be visible behind the nearest subject. A shallow scene with a wall close behind the subject is a failed response, and so is a close-up that crops the city out."
 neon = "NEON AFTER DARK — whenever the light line below puts the scene at night or below where daylight reaches, the main light in the frame is neon: bent glass tube in colour, on its brackets, tinting the haze and every wet surface. Name at least two neon fixtures and say what shape each one traces — a pictogram, a single character, an arrow, a border — never what words it spells. A dark frame lit only by lamps, bulbs or candles is a failed response, and so is a sign made mostly of words. By day the tube may still be there, unlit."
 temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+# VERBS, 2026-10-10 (STYLE-OVERHAUL Prompt 1) -- see [ghibli.verbs] for the
+# rule. "buckling" went to "peeling away" and "cooling" to "condensing", so the
+# only verbs shared with ghibli's same arrays are the ones native to both
+# (flooding, steaming, cooking).
+[cyberpunk.verbs]
+process_hard = ["shorting out", "sparking", "flooding", "leaking", "overloading", "corroding", "blacking out", "jamming", "venting", "peeling away", "melting", "collapsing into", "seizing up", "gridlocking", "tripping out", "crushing", "sinking", "rotting", "overheating", "bursting", "grinding to a halt", "shattering"]
+process_soft = ["humming", "flickering", "steaming", "cycling", "dripping", "reflecting", "idling", "charging", "simmering", "ticking over", "dimming", "streaming", "glowing", "condensing", "rattling", "scrolling", "purring", "buzzing", "blinking", "fogging up", "whirring"]
+actor_hard = [
+  # work
+  "prying open", "hot-wiring", "splicing", "hauling", "welding", "cutting free", "forcing", "holding shut", "dragging", "wrestling with", "bracing against", "jacking into", "rerouting", "bolting down",
+  # rest
+  "holing up in", "sleeping rough under", "sitting out",
+  # ritual
+  "burning offerings at", "chanting over", "feeding coins into",
+  # play
+  "gambling over", "betting on", "drag-racing",
+  # travel
+  "shoving through", "squeezing through", "clinging to the outside of", "scaling", "ducking under",
+]
+actor_soft = [
+  # work
+  "cooking", "soldering", "sorting scrap", "tuning", "feeding", "hanging laundry", "washing", "selling", "delivering",
+  # rest
+  "slurping noodles", "napping under", "reading by screen-light", "sharing a smoke",
+  # play
+  "playing mahjong at", "singing along to", "dancing under", "gaming on",
+  # ritual
+  "lighting incense at", "leaving food at", "pasting a prayer sticker on", "ringing a shrine bell at",
+  # travel
+  "riding pillion through", "strolling through", "waiting on a platform for", "ferrying",
+]
 
 # REGISTERS, 2026-09-26. How this world realises each substance register, one
 # span-and-principle line per register -- never an inventory (see
