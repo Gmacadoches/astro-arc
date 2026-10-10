@@ -15,7 +15,8 @@ the Stage 2 prompt is read (`imagePrompt`), never the style suffix, since the
 suffix is identical on every sample and would count as a repeat.
 
 Reports, for each sweep:
-  - how many prompts use each verb from any verb list the pipeline offers:
+  - how many prompts use each verb phrase from any verb list the pipeline offers
+    (inflected forms only, with the phrase's particle or object word nearby):
     the global _VERBS_* and _ACTOR_VERBS_* lists, STAGE2_SYSTEM's own actor
     verbs, and every [<style>.verbs] array in styles.toml
   - how many prompts contain each tracked attractor term
@@ -93,13 +94,7 @@ WORK_LIMIT = 0.60
 # "spilling into", "watching something at work".
 _SKIP_WORDS = {"being", "a", "an", "the"}
 _IRREGULAR = {"fled": "flee", "fleeing": "flee", "bore": "bear", "borne": "bear"}
-_PARTICLE_VERBS = {"bear": "down"}
-_UNDOUBLED = set()  # bases _base() recovered from a doubled consonant (digging -> dig)  # "bear down on" is one verb; "bear" alone is not
-
-
-def _head(phrase):
-    words = [w for w in re.findall(r"[a-z'-]+", phrase.lower()) if w not in _SKIP_WORDS]
-    return words[0] if words else ""
+_UNDOUBLED = set()  # bases _base() recovered from a doubled consonant (digging -> dig)
 
 
 def _base(word):
@@ -120,25 +115,42 @@ def _base(word):
     return word
 
 
-def verb_pattern(base):
-    """Regex matching a verb's common inflections from its base. The base may
-    have lost a final e to -ing (erod, brac), so both spellings are allowed:
-    erod -> erode/erodes/eroded/eroding; dig -> digs/digging; carry -> carried.
+_PREPOSITIONS = {"into", "on", "against", "through", "at", "under", "with", "beside", "to",
+                 "by", "across", "over", "past", "for", "from", "in", "of", "something", "outside"}
 
-    It cannot tell a verb from the same word used otherwise (dry ground, a
-    warm wall, the ship's hold), so those counts run slightly high."""
-    if base in _PARTICLE_VERBS:
-        return rf"\b(bear|bears|bore|bearing|borne)\s+{_PARTICLE_VERBS[base]}\b"
+
+def _forms(base):
+    """A verb's inflected forms from its base, never the bare base itself: the
+    bare form is usually also a noun or adjective (fish, dry, black, lean), and
+    counting it would score "a dry wall" as the verb. erod -> eroding, eroded,
+    erodes; dig -> digging, digs; carry -> carried."""
     if base == "flee":
-        forms = {"flee", "flees", "fled", "fleeing"}
-    elif base.endswith("y") and len(base) > 2 and base[-2] not in "aeiou":
-        forms = {base, base[:-1] + "ies", base[:-1] + "ied", base + "ing"}
-    elif base in _UNDOUBLED:
-        forms = {base, base + "s", base + base[-1] + "ed", base + base[-1] + "ing"}
-    else:
-        stem = base[:-1] if base.endswith("e") else base
-        forms = {base, stem + "e", stem + "es", base + "s", stem + "ed", stem + "ing"}
-    return r"\b(" + "|".join(sorted(forms, key=len, reverse=True)) + r")\b"
+        return {"flees", "fled", "fleeing"}
+    if base.endswith("y") and len(base) > 2 and base[-2] not in "aeiou":
+        return {base[:-1] + "ies", base[:-1] + "ied", base + "ing"}
+    if base in _UNDOUBLED:
+        return {base + "s", base + base[-1] + "ed", base + base[-1] + "ing"}
+    stem = base[:-1] if base.endswith("e") else base
+    return {stem + "ing", stem + "ed", stem + "es", stem + "s"}
+
+
+def phrase_pattern(phrase):
+    """Regex for one verb phrase as the lists write it: the head verb in an
+    inflected form, plus its particle or object word within three words when
+    the phrase has one ("blacking out", "hanging laundry", "silting up"). A
+    trailing preposition ("spilling into", "leaning against") is not required."""
+    words = [w for w in re.findall(r"[a-z'-]+", phrase.lower()) if w not in _SKIP_WORDS]
+    if not words:
+        return None
+    base = _base(words[0])
+    rest = [w for w in words[1:] if w not in _PREPOSITIONS]
+    if base == "bear" and rest[:1] == ["down"]:
+        return r"\b(bears|bore|bearing|borne)\s+down\b"
+    head = r"\b(" + "|".join(sorted(_forms(base), key=len, reverse=True)) + r")\b"
+    if rest:
+        tail = re.escape(rest[-1] if rest[-1] not in ("free", "loose", "open") else rest[0])
+        return head + r"(?:\W+\w+){0,3}?\W+" + tail + r"\w*"
+    return head
 
 
 def _split(listing):
@@ -153,9 +165,9 @@ def verb_sources():
 
     def add(phrases, name):
         for p in phrases:
-            head = _head(p)
-            if head:
-                sources.setdefault(_base(head), set()).add(name)
+            p = p.strip().lower()
+            if p and phrase_pattern(p):
+                sources.setdefault(p, set()).add(name)
 
     for name in ("_VERBS_HARD", "_VERBS_SOFT", "_ACTOR_VERBS_HARD", "_ACTOR_VERBS_SOFT"):
         if hasattr(lp, name):
@@ -221,9 +233,9 @@ def measure(path, data, sources):
     n = len(prompts)
     low = [p.lower() for p in prompts]
     verbs = {}
-    for base in sources:
-        pat = re.compile(verb_pattern(base))
-        verbs[base] = sum(1 for p in low if pat.search(p))
+    for phrase in sources:
+        pat = re.compile(phrase_pattern(phrase))
+        verbs[phrase] = sum(1 for p in low if pat.search(p))
     terms = {t: sum(1 for p in low if re.search(_TERM_PATTERNS[t], p)) for t in TERMS}
     groups = {g: sum(1 for p in low if any(re.search(_TERM_PATTERNS[t], p) for t in members))
               for g, members in _GROUPS.items()}
