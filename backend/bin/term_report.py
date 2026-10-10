@@ -154,7 +154,8 @@ def phrase_pattern(phrase):
     forms = _forms(base)
     if not passive:
         forms = {f for f in forms if not f.endswith("ed") or f == "fled"}
-    head = r"\b(" + "|".join(sorted(forms, key=len, reverse=True)) + r")\b"
+    # (?<!-): a hyphenated compound ("herb-drying rack") is a noun, not the verb.
+    head = r"(?<![-\w])(" + "|".join(sorted(forms, key=len, reverse=True)) + r")\b"
     if rest:
         tail = re.escape(rest[0] if rest[0] not in _PREPOSITIONS or len(rest) == 1 else rest[1])
         return head + r"(?:\W+\w+){0,3}?\W+" + tail + r"\w*"

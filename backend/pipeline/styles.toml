@@ -272,17 +272,25 @@ hi = "The scene faces a near star full on: every surface is lit and no face is h
 # [ghibli] `conditions` array would override its range. Later the same day
 # era's "patched" and materials' "softened by moss" went too: the after-sweep
 # traced patched and moss in the objects to those two words.
+# RE-CHARTERED 2026-10-10 (STYLE-OVERHAUL Prompt 4, grilled with Garrett):
+# materials lead with wood, paper, tile, cloth and stone (iron and enamel only
+# where a machine needs them -- the sweeps put riveted iron on everything);
+# society and inhabitants gain the days that are not work; favoured_actors
+# demotes the lone soot-marked mechanic, this project's own attractor; every
+# field cut to at most two examples. Sources: Miyazaki 1984-2023 plus Pom Poko;
+# keep out Ghibli's near-realist films. Research:
+# verification/charter-ghibli/research.md.
 [ghibli.world]
-era = "Early-industrial in feeling, but its engineering is impossible and nobody minds. Machines walk, fly, breathe steam and have faces; a building may have legs; a vehicle may be an animal. They are hand-built, far oversized for their job, and kept running by someone who loves them. Technology here is a character, not a backdrop."
-materials = "Timber, riveted iron, canvas, rope, poured concrete going green, glazed tile, enamelled metal, thatch, cut stone. These ordinary materials are what the impossible things are built from: the flying machine is canvas and bicycle parts, the walking house is scavenged roofing and iron legs."
-physics = "Impossible things obey ordinary physics. They have weight, they cast shadows, they rust, they are lit like everything else, and the ground takes their load. Nothing glows of its own accord, nothing is translucent, and nothing floats without a visible reason — a thing that could be rendered as a light effect does not belong here. The wonder is that something enormous and impossible is also solid."
-society = "Small settlements where work is done by hand and people are known by name. Institutions are distant; the weather and the land are close. Spirits, gods and creatures share the place and hold jobs in it, and no one finds this worth remarking on."
-weather = "Weather is a presence and often a threat, and it runs the whole range: hard-edged cumulus over a deep blue sky, flat grey overcast, fog that hides the far side of a field, rain that means it, snow, dusk, full night. Wind moves through everything. Pick the weather the day calls for rather than defaulting to fine — this world is at least as itself in bad weather as in good."
-inhabitants = "Children and the old; working people known by name; creatures the size of houses with their own purposes and no interest in being watched; spirits that have taken a shape and a trade; machines that someone tends and that may be awake."
-strangeness = "The genuinely strange is completely unremarkable. Enormous unexplained machinery rusting in a meadow, a creature the size of a house asleep among ordinary trees, a derelict flying city, a shrine crowded with objects nobody living remembers the use of. Such things are physically solid and lit exactly like everything around them, and nobody in the frame is astonished by them."
-numinous = "Spirits are ordinary residents. They take a body, a size and a job — a bathhouse worker, a river that is also somebody, a soot-coloured swarm that carries coal, a boar the length of a field, a forest thing that turns its head. They are solid, they displace air, they leave prints, and they are lit like everything else. People greet them, avoid them, or work alongside them without comment. Never a glow, a mist or a translucency — if it could be painted as a light effect it is not one of these."
-dread = "This world at its darkest is not a different world, it is this one with the other face turned out. Gods and creatures are maimed, sickened, or boiling with something under the skin; a thing the length of a hillside can be in agony and destroying everything it crosses. Industry eats the forest and the people doing the eating have good reasons. Violence is sudden, physical and costly — an arm taken off, a wound that will not close, a curse spreading up a limb — and it is never relished by the frame. Nobody here is simply good or simply bad, and the image should not tell you whom to side with."
-favoured_actors = "This world is richest in creatures with their own purposes, part-human figures, spirits holding a trade, swarms, and machines that may be awake. A lone ordinary person is the least interesting inhabitant available and should not be the default — reach for the others first where the constellation allows one."
+era = "Early-industrial in feeling, with engineering that is impossible and that nobody minds: machines walk, fly and have faces, and a building may have legs. Everything is hand-built, far oversized for its job, and kept running by someone who loves it. Technology here is a character, not a backdrop."
+materials = "Wood, paper, tile, cloth, thatch and cut stone carry most of this world, with iron and enamel only where a machine needs them. These ordinary materials are what the impossible things are made of: a flying machine of canvas and bicycle parts, a walking house of scavenged roofing."
+physics = "Impossible things obey ordinary physics. They have weight, they cast shadows, they rust, they are lit like everything else, and the ground takes their load. Nothing glows of its own accord, nothing is translucent, and nothing floats without a visible reason; a thing that could be rendered as a light effect does not belong here. The wonder is that something enormous and impossible is also solid."
+society = "Small settlements where people are known by name, the weather and the land are close, and institutions are distant. Spirits, gods and creatures share the place and hold jobs in it, and no one finds this worth remarking on. Days here are not all work: people wait for a bus in the rain, bathe, eat together at a long table, and fly for the joy of it."
+weather = "Weather is a presence and often a threat, and it runs the whole range, from hard-edged cumulus over deep blue to rain that means it, fog, snow, dusk and full night. Wind moves through everything. Pick the weather the day calls for rather than defaulting to fine; this world is at least as itself in bad weather as in good."
+inhabitants = "Children on the edge of growing up, the old, and working people known by name; creatures the size of houses with their own purposes; spirits that have taken a shape and a trade; machines someone looks after that may be awake. They are as often at a meal, a bath or a journey as at work."
+strangeness = "The genuinely strange is completely unremarkable: unexplained machinery left standing in a meadow, a creature the size of a house asleep among ordinary trees. Such things are physically solid and lit exactly like everything around them, and nobody in the frame is astonished by them."
+numinous = "Spirits are ordinary residents. They take a body, a size and a job, like a river that is also somebody or a soot-coloured swarm that carries coal. They are solid, they leave prints, and they are lit like everything else; people greet them, avoid them or work alongside them without comment. Never a glow, a mist or a translucency: if it could be painted as a light effect it is not one of these."
+dread = "This world at its darkest is this one with the other face turned out: a god maimed or boiling with something under the skin, industry eating the forest for good reasons. Violence is sudden, physical and costly and never relished by the frame. Nobody here is simply good or simply bad, and the image should not tell you whom to side with."
+favoured_actors = "This world is richest in creatures with their own purposes, part-human figures, spirits holding a trade, swarms, and machines that may be awake. A lone ordinary person, and above all a lone soot-marked mechanic at a machine, is the least interesting inhabitant available and should not be the default."
 # myth, 2026-10-10 (STYLE-OVERHAUL Prompt 2): where this world's stories come
 # from. Stage 1.5's meaning keeps Jung and Neumann as the lens for what kind of
 # situation a day is, and looks for its form here. Placeholder wording from the
@@ -339,7 +347,7 @@ highlight_modes = [
 # added 2026-09-26: without it, dark cells resolved "half the frame open" as
 # a lit sky.
 [ghibli.brief]
-impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable; it may be the highlight. Not a decorated version of an ordinary thing: a machine that is clearly alive or awake, a creature far too large for its kind, a structure that walks or floats or grew where it stands, a being that is plainly not a person. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
+impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable; it may be the highlight. Give it this world's own form: a machine that is plainly alive or awake, a spirit holding a job, a creature far too large for its kind, or a building that walks or flies. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
 openness ="OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
 
 # VERBS, 2026-10-10 (STYLE-OVERHAUL Prompt 1). Each run draws 3 process verbs
@@ -369,6 +377,32 @@ actor_soft.rest = ["napping beside", "sharing food with", "dozing against", "eat
 actor_soft.play = ["sketching", "fishing", "whittling", "splashing in", "playing tag around", "flying a kite from"]
 actor_soft.ritual = ["leaving an offering at", "hanging a paper charm on", "lighting a lantern for"]
 actor_soft.travel = ["riding", "leading by the hand", "cycling past", "wading across", "walking home past"]
+
+# REGISTERS, 2026-10-10 (STYLE-OVERHAUL Prompt 4): ghibli had none of its own.
+# One span-and-principle line per register, at most two examples, no example
+# noun repeated across lines. "glass and ceramic" avoids the word ceramic,
+# which Prompt 3's check showed paints jars blue-and-white.
+[ghibli.registers]
+"botanical" = "Plants as a force that reclaims: a camphor tree wider than a house, a vine swallowing a stone wall. Green is never decoration here; it is winning slowly, or being cut back by hand."
+"bodily and anatomical" = "The bodies of the large and the strange as terrain: the flank of a boar god, the ribs of a creature that has lain down for good. Bodies are warm, heavy and breathing, and when hurt they are plainly hurt, never gory."
+"fungal and decaying" = "Rot as the forest's other life: a spore-forest grown over a ruin, a fallen trunk going soft under shelf fungus. Decay here is alive and has its own spirits; it is neither clean nor evil."
+"animal and creaturely" = "Animals with their own business: a cat that might be more than a cat, a heron that watches too long. The large ones are gods or nearly; the small ones go about their day and perform for no one."
+"geological" = "Stone that holds the land up and the old powers in: a cliff a village is built into, a stone gate half-sunk on a hillside. Rock is solid, lit by the weather, and often carved by people long gone."
+"metallic and ore" = "Metal as the stuff of mines and machines: a mining town's tracks and ore carts, a cast-iron stove in a witch's kitchen. It rusts, it is fixed by hand, and it is never chrome."
+"glass and ceramic" = "Glass in a household's hands: a greenhouse in an overgrown garden, the bottle-glass windows of a hill town. It catches daylight; nothing made of glass glows of its own accord."
+"architectural" = "Buildings that look grown into their places: a bathhouse stacked up a hillside, a moving castle of scavenged roofs and chimneys. Every building is lived in and shows it."
+"domestic interior" = "A home is a kitchen, a stair and a window: a farmhouse hearth, an attic bedroom. It always opens onto the world through a window or a door, and is never the setting for a register that is not this one."
+"mechanical" = "Machines built by hand and oversized for their jobs: an ornithopter's beating wings, a lift worked by a spirit at the wheel. Legible as machines, and possibly awake."
+"industrial and infrastructural" = "Works that feed a town and eat a forest: an ironworks on a lake, a railway laid across flooded water. Industry has people in it, good reasons, and a cost."
+"agricultural and cultivated" = "Land worked by hand: paddies stepped down a valley, a kitchen garden behind a farmhouse. The subject is the season's work and its yield."
+"aquatic" = "Water as weather and as somebody: a river god choked with refuse, a sea that has risen over a town. Water moves, floods and carries the sky in it."
+"atmospheric" = "Sky as the biggest presence in frame: cumulus building over deep blue, a storm wall advancing across a field. Wind is visible in grass, cloth and hair."
+"glacial and frozen" = "Cold as hardship and as quiet: a mountain pass in snow, frost on a carriage window. Ice belongs to weather and to high places."
+"fire and ember" = "Fire as a household creature and as a disaster: a hearth fire that talks, a town burning under bombers. Every flame has fuel and a place."
+"textile and fiber" = "Cloth on the move: laundry on a line, an airship's canvas skin. It catches wind and light and is always in use."
+"ritual object" = "The small shrines that sit everywhere: a roadside stone figure in a red bib, a shrine rope round a great tree. Offerings are modest and well kept."
+"paper and inscription" = "Paper as charm, letter and contract: a talisman stuck to a doorway, a name signed away in a spirit's ledger. Writing shows as marks, never readable words."
+"instrument and measure" = "Instruments of flight and trade: an altimeter's dial in a cockpit, a market scale. To measure here is to fly safely or to trade fairly."
 
 [ghibli]
 label = "Studio Ghibli"
@@ -425,7 +459,10 @@ space = [
 # colour heightened rather than muted, and still saturated in shadow, in rain
 # and at night rather than draining to grey; fine detail held even in the
 # darkest parts of the frame." suffix_figures is unchanged.
-suffix_base = "A frame from a hand-drawn Studio Ghibli feature film of the 1980s and 90s, shot on 35mm film. Backgrounds are hand-painted in opaque poster colour with visible brushwork; colour is natural and daylight-true — leaf greens, sky blues, warm earth, soft greys under overcast — never neon and never chrome. Shadows are coloured and transparent, never black. Light comes from the sun, the sky or a fire, never from glowing objects. Slight film grain and gentle softness toward the edges of the frame; no digital bloom, lens flare or glossy sheen."
+# REVISED again 2026-10-10 (Prompt 4): the Prompt 3 renders showed the model
+# ignoring "shot on 35mm film", "slight film grain" and "softness toward the
+# edges"; the last sentence now states the visible result instead.
+suffix_base = "A frame from a hand-drawn Studio Ghibli feature film of the 1980s and 90s. Backgrounds are hand-painted in opaque poster colour with visible brushwork; colour is natural and daylight-true — leaf greens, sky blues, warm earth, soft greys under overcast — never neon and never chrome. Shadows are coloured and transparent, never black. Light comes from the sun, the sky or a fire, never from glowing objects. Visible grain over flat areas of sky and wall; the whole frame slightly soft, warm and faded, like an old cinema print; no digital crispness, bloom, lens flare or glossy sheen."
 suffix_figures = " Figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
 # guidance removed 2026-09-20: superseded by [ghibli.world] above. Its
 # world-description became the charter's fields; its prohibitions went to
