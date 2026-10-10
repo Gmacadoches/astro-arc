@@ -294,9 +294,13 @@ dread = "This city at its darkest is not simply this city at night in the rain. 
 favoured_actors = "This world is richest in crowds at the market, the platform and the stairwell, the numinous in its fed and tended bodies, figures joined by hauling, cooking, carrying or sorting the same thing, the dead and the decommissioned, animals living off the infrastructure, and swarms — rats, pigeons, physical drones. Two figures are this genre's most worn images and should not be the default: a lone figure standing in the rain under a sign, and a lone repair tech bent over a machine. Reach past both where the constellation allows."
 # highlight, 2026-10-09 (Q68 d, Garrett): something alive in the machine.
 # Kept loose on purpose -- the principle, not the form; the register and the
-# day decide what the living thing is. Replaces the fallback "wrong in one way,
+# day decide what the living thing is. REWORDED same day by Garrett: the first
+# version ("a plant, an animal, a body...") gave animals 10-15 of 20 highlights
+# whatever the actor (cp-highlight-actor-*); this one leads with cyberpunk's core
+# -- body into machine, machines that outlive their purpose, systems that watch
+# or answer back, growth feeding on hardware -- and names no animal. Replaces the fallback "wrong in one way,
 # larger or older" logic, whose cyberpunk results Garrett judged not working.
-highlight = "The one living thing the eye finds first amid the hardware. It might be a plant, an animal, a body, growth, rot, or something the city has fed until it woke. It does not have to be strange or out of place; it is simply the thing that is alive, and the frame is built so the eye goes to it."
+highlight = "The living point of the frame, which the eye finds first, and it belongs to the machine world: a body worn into its hardware (prostheses, ports, implants, goggles), a machine that has outlived its purpose and kept itself running, a system that watches or answers back, or growth and rot feeding on the hardware. It does not have to be strange or out of place; it is the thing in the frame that is alive, and the frame is built so the eye goes to it."
 
 # BRIEF, 2026-09-26. Cyberpunk's own rules in place of ghibli's (see
 # [ghibli.brief]); decided in the chartering session.
