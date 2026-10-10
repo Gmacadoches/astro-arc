@@ -1397,6 +1397,27 @@ def load_style_verbs(style_key):
     return out
 
 
+# How worn things are, drawn per run for every style (STYLE-OVERHAUL Prompt 1,
+# Step 5). Wear used to be a constant -- the highlight, THE IMPOSSIBLE, the
+# soft/lo actor relation and both charters all required it -- so every image
+# came back weathered. Hard days lean to the far end, soft days to the near
+# one; nothing is ruled out on either. A style may replace the list with a
+# `conditions` array (a pristine world, a ruined one), drawn evenly.
+CONDITIONS = ("newly made", "kept and cared for", "worn with long use", "failing", "ruined")
+_CONDITION_WEIGHTS = {
+    "hard": {"newly made": 1, "kept and cared for": 1, "worn with long use": 3, "failing": 3, "ruined": 3},
+    "soft": {"newly made": 3, "kept and cared for": 3, "worn with long use": 3, "failing": 1, "ruined": 1},
+}
+
+
+def load_style_conditions(style_key):
+    values = _style_table(style_key, "conditions")
+    if not isinstance(values, list):
+        return None
+    values = [str(v).strip() for v in values if str(v).strip()]
+    return values or None
+
+
 # The brief rules a [space] array replaces, by their key in [<style>.brief].
 SPACE_REPLACES_BRIEF = ("openness", "depth")
 
@@ -1474,6 +1495,13 @@ def draw_style_choices(style_key, dial, history, period_key):
     if space:
         draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
         dial["space"] = draws["space"]
+
+    conditions = load_style_conditions(style_key) or list(CONDITIONS)
+    used = _recent_draws(history, style_key, "condition")
+    pool = [c for c in conditions if c not in used] or conditions
+    weights = _CONDITION_WEIGHTS["hard" if hard else "soft"]
+    draws["condition"] = rng.choices(pool, weights=[weights.get(c, 1) for c in pool])[0]
+    dial["condition"] = draws["condition"]
 
     modes = load_highlight_modes(style_key)
     if modes:
@@ -1831,6 +1859,10 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
     direction = (meaning.get("dial") or {}).get("tonalDirection") or dial.get("tonalDirection")
     if direction:
         user_lines.append(f"Direction for this timeframe: {direction}")
+    # The same line Stage 2 gets, so the pieces named here do not arrive
+    # already weathered on a day whose things are newly made.
+    if dial.get("condition"):
+        user_lines.append(f"Condition of things in this scene: {dial['condition']}.")
 
     result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1",
                                temperature=0.95, stage="stage15")
@@ -2246,6 +2278,8 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         brief.append("  " + rule.format_map(_BriefValues(dial)))
     if space:
         brief += [f"  SPACE — today's depth: {space.rstrip('.')}.", f"  {WALLPAPER_RULE}"]
+    if dial.get("condition"):
+        brief.append(f"  Condition of things in this scene: {dial['condition']}.")
     if dial.get("spatial"):
         brief.append(f"  Where the event sits: {dial['spatial'].replace('{deep}', deep)}")
     if dial.get("light"):
