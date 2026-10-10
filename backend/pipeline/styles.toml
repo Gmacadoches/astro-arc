@@ -32,7 +32,12 @@ guidance = "An illustrative, diagrammatic tradition — depicts discrete objects
 
 [cosmic]
 label = "Cosmic / Nebula"
-suffix = "ethereal cosmic art, nebula and starfield, dreamlike aurora colors, soft glowing light, painterly, otherworldly"
+# REWRITTEN 2026-10-10 (STYLE-OVERHAUL Prompt 3) -- see the ghibli note. Now a
+# 1970s paperback cover painting: airbrushed gradients for gas, hard-edged
+# acrylic for solids, one hard star as key light. The previous suffix, for the
+# record: "ethereal cosmic art, nebula and starfield, dreamlike aurora colors,
+# soft glowing light, painterly, otherworldly".
+suffix = "A 1970s science-fiction paperback cover painting in the tradition of Chesley Bonestell and Chris Foss. Atmospheres, nebulae and the edges of planets are smooth airbrushed gradients; solid bodies — rock, ice, hull, bone — are hard-edged opaque acrylic with a crisp line between their lit and shadowed sides. Starfields are fine spattered white paint over deep black. A single hard star is the key light and reflected planet-glow is the only fill. The slight grain and gentle colour banding of a printed cover. No text or title."
 guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae, and dreamlike or symbolic forms are all welcome here, alongside concrete subjects."
 
 # LIGHT, 2026-10-10 (STYLE-OVERHAUL Prompt 2). The global light lines are
@@ -313,7 +318,20 @@ space = [
 # If recognisability drops, this is the change that did it, and the fix is to
 # move that clause into the charter's `weather` as a bright-day option rather
 # than back into the suffix.
-suffix_base = "Studio Ghibli feature-film animation style. Hand-painted backgrounds in layered opaque paint with visible brushwork in foliage, stone, cloth and water; forms built from stacked paint rather than smooth digital gradients; colour heightened rather than muted, and still saturated in shadow, in rain and at night rather than draining to grey; fine detail held even in the darkest parts of the frame."
+# REWRITTEN 2026-10-10 (STYLE-OVERHAUL Prompt 3). The ghibli, cyberpunk and
+# cosmic suffixes all asked for saturated, painterly, hazy digital
+# illustration, close to the image model's default look, while the four
+# styles that render distinctly each name a medium far from it. The three new
+# suffixes differ from each other in line, shadow and light source: ghibli is
+# 35mm hand-painted film, daylight-true colour, coloured shadows, light only
+# from sun, sky or fire. The previous suffix_base, for the record:
+# "Studio Ghibli feature-film animation style. Hand-painted backgrounds in
+# layered opaque paint with visible brushwork in foliage, stone, cloth and
+# water; forms built from stacked paint rather than smooth digital gradients;
+# colour heightened rather than muted, and still saturated in shadow, in rain
+# and at night rather than draining to grey; fine detail held even in the
+# darkest parts of the frame." suffix_figures is unchanged.
+suffix_base = "A frame from a hand-drawn Studio Ghibli feature film of the 1980s and 90s, shot on 35mm film. Backgrounds are hand-painted in opaque poster colour with visible brushwork; colour is natural and daylight-true — leaf greens, sky blues, warm earth, soft greys under overcast — never neon and never chrome. Shadows are coloured and transparent, never black. Light comes from the sun, the sky or a fire, never from glowing objects. Slight film grain and gentle softness toward the edges of the frame; no digital bloom, lens flare or glossy sheen."
 suffix_figures = " Figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
 # guidance removed 2026-09-20: superseded by [ghibli.world] above. Its
 # world-description became the charter's fields; its prohibitions went to
@@ -515,7 +533,21 @@ space = [
 # The `signature = false` switch set here on 2026-10-08 (Q57) is gone: the
 # natal visual signature was removed from the pipeline for every style the
 # same day, after a with/without test showed it changed nothing measurable.
-suffix_base = "Digital illustration in the tradition of contemporary anime background art and cyberpunk concept painting: painterly brushwork, crisp detail where the eye lands, soft atmospheric haze between the layers of distance. A saturated neon palette carries every frame, by day or night: electric cyan and teal against hot magenta and pink, with accents of sodium orange and acid yellow; shadows fall into deep blue and violet, never black, brown or grey. Light glows: signs and screens bloom into the haze, wet surfaces mirror the colour in long streaks, rain and steam catch it. Any lettering is soft, distant or abstract, never crisp readable words."
+# REWRITTEN 2026-10-10 (STYLE-OVERHAUL Prompt 3) -- see the ghibli note. Now
+# 1980s cel animation: ink outlines on everything, two-tone cel shading, solid
+# near-black shadows, airbrush only on light sources. The palette stays in the
+# technique, as the 2026-10-08 rewrite below decided. The previous
+# suffix_base, for the record: "Digital illustration in the tradition of
+# contemporary anime background art and cyberpunk concept painting: painterly
+# brushwork, crisp detail where the eye lands, soft atmospheric haze between
+# the layers of distance. A saturated neon palette carries every frame, by day
+# or night: electric cyan and teal against hot magenta and pink, with accents
+# of sodium orange and acid yellow; shadows fall into deep blue and violet,
+# never black, brown or grey. Light glows: signs and screens bloom into the
+# haze, wet surfaces mirror the colour in long streaks, rain and steam catch
+# it. Any lettering is soft, distant or abstract, never crisp readable words."
+# suffix_figures is unchanged.
+suffix_base = "A frame from a 1980s Japanese cel-animated science-fiction feature. Hard-edged two-tone cel shading with clean black ink outlines on everything, buildings and machines included; dense hand-drawn mechanical detail. Deep shadows are solid near-black blue. Only light sources are airbrushed — signs, screens and lamps carry soft halos and streaks — while every surface stays flat painted colour: electric cyan, hot magenta and sodium orange against the dark, or flat hazy white smog-light by day. Visible flatness of painted cels and slight film grain. Lettering appears only as glyphs and pictograms, never as readable words."
 suffix_figures = " Figures are drawn as anime illustration: cel-shaded with clean ink linework, saturated colour on clothing and gear, dense mechanical detail on prosthetics, helmets and rigs. Only the nearest one or two have fully drawn faces; figures further back are silhouettes or simple shapes lit by the neon."
 # guidance removed 2026-09-26: superseded by [cyberpunk.world] above. Its one
 # prohibition (no abstract energy-beings) is carried by `physics`. In git.
