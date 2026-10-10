@@ -122,6 +122,24 @@ def anomaly_survival(anomaly, prompt):
     return hits, len(tokens), hits >= 1
 
 
+# Every polarity x intensity cell once, exposure lo/mid/hi twice each and
+# multiplicity across its range, so six consecutive samples cover the dial.
+ROTATION_CELLS = (
+    "hard/hi/4/lo",
+    "soft/lo/1/hi",
+    "hard/mid/2/mid",
+    "soft/mid/3/lo",
+    "hard/lo/1/hi",
+    "soft/hi/4/mid",
+)
+
+
+def texture_for_cell(cell):
+    pol, iband, mult, eband = cell.split("/")
+    return {"polarity": pol, "intensityBand": iband,
+            "multiplicity": int(mult), "exposureBand": eband}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True, help="folder name under verification/")
@@ -141,6 +159,14 @@ def main():
     # (and vice versa) — the two matrices that actually prove the dial works.
     ap.add_argument("--cell",
                     help="pin one dial cell: polarity/intensityBand/multiplicity/exposureBand (e.g. soft/lo/1/hi)")
+    # --rotate-cells gives each sample its own cell from ROTATION_CELLS instead.
+    # PIPELINE.md's "two traps": a pinned cell repeats its own sentences across
+    # every sample and reads as a style problem. Production rotates cells
+    # daily, so a variety measurement must too.
+    ap.add_argument("--rotate-cells", action="store_true",
+                    help="give each sample the next cell of ROTATION_CELLS instead of one pinned dial")
+    ap.add_argument("--repeat", type=int, default=1,
+                    help="run the register list this many times (cells keep rotating)")
     ap.add_argument("--force-quality", action="store_true",
                     help="no-op since 2026-10-08; every sample already uses one tier")
     ap.add_argument("--label", default="", help="one line recorded in the summary")
@@ -171,14 +197,13 @@ def main():
     dial = None
     if hasattr(lp, "dial_from_texture"):
         if args.cell:
-            pol, iband, mult, eband = args.cell.split("/")
-            texture = {"polarity": pol, "intensityBand": iband,
-                       "multiplicity": int(mult), "exposureBand": eband}
+            texture = texture_for_cell(args.cell)
         else:
             texture = reading["arc"].get("texture")
         dial = lp.dial_from_texture(texture)
         (out_dir / "00_dial.json").write_text(json.dumps(
-            {"cell": args.cell, "texture": texture, "dial": dial},
+            {"cell": args.cell, "rotateCells": list(ROTATION_CELLS) if args.rotate_cells else None,
+             "texture": texture, "dial": dial},
             indent=2, default=str))
 
     # --- pin Stage 1 -------------------------------------------------
@@ -233,6 +258,11 @@ def main():
         wanted = [r.strip() for r in args.registers.split(",")]
         registers = [r for r in registers if r in wanted] or wanted
 
+    registers = registers * max(1, args.repeat)
+    job_cells = [ROTATION_CELLS[i % len(ROTATION_CELLS)] if args.rotate_cells else None
+                 for i in range(len(registers))]
+    job_dials = [lp.dial_from_texture(texture_for_cell(c)) if c else dial for c in job_cells]
+
     if args.pairs:
         # Mirror production's pairing rules (llm_pipeline.pick_registers)
         # rather than pairing naively: the secondary must never be a people
@@ -244,9 +274,9 @@ def main():
         families = getattr(lp, "REGISTER_FAMILIES", {})
         # Honor the dial's cohesion, or a cohere cell would be tested with
         # colliding pairs and prove nothing about the mode it claims to test.
-        cohesion = (dial or {}).get("registerCohesion", "collide")
         jobs = []
         for i, primary in enumerate(registers):
+            cohesion = (job_dials[i] or {}).get("registerCohesion", "collide")
             pool = [r for r in registers if r != primary and r not in people]
             if cohesion == "cohere":
                 # Same family, and genuinely no partner where a family has no
@@ -267,7 +297,17 @@ def main():
 
     results = []
     total_cost = 0.0
+    # The sweep's own history, for the per-style draws: each sample sees the
+    # draws of the samples before it, exactly as consecutive production runs
+    # do, and production's history.json is never read or written.
+    sweep_history = []
+    period_key = reading["arc"]["periodKey"]
     for i, (primary, secondary) in enumerate(jobs, start=1):
+        dial = job_dials[i - 1]
+        draws = {}
+        if dial is not None and hasattr(lp, "draw_style_choices"):
+            dial, draws = lp.draw_style_choices(style_key, dial, sweep_history, period_key)
+            sweep_history.insert(0, {"artStyle": style_key, "draws": draws})
         name = slug(primary) + ("__" + slug(secondary) if secondary else "")
         stem = f"{i:02d}_{name}"
         print(f"[{i}/{len(jobs)}] {primary}" + (f" + {secondary}" if secondary else ""), file=sys.stderr)
@@ -343,6 +383,8 @@ def main():
             "conceptTags": tags,
             "hasPeople": has_people,
             "promptWords": len(prompt.split()),
+            "cell": job_cells[i - 1] or args.cell,
+            "draws": draws,
             "stage2Cost": s2cost,
             "quality": quality,
         }
