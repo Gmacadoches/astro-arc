@@ -154,6 +154,8 @@ def phrase_pattern(phrase):
 
 
 def _split(listing):
+    if isinstance(listing, dict):
+        return [v for group in listing.values() for v in _split(group)]
     if isinstance(listing, (list, tuple)):
         return [str(x) for x in listing]
     return [v.strip() for v in str(listing).split(",") if v.strip()]
@@ -191,7 +193,7 @@ def load_sweep(arg):
     return path, data
 
 
-ACTIVITY_SYSTEM = """You classify what the main living actor in a described image is doing. Answer with exactly one of:
+ACTIVITY_SYSTEM = """You classify what the main living actor in a described image is doing IN THIS MOMENT. Judge the activity the sentence describes, not the actor's trade or what they are dressed for: a mechanic eating lunch is resting, a porter riding a train is travelling, a cook lighting incense at a shrine is at ritual. Answer with exactly one of:
 - work: labour or a chore — hauling, repairing, cleaning, tending, sorting, carrying loads, cooking for sale, operating machinery
 - rest: sleeping, sitting idle, eating a meal, waiting, lounging
 - play: games, music for pleasure, children playing, leisure, fishing for fun, sketching
@@ -199,6 +201,10 @@ ACTIVITY_SYSTEM = """You classify what the main living actor in a described imag
 - travel: walking, riding, sailing, arriving, leaving, crossing somewhere on a journey
 - none: there is no living actor, or it has no activity at all
 Respond with JSON: {"activity": "one of work, rest, play, ritual, travel, none"}"""
+
+
+# Bumped when ACTIVITY_SYSTEM changes, so cached answers are re-asked.
+ACTIVITY_VERSION = 2
 
 
 def classify_activity(path, samples):
@@ -212,7 +218,8 @@ def classify_activity(path, samples):
     out = []
     for s in samples:
         key = str(s.get("index"))
-        if key not in cache or cache[key].get("prompt") != s["imagePrompt"]:
+        if (key not in cache or cache[key].get("prompt") != s["imagePrompt"]
+                or cache[key].get("v") != ACTIVITY_VERSION):
             try:
                 result, _ = lp._chat_json(model, ACTIVITY_SYSTEM, s["imagePrompt"], "stage2",
                                           temperature=0.0)
@@ -220,7 +227,7 @@ def classify_activity(path, samples):
             except Exception as exc:  # noqa: BLE001 — a report must survive one bad call
                 print(f"term_report: activity call failed: {exc}", file=sys.stderr)
                 act = "unknown"
-            cache[key] = {"prompt": s["imagePrompt"], "activity": act}
+            cache[key] = {"prompt": s["imagePrompt"], "activity": act, "v": ACTIVITY_VERSION}
             changed = True
         out.append(cache[key]["activity"])
     if changed:

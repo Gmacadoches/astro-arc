@@ -477,6 +477,10 @@ _CHARTER_FIELDS = (
     ("numinous", "How the numinous appears, and whether it has a body"),
     ("dread", "How this world goes dark"),
     ("favoured_actors", "Who this world is richest in"),
+    # STYLE-OVERHAUL Prompt 2, 2026-10-10: the traditions this world's stories
+    # come from. stage15_meaning keeps Jung and Neumann as the structural lens
+    # and looks for the situation's form here (see MYTH_LENS).
+    ("myth", "Myths and folk traditions its stories come from"),
     ("forbids", "Never in this world"),
 )
 
@@ -558,7 +562,7 @@ class _BriefValues(dict):
 # same migration strategy as `guidance` standing in for a missing charter.
 DEFAULT_STAGE2_BRIEF = (
     "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, "
-    "and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary "
+    "and nothing in the scene treats it as remarkable; it may be the highlight. Not a decorated version of an ordinary "
     "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
     "structure that walks or floats or grew where it stands, a being that is plainly not a "
     "person. Build it from this world's own materials, give it real weight, light it "
@@ -572,23 +576,42 @@ DEFAULT_STAGE2_BRIEF = (
 )
 
 
+# STYLE-OVERHAUL Prompt 2: one thing in frame that could only exist in this
+# world. A charter writes its own as `signature` in [<style>.brief]; ghibli's
+# THE IMPOSSIBLE (`impossible`) already does this job. Everyone else gets this.
+SIGNATURE_KEYS = ("signature", "impossible")
+DEFAULT_SIGNATURE = ("SIGNATURE — at least one thing in frame could only exist in {styleLabel}'s "
+                     "world, named explicitly. It may be the highlight or the actor. An image that "
+                     "could be relabelled as another style is a failed response.")
+
+
 def load_style_brief(style_key):
-    """The rules Stage 2's brief carries for this style, in file order, or
-    None for a style with no `[<style>.brief]` table -- which stage2_image_prompt
-    reads as "use DEFAULT_STAGE2_BRIEF". An empty table is a real answer (no
-    style-specific rules) and returns [], not None.
+    """The rules Stage 2's brief carries for this style, in file order. A
+    style with no `[<style>.brief]` table gets DEFAULT_STAGE2_BRIEF; every
+    style without a rule keyed in SIGNATURE_KEYS also gets DEFAULT_SIGNATURE.
+    (stage2_image_prompt still reads a None from an older caller as "use
+    DEFAULT_STAGE2_BRIEF".)
 
     Rule text may use the dial's string values as {placeholders}
     ({wonderTone}, {light}, ...)."""
     brief = (load_styles().get(style_key) or {}).get("brief")
     if not isinstance(brief, dict):
-        return None
+        # Unchartered: ghibli's fallback rules, plus the default signature.
+        return list(DEFAULT_STAGE2_BRIEF) + [_default_signature(style_key)]
     # A style with a [space] array gets today's drawn space line and the
     # WALLPAPER rule instead of its own fixed depth rule (see
     # draw_style_choices); keeping both would hand Stage 2 the old fixed
     # distance on top of the new one.
     skip = SPACE_REPLACES_BRIEF if load_style_space(style_key) else ()
-    return [str(v).strip() for k, v in brief.items() if k not in skip and str(v).strip()]
+    rules = [str(v).strip() for k, v in brief.items() if k not in skip and str(v).strip()]
+    if not any(k in brief for k in SIGNATURE_KEYS):
+        rules.append(_default_signature(style_key))
+    return rules
+
+
+def _default_signature(style_key):
+    label = (load_styles().get(style_key) or {}).get("label") or style_key
+    return DEFAULT_SIGNATURE.replace("{styleLabel}", label)
 
 
 def load_style_world(style_key):
@@ -1125,8 +1148,13 @@ _DENSITY_BY_MULTIPLICITY = (
 
 # Verbs decide which relations get depicted, so this is shape, not flavor. The old
 # list was six pressure verbs plus two neutral ones, applied unconditionally.
-_VERBS_HARD = "feeding, binding, eroding, crushing, spilling into, bearing down on"
-_VERBS_SOFT = "holding, drying, ripening, settling, leaning against, warming, being mended, being carried"
+# Since 2026-10-10 these are a FALLBACK for a style with no [verbs] table, and
+# are drawn from three at a time like a charter's (draw_style_choices), so
+# each list was lengthened to keep any one verb out of most prompts.
+_VERBS_HARD = ("feeding, binding, eroding, crushing, spilling into, bearing down on, toppling, "
+               "splitting, flooding, smothering, scorching, cracking open")
+_VERBS_SOFT = ("holding, drying, ripening, settling, leaning against, warming, being mended, "
+               "being carried, drifting, rising, cooling, swaying")
 
 # How close the event sits — never whether the frame is open. The "hi" cell used
 # to read "short sightlines, no far distance to escape into", which is a direct
@@ -1278,10 +1306,20 @@ _ACTOR_SITE_RELATION = {
 # reaction-shaped verb there is and would contradict the rule that no figure's
 # job is to react; and "watching"/"listening to" are kept only in the sense of
 # attending to a thing at work, never to a face.
-_ACTOR_VERBS_HARD = ("hauling, prising, bracing against, digging out, striking, "
-                     "shouldering, forcing, being pinned by, being carried off by")
-_ACTOR_VERBS_SOFT = ("tending, mending, feeding, washing, harvesting, carrying, "
-                     "watching something at work, listening to, sleeping beside")
+# Grouped by activity since 2026-10-10, like a charter's actor tables; the
+# rest/play/ritual/travel groups are new.
+_ACTOR_VERBS_HARD = {
+    "work": "hauling, prising, bracing against, digging out, striking, shouldering, forcing",
+    "rest": "sheltering under, waiting out, being pinned by",
+    "ritual": "keeping vigil over, burning something at",
+    "travel": "climbing, pushing through, being carried off by",
+}
+_ACTOR_VERBS_SOFT = {
+    "work": "tending, mending, feeding, washing, harvesting, carrying",
+    "rest": "sleeping beside, eating, sitting with",
+    "play": "playing, watching something at work, listening to",
+    "travel": "walking past, riding, arriving at",
+}
 
 # What a reading with NO texture block degrades to — an old reading-*.json from
 # before the texture existed, or a hand-pinned input. These are the pre-dial
@@ -1305,7 +1343,7 @@ NO_TEXTURE_DIAL = {
     # fallback gets the most neutral cell of each rather than nothing: a
     # missing texture must not also mean a missing actor, or the degraded path
     # quietly reverts to the object-strewn output this work exists to fix.
-    "actorVerbs": _ACTOR_VERBS_SOFT,
+    "actorVerbs": _ACTOR_VERBS_SOFT["work"],
     "registerCohesion": "collide",
     "spatial": None,
     "light": None,
@@ -1346,12 +1384,15 @@ def dial_from_texture(texture):
         # each array to draw from without re-reading the texture.
         "polarity": polarity,
         "intensityBand": intensity_band,
+        # For a style's own [light] lines (draw_style_choices).
+        "exposureBand": exposure_band,
         "sites": sites,
         "objectRange": objects,
         "thingRange": things,
         "wordRange": words,
         "verbs": _VERBS_HARD if polarity == "hard" else _VERBS_SOFT,
-        "actorVerbs": _ACTOR_VERBS_HARD if polarity == "hard" else _ACTOR_VERBS_SOFT,
+        # Replaced by draw_style_choices with one drawn activity's verbs.
+        "actorVerbs": (_ACTOR_VERBS_HARD if polarity == "hard" else _ACTOR_VERBS_SOFT)["work"],
         "registerCohesion": "collide" if polarity == "hard" else "cohere",
         "spatial": _SPATIAL_BY_INTENSITY[intensity_band],
         "prominence": _PROMINENCE_BY_INTENSITY[intensity_band],
@@ -1384,6 +1425,12 @@ def dial_from_texture(texture):
 VERB_ARRAYS = ("process_hard", "process_soft", "actor_hard", "actor_soft")
 VERB_ARRAY_LEN = (20, 30)
 VERB_DRAW = 3
+# The actor arrays are tables keyed by activity, and a run draws ONE activity
+# first, then its verbs from that activity alone. Measured 2026-10-10: with one
+# flat array of mixed activities, Stage 2 handed "polishing, splashing in,
+# eating lunch on" picked polishing, and 83-92% of actors stayed at work.
+# Drawing the activity gives work one share in four or five.
+ACTIVITIES = ("work", "rest", "play", "ritual", "travel")
 SPACE_ARRAY_LEN = (6, 8)
 STYLE_RECENCY = 2
 
@@ -1407,14 +1454,42 @@ def load_style_verbs(style_key):
     lo, hi = VERB_ARRAY_LEN
     out = {}
     for name in VERB_ARRAYS:
-        values = [str(v).strip() for v in (table.get(name) or []) if str(v).strip()]
+        raw = table.get(name) or []
+        if name.startswith("actor_"):
+            if not isinstance(raw, dict):
+                raise PipelineError(f"styles.toml [{style_key}.verbs] {name} must be a table "
+                                    f"keyed by activity ({', '.join(ACTIVITIES)})")
+            groups = {k: [str(v).strip() for v in raw.get(k) or [] if str(v).strip()]
+                      for k in ACTIVITIES}
+            groups = {k: v for k, v in groups.items() if v}
+            missing = [k for k in ("work", "rest", "travel") if k not in groups]
+            if missing or not ({"play", "ritual"} & groups.keys()):
+                raise PipelineError(f"styles.toml [{style_key}.verbs] {name} needs work, rest, "
+                                    f"travel, and play or ritual")
+            values = [v for k in groups for v in groups[k]]
+        else:
+            groups = None
+            values = [str(v).strip() for v in raw if str(v).strip()]
         if not lo <= len(values) <= hi:
             raise PipelineError(f"styles.toml [{style_key}.verbs] {name} has {len(values)} "
                                 f"entries; it needs {lo} to {hi}")
         if len(set(values)) != len(values):
             raise PipelineError(f"styles.toml [{style_key}.verbs] {name} repeats an entry")
-        out[name] = values
+        out[name] = groups or values
     return out
+
+
+def _global_verbs():
+    """The fallback for a style with no [verbs] table, in the same shape:
+    the global lists, drawn from like any style's rather than sent whole
+    (sent whole, 'drying' was in 67% of cosmic's prompts)."""
+    split = lambda text: [v.strip() for v in text.split(",") if v.strip()]  # noqa: E731
+    return {
+        "process_hard": split(_VERBS_HARD),
+        "process_soft": split(_VERBS_SOFT),
+        "actor_hard": {k: split(v) for k, v in _ACTOR_VERBS_HARD.items()},
+        "actor_soft": {k: split(v) for k, v in _ACTOR_VERBS_SOFT.items()},
+    }
 
 
 # How worn things are, drawn per run for every style (STYLE-OVERHAUL Prompt 1,
@@ -1428,6 +1503,13 @@ _CONDITION_WEIGHTS = {
     "hard": {"newly made": 1, "kept and cared for": 1, "worn with long use": 3, "failing": 3, "ruined": 3},
     "soft": {"newly made": 3, "kept and cared for": 3, "worn with long use": 3, "failing": 1, "ruined": 1},
 }
+
+
+# Measured 2026-10-10: on failing and ruined days the condition came back as the
+# old surface words (worn, cracked, moss, patched), i.e. the same grainy texture.
+CONDITION_HOW = ("Show it through the shape and state of things already named — what is "
+                 "missing, fallen, new, kept or half-built — not through surface words like worn, "
+                 "weathered, cracked, mossy or patched, and not with extra words of its own.")
 
 
 def load_style_conditions(style_key):
@@ -1446,7 +1528,8 @@ SPACE_REPLACES_BRIEF = ("openness", "depth")
 # fixing where the depth is.
 WALLPAPER_RULE = ("WALLPAPER — The frame always has somewhere for the eye to go past the subject; "
                   "today's space line says where. A sealed close-up with nothing past the subject "
-                  "is a failed response.")
+                  "is a failed response. Name what is there rather than that it is far: not "
+                  "\"beyond\", \"in the distance\" or \"far off\".")
 
 
 def load_style_space(style_key):
@@ -1502,19 +1585,30 @@ def draw_style_choices(style_key, dial, history, period_key):
     rng = _style_rng(period_key, style_key, history)
     hard = (dial.get("polarity") or "soft") == "hard"
 
-    verbs = load_style_verbs(style_key)
-    if verbs:
-        process = verbs["process_hard" if hard else "process_soft"]
-        actor = verbs["actor_hard" if hard else "actor_soft"]
-        draws["processVerbs"] = _draw(rng, process, _recent_draws(history, style_key, "processVerbs"), VERB_DRAW)
-        draws["actorVerbs"] = _draw(rng, actor, _recent_draws(history, style_key, "actorVerbs"), VERB_DRAW)
-        dial["verbs"] = ", ".join(draws["processVerbs"])
-        dial["actorVerbs"] = ", ".join(draws["actorVerbs"])
+    verbs = load_style_verbs(style_key) or _global_verbs()
+    process = verbs["process_hard" if hard else "process_soft"]
+    actor = verbs["actor_hard" if hard else "actor_soft"]
+    draws["processVerbs"] = _draw(rng, process, _recent_draws(history, style_key, "processVerbs"), VERB_DRAW)
+    # Activity first, never the one this style drew last; then its verbs.
+    last = _recent_draws(history, style_key, "activity", window=1)
+    draws["activity"] = _draw(rng, list(actor), last, 1)[0]
+    draws["actorVerbs"] = _draw(rng, actor[draws["activity"]],
+                                _recent_draws(history, style_key, "actorVerbs"), VERB_DRAW)
+    dial["verbs"] = ", ".join(draws["processVerbs"])
+    dial["actorVerbs"] = ", ".join(draws["actorVerbs"])
+    dial["activity"] = draws["activity"]
 
     space = load_style_space(style_key)
     if space:
         draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
         dial["space"] = draws["space"]
+
+    # A style's own light lines, where the global ones assume an Earth sky
+    # (STYLE-OVERHAUL Prompt 2). Not a draw: the exposure band decides.
+    light = _style_table(style_key, "light")
+    band = dial.get("exposureBand")
+    if isinstance(light, dict) and band and str(light.get(band) or "").strip():
+        dial["light"] = str(light[band]).strip()
 
     conditions = load_style_conditions(style_key) or list(CONDITIONS)
     used = _recent_draws(history, style_key, "condition")
@@ -1598,7 +1692,7 @@ Rules:
 - You will be told which direction this timeframe actually runs in. Follow it.
 - Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
 - **Use no visual or compositional language at all.** Do not say where anything sits, how it is lit, what color it is, what it looks like, or how any two things are arranged relative to each other. You are not staging a picture. If you begin composing, you have failed this task.
-- **Name the actor the constellation already contains.** Every archetypal situation has a cast: the night-sea journey has someone inside the monster, the dragon-fight has whoever won it, the child born and held has a child and whoever holds it, captivity has a captive. Say who is in this situation, as a concrete living thing rather than a role label — "a woman who has been walking since before light", not "the seeker". Then classify that actor as exactly one of the available kinds. Do not invent an actor the constellation does not imply, and do not reach for a person when the situation belongs to an animal, a swarm, or something that was alive and is not.
+- **Name the actor the constellation already contains.** Every archetypal situation has a cast: the night-sea journey has someone inside the monster, the dragon-fight has whoever won it, the child born and held has a child and whoever holds it, captivity has a captive. Say who is in this situation, as a concrete living thing rather than a role label — "a ferryman's widow", "the oldest of the mill dogs", not "the seeker". Say WHO they are, not what they are doing: their activity in the picture is decided later, and an actor named mid-chore ("a mechanic tending the machine") stays at that chore in every image of the day. Then classify that actor as exactly one of the available kinds. Do not invent an actor the constellation does not imply, and do not reach for a person when the situation belongs to an animal, a swarm, or something that was alive and is not.
 - **Classify the actor by WHAT IT IS, not by how many there are.** These are the kinds available, and one of them is exactly right:
 {{ACTOR_KIND_TABLE}}
   `solitary` means an ORDINARY HUMAN BEING alone — nothing else. A single spirit is `presence`, not `solitary`. A single part-human figure is `man-beast`. A single creature is `animal`. A single machine working by itself is `automaton`, but two or more machines, creatures or spirits joined by one task are `figures-in-relation`, which is not restricted to people. A single corpse or remnant is `the-dead`. Being one of something is not what makes an actor `solitary`; being an unremarkable person is. This is the most common misclassification, so check it before you answer.
@@ -1616,6 +1710,7 @@ Rules:
 - **It must belong to THE WORLD described below**, made of its materials and possible within its physics. The myth is the content; the world decides what the content is made of. A neon city and a river valley get the same monster and build it differently.
 - **THE REGISTER decides what the material is made of.** You are given a primary material register, possibly a secondary one, and where available a description of how this world realises each. At least half of the pieces you name, and the highlight, must be made of the primary register's substance or belong to its territory; the secondary register may supply one or two. The myth decides what the pieces ARE; the register decides what they are MADE OF — a glacial day and a botanical day get the same monster, built once from ice and once from roots. A list made mostly of other materials is a failed response.
 - Keep the specificity of a curator and drop the inventory of one. Not "an animal" but "the goat the toll-keeper sends across first"; not "a tool" but "the ferryman's pole, notched with the name of every crossing."
+- Containers for liquid — troughs, cisterns, basins, bowls, jars, pools — are this pipeline's most repeated props. Name one only when the myth itself is about a vessel.
 - NEVER return a generic category or a stock prop. A door, a mirror, a key, a candle, a chain, a scale, a mask, a book, a clock, a lantern, a rope, a bridge, a tapestry, a gear, a tree with visible roots — these and anything similarly available are failures. If an object could illustrate any reading whatsoever, it is the wrong object.
 - **Vary everything the register leaves open.** Within the register's substance, reach across traditions, centuries and forms; whatever is not drawn from the register reaches across the material world — wax, lead, feather, grain, glass, salt, horn, silk.
 - Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
@@ -1667,7 +1762,23 @@ Respond with a JSON object with exactly these keys:
 # 12->13 on 2026-10-10 (STYLE-OVERHAUL Prompt 1): the Great Mother paragraph
 # lost its vessel inventory (bowl, oven, cave, tomb, well, granary...), the
 # source the review traced the repeated containers back to.
-STAGE15_SCHEMA_VERSION = 13
+# 13->14 on 2026-10-10: the actor is named as who, not mid-chore.
+# 14->15 on 2026-10-10 (STYLE-OVERHAUL Prompt 2): a charter's `myth` field and
+# MYTH_LENS reach the meaning call.
+STAGE15_SCHEMA_VERSION = 15
+
+
+# Sent to stage15_meaning only for a style whose charter has a `myth` field.
+# Until then every world got the same Jungian stories rebuilt in different
+# materials, so Ghibli rendered like Ghibli without becoming a Ghibli place.
+MYTH_LENS = ("THIS WORLD'S MYTHS — Jung and Neumann above say what kind of situation this is. "
+             "Find this situation's form in THIS WORLD's own traditions, listed under myth in "
+             "the world below. Name the constellation in their terms where one fits.")
+
+
+def style_has_myth(style_key):
+    world = (load_styles().get(style_key) or {}).get("world") or {}
+    return isinstance(world, dict) and bool(str(world.get("myth") or "").strip())
 
 
 def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=None,
@@ -1740,6 +1851,8 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
             "THE WORLD — every object you name, and the anomaly, must belong to it:\n"
             + style_world
         )
+        if style_has_myth(style_key):
+            user_lines.append(MYTH_LENS)
     user_lines += [
         f"Reading: {stage1_result['reading']}",
         f"Distillation: {stage1_result['distillation']}",
@@ -1894,7 +2007,7 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
     # The same line Stage 2 gets, so the pieces named here do not arrive
     # already weathered on a day whose things are newly made.
     if dial.get("condition"):
-        user_lines.append(f"Condition of things in this scene: {dial['condition']}.")
+        user_lines.append(f"Condition of things in this scene: {dial['condition']}. {CONDITION_HOW}")
     if avoid_material:
         user_lines.append(
             "RECENTLY USED — these pieces and highlights are spent; do not reuse these or close variants:\n"
@@ -2004,8 +2117,9 @@ PEOPLE
 
 STYLE
 
-- You are told which rendering style this image will be painted in, along with a description of what it can depict. Treat that description as a source of invention, not just a limit: some styles are entire authored worlds with their own recurring subjects, textures and moods, not a technique you could apply to any subject — reach into that world and invent imagery that belongs there. Where the description is a boundary (what the style cannot render), it still applies as one: a grounded, representational style cannot credibly render a being made of pure energy; a visionary style can. Find a concrete equivalent inside the style's vocabulary that carries the same meaning.
-- The registers still name the actual subject. The style's world supplies texture, mood and recurring qualities for rendering that subject — never a replacement for it. A style whose world leans pastoral does not turn every register into a cottage garden: "botanical" in that world is still growing things; "mechanical" is still a mechanism. If you notice yourself reaching for the same handful of style-world subjects regardless of the registers you were given, the registers are being overridden — don't let that happen.
+- You are told which rendering style this image will be painted in, along with its world: what it can depict and what lives in it. Treat that description as a source of invention, not just a limit: reach into that world and invent imagery that belongs there. Where it marks a boundary (what the style cannot render), it still applies as one: a grounded style cannot credibly render a being made of pure energy; find a concrete equivalent inside its vocabulary.
+- The division of labour, and both halves must be visible in the prompt: THE REGISTERS decide what things are MADE OF. THE WORLD decides WHAT PLACE this is and WHAT KIND OF THING lives here: its buildings, its machines, its creatures, its people and their customs. A geological day in a world of walking machines is that world's quarry, worked by that world's machines and spirits, cut from stone.
+- The world must not turn every register into the same favourite scene: if the place would be the same whatever the registers were, rebuild it.
 
 COLOR, REGISTERS, AVOIDANCE
 
@@ -2286,7 +2400,10 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
             f"    How this kind is framed: {actor_guidance(actor_kind) or 'no further framing.'}",
             f"    Toward the objects: {dial['objectRelation']}",
             f"    Toward the place: {dial['siteRelation']}",
-            f"    Verbs for what the actor does: {dial['actorVerbs']}.",
+            (f"    What the actor is doing — {dial['activity']}: {dial['actorVerbs']}. "
+             f"This is the actor's activity in this image, whatever their trade."
+             if dial.get("activity") else
+             f"    Verbs for what the actor does: {dial['actorVerbs']}."),
             "    The actor counts as ONE of the discrete things above, not an addition to them.",
         ]
     else:
@@ -2322,7 +2439,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
     if space:
         brief += [f"  SPACE — today's depth: {space.rstrip('.')}.", f"  {WALLPAPER_RULE}"]
     if dial.get("condition"):
-        brief.append(f"  Condition of things in this scene: {dial['condition']}.")
+        brief.append(f"  Condition of things in this scene: {dial['condition']}. {CONDITION_HOW}")
     if dial.get("spatial"):
         brief.append(f"  Where the event sits: {dial['spatial'].replace('{deep}', deep)}")
     if dial.get("light"):

@@ -35,6 +35,15 @@ label = "Cosmic / Nebula"
 suffix = "ethereal cosmic art, nebula and starfield, dreamlike aurora colors, soft glowing light, painterly, otherworldly"
 guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae, and dreamlike or symbolic forms are all welcome here, alongside concrete subjects."
 
+# LIGHT, 2026-10-10 (STYLE-OVERHAUL Prompt 2). The global light lines are
+# Earth-bound ("full day", "night"), which cosmic cannot satisfy. Each line is
+# a count or a failure condition, like the globals, and overrides the line for
+# that exposure band. The rest of cosmic's charter waits for Prompt 4.
+[cosmic.light]
+lo = "The scene is on a body's night side, in eclipse, or deep inside a dust cloud. At least two thirds of the frame is black, and the only light is starlight, a distant star's rim or a body's own heat. A frame that is mostly lit is a failed response."
+mid = "A single hard star lights the scene from one side. A crisp line divides lit faces from dark ones, and both are substantial. A frame lit evenly from everywhere is a failed response."
+hi = "The scene faces a near star full on: every surface is lit and no face is hidden. A frame that is mostly dark, or lit mainly by glows of its own, is a failed response."
+
 # Rewritten 2026-09-07 from actual research (see CHANGELOG.md), not general
 # impression — the original suffix wrongly called for "watercolor" character
 # rendering. Ghibli characters are flat cel-shaded (solid base color, one
@@ -161,10 +170,12 @@ guidance = "A visionary, abstract-friendly tradition — energy, light, nebulae,
 # in five places at once, so every image came back gritty and the image model
 # painted the same grainy stone in every style. How worn things are is now the
 # dial's `condition`, drawn per run (llm_pipeline.draw_style_choices); a
-# [ghibli] `conditions` array would override its range.
+# [ghibli] `conditions` array would override its range. Later the same day
+# era's "patched" and materials' "softened by moss" went too: the after-sweep
+# traced patched and moss in the objects to those two words.
 [ghibli.world]
-era = "Early-industrial in feeling, but its engineering is impossible and nobody minds. Machines walk, fly, breathe steam and have faces; a building may have legs; a vehicle may be an animal. They are hand-built, far oversized for their job, patched, and kept running by someone who loves them. Technology here is a character, not a backdrop."
-materials = "Timber, riveted iron, canvas, rope, poured concrete going green, glazed tile, enamelled metal, thatch, cut stone softened by moss. These ordinary materials are what the impossible things are built from: the flying machine is canvas and bicycle parts, the walking house is scavenged roofing and iron legs."
+era = "Early-industrial in feeling, but its engineering is impossible and nobody minds. Machines walk, fly, breathe steam and have faces; a building may have legs; a vehicle may be an animal. They are hand-built, far oversized for their job, and kept running by someone who loves them. Technology here is a character, not a backdrop."
+materials = "Timber, riveted iron, canvas, rope, poured concrete going green, glazed tile, enamelled metal, thatch, cut stone. These ordinary materials are what the impossible things are built from: the flying machine is canvas and bicycle parts, the walking house is scavenged roofing and iron legs."
 physics = "Impossible things obey ordinary physics. They have weight, they cast shadows, they rust, they are lit like everything else, and the ground takes their load. Nothing glows of its own accord, nothing is translucent, and nothing floats without a visible reason — a thing that could be rendered as a light effect does not belong here. The wonder is that something enormous and impossible is also solid."
 society = "Small settlements where work is done by hand and people are known by name. Institutions are distant; the weather and the land are close. Spirits, gods and creatures share the place and hold jobs in it, and no one finds this worth remarking on."
 weather = "Weather is a presence and often a threat, and it runs the whole range: hard-edged cumulus over a deep blue sky, flat grey overcast, fog that hides the far side of a field, rain that means it, snow, dusk, full night. Wind moves through everything. Pick the weather the day calls for rather than defaulting to fine — this world is at least as itself in bad weather as in good."
@@ -173,6 +184,11 @@ strangeness = "The genuinely strange is completely unremarkable. Enormous unexpl
 numinous = "Spirits are ordinary residents. They take a body, a size and a job — a bathhouse worker, a river that is also somebody, a soot-coloured swarm that carries coal, a boar the length of a field, a forest thing that turns its head. They are solid, they displace air, they leave prints, and they are lit like everything else. People greet them, avoid them, or work alongside them without comment. Never a glow, a mist or a translucency — if it could be painted as a light effect it is not one of these."
 dread = "This world at its darkest is not a different world, it is this one with the other face turned out. Gods and creatures are maimed, sickened, or boiling with something under the skin; a thing the length of a hillside can be in agony and destroying everything it crosses. Industry eats the forest and the people doing the eating have good reasons. Violence is sudden, physical and costly — an arm taken off, a wound that will not close, a curse spreading up a limb — and it is never relished by the frame. Nobody here is simply good or simply bad, and the image should not tell you whom to side with."
 favoured_actors = "This world is richest in creatures with their own purposes, part-human figures, spirits holding a trade, swarms, and machines that may be awake. A lone ordinary person is the least interesting inhabitant available and should not be the default — reach for the others first where the constellation allows one."
+# myth, 2026-10-10 (STYLE-OVERHAUL Prompt 2): where this world's stories come
+# from. Stage 1.5's meaning keeps Jung and Neumann as the lens for what kind of
+# situation a day is, and looks for its form here. Placeholder wording from the
+# overhaul plan; Prompt 4 re-grills it.
+myth = "Shinto kami, the spirits of particular places and the gods of rivers, hills and forests; Japanese folklore of tricksters, shapeshifters and the child spirited away into a world of spirits; and the European fairy tale these films also draw on, of witches' apprentices, cursed shapes and castles that move."
 # highlight added 2026-10-09: the thing the eye goes to first. This is the
 # "anomaly" wording every style used to share (wrong in one way, larger or
 # older, solid, unexplained, cropped if enormous), moved here because it is
@@ -224,7 +240,7 @@ highlight_modes = [
 # added 2026-09-26: without it, dark cells resolved "half the frame open" as
 # a lit sky.
 [ghibli.brief]
-impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary thing: a machine that is clearly alive or awake, a creature far too large for its kind, a structure that walks or floats or grew where it stands, a being that is plainly not a person. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
+impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable; it may be the highlight. Not a decorated version of an ordinary thing: a machine that is clearly alive or awake, a creature far too large for its kind, a structure that walks or floats or grew where it stands, a being that is plainly not a person. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
 openness ="OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
 
 # VERBS, 2026-10-10 (STYLE-OVERHAUL Prompt 1). Each run draws 3 process verbs
@@ -233,37 +249,27 @@ openness ="OPENNESS — applies to every image, whatever the numbers above say: 
 # _VERBS_* and _ACTOR_VERBS_* lists, which every style shared and which put
 # spill, feed and bear down into a third to a half of all prompts.
 #   process_*: things happening to things, with no one doing them.
-#   actor_*:   what the actor does. Each array spans work, rest, play or
-#              ritual, and travel, because a chore in every frame is part of
-#              the shared scene skeleton the review found.
+#   actor_*:   what the actor does, as tables keyed by activity (work, rest,
+#              play, ritual, travel; play or ritual may be absent). A run draws
+#              one activity, then 3 verbs from it, because a chore in every
+#              frame was part of the shared scene skeleton: with one mixed
+#              array Stage 2 still picked the chore (83-92% working).
 # 20-30 entries per array, validated on load. No verb is shared with
 # cyberpunk's same array unless it is native to both (flooding, steaming,
 # cooking).
 [ghibli.verbs]
 process_hard = ["flooding", "silting up", "rusting through", "buckling", "sagging under", "splitting", "scorching", "smothering", "choking", "tearing loose", "swallowing", "toppling", "gnawing at", "rotting through", "washing out", "burying", "souring", "cracking open", "overgrowing", "scouring", "flattening", "boiling over"]
 process_soft = ["drying", "steaming", "sprouting through", "ripening", "swaying", "trickling", "warming", "settling", "drifting", "bobbing", "filling", "draining clear", "shading", "sheltering", "rustling", "cooling", "rising", "flowering", "nesting in", "gathering dew", "rippling", "unfurling"]
-actor_hard = [
-  # work
-  "hauling", "bailing", "shoring up", "chopping free", "dragging", "wrestling with", "cranking", "hammering", "beating back", "holding down", "cutting loose", "pumping", "shovelling", "shouldering", "roping", "digging out", "damming", "carrying off",
-  # rest
-  "sheltering under", "huddling in", "waiting out",
-  # play or ritual
-  "racing", "ringing", "scattering salt over",
-  # travel
-  "fording", "scrambling up", "pushing through", "poling across",
-]
-actor_soft = [
-  # work
-  "cooking", "hanging out washing", "polishing", "sweeping", "oiling", "picking", "tying", "kneading", "airing out", "stacking",
-  # rest
-  "napping beside", "sharing food with", "dozing against", "eating lunch on", "sitting out",
-  # play
-  "sketching", "fishing", "whittling", "splashing in", "playing tag around", "flying a kite from",
-  # ritual
-  "leaving an offering at", "hanging a paper charm on", "lighting a lantern for",
-  # travel
-  "riding", "leading by the hand", "cycling past", "wading across", "walking home past",
-]
+actor_hard.work = ["hauling", "bailing", "shoring up", "chopping free", "dragging", "wrestling with", "cranking", "hammering", "beating back", "holding down", "cutting loose", "pumping", "shovelling", "shouldering", "roping", "digging out", "damming", "carrying off"]
+actor_hard.rest = ["sheltering under", "huddling in", "waiting out"]
+actor_hard.play = ["racing", "flying kites into", "sledging down"]
+actor_hard.ritual = ["ringing", "scattering salt over"]
+actor_hard.travel = ["fording", "scrambling up", "pushing through", "poling across"]
+actor_soft.work = ["cooking", "hanging out washing", "polishing", "sweeping", "oiling", "picking", "tying", "kneading", "airing out", "stacking"]
+actor_soft.rest = ["napping beside", "sharing food with", "dozing against", "eating lunch on", "sitting out"]
+actor_soft.play = ["sketching", "fishing", "whittling", "splashing in", "playing tag around", "flying a kite from"]
+actor_soft.ritual = ["leaving an offering at", "hanging a paper charm on", "lighting a lantern for"]
+actor_soft.travel = ["riding", "leading by the hand", "cycling past", "wading across", "walking home past"]
 
 [ghibli]
 label = "Studio Ghibli"
@@ -360,9 +366,12 @@ suffix_figures = " Figures rendered in flat cel-shaded color with a single hard-
 # all"; suffix_base turns unreadable lettering into a depth-of-field
 # instruction, which image models obey better than "do not write text".
 # WEAR, 2026-10-10: "Surfaces are worn and patched" (materials) went for the
-# same reason as ghibli's -- see the note above [ghibli.world].
+# same reason as ghibli's -- see the note above [ghibli.world]. Later the same
+# day "patched ever since" (era) became "kept running ever since", and the
+# industrial line's "patched" and the aquatic line's cisterns went too: an
+# after-sweep traced patched (5/12) and cisterns to exactly those words.
 [cyberpunk.world]
-era = "A future that arrived decades ago and has been patched ever since. Nothing is new: machines are retrofitted onto older machines, towers are built over the roofs of earlier towers, and every system runs on parts from three generations of manufacturers. The technology is powerful and it is old, and most of it is kept alive by people who were never meant to maintain it."
+era = "A future that arrived decades ago and has been kept running ever since. Nothing is new: machines are retrofitted onto older machines, towers are built over the roofs of earlier towers, and every system runs on parts from three generations of manufacturers. The technology is powerful and it is old, and most of it is kept alive by people who were never meant to maintain it."
 materials = "Concrete, sheet steel, corrugated plastic, rack steel, ribbed conduit, bent glass tube, enamel, tin, tarpaulin — and electricity everywhere and exposed: cable bundled, taped and hanging in swags between buildings, junction boxes, transformers on brackets, neon, screens and holographic signs stacked up every facade. Under the city's light, surfaces read as colour — teal, magenta and orange in every reflection — never as brown grime. Repairs are visible and never match what they repair."
 physics = "The city is lit by its own signs. After dark, and in the lower levels at any hour, neon and screen light is everywhere — bent tube in every colour, lit panels, holographic advertising hanging over the street — all of it blooming into the haze and streaking across every wet surface. Most of it is shape rather than words: a pictogram, a single character, an arrow, a border, a fish or a bowl or a cross traced in light, seen from below, edge-on, or blurred by rain and distance. Holograms are signage and nothing more — an advert, a route arrow, a dancing figure selling something. The numinous is never a hologram or a glow; it always has a body you could put your hand on. Impossible things here are heavy, bolted down, dripping, and lit by the colour around them."
 society = "A city built upward because it has nowhere else to go: towers packed so close their walls touch, walkways and cables strung between them, lower levels that have not seen the sky in decades. It belongs to no single culture — migrant districts layered over each other, and where lettering shows at all it is in many scripts and not only East Asian ones. Institutions are distant, sealed behind glass high above the street, and deny that anything below them is alive; the street feeds it anyway. Life is markets, stairwells, workshops, housing blocks, clinics and transit, and most work is done by hand. There is a port, and it is one district among many."
@@ -372,6 +381,8 @@ strangeness = "Things older or more alive than the city, left where they are and
 numinous = "The numinous is whatever has grown past its makers, and the old gods who have moved into hardware. The first can be any size: a vending machine that answers back, a server hall that has grown into a cathedral, a transit line running trains nobody scheduled, a mass of flesh and machine fused beyond anyone's ownership that is plainly alive and plainly someone. The second are loa, kami, saints and spirits who have taken a salvaged body — a shrine built around a robot torso, a river god living in a storm drain. Both are physical, heavy and tended: candles, stickers, food, grease-pencil prayers, a technician who is also a priest. A machine still doing the job it was built for is not one of these; one that has outgrown its job and is being fed is. Never a glow, a projection or a voice from nowhere — it has a body you could put your hand on."
 dread = "This city at its darkest is not simply this city at night in the rain. It is the body failing — a prosthetic rejected, flesh grown around metal that should have come out; infrastructure giving way — a tower leaning, water rising through the lower levels, a district going dark; a person owned, collateral in someone else's contract; and the numinous fenced off, leased and metered, its shrine behind a turnstile. Violence is sudden, mechanical and costly, never glamorous, and the frame does not admire the corporation or the gun."
 favoured_actors = "This world is richest in crowds at the market, the platform and the stairwell, the numinous in its fed and tended bodies, figures joined by hauling, cooking, carrying or sorting the same thing, the dead and the decommissioned, animals living off the infrastructure, and swarms — rats, pigeons, physical drones. Two figures are this genre's most worn images and should not be the default: a lone figure standing in the rain under a sign, and a lone repair tech bent over a machine. Reach past both where the constellation allows."
+# myth, 2026-10-10 (STYLE-OVERHAUL Prompt 2) -- see [ghibli.world]'s note.
+myth = "Loa, orisha, saints and kami living in hardware: the spirits of Vodou and Santería riding machines instead of people, saints whose days are kept at junction-box shrines, household and kitchen gods given salvaged bodies, and the street's own legends of what lives in the network and the drains."
 # highlight, 2026-10-09 (Q68 d, Garrett): something alive in the machine.
 # Kept loose on purpose -- the principle, not the form; the register and the
 # day decide what the living thing is. REWORDED same day by Garrett: the first
@@ -417,30 +428,16 @@ temper = "TEMPER — the highlight, and anything numinous in the frame, is in th
 [cyberpunk.verbs]
 process_hard = ["shorting out", "sparking", "flooding", "leaking", "overloading", "corroding", "blacking out", "jamming", "venting", "peeling away", "melting", "collapsing into", "seizing up", "gridlocking", "tripping out", "crushing", "sinking", "rotting", "overheating", "bursting", "grinding to a halt", "shattering"]
 process_soft = ["humming", "flickering", "steaming", "cycling", "dripping", "reflecting", "idling", "charging", "simmering", "ticking over", "dimming", "streaming", "glowing", "condensing", "rattling", "scrolling", "purring", "buzzing", "blinking", "fogging up", "whirring"]
-actor_hard = [
-  # work
-  "prying open", "hot-wiring", "splicing", "hauling", "welding", "cutting free", "forcing", "holding shut", "dragging", "wrestling with", "bracing against", "jacking into", "rerouting", "bolting down",
-  # rest
-  "holing up in", "sleeping rough under", "sitting out",
-  # ritual
-  "burning offerings at", "chanting over", "feeding coins into",
-  # play
-  "gambling over", "betting on", "drag-racing",
-  # travel
-  "shoving through", "squeezing through", "clinging to the outside of", "scaling", "ducking under",
-]
-actor_soft = [
-  # work
-  "cooking", "soldering", "sorting scrap", "tuning", "feeding", "hanging laundry", "washing", "selling", "delivering",
-  # rest
-  "slurping noodles", "napping under", "reading by screen-light", "sharing a smoke",
-  # play
-  "playing mahjong at", "singing along to", "dancing under", "gaming on",
-  # ritual
-  "lighting incense at", "leaving food at", "pasting a prayer sticker on", "ringing a shrine bell at",
-  # travel
-  "riding pillion through", "strolling through", "waiting on a platform for", "ferrying",
-]
+actor_hard.work = ["prying open", "hot-wiring", "splicing", "hauling", "welding", "cutting free", "forcing", "holding shut", "dragging", "wrestling with", "bracing against", "jacking into", "rerouting", "bolting down"]
+actor_hard.rest = ["holing up in", "sleeping rough under", "sitting out"]
+actor_hard.play = ["gambling over", "betting on", "drag-racing"]
+actor_hard.ritual = ["burning offerings at", "chanting over", "feeding coins into"]
+actor_hard.travel = ["shoving through", "squeezing through", "clinging to the outside of", "scaling", "ducking under"]
+actor_soft.work = ["cooking", "soldering", "sorting scrap", "tuning", "feeding", "hanging laundry", "washing", "selling", "delivering"]
+actor_soft.rest = ["slurping noodles", "napping under", "reading by screen-light", "sharing a smoke"]
+actor_soft.play = ["playing mahjong at", "singing along to", "dancing under", "gaming on"]
+actor_soft.ritual = ["lighting incense at", "leaving food at", "pasting a prayer sticker on", "ringing a shrine bell at"]
+actor_soft.travel = ["riding pillion through", "strolling through", "waiting on a platform for", "ferrying"]
 
 # REGISTERS, 2026-09-26. How this world realises each substance register, one
 # span-and-principle line per register -- never an inventory (see
@@ -468,9 +465,9 @@ actor_soft = [
 "architectural" = "Architecture here is accretion, not design. No building is one building: the original frame is a skeleton under decades of unauthorised additions (rooms cantilevered off a balcony, a floor added in sheet metal, a stair bolted to the outside, a bridge two neighbours built between their windows). Look at the joins, where one owner's work meets the next. Its highlight: the join where someone made the building their own and it took: a room grown off a balcony with people living in it, a stair a creature uses as its road, a sign bracket that has become a home, a facade machine still answering a tenant who left decades ago."
 "domestic interior" = "A home is one small room doing every job: bunk and kitchen and shrine and workbench at once, a rice cooker beside a soldering iron, laundry hung across a window unit, a family's whole life on one shelf. Neon comes in through the curtain. It is crowded and cared for, never squalid for its own sake. Its highlight: the thing that makes this one room alive: a pet machine nobody can bear to switch off, a child asleep among the tools, a seedling raised under a grow-lamp in a teacup, a window looking straight into a neighbour's life."
 "mechanical" = "Every machine has been opened, fixed and closed again by someone who is not its maker: a lift's cable drum rebuilt with parts from a motorbike, a generator on its third engine, a vending machine with its guts on the pavement, a repair stall's bench stacked with disassembled things. The machine is legible as a machine, with its casing off. Its highlight: a machine that has stopped being only a machine: one that hums a tune its owner taught it, one with an animal living in its heat, one a person has partly become, a lift that will only stop at certain floors."
-"industrial and infrastructural" = "The city's nervous system, exposed and overloaded: substations humming in stairwells, cable trays packed past capacity, water mains sweating along a corridor ceiling, ventilation shafts, transit tunnels, the pumps that keep the lower levels dry. It is patched rather than maintained, and one failure takes a district dark. Its highlight: where the city's systems keep something alive, or something alive keeps a system going: a worker strapped into a junction as part of it, eels keeping a pump intake clear, a substation warm enough to sleep against, a valve someone comes to turn by hand every day."
+"industrial and infrastructural" = "The city's nervous system, exposed and overloaded: substations humming in stairwells, cable trays packed past capacity, water mains sweating along a corridor ceiling, ventilation shafts, transit tunnels, the pumps that keep the lower levels dry. It is kept going rather than maintained, and one failure takes a district dark. Its highlight: where the city's systems keep something alive, or something alive keeps a system going: a worker strapped into a junction as part of it, eels keeping a pump intake clear, a substation warm enough to sleep against, a valve someone comes to turn by hand every day."
 "agricultural and cultivated" = "Food grown in the city's leftover space by labour, measured by yield: hydroponic trays in a dead parking structure, mushroom beds in a basement, fish farmed in drums, chickens on a balcony, algae vats, a rooftop terraced for rice. Unlike botanical, the subject here is the system and the work: rows, irrigation lines, harvests, someone tending it. Its highlight: the crop or its keeper at their most alive: a harvest coming in, an animal being fed, a grower whose augmented hands do the picking, a vat brewing something that glows from inside."
-"aquatic" = "Water is inside the city: either too much of it or sold. It floods the lower levels, sheets off awnings into gutters, sweats through ceilings, runs black in drainage channels, stands in cisterns and coolant tanks, and clean water comes in bottles and jerrycans with a price on them. The sea is rarely in frame; this is the water the city could not keep out or had to buy. Its highlight: what lives in the water the city couldn't keep out: fish farmed in a flooded stairwell, a diver in a sealed suit working the drowned levels, a cistern pump that has started breeding things in its tank, a person swimming somewhere no one should."
+"aquatic" = "Water is inside the city: either too much of it or sold. It floods the lower levels, sheets off awnings into gutters, sweats through ceilings, runs black in drainage channels, stands in coolant tanks and flooded sumps, and clean water comes in bottles and jerrycans with a price on them. The sea is rarely in frame; this is the water the city could not keep out or had to buy. Its highlight: what lives in the water the city couldn't keep out: fish farmed in a flooded stairwell, a diver in a sealed suit working the drowned levels, a sump pump that has started breeding things in its tank, a person swimming somewhere no one should."
 "atmospheric" = "The air here is thick enough to hold light. Steam venting from grates, smog, kitchen smoke rolling out of a stall, air-conditioner exhaust, dust, rain in the air. It is where the neon becomes visible as colour, and it always comes from somewhere you could point to. Its highlight: something alive the air gives away: the breath and smoke of a crowd at a stall, wings moving through steam, a masked figure filtering the smog, a vent exhaling like a sleeper."
 "glacial and frozen" = "Cold here is always made by a machine, and it is paid for. Freezer lockers at the fish market, frost furring the coolant lines of a server hall, a morgue drawer, ice delivered in blocks on a hand cart, a refrigeration plant's condensers roaring on a roof. It exists to keep something from rotting (food, bodies, data), and a power cut means a thaw. Its highlight: what the cold is keeping alive: a sleeper in a cryo drawer, something holy kept in a fish-market freezer, frost growing like a plant across a coolant line, a worker's breath hanging in the freezer light."
 "fire and ember" = "Fire is the oldest technology still running here. It belongs to the street (woks roaring on a stall, an oil drum burning for warmth, a backroom smelter, candles at a shrine, a welder's arc) and it is also the street's worst danger: a cable tray smouldering, a transformer on fire in a stairwell. Every flame has a fuel and a vessel. Its highlight: what lives by the fire: a cook whose arm is the burner, an animal warming itself at a transformer fire, a forge robot still running at its one job, a shrine flame someone has kept lit for years."

@@ -7,4 +7,7 @@
 # prediction rather than observation gives false confidence and decays as
 # the model finds synonyms for whatever you guessed instead of it.
 
-terms = []
+# 2026-10-10 (STYLE-OVERHAUL): "barn" was in 21 of 33 archived days across six
+# styles, copied from the highlight's own "the size of a barn or a hillside".
+# That wording is gone and Stage 2 still wrote "barn-sized" unprompted.
+terms = ["barn-sized"]
