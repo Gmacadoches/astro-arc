@@ -532,8 +532,8 @@ DEFAULT_STAGE2_BRIEF = (
     "and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary "
     "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
     "structure that walks or floats or grew where it stands, a being that is plainly not a "
-    "person. Build it from this world's own materials, give it real weight and wear, light it "
-    "like everything else, and let the actor work around it the way they would a wall. An image "
+    "person. Build it from this world's own materials, give it real weight, light it "
+    "like everything else, and let the actor treat it the way they would a wall. An image "
     "in which everything could exist is a failed response.\n"
     "    What temper it is in: {wonderTone}\n"
     "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
@@ -1113,8 +1113,11 @@ _PROMINENCE_BY_INTENSITY = {
 # tonal falseness STAGE1_SYSTEM and the dial's tonalDirection both exist to
 # prevent.
 _WONDER_BY_POLARITY = {
-    "hard": "It is not charming. This world's strangeness turns dangerous, diseased or grieving: things that are sickened, possessed, boiling with something under the skin, maimed, enormous and enraged, or dying slowly and taking the place with them. Nobody is reassured by it and nobody is safe from it, and it is still ordinary enough that the work continues around it.",
-    "soft": "It is at peace, which is not the same as friendly. It is occupied with its own business and indifferent to being watched: working, resting, feeding, travelling, or simply long settled where it is.",
+    "hard": "It is not charming. This world's strangeness turns dangerous, diseased or grieving: things that are sickened, possessed, boiling with something under the skin, maimed, enormous and enraged, or dying slowly and taking the place with them. Nobody is reassured by it and nobody is safe from it, and it is still ordinary enough that the day goes on around it.",
+    # Its list of activities ("working, resting, feeding, travelling, or simply
+    # long settled") went 2026-10-10: feed and settle were two of the most
+    # repeated verbs in every style. The activity comes from the drawn verbs.
+    "soft": "It is at peace, which is not the same as friendly. It is occupied with its own business and indifferent to being watched.",
 }
 
 _LIGHT_BY_EXPOSURE = {
@@ -1159,13 +1162,23 @@ _LIGHT_BY_EXPOSURE = {
 # Until 2026-10-09 every cell also said "nothing explains why it is here". That
 # is a property of ghibli's highlight, not of how an actor treats one, so it
 # moved into ghibli's charter `highlight` and DEFAULT_HIGHLIGHT.
+#
+# STANCE ONLY since 2026-10-10 (STYLE-OVERHAUL Prompt 1), in all three actor
+# tables. Each cell used to name actions ("prising at it, digging it out...",
+# "cleaning, mending, feeding, oiling"), and those words reached every style's
+# prompts verbatim; mended/patched turned up on 15 of 33 days across all seven
+# styles. A cell now says only where the actor stands toward the thing (set
+# against it, using it, at rest beside it, has not seen it), and the action
+# comes from the drawn actor verbs. Each cell keeps its hard/soft and lo/mid/hi
+# meaning; the soft/lo cell lost "weathered almost into landscape", because
+# wear is now the dial's `condition`.
 _ACTOR_ANOMALY_RELATION = {
-    ("hard", "hi"): "It is acting on the actor — displacing them, blocking the way, pressing on what they are doing, forcing them to work around it. They cannot move it and cannot ignore it.",
-    ("hard", "mid"): "The actor is working against it — prising at it, digging it out, dismantling it, hauling at it — and is not winning yet.",
-    ("hard", "lo"): "The actor has not seen it. It is behind them, above them, or under their feet, and it is doing something.",
-    ("soft", "hi"): "The actor has put it to use — works from it, shelters under it, draws from it, stores in it. Entirely unbothered.",
-    ("soft", "mid"): "The actor tends it — cleaning, mending, feeding, oiling or watering it, as though it were theirs to look after.",
-    ("soft", "lo"): "It has been here longer than the actor has. They live alongside it without thought; it has weathered almost into landscape and stopped being remarkable to anyone.",
+    ("hard", "hi"): "It has the upper hand: it is in the actor's way and on top of what they are doing. They cannot move it and cannot ignore it.",
+    ("hard", "mid"): "The actor is set against it, and is not winning yet.",
+    ("hard", "lo"): "The actor has not seen it. It is behind them, above them, or under their feet, and it is not inert.",
+    ("soft", "hi"): "The actor has put it to use, and is entirely unbothered by it.",
+    ("soft", "mid"): "It is in the actor's care, as though it were theirs to look after.",
+    ("soft", "lo"): "It has been here longer than the actor has. They live alongside it without a thought; it has become part of the place and stopped being remarkable to anyone.",
 }
 
 # NEW 2026-09-20, and the layer that most directly answers "museum objects
@@ -1174,12 +1187,12 @@ _ACTOR_ANOMALY_RELATION = {
 # Keyed on the same (polarity, intensity) the rest of the dial uses, so no new
 # axis is invented and no new astrology is needed.
 _ACTOR_OBJECT_RELATION = {
-    ("hard", "hi"): "The objects are in the actor's way or on top of them: being shoved aside, climbed over, dug out from under, or carried when there are too many to carry.",
-    ("hard", "mid"): "The actor is working the objects and the work is going badly — one is stuck, one is broken, one will not fit, and the effort shows in the body.",
-    ("hard", "lo"): "The objects are not the actor's business. They belong to the place and the actor is passing among them, using one absently at most.",
-    ("soft", "hi"): "The actor is using the objects for exactly what they are for, competently, mid-task, with more of them to hand than are needed.",
-    ("soft", "mid"): "The actor is putting the objects in order — sorting, stacking, cleaning, mending, laying them out, packing them away.",
-    ("soft", "lo"): "The objects are at rest and so is the actor. They have been used and set down, and nobody is reaching for them.",
+    ("hard", "hi"): "The objects are in the actor's way or on top of them, more of them than anyone could manage.",
+    ("hard", "mid"): "The actor is set against the objects and it is going badly: one is stuck, one is broken, one will not fit, and the effort shows in the body.",
+    ("hard", "lo"): "The objects are not the actor's business. They belong to the place, and the actor's attention is elsewhere.",
+    ("soft", "hi"): "The actor is using the objects for exactly what they are for, competently, with more of them to hand than are needed.",
+    ("soft", "mid"): "The objects are in the actor's keeping, and in good order.",
+    ("soft", "lo"): "The objects are at rest and so is the actor; nobody needs them now.",
 }
 
 # NEW 2026-09-20. Where the actor stands in relation to the PLACE, which is a
@@ -1187,11 +1200,11 @@ _ACTOR_OBJECT_RELATION = {
 # actor tends to be dropped into the middle of the frame facing out.
 _ACTOR_SITE_RELATION = {
     ("hard", "hi"): "The actor is caught in the site — down inside it, under it, hemmed by it, or on the part of it that is failing.",
-    ("hard", "mid"): "The actor is crossing the site and it is resisting them: the ground, the weather or the structure is making the crossing hard.",
-    ("hard", "lo"): "The actor is at the edge of the site, arriving or about to leave, with most of the place still ahead of or behind them.",
-    ("soft", "hi"): "The actor is working the site and it is theirs to work — they know where everything is and the place is answering.",
+    ("hard", "mid"): "The place is against the actor: its ground, its weather or its structure is resisting them.",
+    ("hard", "lo"): "The actor is at the edge of the site, with most of the place still ahead of or behind them.",
+    ("soft", "hi"): "The place is the actor's own: they know where everything is, and it answers them.",
     ("soft", "mid"): "The actor is somewhere they have been many times. Nothing about the place needs their attention.",
-    ("soft", "lo"): "The actor is at rest in the site, or asleep in it, and the place continues around them without them.",
+    ("soft", "lo"): "The actor is at rest in the site, and the place goes on around them without them.",
 }
 
 # Actors do different things from materials, and the existing tables are almost
@@ -1830,7 +1843,7 @@ WHAT THE IMAGE MUST CONTAIN
 
 HOW TO WRITE IT
 
-- Describe only what is physically there. NEVER explain what anything means. The following words and every close relative of them are forbidden in your output: symbolizing, symbolic, suggesting, suggestive, representing, as if, evoking, conveying, inviting, embodying, reflecting (in the figurative sense), hinting, capturing, "a sense of", "the sense of", "a feeling of", "the feeling of", "an impression of", "creating an atmosphere of", "limned with", "the whole scene is", "there is a quality of". Any article works the same way — "the sense of ripening" is forbidden exactly as "a sense of ripening" is. An image model cannot paint a verb about meaning; every one of those words spends your budget to produce nothing. Say the thing; let it mean what it means.
+- Describe only what is physically there. NEVER explain what anything means. The following words and every close relative of them are forbidden in your output: symbolizing, symbolic, suggesting, suggestive, representing, as if, evoking, conveying, inviting, embodying, reflecting (in the figurative sense), hinting, capturing, "a sense of", "the sense of", "a feeling of", "the feeling of", "an impression of", "creating an atmosphere of", "limned with", "the whole scene is", "there is a quality of". Any article works the same way — "the sense of renewal" is forbidden exactly as "a sense of renewal" is. An image model cannot paint a verb about meaning; every one of those words spends your budget to produce nothing. Say the thing; let it mean what it means.
 - Concrete and oddly specific over generically mystical. Name particular objects, particular wear, particular substances. "A dented milk pail half full of chalk" beats "vessels of nourishment."
 - Avoid generic intensifiers. "Vibrant," "intricate," "swirling," "mystical," "ethereal," "magical" are close to meaningless to an image model and are this pipeline's known crutch words. Prefer a described fact over an intensifier.
 - Match the light, scale and spatial pressure to the reading's actual feeling before any symbol does. When the reading is dark, the image is genuinely dark — close, heavy, dim, cold, airless, or too exposed — not a pleasant scene with a sad object in it. When the reading is light, let it be genuinely light. Do not default to warm golden pleasantness; that is this pipeline's known failure mode.
@@ -1839,8 +1852,8 @@ PEOPLE
 
 - THE ACTOR IS GIVEN TO YOU, and it is not optional. THE COMPOSITION BRIEF names who or what is in this scene — a person, a crowd, an animal, a swarm, a part-human figure, a machine that has not stopped, a body — along with how that actor is framed. Put them in the frame and give them something to do. The register says what the world is MADE OF; the actor says WHO IS IN IT. They are independent: a mechanical world with one person in it is a normal image, not a contradiction.
 - The only exception is an actor of "none", which THE COMPOSITION BRIEF will state explicitly. Then the materials carry the image alone, as the place and its objects.
-- INTERACTION WITH THE ACTOR IS THE POINT. A scene where the actor merely stands among the objects is the same failure as a still-life. The brief gives you the actor's relation to the anomaly, to the objects and to the site: use all three. Something is being hauled, prised, tended, mended, fled, watched, carried, worked. Meaning comes from what passes between the actor and the world, not from their sharing a frame.
-- Figures act; they do not emote. Give each figure a task and a thing to attend to, and let the task explain the posture. Faces are fine: let them show the effort or attention of the task, and no expression that would still read if the task were taken away. Never a pose that exists to be read as a feeling, and never a figure whose job is to react to another figure or to the scene. Two or more figures may share a frame in a shared task or a physical struggle: show what their bodies are doing — grip, weight, strain — never why they do it, and never which of them to side with. Physical, never graphic: no wounds, blood or gore. This holds for people, animals and machines alike.
+- INTERACTION WITH THE ACTOR IS THE POINT. A scene where the actor merely stands among the objects is the same failure as a still-life. The brief gives you the actor's relation to the anomaly, to the objects and to the site: use all three. What the actor does comes from the actor verbs in THE COMPOSITION BRIEF; take the action from those rather than from your own habits. Meaning comes from what passes between the actor and the world, not from their sharing a frame.
+- Figures act; they do not emote. Give each figure an activity and a thing to attend to, and let the activity explain the posture. The activity is whatever the brief's actor verbs call for: work, but just as often rest, play, ritual or travel. Not every figure is doing a chore. Faces are fine: let them show the effort or attention of the activity, and no expression that would still read if the activity were taken away. Never a pose that exists to be read as a feeling, and never a figure whose job is to react to another figure or to the scene. Two or more figures may share a frame in a shared activity or a physical struggle: show what their bodies are doing — grip, weight, strain — never why they do it, and never which of them to side with. Physical, never graphic: no wounds, blood or gore. This holds for people, animals and machines alike.
 - The actor is not a way to reach the density requirement, and neither are people. A crowd or a swarm counts as ONE element no matter how many bodies are in it. Reach the thing count with objects, structures and materials, never by multiplying faces.
 
 STYLE
