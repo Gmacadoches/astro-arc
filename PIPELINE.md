@@ -135,6 +135,30 @@ a high-exposure day must be full, even daylight. As moods ("most of the frame
 is unlit"), neither was obeyed. Mood words are not obeyed; counts and failure
 conditions are.
 
+**Then the style draws.** `draw_style_choices` takes the dial and fills in what
+each world says for itself, from arrays in the style's charter. Each draw skips
+whatever this style drew in its last two runs, and is seeded from the period,
+the style and the history length, so a sweep is reproducible but a same-day
+regenerate differs:
+
+- **verbs**: 3 process verbs (things happening with no one doing them) from
+  the day's polarity, and an **activity** (work, rest, play, ritual or
+  travel; none repeats until the others have had a turn) with 3 actor verbs
+  from it. Before this, every style got one fixed list, and spill, feed and
+  bear down sat in a third to a half of all prompts, with 83% of actors at a
+  chore.
+- **space**: one depth recipe, replacing the fixed "half the frame open" that
+  put far off / distance / beyond into 29 of 33 days. Every style also gets the
+  same WALLPAPER rule: somewhere for the eye to go past the subject.
+- **highlight mode**: today's kind of wrongness for the highlight.
+- **condition**: how worn things are (newly made, kept, worn, failing,
+  ruined), weighted toward the far end on hard days. Wear used to be required
+  in five places at once, and every image came back weathered.
+- **light**: a style's own `[light]` lines replace the global ones, which
+  assume an Earth sky (cosmic and cyberpunk have their own).
+
+The draws go into the history entry and are shown on the run page.
+
 The constants survive as `NO_TEXTURE_DIAL`, the fallback for a reading with no
 texture block at all. (A `pipelineMode: "legacy"` setting that pinned the dial
 back to them was removed on 2026-09-13.)
@@ -171,8 +195,15 @@ The constellations an install has used recently are passed in as already
 spent, and so are the last 4 actor kinds. Without that pressure, 83% of days
 reached for the same archetype and most actors were `solitary`.
 
+Jung and Neumann say what kind of situation the day is. A charter's `myth`
+field says which traditions its stories come from (Shinto kami and yōkai,
+loa in hardware, the constellations as beings), and the meaning is named in
+that world's terms where one fits. The actor is named as who they are, not
+what they are doing; the activity is drawn later.
+
 Cached in `pipeline/amplifications/<periodKey>.json`, invalidated by
-`STAGE15_SCHEMA_VERSION`, so **a regenerate never changes the day's meaning**.
+`STAGE15_SCHEMA_VERSION` and keyed on a hash of the style's charter, so **a
+regenerate never changes the day's meaning**, and editing a charter does.
 `presence` is only eligible in a style whose charter says how the numinous
 takes a body.
 
@@ -187,10 +218,15 @@ substance.
 
 **What a highlight is depends on the world.** Each charter defines it in its
 `highlight` field, and a register line may say what form it takes in that
-material. Ghibli's is the strange thing nobody remarks on: native, wrong in one
-way (far larger or far older), solid, unexplained. A style with no charter gets
-that same definition as its fallback. Until 2026-10-09 this was "the anomaly",
+material. Ghibli's is the strange thing nobody remarks on; cyberpunk's is
+something alive in the machine; cosmic's is a constellation-being's body. Each
+charter's `highlight_modes` list the kinds of wrongness it can have, and one is
+drawn per run. No definition names a size comparison any more: "the size of a
+barn" put barn into 21 of 33 days. Until 2026-10-09 this was "the anomaly",
 defined once for every style; the data key is still `anomaly`.
+
+The last 6 runs' objects and highlights are passed in as spent, and the
+day's condition is passed in so the objects do not arrive pre-weathered.
 
 Never cached, so every run, regenerates included, gets a new register and new
 objects for the same meaning. That is what keeps same-day regenerates from all
@@ -215,15 +251,17 @@ from the dial — there is no fixed palette for the series. (A natal "visual
 signature" that tried to fix one was removed on 2026-10-08: with and without
 it, the prompts differed no more than two draws with it.)
 
-**The style decides more than the look.** A *world* style (ghibli, cyberpunk)
-has a charter in `styles.toml` — era, materials, physics, society, weather,
-inhabitants, strangeness, the numinous, dread, favoured actors — and its own
-**brief rules**, phrased as failure conditions because that is what Stage 2
-obeys. Ghibli's are THE IMPOSSIBLE (something in frame could not exist) and
-OPENNESS (half the frame is open distance); cyberpunk's are DEPTH, NEON AFTER
-DARK and TEMPER. A *technique* style (engraving, ukiyo-e and the rest) has only
-a `guidance` line and gets ghibli's two rules as a fallback, until it is
-chartered.
+**The style decides the world, not just the look.** All seven styles have a
+charter in `styles.toml` (era, materials, physics, society, weather,
+inhabitants, strangeness, the numinous, dread, favoured actors, myth,
+highlight) and their own **brief rules**, phrased as failure conditions
+because that is what Stage 2 obeys. Every style has a **signature** rule:
+something in frame that could only exist in this world, and an image that
+could be relabelled as another style fails. The division Stage 2 is given:
+the registers decide what things are made of; the world decides what place
+this is and what lives there. See `docs/charter-schema.md` for every field.
+A new style with no charter falls back to ghibli's old rules, kept in one
+labelled block in `llm_pipeline.py`.
 
 ## 8. The melodrama check
 
@@ -295,7 +333,7 @@ Five TOML files, read fresh on every run. No restart, no reinstall.
 | File | What it controls | Try this |
 | --- | --- | --- |
 | `pipeline/registers.toml` | the 20 materials a scene is built from, in five families | add one under the family it is made of |
-| `pipeline/styles.toml` | the 7 styles: `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules and `registers` lines, or a `guidance` line | edit a charter field, then sweep it |
+| `pipeline/styles.toml` | the 7 styles: `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules, `registers` lines, `verbs`, `space`, `highlight_modes`, optional `light` and `conditions` (see `docs/charter-schema.md`) | edit a charter field, then sweep it and run `term_report.py` |
 | `pipeline/actors.toml` | the 11 actor kinds Stage 1.5 casts from, and register/actor pairs to exclude | reword a kind; keep it a span and a principle, never a list |
 | `pipeline/cliches.toml` | hard-blocked exact terms | add a word **only after** you see it repeat |
 | `pipeline/model-rates.toml` | model prices and the quality presets | add a model, or retune a preset |
