@@ -21,7 +21,7 @@ Reports, for each sweep:
     verbs, and every [<style>.verbs] array in styles.toml
   - how many prompts contain each tracked attractor term
   - what the actor is doing: work, or rest, play, ritual or travel. Classified
-    by the caption model (gpt-4o-mini unless configured), because no word list
+    by the configured Stage 2 model, because no word list
     can tell "carrying a lantern to the shrine" from "carrying sacks". The
     answers are cached in the sweep folder as 00_activity.json, so re-running
     the report costs nothing.
@@ -136,19 +136,27 @@ def _forms(base):
 
 def phrase_pattern(phrase):
     """Regex for one verb phrase as the lists write it: the head verb in an
-    inflected form, plus its particle or object word within three words when
-    the phrase has one ("blacking out", "hanging laundry", "silting up"). A
-    trailing preposition ("spilling into", "leaning against") is not required."""
-    words = [w for w in re.findall(r"[a-z'-]+", phrase.lower()) if w not in _SKIP_WORDS]
+    inflected form, then the phrase's next word within three words when it has
+    one ("blacking out", "hanging laundry", "leaning against", "sitting
+    with"). -ed forms count only for a passive phrase ("being mended"): for an
+    -ing phrase they are nearly always adjectives ("stacked towers", "a
+    cracked dial"), and so is a bare head ("a brazier sits under the rail" is
+    placement, not "sitting with")."""
+    raw = re.findall(r"[a-z'-]+", phrase.lower())
+    passive = bool(raw) and raw[0] == "being"
+    words = [w for w in raw if w not in _SKIP_WORDS]
     if not words:
         return None
     base = _base(words[0])
-    rest = [w for w in words[1:] if w not in _PREPOSITIONS]
+    rest = [w for w in words[1:] if w not in ("a", "an", "the", "something")]
     if base == "bear" and rest[:1] == ["down"]:
         return r"\b(bears|bore|bearing|borne)\s+down\b"
-    head = r"\b(" + "|".join(sorted(_forms(base), key=len, reverse=True)) + r")\b"
+    forms = _forms(base)
+    if not passive:
+        forms = {f for f in forms if not f.endswith("ed") or f == "fled"}
+    head = r"\b(" + "|".join(sorted(forms, key=len, reverse=True)) + r")\b"
     if rest:
-        tail = re.escape(rest[-1] if rest[-1] not in ("free", "loose", "open") else rest[0])
+        tail = re.escape(rest[0] if rest[0] not in _PREPOSITIONS or len(rest) == 1 else rest[1])
         return head + r"(?:\W+\w+){0,3}?\W+" + tail + r"\w*"
     return head
 
@@ -193,18 +201,18 @@ def load_sweep(arg):
     return path, data
 
 
-ACTIVITY_SYSTEM = """You classify what the main living actor in a described image is doing IN THIS MOMENT. Judge the activity the sentence describes, not the actor's trade or what they are dressed for: a mechanic eating lunch is resting, a porter riding a train is travelling, a cook lighting incense at a shrine is at ritual. Answer with exactly one of:
+ACTIVITY_SYSTEM = """You classify what the actor in a described image is doing IN THIS MOMENT. The actor is the person, creature, spirit or machine-figure the description shows doing something; never a plant, a building or the place, however much of the frame they fill. Judge by the verb the description gives the actor, never by their trade, their workplace or the objects around them: a mechanic eating lunch is resting, a nurse riding pillion is travelling, a clerk pasting a prayer sticker or ringing a bell and scattering salt is at ritual, a nurse racing pill bottles along a bench is playing. Where the actor does two things, judge the one the description leads with. Answer with exactly one of:
 - work: labour or a chore — hauling, repairing, cleaning, tending, sorting, carrying loads, cooking for sale, operating machinery
 - rest: sleeping, sitting idle, eating a meal, waiting, lounging
-- play: games, music for pleasure, children playing, leisure, fishing for fun, sketching
+- play: games, gambling, racing for fun, music for pleasure, children playing, leisure, fishing for fun, sketching
 - ritual: worship, offering, ceremony, prayer, a festival, a funeral rite
 - travel: walking, riding, sailing, arriving, leaving, crossing somewhere on a journey
-- none: there is no living actor, or it has no activity at all
+- none: there is no actor at all
 Respond with JSON: {"activity": "one of work, rest, play, ritual, travel, none"}"""
 
 
 # Bumped when ACTIVITY_SYSTEM changes, so cached answers are re-asked.
-ACTIVITY_VERSION = 2
+ACTIVITY_VERSION = 5
 
 
 def classify_activity(path, samples):
@@ -213,7 +221,9 @@ def classify_activity(path, samples):
     if cache_path.exists():
         cache = json.loads(cache_path.read_text())
     config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
-    model = config.get("captionModel") or lp.CAPTION_MODEL
+    # The writing model, not the caption judge: gpt-4o-mini returned "none" for
+    # 5 of 12 prompts that plainly had a nurse in them (2026-10-10).
+    model = config.get("stage2Model") or config.get("captionModel") or lp.CAPTION_MODEL
     changed = False
     out = []
     for s in samples:

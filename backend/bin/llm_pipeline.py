@@ -572,7 +572,7 @@ DEFAULT_STAGE2_BRIEF = (
     "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
     "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
     "is just a texture; it only becomes huge beside something that is not.",
-    "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out.",
+    "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or depth that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out. Name what is out there rather than that it is far: not \"beyond\", \"in the distance\" or \"far off\".",
 )
 
 
@@ -1315,7 +1315,9 @@ _ACTOR_VERBS_HARD = {
     "travel": "climbing, pushing through, being carried off by",
 }
 _ACTOR_VERBS_SOFT = {
-    "work": "tending, mending, feeding, washing, harvesting, carrying",
+    # "feeding" left this list 2026-10-10: it is also in _VERBS_HARD, so a
+    # style on the fallback drew it twice as often as anything else (33%).
+    "work": "tending, mending, sorting, washing, harvesting, carrying",
     "rest": "sleeping beside, eating, sitting with",
     "play": "playing, watching something at work, listening to",
     "travel": "walking past, riding, arriving at",
@@ -1589,8 +1591,11 @@ def draw_style_choices(style_key, dial, history, period_key):
     process = verbs["process_hard" if hard else "process_soft"]
     actor = verbs["actor_hard" if hard else "actor_soft"]
     draws["processVerbs"] = _draw(rng, process, _recent_draws(history, style_key, "processVerbs"), VERB_DRAW)
-    # Activity first, never the one this style drew last; then its verbs.
-    last = _recent_draws(history, style_key, "activity", window=1)
+    # Activity first, then its verbs. No activity repeats until every other one
+    # has had a turn: drawn independently, ghibli got work on 6 of 12 sweep
+    # samples by chance (long-run share 21%), and a run of chores is exactly
+    # what this exists to stop.
+    last = _recent_draws(history, style_key, "activity", window=len(actor) - 1)
     draws["activity"] = _draw(rng, list(actor), last, 1)[0]
     draws["actorVerbs"] = _draw(rng, actor[draws["activity"]],
                                 _recent_draws(history, style_key, "actorVerbs"), VERB_DRAW)
@@ -2401,7 +2406,9 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
             f"    Toward the objects: {dial['objectRelation']}",
             f"    Toward the place: {dial['siteRelation']}",
             (f"    What the actor is doing — {dial['activity']}: {dial['actorVerbs']}. "
-             f"This is the actor's activity in this image, whatever their trade."
+             f"This is the actor's activity in this image, whatever their trade. The lines "
+             f"above say where the actor stands toward things; this line says what they are "
+             f"doing, and where the two pull apart, this line wins."
              if dial.get("activity") else
              f"    Verbs for what the actor does: {dial['actorVerbs']}."),
             "    The actor counts as ONE of the discrete things above, not an addition to them.",
