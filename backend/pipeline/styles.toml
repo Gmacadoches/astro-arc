@@ -171,7 +171,23 @@ favoured_actors = "This world is richest in creatures with their own purposes, p
 # older, solid, unexplained, cropped if enormous), moved here because it is
 # this world's logic and not a universal one. Tested under the old name across
 # the 2026-09 sweeps; reworded only to stand alone.
-highlight = "One thing, native to this world and made of its own materials, that is wrong in exactly one way: far too large for its kind (the size of a barn or a hillside where its kind is the size of a hand or a room) or far older and more worn than everything around it (older, never newer: never modern, manufactured or electronic). It is solid, heavy and lit like everything else; it does not glow, float, shimmer or look magical. Nothing in the scene explains why it is there. If it is enormous, put part of it in shot, close (the foot of it, one edge, the shadow it throws) rather than shrinking it or pushing it into the distance."
+# REWRITTEN 2026-10-10 (STYLE-OVERHAUL Prompt 1). It named "the size of a barn
+# or a hillside" and offered only two wrongnesses (far larger, far older and
+# more worn), and the review found barn in 21 of 33 days and ancient/older in
+# 37 of 52 highlights across six styles. The kind of wrongness is now drawn per
+# run from highlight_modes, the scale comparison is left to the scene, and wear
+# is the dial's condition. "Never modern, manufactured or electronic" stays:
+# that is this world's, whatever the mode.
+highlight = "One thing, native to this world and made of its own materials, that is wrong in exactly one way; today's kind of wrongness is given with this definition. Whatever the wrongness, it is never modern, manufactured or electronic. It is solid and lit like everything else; it does not glow, float, shimmer or look magical. Nothing in the scene explains why it is there. Where its wrongness is size, choose a scale comparison native to this scene, never the same one twice, and put part of it in shot, close (the foot of it, one edge, the shadow it throws) rather than shrinking it or pushing it to the back of the frame."
+# One drawn per run, never one of ghibli's last 2.
+highlight_modes = [
+  "far too large for its kind",
+  "far older than everything around it",
+  "awake when it should be inert",
+  "in the wrong element (a boat in a tree, a house on a river)",
+  "one of a crowd where there should be only one",
+  "being used for a job it was never built for",
+]
 # `forbids` removed 2026-09-20 at Garrett's direction: a poorly introduced
 # control from too far back in the iteration process. A charter says what
 # a world IS; it should not need a list of what it is not.

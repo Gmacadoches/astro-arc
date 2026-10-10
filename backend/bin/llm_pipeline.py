@@ -491,15 +491,23 @@ _CHARTER_FIELDS = (
 # in that material. This text is the fallback for styles with no charter yet,
 # so their behaviour does not change until they are chartered. The data key
 # stays `anomaly` so archived records and sweeps keep reading.
+#
+# Rewritten 2026-10-10 (STYLE-OVERHAUL Prompt 1): it named "the size of a barn
+# or a hillside" and "far older and more worn", and barn reached 21 of 33 days
+# and ancient/older 37 of 52 highlights. No size comparison is named now, wear
+# is the dial's condition, and "far older" gave way to a wrong place, so an
+# unchartered style's highlight is not always an antique. A style's own
+# highlight_modes, when it has them, say today's kind of wrongness.
 DEFAULT_HIGHLIGHT = (
     "One thing, native to this world and made of its own materials, that is wrong in exactly "
-    "one way: far too large for its kind (the size of a barn or a hillside where its kind is the "
-    "size of a hand or a room) or far older and more worn than everything around it (older, never "
-    "newer: never modern, manufactured or electronic). It is solid, heavy and lit like everything "
-    "else; it does not glow, float, shimmer or look magical. Nothing in the scene explains why it "
-    "is there. If it is enormous, put part of it in shot, close (the foot of it, one edge, the "
-    "shadow it throws) rather than shrinking it or pushing it into the distance."
+    "one way: far too large for its kind, or somewhere its kind could never be. It is solid and "
+    "lit like everything else; it does not glow, float, shimmer or look magical. Nothing in the "
+    "scene explains why it is there. If it is large, choose a scale comparison native to this "
+    "scene, never the same one twice, and put part of it in shot, close (one edge, the shadow it "
+    "throws) rather than shrinking it or pushing it to the back of the frame."
 )
+
+HIGHLIGHT_MODES_LEN = (4, 6)
 
 
 def load_style_highlight(style_key):
@@ -508,6 +516,27 @@ def load_style_highlight(style_key):
     world = (load_styles().get(style_key) or {}).get("world") or {}
     text = str(world.get("highlight") or "").strip() if isinstance(world, dict) else ""
     return text or DEFAULT_HIGHLIGHT
+
+
+def load_highlight_modes(style_key):
+    """`highlight_modes` under `[<style>.world]`: 4-6 kinds of wrongness, one
+    drawn per run, or None for a style without them."""
+    world = (load_styles().get(style_key) or {}).get("world") or {}
+    values = world.get("highlight_modes") if isinstance(world, dict) else None
+    if values is None:
+        return None
+    lo, hi = HIGHLIGHT_MODES_LEN
+    values = [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
+    if not lo <= len(values) <= hi:
+        raise PipelineError(f"styles.toml [{style_key}.world] highlight_modes has {len(values)} "
+                            f"entries; it needs {lo} to {hi}")
+    return values
+
+
+def highlight_with_mode(highlight, dial):
+    """The highlight definition with today's drawn kind of wrongness, if any."""
+    mode = (dial or {}).get("highlightMode")
+    return f"{highlight} Today's kind of wrongness: {mode}." if mode else highlight
 
 
 class _BriefValues(dict):
@@ -1446,6 +1475,11 @@ def draw_style_choices(style_key, dial, history, period_key):
         draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
         dial["space"] = draws["space"]
 
+    modes = load_highlight_modes(style_key)
+    if modes:
+        draws["highlightMode"] = _draw(rng, modes, _recent_draws(history, style_key, "highlightMode"), 1)[0]
+        dial["highlightMode"] = draws["highlightMode"]
+
     return dial, draws
 
 
@@ -1782,7 +1816,8 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
         line = load_register_line(style_key, secondary_register)
         user_lines.append(f"SECONDARY REGISTER — may supply one or two pieces: {secondary_register}"
                           + (f"\n  In this world: {line}" if line else ""))
-    user_lines.append(f"THE HIGHLIGHT — what it is in this world: {load_style_highlight(style_key)}")
+    user_lines.append("THE HIGHLIGHT — what it is in this world: "
+                      + highlight_with_mode(load_style_highlight(style_key), dial))
     user_lines += [
         f"Reading: {stage1_result['reading']}",
         f"Distillation: {stage1_result['distillation']}",
@@ -2157,7 +2192,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         f"  Verbs of interaction to draw on: {dial['verbs']}.",
         f"  The two registers: {'COLLIDE' if dial['registerCohesion'] == 'collide' else 'COHERE — build one continuous material world, not two things meeting'}.",
         f"  REQUIRED: the primary register ({register}) must put at least one substantial thing of its own in the frame, named explicitly, beyond the objects you were given. A scene that merely takes place near that material does not count — if the register is \"mechanical\" an actual mechanism with working parts is visible; if \"aquatic\", real water; if \"bodily and anatomical\", actual anatomy as material rather than a person standing there.",
-        f"  What a highlight is in this world: {highlight or DEFAULT_HIGHLIGHT}",
+        f"  What a highlight is in this world: {highlight_with_mode(highlight or DEFAULT_HIGHLIGHT, dial)}",
         f"  How prominent the highlight is in this image: {dial.get('prominence') or _PROMINENCE_BY_INTENSITY['mid']}",
         f"  The highlight, and how the actor treats it: {dial['anomalyRelation']}",
     ]
