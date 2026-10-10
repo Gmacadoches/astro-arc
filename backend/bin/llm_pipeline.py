@@ -1699,6 +1699,9 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     if dial is None:
         dial = dict(NO_TEXTURE_DIAL)
     natal_hash = _natal_hash(config)
+    # The charter is an input as well as the style key: editing it must
+    # re-draw that day's meaning, not serve one written for the old wording.
+    charter_hash = hashlib.sha256(style_world.encode()).hexdigest()[:12]
     cache_path = AMPLIFICATIONS_DIR / f"{period_key}.json"
     if cache and cache_path.exists():
         try:
@@ -1712,6 +1715,7 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
             if (cached.get("constellation")
                     and cached.get("natalHash") == natal_hash
                     and cached.get("styleKey") == style_key
+                    and cached.get("charterHash") == charter_hash
                     and cached.get("schemaVersion") == STAGE15_SCHEMA_VERSION):
                 return cached, None
         except (json.JSONDecodeError, OSError):
@@ -1807,6 +1811,7 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     result["generatedAt"] = datetime.now(timezone.utc).isoformat()
     result["natalHash"] = natal_hash
     result["styleKey"] = style_key
+    result["charterHash"] = charter_hash
     result["schemaVersion"] = STAGE15_SCHEMA_VERSION
     if cache:
         AMPLIFICATIONS_DIR.mkdir(parents=True, exist_ok=True)

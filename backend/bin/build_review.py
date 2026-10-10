@@ -187,7 +187,8 @@ PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">
         <div class="meta-row"><span class="label">Register</span><span class="chip">{register}</span>{secondary_register_chip}</div>
         <div class="meta-row"><span class="label">Constellation</span><span class="chip">{constellation}</span></div>
         <div class="meta-row"><span class="label">Objects</span>{amplification_chips}</div>
-        <div class="meta-row"><span class="label">Anomaly</span><span class="chip">{intrusion}</span></div>
+        <div class="meta-row"><span class="label">Highlight</span><span class="chip">{intrusion}</span></div>
+        {draws_rows}
         <div class="meta-row"><span class="label">Concept tags</span>{concept_tag_chips}</div>
         <details class="avoided-details">
           <summary><span class="toggle-icon"><span class="plus">+</span><span class="minus">&minus;</span></span><span class="label">Avoided (recent)</span></summary>
@@ -303,6 +304,28 @@ def _cost_note(cost):
     )
 
 
+# The per-style draws (llm_pipeline.draw_style_choices), in the order they
+# shape the prompt. Runs before 2026-10-10 have none and show nothing.
+_DRAW_LABELS = (
+    ("highlightMode", "Highlight mode"),
+    ("condition", "Condition"),
+    ("space", "Space"),
+    ("processVerbs", "Process verbs"),
+    ("actorVerbs", "Actor verbs"),
+)
+
+
+def _draws_rows(draws):
+    rows = []
+    for key, label in _DRAW_LABELS:
+        value = draws.get(key)
+        if not value:
+            continue
+        chips = "".join(_chip(v) for v in value) if isinstance(value, list) else _chip(value)
+        rows.append(f'<div class="meta-row"><span class="label">{label}</span>{chips}</div>')
+    return "\n        ".join(rows)
+
+
 def _fmt_cost(value):
     if value is None:
         return "—"
@@ -340,7 +363,8 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         constellation=_esc(meta.get("constellation") or "—"),
         amplification_chips=("".join(_chip(o, "tag") for o in (meta.get("amplificationObjects") or []))
                              or '<span class="chip">—</span>'),
-        intrusion=_esc(meta.get("intrusion") or "—"),
+        intrusion=_esc(meta.get("anomaly") or meta.get("intrusion") or "—"),
+        draws_rows=_draws_rows(meta.get("draws") or {}),
         concept_tag_chips="".join(_chip(t, "tag") for t in concept_tags) or '<span class="chip">none</span>',
         avoided_chips="".join(_chip(t) for t in avoided) or '<span class="chip">none yet</span>',
         # The natal visual signature was removed on 2026-10-08; older runs keep
