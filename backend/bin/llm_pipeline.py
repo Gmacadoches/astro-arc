@@ -1269,6 +1269,10 @@ def dial_from_texture(texture):
 
     return {
         "mode": "coherent",
+        # Kept so the per-style draws (draw_style_choices) know which half of
+        # each array to draw from without re-reading the texture.
+        "polarity": polarity,
+        "intensityBand": intensity_band,
         "sites": sites,
         "objectRange": objects,
         "thingRange": things,
@@ -1289,6 +1293,107 @@ def dial_from_texture(texture):
             "This timeframe is not under strain. Do not import darkness it does not have."
         ),
     }
+
+
+# ---- Per-style draws (STYLE-OVERHAUL Prompt 1, 2026-10-10) -----------------
+#
+# A review of 142 archived runs found the same verbs (spill 44, feed 36, bear
+# down 28 ...), the same far-off distance, the same giant ancient worn highlight
+# and the same vessels in every style, copied from fixed text every style
+# receives. The fixed lists move into each charter as arrays, and each run
+# draws a few entries, never ones this style drew in its last
+# STYLE_RECENCY runs.
+#
+# Seeded from period_key + style + the history length, so a sweep (which keeps
+# its own in-memory history) is reproducible, but a same-day regenerate, which
+# comes after one more history entry, draws differently.
+
+VERB_ARRAYS = ("process_hard", "process_soft", "actor_hard", "actor_soft")
+VERB_ARRAY_LEN = (20, 30)
+VERB_DRAW = 3
+SPACE_ARRAY_LEN = (6, 8)
+STYLE_RECENCY = 2
+
+
+def _style_table(style_key, name):
+    table = (load_styles().get(style_key) or {}).get(name)
+    return table if table is not None else None
+
+
+def load_style_verbs(style_key):
+    """`[<style>.verbs]` as {array: [verb, ...]}, or None for a style without
+    one -- which keeps the global _VERBS_* / _ACTOR_VERBS_* strings, so an
+    unchartered style behaves as before. A table that is present must carry
+    all four arrays at 20-30 entries each; anything else raises, because a
+    half-written list would quietly hand Stage 2 three verbs from a dozen."""
+    table = _style_table(style_key, "verbs")
+    if table is None:
+        return None
+    if not isinstance(table, dict):
+        raise PipelineError(f"styles.toml [{style_key}.verbs] must be a table")
+    lo, hi = VERB_ARRAY_LEN
+    out = {}
+    for name in VERB_ARRAYS:
+        values = [str(v).strip() for v in (table.get(name) or []) if str(v).strip()]
+        if not lo <= len(values) <= hi:
+            raise PipelineError(f"styles.toml [{style_key}.verbs] {name} has {len(values)} "
+                                f"entries; it needs {lo} to {hi}")
+        if len(set(values)) != len(values):
+            raise PipelineError(f"styles.toml [{style_key}.verbs] {name} repeats an entry")
+        out[name] = values
+    return out
+
+
+def _style_history(history, style_key):
+    return [e for e in history if e.get("artStyle") == style_key]
+
+
+def _recent_draws(history, style_key, key, window=STYLE_RECENCY):
+    """Everything this style drew under `key` in its last `window` runs."""
+    used = set()
+    for entry in _style_history(history, style_key)[:window]:
+        value = (entry.get("draws") or {}).get(key)
+        if isinstance(value, list):
+            used.update(value)
+        elif value:
+            used.add(value)
+    return used
+
+
+def _style_rng(period_key, style_key, history):
+    seed = hashlib.sha256(f"{period_key}|{style_key}|{len(history)}".encode()).hexdigest()
+    return random.Random(int(seed[:16], 16))
+
+
+def _draw(rng, pool, used, k):
+    """k entries of `pool` not in `used`, falling back to the whole pool when
+    fewer than k are left. File order in, so the seed alone decides."""
+    fresh = [x for x in pool if x not in used]
+    if len(fresh) < k:
+        fresh = list(pool)
+    return rng.sample(fresh, min(k, len(fresh)))
+
+
+def draw_style_choices(style_key, dial, history, period_key):
+    """This run's draws from the style's charter arrays, and the dial with them
+    applied: (dial, draws). `draws` is what goes into the history entry (so the
+    next run can exclude it) and into pipeline-meta (so the run page can show
+    it). Keys a style has no array for are simply absent."""
+    dial = dict(dial)
+    draws = {}
+    rng = _style_rng(period_key, style_key, history)
+    hard = (dial.get("polarity") or "soft") == "hard"
+
+    verbs = load_style_verbs(style_key)
+    if verbs:
+        process = verbs["process_hard" if hard else "process_soft"]
+        actor = verbs["actor_hard" if hard else "actor_soft"]
+        draws["processVerbs"] = _draw(rng, process, _recent_draws(history, style_key, "processVerbs"), VERB_DRAW)
+        draws["actorVerbs"] = _draw(rng, actor, _recent_draws(history, style_key, "actorVerbs"), VERB_DRAW)
+        dial["verbs"] = ", ".join(draws["processVerbs"])
+        dial["actorVerbs"] = ", ".join(draws["actorVerbs"])
+
+    return dial, draws
 
 
 # The anomaly (2026-09-12, was "intrusion"): it used to be an object from "a
@@ -2094,6 +2199,10 @@ def build(reading, config):
     history = load_history()
     registers = load_registers()
     cliches = load_cliches()
+    # Per-style draws (verbs, ...) from the charter's arrays, never repeating
+    # what this style drew in its last STYLE_RECENCY runs. Before Stage 1.5,
+    # because the dial they change is one of its inputs.
+    dial, draws = draw_style_choices(style_key, dial, history, period_key)
     register, secondary_register = pick_registers(history, registers, dial["registerCohesion"])
     amplification, stage15_cost = stage15_amplify(
         stage1, stage1_model, period_key, config, dial=dial,
@@ -2152,6 +2261,10 @@ def build(reading, config):
         # rather than a change of shape.
         "register": register,
         "secondaryRegister": secondary_register,
+        # The style and its draws, so the next run of this style can exclude
+        # what this one drew (see draw_style_choices).
+        "artStyle": style_key,
+        "draws": draws,
     }
     # NOT saved here as of 2026-10-08. build() runs before the image call, so
     # saving the entry now meant a render refused by the provider still counted
@@ -2192,6 +2305,7 @@ def build(reading, config):
         "pipelineMode": dial["mode"],
         "texture": reading["arc"].get("texture"),
         "dial": {k: v for k, v in dial.items() if k != "mode"},
+        "draws": draws,
         "avoidedConcepts": avoid,
         "artStyle": style_key,
         # The display name for that key (styles.toml's own `label`), so
