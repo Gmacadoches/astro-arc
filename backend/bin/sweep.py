@@ -305,9 +305,10 @@ def main():
     for i, (primary, secondary) in enumerate(jobs, start=1):
         dial = job_dials[i - 1]
         draws = {}
+        history_entry = {"artStyle": style_key}
         if dial is not None and hasattr(lp, "draw_style_choices"):
             dial, draws = lp.draw_style_choices(style_key, dial, sweep_history, period_key)
-            sweep_history.insert(0, {"artStyle": style_key, "draws": draws})
+            history_entry["draws"] = draws
         name = slug(primary) + ("__" + slug(secondary) if secondary else "")
         stem = f"{i:02d}_{name}"
         print(f"[{i}/{len(jobs)}] {primary}" + (f" + {secondary}" if secondary else ""), file=sys.stderr)
@@ -318,11 +319,16 @@ def main():
         sample_amp = amplification
         material_cost = None
         if split and amplification is not None:
+            material_kwargs = {}
+            if hasattr(lp, "recent_material"):
+                material_kwargs["avoid_material"] = lp.recent_material(sweep_history)
             material, material_cost = lp.stage15_material(
                 stage1, amplification, stage1_model, config, dial=dial,
                 style_key=style_key, style_world=lp.load_style_world(style_key),
-                register=primary, secondary_register=secondary)
+                register=primary, secondary_register=secondary, **material_kwargs)
             sample_amp = {**amplification, **material}
+            history_entry["objects"] = material.get("objects") or []
+            history_entry["highlight"] = material.get("anomaly") or ""
             total_cost += material_cost or 0.0
         if sample_amp is not None:
             kwargs["amplification"] = sample_amp
@@ -434,6 +440,7 @@ def main():
 
         (out_dir / f"{stem}.json").write_text(json.dumps(record, indent=2))
         results.append(record)
+        sweep_history.insert(0, history_entry)
 
     summary = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),

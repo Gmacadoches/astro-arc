@@ -749,6 +749,26 @@ def recent_constellations(window=AMPLIFY_AVOID_WINDOW, exclude=None):
     return out
 
 
+# Objects and highlights are drawn fresh every run, but nothing stopped the
+# same ones coming back: the archive has one day's divination cup and votive
+# liver in 12 runs across 4 styles. The last few runs' material is passed to
+# the material call as spent, the way recent_constellations is to the meaning.
+MATERIAL_AVOID_WINDOW = 6
+
+
+def recent_material(history, window=MATERIAL_AVOID_WINDOW):
+    """The objects and highlights of the last `window` runs of any style,
+    most recent first, deduped. Entries from before 2026-10-10 carry neither
+    and contribute nothing."""
+    out = []
+    for entry in history[:window]:
+        for item in list(entry.get("objects") or []) + [entry.get("highlight")]:
+            item = (item or "").strip() if isinstance(item, str) else ""
+            if item and item not in out:
+                out.append(item)
+    return out
+
+
 def recent_actor_kinds(window=ACTOR_VETO_WINDOW, exclude=None):
     """The last `window` actor kinds, most recent first, for Stage 1.5 to pick
     around. Same source and same shape as recent_constellations, because it is
@@ -1806,7 +1826,8 @@ def load_register_line(style_key, register):
 
 
 def stage15_material(stage1_result, meaning, model, config, dial=None, style_key=None,
-                     style_world="", register=None, secondary_register=None):
+                     style_world="", register=None, secondary_register=None,
+                     avoid_material=None):
     """The MATERIAL half of Stage 1.5: objects and the highlight (key
     `anomaly`, see DEFAULT_HIGHLIGHT), built
     from the day's register. Never cached -- every generation, regenerates
@@ -1820,6 +1841,9 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
     `meaning` is stage15_meaning's result. Its stored tonalDirection is used
     rather than the current dial's, so the material runs in the same direction
     as the meaning it was written for even when the Moon has moved since.
+
+    `avoid_material` is recent_material()'s list: the last runs' objects and
+    highlights, passed as spent. None or [] sends nothing.
 
     Returns (result_dict, cost)."""
     if dial is None:
@@ -1863,6 +1887,11 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
     # already weathered on a day whose things are newly made.
     if dial.get("condition"):
         user_lines.append(f"Condition of things in this scene: {dial['condition']}.")
+    if avoid_material:
+        user_lines.append(
+            "RECENTLY USED — these pieces and highlights are spent; do not reuse these or close variants:\n"
+            + "\n".join(f"  - {m}" for m in avoid_material)
+        )
 
     result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1",
                                temperature=0.95, stage="stage15")
@@ -1886,7 +1915,8 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
 
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
                     avoid_archetypes=None, avoid_kinds=None, style_key=None,
-                    style_world="", register=None, secondary_register=None, material=True):
+                    style_world="", register=None, secondary_register=None, material=True,
+                    avoid_material=None):
     """Stage 1.5, both halves: the day's MEANING (cached per period, see
     stage15_meaning) and fresh MATERIAL for this register (never cached, see
     stage15_material), merged into the one dict Stage 2 and the records have
@@ -1905,7 +1935,8 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
         return meaning, meaning_cost
     mat, material_cost = stage15_material(
         stage1_result, meaning, model, config, dial=dial, style_key=style_key,
-        style_world=style_world, register=register, secondary_register=secondary_register)
+        style_world=style_world, register=register, secondary_register=secondary_register,
+        avoid_material=avoid_material)
     cost = (meaning_cost or 0.0) + (material_cost or 0.0)
     return {**meaning, **mat}, cost
 
@@ -2335,6 +2366,7 @@ def build(reading, config):
         stage1, stage1_model, period_key, config, dial=dial,
         style_key=style_key, style_world=load_style_world(style_key),
         register=register, secondary_register=secondary_register,
+        avoid_material=recent_material(history),
     )
     avoid = avoid_concepts(history)
     style_label, style_guidance = load_style_info(style_key)
@@ -2392,6 +2424,9 @@ def build(reading, config):
         # what this one drew (see draw_style_choices).
         "artStyle": style_key,
         "draws": draws,
+        # For recent_material: the next runs' material call treats these as spent.
+        "objects": amplification.get("objects") or [],
+        "highlight": amplification.get("anomaly") or "",
     }
     # NOT saved here as of 2026-10-08. build() runs before the image call, so
     # saving the entry now meant a render refused by the provider still counted
