@@ -485,6 +485,19 @@ _CHARTER_FIELDS = (
 )
 
 
+
+# ===========================================================================
+# FALLBACKS FOR AN UNCHARTERED STYLE
+#
+# As of 2026-10-10 (STYLE-OVERHAUL Prompt 4) every shipped style has a
+# charter with its own highlight, brief rules, signature and verbs, so nothing
+# below reaches a shipped style. It is kept, in one place, for a new or
+# user-created style that has no charter yet, which then behaves the way every
+# style did before it was chartered. NOT here: the global light lines
+# (_LIGHT_BY_EXPOSURE), which five of the seven styles still use because only
+# cosmic and cyberpunk have a [light] table.
+# ===========================================================================
+
 # THE HIGHLIGHT, 2026-10-09. The one thing in a scene the eye goes to first.
 # Until today this was "the anomaly", defined once for every style in Stage
 # 1.5's and Stage 2's prompts -- wrong in exactly one way, far LARGER or far
@@ -510,6 +523,66 @@ DEFAULT_HIGHLIGHT = (
     "scene, never the same one twice, and put part of it in shot, close (one edge, the shadow it "
     "throws) rather than shrinking it or pushing it to the back of the frame."
 )
+
+# The brief rules every style ran on until 2026-09-26, verbatim, with the dial
+# values as {placeholders}. They were written for ghibli and now live in
+# [ghibli.brief]; this copy is only the fallback for styles that have not been
+# chartered yet (symbolist, engraving, cosmic, ukiyoe, illuminated), so their
+# output does not change until someone decides what theirs should be -- the
+# same migration strategy as `guidance` standing in for a missing charter.
+DEFAULT_STAGE2_BRIEF = (
+    "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, "
+    "and nothing in the scene treats it as remarkable; it may be the highlight. Not a decorated version of an ordinary "
+    "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
+    "structure that walks or floats or grew where it stands, a being that is plainly not a "
+    "person. Build it from this world's own materials, give it real weight, light it "
+    "like everything else, and let the actor treat it the way they would a wall. An image "
+    "in which everything could exist is a failed response.\n"
+    "    What temper it is in: {wonderTone}\n"
+    "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
+    "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
+    "is just a texture; it only becomes huge beside something that is not.",
+    "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or depth that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out. Name what is out there rather than that it is far: not \"beyond\", \"in the distance\" or \"far off\".",
+)
+
+# STYLE-OVERHAUL Prompt 2: one thing in frame that could only exist in this
+# world. A charter writes its own as `signature` in [<style>.brief]; ghibli's
+# THE IMPOSSIBLE (`impossible`) already does this job. Everyone else gets this.
+SIGNATURE_KEYS = ("signature", "impossible")
+DEFAULT_SIGNATURE = ("SIGNATURE — at least one thing in frame could only exist in {styleLabel}'s "
+                     "world, named explicitly. It may be the highlight or the actor. An image that "
+                     "could be relabelled as another style is a failed response.")
+
+# Verbs decide which relations get depicted, so this is shape, not flavor. The old
+# list was six pressure verbs plus two neutral ones, applied unconditionally.
+# Since 2026-10-10 these are a FALLBACK for a style with no [verbs] table, and
+# are drawn from three at a time like a charter's (draw_style_choices), so
+# each list was lengthened to keep any one verb out of most prompts.
+_VERBS_HARD = ("feeding, binding, eroding, crushing, spilling into, bearing down on, toppling, "
+               "splitting, flooding, smothering, scorching, cracking open")
+_VERBS_SOFT = ("holding, drying, ripening, settling, leaning against, warming, being mended, "
+               "being carried, drifting, rising, cooling, swaying")
+
+# Grouped by activity since 2026-10-10, like a charter's actor tables; the
+# rest/play/ritual/travel groups are new.
+_ACTOR_VERBS_HARD = {
+    "work": "hauling, prising, bracing against, digging out, striking, shouldering, forcing",
+    "rest": "sheltering under, waiting out, being pinned by",
+    "ritual": "keeping vigil over, burning something at",
+    "travel": "climbing, pushing through, being carried off by",
+}
+_ACTOR_VERBS_SOFT = {
+    # "feeding" left this list 2026-10-10: it is also in _VERBS_HARD, so a
+    # style on the fallback drew it twice as often as anything else (33%).
+    "work": "tending, mending, sorting, washing, harvesting, carrying",
+    "rest": "sleeping beside, eating, sitting with",
+    "play": "playing, watching something at work, listening to",
+    "travel": "walking past, riding, arriving at",
+}
+
+# ===========================================================================
+# END OF FALLBACKS
+# ===========================================================================
 
 HIGHLIGHT_MODES_LEN = (4, 6)
 
@@ -554,35 +627,6 @@ class _BriefValues(dict):
         return "{" + key + "}"
 
 
-# The brief rules every style ran on until 2026-09-26, verbatim, with the dial
-# values as {placeholders}. They were written for ghibli and now live in
-# [ghibli.brief]; this copy is only the fallback for styles that have not been
-# chartered yet (symbolist, engraving, cosmic, ukiyoe, illuminated), so their
-# output does not change until someone decides what theirs should be -- the
-# same migration strategy as `guidance` standing in for a missing charter.
-DEFAULT_STAGE2_BRIEF = (
-    "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, "
-    "and nothing in the scene treats it as remarkable; it may be the highlight. Not a decorated version of an ordinary "
-    "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
-    "structure that walks or floats or grew where it stands, a being that is plainly not a "
-    "person. Build it from this world's own materials, give it real weight, light it "
-    "like everything else, and let the actor treat it the way they would a wall. An image "
-    "in which everything could exist is a failed response.\n"
-    "    What temper it is in: {wonderTone}\n"
-    "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
-    "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
-    "is just a texture; it only becomes huge beside something that is not.",
-    "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or depth that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out. Name what is out there rather than that it is far: not \"beyond\", \"in the distance\" or \"far off\".",
-)
-
-
-# STYLE-OVERHAUL Prompt 2: one thing in frame that could only exist in this
-# world. A charter writes its own as `signature` in [<style>.brief]; ghibli's
-# THE IMPOSSIBLE (`impossible`) already does this job. Everyone else gets this.
-SIGNATURE_KEYS = ("signature", "impossible")
-DEFAULT_SIGNATURE = ("SIGNATURE — at least one thing in frame could only exist in {styleLabel}'s "
-                     "world, named explicitly. It may be the highlight or the actor. An image that "
-                     "could be relabelled as another style is a failed response.")
 
 
 def load_style_brief(style_key):
@@ -1146,15 +1190,6 @@ _DENSITY_BY_MULTIPLICITY = (
     (99,        3,     (4, 6),    (6, 10), (100, 130)),
 )
 
-# Verbs decide which relations get depicted, so this is shape, not flavor. The old
-# list was six pressure verbs plus two neutral ones, applied unconditionally.
-# Since 2026-10-10 these are a FALLBACK for a style with no [verbs] table, and
-# are drawn from three at a time like a charter's (draw_style_choices), so
-# each list was lengthened to keep any one verb out of most prompts.
-_VERBS_HARD = ("feeding, binding, eroding, crushing, spilling into, bearing down on, toppling, "
-               "splitting, flooding, smothering, scorching, cracking open")
-_VERBS_SOFT = ("holding, drying, ripening, settling, leaning against, warming, being mended, "
-               "being carried, drifting, rising, cooling, swaying")
 
 # How close the event sits — never whether the frame is open. The "hi" cell used
 # to read "short sightlines, no far distance to escape into", which is a direct
@@ -1306,22 +1341,6 @@ _ACTOR_SITE_RELATION = {
 # reaction-shaped verb there is and would contradict the rule that no figure's
 # job is to react; and "watching"/"listening to" are kept only in the sense of
 # attending to a thing at work, never to a face.
-# Grouped by activity since 2026-10-10, like a charter's actor tables; the
-# rest/play/ritual/travel groups are new.
-_ACTOR_VERBS_HARD = {
-    "work": "hauling, prising, bracing against, digging out, striking, shouldering, forcing",
-    "rest": "sheltering under, waiting out, being pinned by",
-    "ritual": "keeping vigil over, burning something at",
-    "travel": "climbing, pushing through, being carried off by",
-}
-_ACTOR_VERBS_SOFT = {
-    # "feeding" left this list 2026-10-10: it is also in _VERBS_HARD, so a
-    # style on the fallback drew it twice as often as anything else (33%).
-    "work": "tending, mending, sorting, washing, harvesting, carrying",
-    "rest": "sleeping beside, eating, sitting with",
-    "play": "playing, watching something at work, listening to",
-    "travel": "walking past, riding, arriving at",
-}
 
 # What a reading with NO texture block degrades to — an old reading-*.json from
 # before the texture existed, or a hand-pinned input. These are the pre-dial
