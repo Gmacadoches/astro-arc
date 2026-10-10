@@ -1206,7 +1206,9 @@ _DENSITY_BY_MULTIPLICITY = (
 # no [space] array.
 _SPATIAL_BY_INTENSITY = {
     "hi": "The event is close and large, pressing into the foreground — the viewer is inside it rather than observing it. The pressure comes from its scale and nearness, not from being shut in: the world still continues past it to {deep}.",
-    "mid": "The event sits a few paces from the viewer, with one clear middle ground and {deep} behind it, real but untroubled.",
+    # "a few paces from the viewer" (2026-10-10, itself a rewording) was copied
+    # into 27% of 56 cross-style prompts the same day.
+    "mid": "The event is in the middle ground, neither pressing on the viewer nor small at the back, with {deep} behind it, real but untroubled.",
     "lo": "The event is small and peripheral — off to one side, or partly out of view. Most of the frame is world, not event.",
 }
 
@@ -1249,7 +1251,9 @@ _LIGHT_BY_EXPOSURE = {
     # obeyed: across the cyberpunk (a) sweeps and ghibli's darkest cell, lo
     # cells came back overcast day, sunset, or full sun.
     "lo": "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response.",
-    "mid": "Raking, partial light — lit and unlit areas both substantial, with a clear direction to the light.",
+    # "Raking, partial light" until 2026-10-10: "raking" was copied into 32% of
+    # 56 cross-style prompts. Same meaning, no adjective to copy.
+    "mid": "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response.",
     # Rewritten 2026-09-26 to match "lo": a count and a failure condition. Once
     # lo was fixed, cyberpunk's rain-and-neon pulled hi cells to dusk and sunset
     # (cp-a4-*), because a mood line gives nothing to push back with.
