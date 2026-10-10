@@ -166,6 +166,12 @@ strangeness = "The genuinely strange is completely unremarkable. Enormous unexpl
 numinous = "Spirits are ordinary residents. They take a body, a size and a job — a bathhouse worker, a river that is also somebody, a soot-coloured swarm that carries coal, a boar the length of a field, a forest thing that turns its head. They are solid, they displace air, they leave prints, and they are lit like everything else. People greet them, avoid them, or work alongside them without comment. Never a glow, a mist or a translucency — if it could be painted as a light effect it is not one of these."
 dread = "This world at its darkest is not a different world, it is this one with the other face turned out. Gods and creatures are maimed, sickened, or boiling with something under the skin; a thing the length of a hillside can be in agony and destroying everything it crosses. Industry eats the forest and the people doing the eating have good reasons. Violence is sudden, physical and costly — an arm taken off, a wound that will not close, a curse spreading up a limb — and it is never relished by the frame. Nobody here is simply good or simply bad, and the image should not tell you whom to side with."
 favoured_actors = "This world is richest in creatures with their own purposes, part-human figures, spirits holding a trade, swarms, and machines that may be awake. A lone ordinary person is the least interesting inhabitant available and should not be the default — reach for the others first where the constellation allows one."
+# highlight added 2026-10-09: the thing the eye goes to first. This is the
+# "anomaly" wording every style used to share (wrong in one way, larger or
+# older, solid, unexplained, cropped if enormous), moved here because it is
+# this world's logic and not a universal one. Tested under the old name across
+# the 2026-09 sweeps; reworded only to stand alone.
+highlight = "One thing, native to this world and made of its own materials, that is wrong in exactly one way: far too large for its kind (the size of a barn or a hillside where its kind is the size of a hand or a room) or far older and more worn than everything around it (older, never newer: never modern, manufactured or electronic). It is solid, heavy and lit like everything else; it does not glow, float, shimmer or look magical. Nothing in the scene explains why it is there. If it is enormous, put part of it in shot, close (the foot of it, one edge, the shadow it throws) rather than shrinking it or pushing it into the distance."
 # `forbids` removed 2026-09-20 at Garrett's direction: a poorly introduced
 # control from too far back in the iteration process. A charter says what
 # a world IS; it should not need a list of what it is not.
@@ -186,14 +192,16 @@ favoured_actors = "This world is richest in creatures with their own purposes, p
 # THE IMPOSSIBLE: until it existed wonder was only DESCRIBED in the charter
 # and nothing required it, so a world of walking machines reliably produced a
 # plausible flour mill. A charter says what MAY exist; only the brief makes
-# something appear. {wonder}/{wonderTone} are filled from the dial.
+# something appear. {wonderTone} is filled from the dial. (A {wonder}
+# scale line went on 2026-10-09: prominence is now a style-neutral brief line
+# about the highlight, sent to every style.)
 #
 # OPENNESS: these are wallpapers; an enclosed room reads as claustrophobic at
 # desktop size however good its content. "Open means depth, not daylight" was
 # added 2026-09-26: without it, dark cells resolved "half the frame open" as
 # a lit sky.
 [ghibli.brief]
-impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary thing: a machine that is clearly alive or awake, a creature far too large for its kind, a structure that walks or floats or grew where it stands, a being that is plainly not a person. Build it from this world's own materials, give it real weight and wear, light it like everything else, and let the actor work around it the way they would a wall. An image in which everything could exist is a failed response.\n    How much of the frame it takes: {wonder}\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
+impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable. Not a decorated version of an ordinary thing: a machine that is clearly alive or awake, a creature far too large for its kind, a structure that walks or floats or grew where it stands, a being that is plainly not a person. Build it from this world's own materials, give it real weight and wear, light it like everything else, and let the actor work around it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
 openness = "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
 
 [ghibli]
@@ -311,7 +319,7 @@ favoured_actors = "This world is richest in crowds at the market, the platform a
 [cyberpunk.brief]
 depth = "DEPTH — applies to every image: the eye must travel a long way into the frame, along whatever this place offers — a market aisle running back under awnings, a flooded underpass, a run of rooftops and water tanks, a platform and its tracks, a corridor of doors, a stair falling away, or a canyon between towers. The canyon is one source of depth among many, not the default. Layer behind layer, each smaller and hazier than the last. It does not need sky. At least three distinct layers of distance must be visible behind the nearest subject. A shallow scene with a wall close behind the subject is a failed response, and so is a close-up that crops the city out."
 neon = "NEON AFTER DARK — whenever the light line below puts the scene at night or below where daylight reaches, the main light in the frame is neon: bent glass tube in colour, on its brackets, tinting the haze and every wet surface. Name at least two neon fixtures and say what shape each one traces — a pictogram, a single character, an arrow, a border — never what words it spells. A dark frame lit only by lamps, bulbs or candles is a failed response, and so is a sign made mostly of words. By day the tube may still be there, unlit."
-temper = "TEMPER — the anomaly, and anything numinous in the frame, is in this temper: {wonderTone}"
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
 
 # REGISTERS, 2026-09-26. How this world realises each substance register, one
 # span-and-principle line per register -- never an inventory (see

@@ -135,7 +135,8 @@ def main():
         kwargs = {"amplification": amp, "dial": dial,
                   "register_guidance": lp.load_register_line(style_key, primary),
                   "secondary_register_guidance": lp.load_register_line(style_key, secondary),
-                  "style_brief": lp.load_style_brief(style_key)}
+                  "style_brief": lp.load_style_brief(style_key),
+                  "highlight": lp.load_style_highlight(style_key)}
         if secondary:
             kwargs["secondary_register"] = secondary
         prompt, tags, has_people, c2 = lp.stage2_image_prompt(

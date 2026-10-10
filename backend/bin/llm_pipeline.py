@@ -481,6 +481,35 @@ _CHARTER_FIELDS = (
 )
 
 
+# THE HIGHLIGHT, 2026-10-09. The one thing in a scene the eye goes to first.
+# Until today this was "the anomaly", defined once for every style in Stage
+# 1.5's and Stage 2's prompts -- wrong in exactly one way, far LARGER or far
+# OLDER, never glowing, nothing explains it. That is ghibli's logic of the
+# unremarked strange thing, and every other world inherited it (Garrett: the
+# cyberpunk anomalies "aren't working"). Now each charter says what a highlight
+# is in its world (`highlight`), and a register line may say what form it takes
+# in that material. This text is the fallback for styles with no charter yet,
+# so their behaviour does not change until they are chartered. The data key
+# stays `anomaly` so archived records and sweeps keep reading.
+DEFAULT_HIGHLIGHT = (
+    "One thing, native to this world and made of its own materials, that is wrong in exactly "
+    "one way: far too large for its kind (the size of a barn or a hillside where its kind is the "
+    "size of a hand or a room) or far older and more worn than everything around it (older, never "
+    "newer: never modern, manufactured or electronic). It is solid, heavy and lit like everything "
+    "else; it does not glow, float, shimmer or look magical. Nothing in the scene explains why it "
+    "is there. If it is enormous, put part of it in shot, close (the foot of it, one edge, the "
+    "shadow it throws) rather than shrinking it or pushing it into the distance."
+)
+
+
+def load_style_highlight(style_key):
+    """What a highlight is in this style's world: the charter's `highlight`
+    field, or DEFAULT_HIGHLIGHT for a style with none."""
+    world = (load_styles().get(style_key) or {}).get("world") or {}
+    text = str(world.get("highlight") or "").strip() if isinstance(world, dict) else ""
+    return text or DEFAULT_HIGHLIGHT
+
+
 class _BriefValues(dict):
     """format_map source for brief rules: the dial's values by key, with an
     unknown or missing key left visible as "{key}" rather than raising, so a
@@ -506,7 +535,6 @@ DEFAULT_STAGE2_BRIEF = (
     "person. Build it from this world's own materials, give it real weight and wear, light it "
     "like everything else, and let the actor work around it the way they would a wall. An image "
     "in which everything could exist is a failed response.\n"
-    "    How much of the frame it takes: {wonder}\n"
     "    What temper it is in: {wonderTone}\n"
     "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
     "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
@@ -521,8 +549,8 @@ def load_style_brief(style_key):
     reads as "use DEFAULT_STAGE2_BRIEF". An empty table is a real answer (no
     style-specific rules) and returns [], not None.
 
-    Rule text may use the dial's string values as {placeholders} ({wonder},
-    {wonderTone}, {light}, ...)."""
+    Rule text may use the dial's string values as {placeholders}
+    ({wonderTone}, {light}, ...)."""
     brief = (load_styles().get(style_key) or {}).get("brief")
     if not isinstance(brief, dict):
         return None
@@ -1063,10 +1091,15 @@ _SPATIAL_BY_INTENSITY = {
 # _SPATIAL_BY_INTENSITY, because the alternative — a constant level of wonder —
 # is exactly the invariant the texture work exists to break. An image that is
 # always astonishing stops being astonishing.
-_WONDER_BY_INTENSITY = {
-    "lo": "ONE impossible thing, and it is quiet: off to a side, half-seen, or so settled into the place that it reads as furniture. The scene would still make sense without noticing it.",
-    "mid": "ONE impossible thing, plainly present and plainly impossible, at the scale of a building or a large animal. It is part of the day's business, not the event of the day.",
-    "hi": "The impossible DOMINATES. Two or more of them, or one so enormous it sets the shape of the whole frame. The ordinary things are small against it and the actor is smaller still.",
+# How prominent the highlight is, by the day's intensity. Style-neutral on
+# purpose (2026-10-09): the charter says WHAT the highlight is, this says only
+# how much of the frame it takes. It replaces _WONDER_BY_INTENSITY, whose
+# "ONE impossible thing... The impossible DOMINATES" was ghibli's vocabulary
+# and reached only the styles that carried THE IMPOSSIBLE.
+_PROMINENCE_BY_INTENSITY = {
+    "lo": "Small and to one side: half-seen, or so settled into the place that it reads as part of it.",
+    "mid": "Plainly present, at the scale of the larger things in the scene; part of the day's business rather than the event of it.",
+    "hi": "It dominates: it sets the shape of the whole frame, and everything else, the actor included, is small against it.",
 }
 
 # Valence. The same world, at its two tempers — and the reason this is split
@@ -1123,13 +1156,15 @@ _LIGHT_BY_EXPOSURE = {
 # keeps the original behaviour intact — the actor has their back to it — so the
 # unremarked mode survives where it was always strongest.
 #
-# Every cell keeps the invariant: nothing in the scene explains why it is here.
+# Until 2026-10-09 every cell also said "nothing explains why it is here". That
+# is a property of ghibli's highlight, not of how an actor treats one, so it
+# moved into ghibli's charter `highlight` and DEFAULT_HIGHLIGHT.
 _ACTOR_ANOMALY_RELATION = {
-    ("hard", "hi"): "It is acting on the actor — displacing them, blocking the way, pressing on what they are doing, forcing them to work around it. They cannot move it and cannot ignore it. Nothing explains why it is here.",
-    ("hard", "mid"): "The actor is working against it — prising at it, digging it out, dismantling it, hauling at it — and is not winning yet. Nothing explains why it is here.",
-    ("hard", "lo"): "The actor has not seen it. It is behind them, above them, or under their feet, and it is doing something. Nothing explains why it is here.",
-    ("soft", "hi"): "The actor has put it to use — works from it, shelters under it, draws from it, stores in it. Entirely unbothered, and it still goes unexplained.",
-    ("soft", "mid"): "The actor tends it — cleaning, mending, feeding, oiling or watering it, as though it were theirs to look after. Nothing explains why it is here.",
+    ("hard", "hi"): "It is acting on the actor — displacing them, blocking the way, pressing on what they are doing, forcing them to work around it. They cannot move it and cannot ignore it.",
+    ("hard", "mid"): "The actor is working against it — prising at it, digging it out, dismantling it, hauling at it — and is not winning yet.",
+    ("hard", "lo"): "The actor has not seen it. It is behind them, above them, or under their feet, and it is doing something.",
+    ("soft", "hi"): "The actor has put it to use — works from it, shelters under it, draws from it, stores in it. Entirely unbothered.",
+    ("soft", "mid"): "The actor tends it — cleaning, mending, feeding, oiling or watering it, as though it were theirs to look after.",
     ("soft", "lo"): "It has been here longer than the actor has. They live alongside it without thought; it has weathered almost into landscape and stopped being remarkable to anyone.",
 }
 
@@ -1201,12 +1236,11 @@ NO_TEXTURE_DIAL = {
     "registerCohesion": "collide",
     "spatial": None,
     "light": None,
-    "wonder": _WONDER_BY_INTENSITY["mid"],
+    "prominence": _PROMINENCE_BY_INTENSITY["mid"],
     "wonderTone": _WONDER_BY_POLARITY["soft"],
     "anomalyRelation": _ACTOR_ANOMALY_RELATION[("soft", "mid")],
     "objectRelation": _ACTOR_OBJECT_RELATION[("soft", "mid")],
     "siteRelation": _ACTOR_SITE_RELATION[("soft", "mid")],
-    "anomalyTypes": "scale (far too LARGE for its kind — the size of a building where it should be the size of a hand), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
     "tonalDirection": None,
 }
 
@@ -1243,16 +1277,12 @@ def dial_from_texture(texture):
         "actorVerbs": _ACTOR_VERBS_HARD if polarity == "hard" else _ACTOR_VERBS_SOFT,
         "registerCohesion": "collide" if polarity == "hard" else "cohere",
         "spatial": _SPATIAL_BY_INTENSITY[intensity_band],
-        "wonder": _WONDER_BY_INTENSITY[intensity_band],
+        "prominence": _PROMINENCE_BY_INTENSITY[intensity_band],
         "wonderTone": _WONDER_BY_POLARITY["hard" if polarity == "hard" else "soft"],
         "light": _LIGHT_BY_EXPOSURE[exposure_band],
         "anomalyRelation": _ACTOR_ANOMALY_RELATION[(polarity, intensity_band)],
         "objectRelation": _ACTOR_OBJECT_RELATION[(polarity, intensity_band)],
         "siteRelation": _ACTOR_SITE_RELATION[(polarity, intensity_band)],
-        # Out-of-place needs knowledge of the world, which Stage 1.5 deliberately
-        # does not have; scale and age are both nameable blind, and they are also
-        # the two qualities a rendering style cannot sand down into charm.
-        "anomalyTypes": "scale (far too LARGE for its kind — the size of a building where it should be the size of a hand), or time (far OLDER and more worn than everything around it — never from a later century, never modern or manufactured)",
         "tonalDirection": (
             "This timeframe is under strain. Do not soften it."
             if polarity == "hard" else
@@ -1338,22 +1368,23 @@ Respond with a JSON object with exactly these keys:
 {"constellation": "one sentence naming the archetypal situation actually active, in the vocabulary above", "movement": "one short phrase naming what is moving into what — e.g. 'uroboric containment giving way to first separation', 'nigredo, the blackening not yet past', 'the dragon-fight won and the treasure not yet set down', 'albedo, the washing nearly through'", "affect": "3 to 6 words naming the felt bodily quality, not an emotion label — e.g. 'close, warm, faintly suffocating', 'dry, ringing, too bright', 'loose-limbed, cool, unhurried', 'wide open, steady, warm at the back of the neck'", "actor": "who is in this situation, as a concrete living thing rather than a role label, in a short phrase — or an empty string if the kind is 'none'", "actorKind": "exactly one of: {{ACTOR_KINDS}}"}"""
 
 # The second half of Stage 1.5, split out 2026-09-26 -- see stage15_material.
-STAGE15_MATERIAL_SYSTEM = """You are completing a Jungian amplification. The archetypal situation has already been named, and so has who is in it; you are given both, with the reading they came from. Your job is to name the MATERIAL of that myth — the beings, places, remains, workings and things the story contains — and one anomaly, all built from the day's material register.
+STAGE15_MATERIAL_SYSTEM = """You are completing a Jungian amplification. The archetypal situation has already been named, and so has who is in it; you are given both, with the reading they came from. Your job is to name the MATERIAL of that myth — the beings, places, remains, workings and things the story contains — and one highlight, all built from the day's material register.
 
 Rules:
 - **The material you name is the FURNITURE OF THE MYTH already named, not objects standing beside it.** If the constellation is the night-sea journey through the belly of the monster, then the material is the monster's ribs arching overhead, the swallowed boat still upright inside it, the lamp that has stayed lit — NOT a thermos and a logbook belonging to someone who happens to be nearby. If it is the dragon-fight won, the material includes the dragon. Whatever the constellation put in the story, put it in the material. This is the single most important rule here: myth is the content, and a scene of ordinary possessions adjacent to a myth is a failure of this task.
 - It need not be an object at all. Name **beings, creatures, places, remains, weather and workings** as freely as things: the thing that was swallowed, the thing that does the swallowing, the door in the hillside, the bones of the last one, the water that will not drain. What matters is that each is concrete enough to picture and specific enough that it could only belong to this story.
 - **It must belong to THE WORLD described below**, made of its materials and possible within its physics. The myth is the content; the world decides what the content is made of. A neon city and a river valley get the same monster and build it differently.
-- **THE REGISTER decides what the material is made of.** You are given a primary material register, possibly a secondary one, and where available a description of how this world realises each. At least half of the pieces you name, and the anomaly, must be made of the primary register's substance or belong to its territory; the secondary register may supply one or two. The myth decides what the pieces ARE; the register decides what they are MADE OF — a glacial day and a botanical day get the same monster, built once from ice and once from roots. A list made mostly of other materials is a failed response.
+- **THE REGISTER decides what the material is made of.** You are given a primary material register, possibly a secondary one, and where available a description of how this world realises each. At least half of the pieces you name, and the highlight, must be made of the primary register's substance or belong to its territory; the secondary register may supply one or two. The myth decides what the pieces ARE; the register decides what they are MADE OF — a glacial day and a botanical day get the same monster, built once from ice and once from roots. A list made mostly of other materials is a failed response.
 - Keep the specificity of a curator and drop the inventory of one. Not "a vessel" but "the iron cauldron they lower the dead into"; not "a tool" but "the pole the ferryman leans on, worn to a bend."
 - NEVER return a generic category or a stock prop. A door, a mirror, a key, a candle, a chain, a scale, a mask, a book, a clock, a lantern, a rope, a bridge, a tapestry, a gear, a tree with visible roots — these and anything similarly available are failures. If an object could illustrate any reading whatsoever, it is the wrong object.
 - **Vary everything the register leaves open.** Within the register's substance, reach across traditions, centuries and forms; whatever is not drawn from the register reaches across the material world — bone, wax, lead, cloth, grain, glass, iron, salt.
 - Never use "as if", "suggesting", "symbolizing", "evoking", "representing" or any other phrase that states what something means or compares it to something it is not. Name the thing. Whatever you write here is carried into the image prompt, and those words are forbidden there.
 - **Use no visual or compositional language at all.** Do not say where anything sits, how it is lit, what color it is, what it looks like, or how any two things are arranged relative to each other. You are not staging a picture. If you begin composing, you have failed this task.
+- **Name one highlight, as this world defines it.** It is not a decorated version of one of your pieces and not a label for the scene's mood; it is a thing, and it is the one the eye finds first.
 - **The actor is already named and is not one of your pieces.** Do not restate it; name what belongs around it in this story.
 
 Respond with a JSON object with exactly these keys:
-{"objects": ["{{OBJECT_RANGE}} pieces of the myth itself \u2014 beings, creatures, places, remains, workings or things \u2014 each named concretely enough to picture, each unmistakably part of THIS story rather than generally suggestive of it, at least half of them made of the primary register"], "anomaly": "exactly one further presence — an object, a creature or a being, and a living one wherever the story allows — made of THE WORLD's own materials and belonging to its era just as the others do — but wrong in one specific way: either far out of {{ANOMALY_TYPES}}. It must be recognisably of this world. What unsettles is not that it came from somewhere else, but that something native is the wrong size or impossibly old. OUT OF TIME MEANS OLDER, AND ONLY OLDER: far more ancient, far more worn, far longer in this place than everything around it. It must NEVER be from a later century than the other objects, never modern or industrial, never a manufactured consumer product, never electronic. A plastic toy, a disposable product, a battery, a printed wrapper or anything similar is a FAILURE of this task, not an interesting answer. OUT OF SCALE MEANS LARGER, AND ALMOST ALWAYS LARGER: monumentally oversized for its own kind, the size of a barn or a hillside where its kind is the size of a hand or a room, while still being the kind of thing this world contains and still made of its materials. A too-SMALL version is a much weaker reading and is a failure unless the reading leaves no other honest option — reach for the enormous first. Nothing in the rest of the material explains why it is here. It is made of the primary register's substance.", "anomalyType": "which single way it is wrong: 'scale' or 'time'"}"""
+{"objects": ["{{OBJECT_RANGE}} pieces of the myth itself \u2014 beings, creatures, places, remains, workings or things \u2014 each named concretely enough to picture, each unmistakably part of THIS story rather than generally suggestive of it, at least half of them made of the primary register"], "anomaly": "THE HIGHLIGHT: exactly one further presence, the thing in this scene the eye goes to first, named concretely enough to picture. What a highlight is in this world is given under THE HIGHLIGHT below; where the register's line says what form it takes in that material, follow it. It belongs to this story as much as the pieces do."}"""
 
 # Bumped whenever STAGE15_SYSTEM changes in a way that should invalidate
 # every cached amplification, or a prompt fix silently does nothing for
@@ -1556,7 +1587,8 @@ def load_register_line(style_key, register):
 
 def stage15_material(stage1_result, meaning, model, config, dial=None, style_key=None,
                      style_world="", register=None, secondary_register=None):
-    """The MATERIAL half of Stage 1.5: objects, anomaly and anomalyType, built
+    """The MATERIAL half of Stage 1.5: objects and the highlight (key
+    `anomaly`, see DEFAULT_HIGHLIGHT), built
     from the day's register. Never cached -- every generation, regenerates
     included, gets fresh material, which is the point of the split: the same
     meaning, a new register, new objects.
@@ -1576,23 +1608,23 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
     system_prompt = (
         STAGE15_MATERIAL_SYSTEM
         .replace("{{OBJECT_RANGE}}", f"{object_lo} to {object_hi}")
-        .replace("{{ANOMALY_TYPES}}", dial["anomalyTypes"])
     )
 
     user_lines = []
     if style_world:
         user_lines.append(
-            "THE WORLD — every piece you name, and the anomaly, must belong to it:\n"
+            "THE WORLD — every piece you name, and the highlight, must belong to it:\n"
             + style_world
         )
     if register:
         line = load_register_line(style_key, register)
-        user_lines.append(f"PRIMARY REGISTER — at least half the pieces, and the anomaly, are made of this: {register}"
+        user_lines.append(f"PRIMARY REGISTER — at least half the pieces, and the highlight, are made of this: {register}"
                           + (f"\n  In this world: {line}" if line else ""))
     if secondary_register:
         line = load_register_line(style_key, secondary_register)
         user_lines.append(f"SECONDARY REGISTER — may supply one or two pieces: {secondary_register}"
                           + (f"\n  In this world: {line}" if line else ""))
+    user_lines.append(f"THE HIGHLIGHT — what it is in this world: {load_style_highlight(style_key)}")
     user_lines += [
         f"Reading: {stage1_result['reading']}",
         f"Distillation: {stage1_result['distillation']}",
@@ -1614,17 +1646,16 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
             raise PipelineError(f"Stage 1.5 material response missing '{key}': {result!r}")
     if not isinstance(result["objects"], list):
         raise PipelineError(f"Stage 1.5 'objects' is not a list: {result['objects']!r}")
-    # anomalyType steers Stage 2's rendering of it; default rather than fail, since
-    # a missing enum is not worth losing a paid call over.
-    if result.get("anomalyType") not in ("scale", "time", "place"):
-        result["anomalyType"] = "time"
     return {
         "objects": result["objects"],
         "anomaly": result["anomaly"],
-        "anomalyType": result["anomalyType"],
+        # Kept as a key, always empty, so archived records and harnesses that
+        # read it keep working. The scale/time typing went with the universal
+        # anomaly definition on 2026-10-09.
+        "anomalyType": None,
         "register": register,
         "secondaryRegister": secondary_register,
-        "materialDial": {k: v for k, v in dial.items() if k in ("objectRange", "anomalyTypes")},
+        "materialDial": {k: v for k, v in dial.items() if k in ("objectRange",)},
     }, chat_call_cost(model, usage)
 
 
@@ -1687,8 +1718,8 @@ WHAT THE IMAGE MUST CONTAIN
 - Openness is not optional and not a style. Every one of these images ends up as a desktop wallpaper, behind windows, all day. The frame has to breathe: there is always a way out of it — a horizon, a sky, a landscape, water, a distance that keeps going — and the scene is composed from far enough back to show it. An interior is allowed, but only one that opens onto that distance through a window, a doorway, a missing wall. A sealed room is the single most reliable way to make one of these images unusable, however good the objects in it are. THE COMPOSITION BRIEF states this as a share of the frame; treat that as a hard minimum.
 - When the brief asks for FEW things, that is a correct image and not a sparse one — but "few things" must never become "empty". Fill the frame with the WORLD instead of with more objects: the landscape, weather, water, architecture, vegetation and surface pattern native to the rendering style you are given. A low count means fewer separate subjects competing, not less to look at. Padding a quiet scene with extra objects defeats the entire point, and so does handing back a single subject on a plain field.
 - Use most of the amplification objects you were given. Put them in the scene as real physical things, at different depths and different scales. You may add a small number of connective things the scene needs to hold together, but the given objects are the substance.
-- THE ANOMALY IS MANDATORY. Place the anomaly object in the scene as a solid, physically present, matter-of-fact thing — the same weight, wear, dirt and lighting as everything else. It must NOT glow, float, shimmer, be translucent, be described as magical or otherworldly, or be visually marked out as special in any way. It BELONGS to this world: do not import an object from another century, another technology or another order of reality. What is wrong with it is one thing only, and you are told which — it is far out of scale for its kind, or far older and more ruined than everything around it. Nothing in the scene explains why it is there.
-- How the world treats the anomaly varies per image and THE COMPOSITION BRIEF tells you which it is. Follow that exactly. Do not write it as a separate closing clause tacked onto the end of the prompt, and do not flag it with "incongruously", "unmistakably", "matter-of-fact", "out of place", "unremarked" or "unnoticed" — naming the wrongness out loud is what made it read as a bolted-on item rather than a fact of the scene. State it as plainly as you state the wall or the weather, wherever it belongs in the description.
+- THE HIGHLIGHT IS MANDATORY. Place it in the scene as a real part of it — the thing the eye goes to first. What a highlight is in this world, and how prominent it is in this image, are in THE COMPOSITION BRIEF; follow both.
+- How the actor treats the highlight varies per image and THE COMPOSITION BRIEF tells you which it is. Follow that exactly. Do not write it as a separate closing clause tacked onto the end of the prompt, and do not flag it with "incongruously", "unmistakably", "matter-of-fact", "out of place", "unremarked" or "unnoticed" — naming the wrongness out loud is what made it read as a bolted-on item rather than a fact of the scene. State it as plainly as you state the wall or the weather, wherever it belongs in the description.
 - Interaction, not arrangement. Things must be doing something to each other, and THE COMPOSITION BRIEF gives you the verbs that apply to this image — use that register of action, not a generically forceful one. A still-life of symbols placed side by side is a failure. Say what is happening between things, not just what is present.
 - Material registers. THE AMPLIFICATION OBJECTS ARE WHAT IS IN THE SCENE; THE REGISTERS ARE WHAT THE SCENE IS MADE OF. The primary register supplies the setting and the substance the scene is built from. Where a secondary register is given it must also be physically present as real matter, not as a mood, a color or a passing mention, and each register must contribute at least one substantial named thing of its own beyond the objects you were given. Test yourself: if this scene would read exactly the same with both registers swapped for two others, you have ignored them and must rebuild it. A register named "mechanical" means an actual mechanism with working parts is in the frame; "aquatic" means real water; "architectural" means real built structure.
 - THE COMPOSITION BRIEF tells you whether the two registers COLLIDE or COHERE in this image. Colliding means the friction between two unrelated materials is part of what makes the image worth looking at — stone against cloth, machinery against flesh, water against paper. Cohering means they belong to one material family and should read as one continuous world, not as two things meeting; build a place that is all of a piece. Where no secondary register is given at all, let the primary carry the whole scene and lean on the rendering style's world for everything else.
@@ -1884,7 +1915,8 @@ def stage2_system():
 def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_model,
                          style_label=None, style_guidance=None, secondary_register=None,
                          amplification=None, dial=None, register_guidance=None,
-                         style_brief=None, secondary_register_guidance=None):
+                         style_brief=None, secondary_register_guidance=None,
+                         highlight=None):
     """`amplification` is Stage 1.5's output (see stage15_amplify). It is
     passed last and defaults to None so the function still works without a
     Stage 1.5 result — sweep.py relies on that to produce a pre-Stage-1.5
@@ -1903,7 +1935,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
             f"  Archetypal constellation: {amplification.get('constellation', '')}",
             f"  Movement: {amplification.get('movement', '')}",
             f"  Objects: {'; '.join(objects)}",
-            f"  ANOMALY (must appear, belongs to this world, wrong only in {amplification.get('anomalyType', 'time')}): {amplification.get('anomaly') or amplification.get('intrusion', '')}",
+            f"  HIGHLIGHT (must appear): {amplification.get('anomaly') or amplification.get('intrusion', '')}",
             f"  Felt quality: {amplification.get('affect', '')}",
             "",
         ]
@@ -1966,27 +1998,13 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         f"  Verbs of interaction to draw on: {dial['verbs']}.",
         f"  The two registers: {'COLLIDE' if dial['registerCohesion'] == 'collide' else 'COHERE — build one continuous material world, not two things meeting'}.",
         f"  REQUIRED: the primary register ({register}) must put at least one substantial thing of its own in the frame, named explicitly, beyond the objects you were given. A scene that merely takes place near that material does not count — if the register is \"mechanical\" an actual mechanism with working parts is visible; if \"aquatic\", real water; if \"bodily and anatomical\", actual anatomy as material rather than a person standing there.",
-        f"  The anomaly, and how the actor treats it: {dial['anomalyRelation']}",
+        f"  What a highlight is in this world: {highlight or DEFAULT_HIGHLIGHT}",
+        f"  How prominent the highlight is in this image: {dial.get('prominence') or _PROMINENCE_BY_INTENSITY['mid']}",
+        f"  The highlight, and how the actor treats it: {dial['anomalyRelation']}",
     ]
-    # A scale anomaly is now monumentally oversized (see STAGE15_SYSTEM), and
-    # that collides with the spatial axis: on a "conversational distance" day
-    # a barn-sized object simply will not fit, so the renderer drops it. It
-    # did, twice out of two, in the first ghibli batch after the change — the
-    # silo reached the prompt and never reached the image, which is also why
-    # anomalySurvived cannot be trusted alone: it reads the prompt, not the
-    # render.
-    #
-    # The fix is the one that world uses for anything enormous: put PART of it
-    # in frame. A thing too big for the shot is more unsettling cropped than
-    # centred, and it costs no extra distance.
-    if (amplification or {}).get("anomalyType") == "scale":
-        brief.append(
-            "  THE ANOMALY IS ENORMOUS, and it must be visibly in this frame. If it does not "
-            "fit the vantage above, do not shrink it, move it to the background, or leave it "
-            "out — put PART of it in shot, close, so its size is unmistakable: the foot of it, "
-            "one edge, the shadow it throws across everything else. The viewer should be unable "
-            "to see all of it at once."
-        )
+    # The "THE ANOMALY IS ENORMOUS, put PART of it in shot" rule that sat here
+    # (fired only for scale anomalies) moved into DEFAULT_HIGHLIGHT and ghibli's
+    # charter `highlight` on 2026-10-09, with the scale/time typing it keyed on.
     # The actor goes in the brief rather than STAGE2_SYSTEM for the reason the
     # register-contribution and openness rules did: the brief is demonstrably
     # the part that gets obeyed. Three relations, not one — the anomaly line
@@ -2108,6 +2126,7 @@ def build(reading, config):
             register_guidance=load_register_line(style_key, register),
             secondary_register_guidance=load_register_line(style_key, secondary_register),
             style_brief=load_style_brief(style_key),
+            highlight=load_style_highlight(style_key),
         )
         stage2_cost += attempt_cost or 0.0
         caption, hits, passed = caption_check(image_prompt, caption_model)

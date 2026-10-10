@@ -40,7 +40,7 @@ code](#tweak-it-without-touching-code).
   │ 3  DIAL        (no LLM)     density, light, how the actor behaves  │  free
   │ 4  REGISTERS   (no LLM)     what the scene is MADE of              │  free
   │ 5  MEANING     Stage 1.5    the myth, and who is in it             │  cached / day
-  │ 6  MATERIAL    Stage 1.5    objects + anomaly, from the register   │  every run
+  │ 6  MATERIAL    Stage 1.5    objects + highlight, from the register │  every run
   │ 7  PROMPT      Stage 2      the actual image prompt                │  every run
   │ 8  CHECK       caption      would it be filed under a feeling?     │  every run
   ╰────────────────────────────────────────────────────────────────────╯
@@ -123,8 +123,10 @@ bump the schema version, or you will test yesterday's output.
 The day's texture becomes hard numbers and fixed sentences: how many sites
 (1–3), how many objects (2–3 on a quiet day, 4–6 on a crowded one), the word
 budget (60–130), which verbs, whether the two registers **collide** (hard days)
-or **cohere** (soft ones), how much of the frame the strange takes and in what
-temper, and how the actor treats the anomaly, the objects and the place.
+or **cohere** (soft ones), how **prominent** the highlight is (small and to one
+side, plainly present, or dominating the frame), in what temper, and how the
+actor treats the highlight, the objects and the place. None of it says what
+anything *is* — that is the charter's job.
 
 The **light** comes from here too, from the exposure band, and it is written
 as a failure condition rather than a mood: a low-exposure day must be night or
@@ -179,22 +181,29 @@ takes a body.
 **Runs:** `llm_pipeline.stage15_material` · **Cost:** ~$0.0059 · **Cache:** never · **Knob:** `stage1Model`
 
 The furniture of that myth, built from the day's register: **2–6 concrete
-objects** and an **anomaly** — one thing that belongs to the world but is wrong
-in exactly one way, far larger than its kind or far older than everything
-around it. At least half the objects, and the anomaly, must be made of the
-primary register's substance.
+objects** and one **highlight** — the thing the eye goes to first. At least half
+the objects, and the highlight, must be made of the primary register's
+substance.
+
+**What a highlight is depends on the world.** Each charter defines it in its
+`highlight` field, and a register line may say what form it takes in that
+material. Ghibli's is the strange thing nobody remarks on: native, wrong in one
+way (far larger or far older), solid, unexplained. A style with no charter gets
+that same definition as its fallback. Until 2026-10-09 this was "the anomaly",
+defined once for every style; the data key is still `anomaly`.
 
 Never cached, so every run, regenerates included, gets a new register and new
 objects for the same meaning. That is what keeps same-day regenerates from all
-looking alike. The anomaly is mandatory and must never be flagged as strange in
-the prompt; naming the wrongness out loud made it read as a bolted-on item.
+looking alike. The highlight is mandatory, and it is never flagged in the
+prompt with words like "out of place"; naming it out loud made it read as a
+bolted-on item.
 
 ## 7. Stage 2 — the image prompt
 
 **Runs:** `llm_pipeline.stage2_image_prompt` · **Cost:** ~$0.0139 · **Cache:** never (temp 0.95) · **Knob:** `stage2Model`, `artStyle`
 
 Everything above converges here: the reading, the meaning and its actor, the
-objects and anomaly, both registers with their style lines, the dial's
+objects and the highlight with its definition and prominence, both registers with their style lines, the dial's
 composition brief, the style's world, the concept tags of the last 8
 generations to avoid, and any hard-blocked terms.
 

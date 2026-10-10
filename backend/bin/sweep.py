@@ -306,6 +306,8 @@ def main():
             # Production passes the style's own brief rules (see build()); a
             # sweep that omitted them would test every style on the fallback.
             kwargs["style_brief"] = lp.load_style_brief(style_key)
+        if hasattr(lp, "load_style_highlight"):
+            kwargs["highlight"] = lp.load_style_highlight(style_key)
 
         try:
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(

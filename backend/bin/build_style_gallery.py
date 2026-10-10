@@ -115,6 +115,7 @@ def main():
             register_guidance=lp.load_register_line(key, args.register),
             secondary_register_guidance=lp.load_register_line(key, args.secondary),
             style_brief=lp.load_style_brief(key),
+            highlight=lp.load_style_highlight(key),
         )
         total += cost or 0.0
         final = prompt + ", " + lp.load_style_suffix(key, has_people)
