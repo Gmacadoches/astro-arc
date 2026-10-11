@@ -22,8 +22,10 @@ Astronomy Engine
 https://github.com/cosinekitty/astronomy
 
 Astro-Arc computes every chart with Astronomy Engine, vendored unmodified at
-backend/vendor/astronomy/astronomy.py (release v2.1.19). It is distributed under
-the MIT License, reproduced in full at backend/vendor/astronomy/LICENSE:
+backend/vendor/astronomy/astronomy.py (release v2.1.19; the same version is
+recorded, with its sha256, in backend/vendor/astronomy/VENDORED.md, and both
+must be updated together). It is distributed under the MIT License, reproduced
+in full at backend/vendor/astronomy/LICENSE:
 
   MIT License
 

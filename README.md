@@ -11,57 +11,66 @@ agree, because the theme is made *from* the wallpaper.
 It runs on a cadence you pick, and every generation is browsable, exportable and
 shareable.
 
-![A shaggy wodewose kneeling to feed bees at an open straw skep, a Neolithic limestone figurine at its knee, harvesters working a field under an enormous sky beyond](docs/images/hero.jpg)
+![A night procession of umbrella yōkai and paper-limbed spirits carries a dismantled grain hoist across a bridge in slanting rain, while a road-worn warrior drinks tea on a post-station veranda beside a festival puppet wagon](docs/images/hero.jpg)
 
 ---
 
-## Seven art styles
+## Seven worlds, not seven filters
 
-Pick one from the widget, or write your own into
-[`styles.toml`](backend/pipeline/styles.toml). These three are the same reading,
-the same objects and the same two material registers — only the style differs:
+Every style is a **world** with its own era, materials, physics, inhabitants,
+myths and rules: what lives there, how it goes dark, what the eye should find
+first, and the one thing that marks a picture as unmistakably that world. The
+same day's reading, rendered in each:
 
-| Ukiyo-e | Cyberpunk | Antique Engraving |
+| Studio Ghibli | Cyberpunk | Cosmic |
 | --- | --- | --- |
-| ![Ukiyo-e](docs/images/styles/ukiyoe.jpg) | ![Cyberpunk](docs/images/styles/cyberpunk.jpg) | ![Antique Engraving](docs/images/styles/engraving.jpg) |
+| ![A river god in work clothes wades past a beached handcart, dragging a net of washbasins and stove lids](docs/images/styles/ghibli.jpg) | ![A carp with a camera lens grown into its skull noses a storm-drain grate while a junction-box spirit receives incense](docs/images/styles/cyberpunk.jpg) | ![The constellation Cancer as a world-sized crab of rock and hull plate over a floating island, its water pouring off the edge into violet space](docs/images/styles/cosmic.jpg) |
+| **Antique Engraving** | **Ukiyo-e** | **Symbolist** |
+| ![A giant horseshoe crab entered as a specimen, with numbered stars and a graticule running from the plate's edge into the harbour](docs/images/styles/engraving.jpg) | ![A huge ghost fishmonger climbs from boat to boat over a river ferry, a warrior watching fireworks beneath a barge canopy](docs/images/styles/ukiyoe.jpg) | ![A household of cloaked women feed white waterbirds beside a wooden chamber that pours like a throat into a moonlit garden](docs/images/styles/symbolist.jpg) |
+| **Illuminated Manuscript** | | |
+| ![A pilgrim leads a mule past a pelican larger than a horse, opening its breast over its young, with a snail-knight from the border in the reeds](docs/images/styles/illuminated.jpg) | | |
 
-**[See all seven →](docs/styles.md)**
-
----
-
-## Why it looks different every day
-
-The image's *subject* comes from your chart. So does its **shape**.
-
-Four independent measurements of the day — how hard the aspects are, how exact,
-how many, and how much of the Moon is lit — decide how many things are in the
-frame, how many places they occupy, how long the prompt is, whether the two
-material registers collide or cohere, where the event sits relative to you, and
-how much the image *attempts* to hide in shadow.
-
-A loaded, hard day is crowded and close. A quiet one is not.
-
-That last one — light — is the only instruction a style can talk the renderer
-out of, and it is worth showing honestly. Each row below is one style. Within a
-row, everything is pinned except the day's exposure: same register, same
-density, same number of objects. Only the chart differs.
-
-| | A quiet, dark day | A quiet, bright day |
-| --- | --- | --- |
-| **Symbolist** | ![A langur-headed figure in a star-embroidered robe on a fogbound hillside, a valley lost in mist behind](docs/images/quiet-dark-symbolist.jpg) | ![A fox-headed figure in the same robe reclining in clover under flat even light, a river valley open to the horizon](docs/images/quiet-bright-symbolist.jpg) |
-| **Ghibli** | ![A kappa half-hidden in wet reeds holding a Roman stylus, a misted river and bridge behind](docs/images/quiet-dark-ghibli.jpg) | ![A crane-headed figure kneeling in marsh reeds with a terracotta swan rattle, dawn light across open water](docs/images/quiet-bright-ghibli.jpg) |
-
-Symbolist does what it is told: the dark day is genuinely fogbound and most of
-the frame is lost in it. Ghibli mostly does not. Its own guidance asks for a
-wide low horizon under an enormous sky, and when that collides with an
-instruction to leave the frame unlit, the sky tends to win — so its "dark" day
-arrives as a bright morning that merely happens to have mist in it.
-
-Both rows are working as designed. The dial always follows the chart; the style
-decides how much of that survives contact with the picture. Density and
-distance come through in every style. Light is the one that negotiates.
+**[What each world is, and how it was built →](docs/styles.md)** ·
+**[Make your own →](docs/charter-schema.md)**
 
 ---
+
+## How it works
+
+The chart never reaches the picture directly. It goes through meaning first:
+
+1. **The reading.** Your natal chart and the day's transits become a short
+   psychological reading in a Jungian frame, written by a model that is
+   forbidden any visual language, so the picture cannot be decided by a cliché
+   ("Mars square Moon" never becomes "a red sword").
+2. **The myth.** The reading becomes an archetypal situation and the someone or
+   something in it, found in the chosen world's own myths: a Ghibli river god, a
+   kami living in a junction box, a constellation walking the sky.
+3. **The material.** That myth is built out of the day's material register
+   (stone, water, paper, machinery and sixteen more) in the world's own terms,
+   with one highlight for the eye to find first.
+4. **The picture.** A composition brief, a style's rules and its technique turn
+   it into an image prompt; the image is rendered and its own colours become the
+   desktop palette.
+
+## Why no two days look alike
+
+The chart decides the **shape** of the picture as well as its subject. Four
+measurements of the day (how hard the aspects are, how exact, how many, and how
+much of the Moon is lit) set how many things are in frame, how many places they
+occupy, how close the event sits, whether the two materials collide or cohere,
+and how much of the frame is dark. A loaded, hard day is crowded and close; a
+quiet one is not.
+
+Then the world draws the rest from its own lists, never repeating what it drew
+in its last runs: what is happening to things, what the people are doing (work,
+but just as often rest, play, ritual or travel), how the frame shows depth, how
+worn things are, and what kind of strangeness the highlight has. The last runs'
+objects and myths are passed back in as already spent.
+
+None of this is a filter on a fixed scene. In a 56-image test of all seven
+styles on the same two days, no two worlds shared more than 4% of the things
+they put in frame.
 
 ## Requirements
 
@@ -106,9 +115,18 @@ see below.
 
 Every generation is kept as a page of its own — the image, the reading, the
 prompt and what it cost — together with its complete theme, in
-`~/.local/share/astro-arc/`. **Browse all generations** in the panel opens the
-gallery, `~/.local/share/astro-arc/index.html`: every generation, newest first,
-each linking to its page. Bookmark it.
+`~/.local/share/astro-arc/`. Under **Themes Generated** in the panel, pick a
+generation and then **Open** its page, **Browse** the whole gallery
+(`~/.local/share/astro-arc/index.html`: every generation, newest first — bookmark
+it), or **Set Theme** to put that generation's colours and wallpaper back on the
+desktop. Set Theme is temporary by design: the next generation replaces it, and
+**Save Theme** is how one becomes a permanent Omarchy theme.
+
+To send one to someone, **Share Record** writes that generation as a single
+`.html` file — the image, the reading, the prompt and the costs, all inside the
+one file, so it opens anywhere with no folder around it. It asks where to save.
+(**Export** is the other direction: it packages the *theme* as a git repo
+someone can install with `omarchy theme install`, and leaves the reading out.)
 
 Uninstalling the plugin leaves your archive untouched, because it was always
 just files in your home directory. Delete the folder when you no longer want
@@ -174,10 +192,11 @@ says which step each one changes:
 
 | File | What it controls |
 | --- | --- |
-| `backend/pipeline/styles.toml` | the art styles and the worlds they belong to |
+| `backend/pipeline/styles.toml` | the seven styles: each one's technique and its world (see [`docs/charter-schema.md`](docs/charter-schema.md)) |
+| `backend/pipeline/registers.toml` | the 20 material registers a scene is built from |
+| `backend/pipeline/actors.toml` | the kinds of actor a scene can have, from a lone person to a swarm |
 | `backend/pipeline/model-rates.toml` | model prices, quality presets, shortlists |
-| `backend/pipeline/registers.toml` | the 25 material registers a scene is built from |
-| `backend/pipeline/cliches.toml` | imagery to block when it starts recurring |
+| `backend/pipeline/cliches.toml` | imagery to block when it starts recurring (empty by design) |
 
 ## Documentation
 
@@ -189,8 +208,11 @@ says which step each one changes:
   run the script, never edit the HTML.
 - [`RELEASING.md`](RELEASING.md) — how a release is cut (`bin/release`), why
   `master` only ever holds releases, and how updates find them.
-- [`docs/styles.md`](docs/styles.md) — all seven art styles, same reading and
-  same objects in each, so the style is the only variable.
+- [`docs/styles.md`](docs/styles.md) — the seven worlds, each rendered from
+  the same reading and register, with what defines each one.
+- [`docs/charter-schema.md`](docs/charter-schema.md) — every field of a style's
+  world, what it controls, and how to write one well: the reference for making
+  your own style.
 
 Each script carries its own header comment explaining what it does and why it
 does it that way; that is the reference for anything PIPELINE.md does not cover.

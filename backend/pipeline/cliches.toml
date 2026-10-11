@@ -7,4 +7,7 @@
 # prediction rather than observation gives false confidence and decays as
 # the model finds synonyms for whatever you guessed instead of it.
 
+# 2026-10-10: "barn-sized" was blocked during the style overhaul and removed
+# the same day at Garrett's direction once its source text was gone (barn at
+# 0 of 56 cross-style prompts). Fix a repeat at its source text first.
 terms = []

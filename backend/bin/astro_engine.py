@@ -50,9 +50,19 @@ SIGNS = [
     ("Pisces", "water", "mutable"),
 ]
 
-# Classical + modern planets only — nodes/Chiron/asteroids can be added once
-# the symbolic model needs them. (name, None) pairs, kept in this shape because
-# callers iterate `for n, _ in BODIES`; ephemeris.BODIES maps the names.
+# Classical + modern planets only. This set is now capped by the ephemeris
+# rather than by taste: Astronomy Engine's Body enum stops at Pluto, so unlike
+# pyswisseph, extra bodies are no longer a matter of naming one.
+#   - Chiron and the asteroids are not reachable at all and would need a new
+#     data source. Worth knowing, since Chiron is close to a signature body of
+#     the archetypal school STAGE1_SYSTEM works in.
+#   - The lunar nodes are reachable but need an adapter: SearchMoonNode /
+#     NextMoonNode find node *crossing events in time*, not a longitude at an
+#     instant, where pyswisseph exposed SE_TRUE_NODE directly.
+#   - Black Moon Lilith would have to be derived from lunar apogee events via
+#     SearchLunarApsis; the library has no Lilith of its own.
+# (name, None) pairs, kept in this shape because callers iterate
+# `for n, _ in BODIES`; ephemeris.BODIES maps the names.
 BODIES = [(name, None) for name in ephemeris.BODIES]
 OUTER_BODIES = {"mars", "jupiter", "saturn", "uranus", "neptune", "pluto"}
 
@@ -413,8 +423,9 @@ def derive_arc(frequency, now_utc, natal, transits_now, now_local=None):
     # how often a new IMAGE appears, not about the sky: transits barely move in
     # an hour, so an hourly arc would be the daily one with a longer key and 23
     # redundant readings a day to pay for. Falling through to here keys the arc
-    # (and so Stage 1, Stage 1.5 and the signature caches) by date, and each
-    # hourly run re-rolls only Stage 2's imagery against the day's reading.
+    # (and so the Stage 1 and Stage 1.5 meaning caches) by date, and each
+    # hourly run re-rolls the material and Stage 2's imagery against the day's
+    # reading.
     moon = transit_bodies["moon"]
     dominant = find_dominant_transit(transit_bodies, natal_bodies, ["moon"], houses)
     return {
@@ -462,7 +473,30 @@ def main():
     birth_local = birth_naive.replace(tzinfo=tz)
     birth_utc = birth_local.astimezone(datetime.timezone.utc)
 
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    # ASTRO_ARC_AT overrides "now", for replaying a past day's chart. Added
+    # 2026-09-20 so archive entries rebuilt from a replay show the sky that
+    # actually stood over that date instead of today's.
+    #
+    # A bare YYYY-MM-DD is taken as 12:00 LOCAL on that day, which is a choice
+    # and not a recovery: the real run happened at some unrecorded hour, and
+    # the Moon moves about 13 degrees a day, so a replayed chart is the right
+    # day and an approximate hour. Anything needing the exact instant should
+    # pass a full ISO timestamp.
+    at = os.environ.get("ASTRO_ARC_AT")
+    if at:
+        try:
+            parsed = datetime.datetime.fromisoformat(at)
+        except ValueError:
+            print(json.dumps({"error": f"ASTRO_ARC_AT is not an ISO date or timestamp: {at!r}"}))
+            sys.exit(1)
+        if parsed.tzinfo is None:
+            if parsed.hour == 0 and parsed.minute == 0 and parsed.second == 0:
+                parsed = parsed.replace(hour=12)
+            parsed = parsed.astimezone() if parsed.tzinfo else parsed.replace(
+                tzinfo=datetime.datetime.now().astimezone().tzinfo)
+        now_utc = parsed.astimezone(datetime.timezone.utc)
+    else:
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
     # The system-local civil clock, which is what the period key is keyed on —
     # see derive_arc()'s docstring for why that is not the same as now_utc.
     now_local = now_utc.astimezone()

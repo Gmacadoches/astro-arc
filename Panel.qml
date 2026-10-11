@@ -796,6 +796,31 @@ Panel {
     loadModelCatalog(root.modelCatalog.everFetched === true && root.modelCatalog.stale === true)
   }
 
+  // The settings model_catalog.py's `nextRun` cost is computed FROM (see its
+  // main(), which reads openaiQuality, openaiModel, the two chat models and
+  // the background size straight out of the config). Those are inputs to the
+  // number, so the number has to be recomputed when any of them changes.
+  //
+  // Without this, picking a different quality in Settings wrote the config,
+  // updated the "Image model: ... · high" readout right next to it, and left
+  // "per full run" showing the cost of the tier you just moved away from —
+  // which is the one figure the choice is being made on.
+  //
+  // A reload here is a disk read of the cached catalog, not a network call:
+  // loadModelCatalog(false) re-runs model_catalog.py, which recomputes the
+  // cost against the settings as they now stand without hitting /v1/models.
+  readonly property string costInputsKey: [
+    root.configState.openaiModel, root.configState.openaiQuality,
+    root.configState.stage1Model, root.configState.stage2Model,
+    root.configState.backgroundSize
+  ].join("|")
+
+  onCostInputsKeyChanged: {
+    // Skip the first evaluation, which fires while configState is still the
+    // defaults and would run a second catalog load on every panel open.
+    if (root.modelCatalog.everFetched === true) root.loadModelCatalog(false)
+  }
+
   Process {
     id: modelCatalogProc
     stdout: StdioCollector {
@@ -1022,6 +1047,7 @@ Panel {
   property string _saveThemeStdout: ""
   property string _saveThemeStderr: ""
   readonly property string saveThemeBin: binDir + "/astro-arc-save-theme"
+  readonly property string setThemeBin: binDir + "/astro-arc-set-theme"
   readonly property string pruneHistoryBin: binDir + "/astro-arc-prune-history"
 
   function reviewForId(id) {
@@ -1074,6 +1100,41 @@ Panel {
     }
   }
 
+  // ---- Set Theme: put the selected generation's theme back on the desktop.
+  // Neighbour to Save and Export, and the odd one out: those two make a copy
+  // and leave the desktop alone, this one changes what you are looking at and
+  // leaves nothing behind — the live astro-arc theme is rebuilt by the next
+  // generation either way. It is the "I liked Tuesday's better" button, and
+  // the reason it is safe to press is that Tuesday's is still in the archive
+  // afterwards. ---------------------------------------------------------------
+  property string _setThemeStdout: ""
+  property string _setThemeStderr: ""
+
+  function setSelectedTheme() {
+    if (!root.selectedReviewId || setThemeProc.running) return
+    root.themeActionStatus = ""
+    root._setThemeStdout = ""
+    root._setThemeStderr = ""
+    setThemeProc.command = [root.setThemeBin, root.selectedReviewId]
+    setThemeProc.running = true
+  }
+
+  Process {
+    id: setThemeProc
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._setThemeStdout = String(text || "").trim() }
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._setThemeStderr = String(text || "").trim() }
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.themeActionStatus = "Desktop is now on “" + root._setThemeStdout
+          + "”. The next generation replaces it."
+        root.themeActionStatusIsError = false
+      } else {
+        root.themeActionStatus = root._setThemeStderr || "Could not set that theme."
+        root.themeActionStatusIsError = true
+      }
+    }
+  }
+
   // ---- Export: package the selected generation as a shareable Omarchy theme
   // REPOSITORY, which is a different job from Save. Save installs a theme on
   // THIS machine; Omarchy distributes themes as git repositories
@@ -1111,6 +1172,47 @@ Panel {
         root.themeActionStatusIsError = false
       } else {
         root.themeActionStatus = root._exportStderr || "Export failed."
+        root.themeActionStatusIsError = true
+      }
+    }
+  }
+
+  // ---- Share Record: the selected generation as ONE self-contained .html —
+  // image, reading, prompt and costs in a single file that opens anywhere.
+  // Neighbour to Export and easy to confuse with it: Export packages the
+  // THEME for a stranger to install and leaves the reading out,
+  // astro-arc-share-record sends the RECORD to someone you chose, to read.
+  // No name prompt here, unlike Save: the script opens a save dialog, so the
+  // file gets named and filed in the same gesture that says where it goes.
+  readonly property string shareRecordBin: binDir + "/astro-arc-share-record"
+  property string _shareStdout: ""
+  property string _shareStderr: ""
+
+  function shareSelectedRecord() {
+    if (root.selectedReviewId === "" || shareRecordProc.running) return
+    root.themeActionStatus = ""
+    root._shareStdout = ""
+    root._shareStderr = ""
+    shareRecordProc.command = [root.shareRecordBin, root.selectedReviewId]
+    shareRecordProc.running = true
+  }
+
+  Process {
+    id: shareRecordProc
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._shareStdout = String(text || "").trim() }
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._shareStderr = String(text || "").trim() }
+    onExited: function(exitCode) {
+      // 2 is the save dialog being cancelled. Nothing was written and nothing
+      // went wrong, so it must not come back red like a failure.
+      if (exitCode === 2) {
+        root.themeActionStatus = "Share cancelled."
+        root.themeActionStatusIsError = false
+      } else if (exitCode === 0) {
+        root.themeActionStatus = "Saved to " + root._shareStdout
+          + " — the image is inside the file, so it opens anywhere you send it."
+        root.themeActionStatusIsError = false
+      } else {
+        root.themeActionStatus = root._shareStderr || "Could not build the record."
         root.themeActionStatusIsError = true
       }
     }
@@ -2301,27 +2403,22 @@ Panel {
             PanelSeparator { foreground: root.bar.foreground }
             PanelSectionHeader { text: "THEMES GENERATED"; foreground: root.bar.foreground }
 
+            // The picker gets the whole row. It used to share it with a
+            // "History" label and the Open button, which left an entry like
+            // "Sep 19, 2:10 PM · Cyberpunk · 2.39 MB" elided in the middle —
+            // and the part that gets cut is the style, which is the part you
+            // are choosing by. The section header already says what this is,
+            // so the label column was pure cost; Open moved to the row below,
+            // where it sits with the other two things you can do to the
+            // entry you picked.
             Item {
               width: parent.width
-              height: Math.max(reviewsLabel.implicitHeight, reviewsDropdown.implicitHeight)
-
-              Text {
-                id: reviewsLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "History"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
+              height: reviewsDropdown.implicitHeight
 
               Dropdown {
                 id: reviewsDropdown
-                anchors.left: reviewsLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: openReviewBtn.left
-                anchors.rightMargin: Style.space(8)
+                anchors.left: parent.left
+                anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 showLabel: false
                 value: root.selectedReviewId
@@ -2337,48 +2434,84 @@ Panel {
                 foreground: root.bar.foreground
                 onChanged: function(value) { root.selectedReviewId = value }
               }
-
-              Button {
-                id: openReviewBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Open"
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                onClicked: root.openSelectedReview()
-              }
             }
 
-            // The whole history as one browsable page — the URL worth
-            // bookmarking. Plain files; opens in the default browser.
-            Item {
+            // ---- One action bar for the selected generation. -------------
+            //
+            // Was two rows with different rules: Open/Browse/Set in a left-
+            // packed Row, then Save/Share/Export anchored left/centre/right in
+            // an Item. Two layout idioms, two orders, and the pair that
+            // actually changes something (Set) sat next to the pair that only
+            // looks (Open/Browse).
+            //
+            // Now one Grid in a single stated order, equal column widths, and
+            // it wraps to two rows only when one will not fit. `columns` is
+            // the whole layout rule: all of them across if the row can hold
+            // them at a sane width, otherwise half each row. Widths are set
+            // from the column count rather than from each label, so the row
+            // stays put when a label shortens to "Setting…" — which is what
+            // the per-button reservedWidth latches used to do one at a time.
+            Grid {
+              id: reviewActions
               width: parent.width
-              height: archiveBtn.implicitHeight
+              visible: !root.themeNamePromptOpen
+              spacing: Style.space(8)
 
+              readonly property int count: 6
+              // The narrowest a button may get before wrapping is better than
+              // cramming. Below this the labels start eliding, which is worse
+              // than a second row.
+              readonly property int minButtonWidth: 84
+              readonly property bool fitsOneRow:
+                (width - spacing * (count - 1)) / count >= minButtonWidth
+              columns: fitsOneRow ? count : Math.ceil(count / 2)
+              readonly property real cellWidth:
+                (width - spacing * (columns - 1)) / columns
+
+              // The whole history as one browsable page — the URL worth
+              // bookmarking. Plain files; opens in the default browser. First
+              // because it is the way in to everything, not just this entry.
               Button {
                 id: archiveBtn
-                anchors.left: parent.left
-                anchors.leftMargin: root.labelColW + Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Browse all generations"
+                text: "Browse All"
+                width: reviewActions.cellWidth
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 onClicked: root.openArchive()
               }
-            }
-
-            Item {
-              width: parent.width
-              height: Math.max(saveThemeBtn.implicitHeight, exportThemeBtn.implicitHeight)
-              visible: !root.themeNamePromptOpen
 
               Button {
+                id: openReviewBtn
+                text: "Open"
+                width: reviewActions.cellWidth
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== ""
+                onClicked: root.openSelectedReview()
+              }
+
+              // The only one here that changes what you are looking at, and
+              // the next generation undoes it — the permanent copies are Save
+              // and Export.
+              Button {
+                id: setThemeBtn
+                text: setThemeProc.running ? "Setting…" : "Set"
+                width: reviewActions.cellWidth
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== "" && !setThemeProc.running
+                onClicked: root.setSelectedTheme()
+              }
+
+              // Save installs the theme here; Export packages it for someone
+              // else.
+              Button {
                 id: saveThemeBtn
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Save Selected Theme"
+                text: "Save"
+                width: reviewActions.cellWidth
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
@@ -2386,24 +2519,32 @@ Panel {
                 onClicked: root.openSaveThemePrompt()
               }
 
-              // Save installs it here; Export packages it for someone else.
               Button {
                 id: exportThemeBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
                 text: exportThemeProc.running ? "Exporting…" : "Export"
+                width: reviewActions.cellWidth
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
                 enabled: root.selectedReviewId !== "" && !exportThemeProc.running
                 onClicked: root.exportSelectedTheme()
+              }
 
-                // Same latch as the Regenerate button: the label shortens while
-                // running, and a control that resizes under the cursor is what
-                // made that button feel wrong.
-                property real reservedWidth: 0
-                onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
-                width: Math.max(implicitWidth, reservedWidth)
+              // The odd one out between its neighbours: they copy the THEME,
+              // this copies the RECORD — one .html with the image in it, made
+              // to be read rather than installed. Last because it is the only
+              // one that is not about the desktop, and NOT dropped: it was
+              // absent from the requested order, but removing a working
+              // feature is a different decision from reordering the bar.
+              Button {
+                id: shareRecordBtn
+                text: shareRecordProc.running ? "Sharing…" : "Share"
+                width: reviewActions.cellWidth
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: root.selectedReviewId !== "" && !shareRecordProc.running
+                onClicked: root.shareSelectedRecord()
               }
             }
 

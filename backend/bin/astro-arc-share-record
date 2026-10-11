@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# Writes ONE generation's record as a single, self-contained .html file — the
+# image, the reading, the prompt and the costs, all in one file that opens
+# anywhere with no folder around it and no server.
+#
+# This is the third thing you can do with a generation, and the three are not
+# interchangeable:
+#
+#   astro-arc-save-theme    installs the theme on THIS machine
+#   astro-arc-export-theme  packages the theme as a git repo a STRANGER can
+#                           install — the reading deliberately left out
+#   astro-arc-share-record  this: the whole record, made to be READ, by
+#                           someone you chose to send it to
+#
+# The rewriting is share_record.py's job (see its header for what is and is not
+# in the file). This resolves the id, asks where to put it, and reports.
+#
+# Usage: astro-arc-share-record <review-id> [--out FILE]
+#   With no --out it opens a save dialog, prefilled with a sensible name, so
+#   the file can be renamed and filed before it is sent.
+#   Prints the written path on success.
+#
+# Exit codes, which the panel distinguishes:
+#   0  written, path on stdout
+#   1  failed
+#   2  the save dialog was cancelled — nothing written, and not an error
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"
+INDEX_FILE="$GENERATIONS_INDEX"
+
+review_id=""
+out_file=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --out) out_file="${2:-}"; shift 2 ;;
+    *) if [[ -z $review_id ]]; then review_id="$1"; fi; shift ;;
+  esac
+done
+
+[[ -n $review_id ]] || { echo "Usage: astro-arc-share-record <review-id> [--out FILE]" >&2; exit 1; }
+[[ -f $INDEX_FILE ]] || { echo "astro-arc-share-record: no generations.json in the archive yet" >&2; exit 1; }
+
+review_path=$(jq -r --arg id "$review_id" '.[] | select(.id == $id) | .path' "$INDEX_FILE")
+[[ -n $review_path ]] || { echo "astro-arc-share-record: no review with id '$review_id'" >&2; exit 1; }
+gen_dir="$(dirname "$review_path")"
+[[ -f $gen_dir/index.html ]] || { echo "astro-arc-share-record: that generation has no page at $gen_dir/index.html" >&2; exit 1; }
+
+# Same normalization astro-arc-export-theme applies to a theme name.
+sanitize() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-*//; s/-*$//'; }
+
+# "astro-arc-2026-09-22-studio-ghibli.html" — the date it was made and what it
+# looks like, which is how you would describe it to the person you are sending
+# it to. Falls back to the id if the index is missing either field.
+created=$(jq -r --arg id "$review_id" '.[] | select(.id == $id) | .createdAt // empty' "$INDEX_FILE" 2>/dev/null || true)
+style=$(jq -r --arg id "$review_id" '.[] | select(.id == $id) | .artStyleLabel // empty' "$INDEX_FILE" 2>/dev/null || true)
+suggested=$(sanitize "astro-arc-${created:0:10}-${style}")
+[[ -n $suggested && $suggested != "astro-arc" ]] || suggested="astro-arc-$review_id"
+
+if [[ -z $out_file ]]; then
+  if [[ -z ${WAYLAND_DISPLAY:-}${DISPLAY:-} ]] || ! command -v zenity >/dev/null 2>&1; then
+    echo "astro-arc-share-record: no save dialog available here — pass --out FILE" >&2
+    exit 1
+  fi
+  start_dir="$HOME/Downloads"
+  [[ -d $start_dir ]] || start_dir="$HOME"
+  # zenity 4 confirms an overwrite itself; --confirm-overwrite is deprecated
+  # and does nothing. A cancel exits 1, which is this script's exit 2.
+  set +e
+  out_file=$(zenity --file-selection --save \
+    --title="Share this generation record" \
+    --filename="$start_dir/$suggested.html" \
+    --file-filter="Web page | *.html *.htm" 2>/dev/null)
+  picker_status=$?
+  set -e
+  # zenity exits 1 when the dialog is closed or cancelled, and something else
+  # (255) when it could not run at all. Only the first is a cancel.
+  if [[ $picker_status -eq 1 || ( $picker_status -eq 0 && -z $out_file ) ]]; then
+    exit 2
+  elif [[ $picker_status -ne 0 ]]; then
+    echo "astro-arc-share-record: could not open the save dialog (zenity exited $picker_status)" >&2
+    exit 1
+  fi
+  [[ $out_file == *.html || $out_file == *.htm ]] || out_file="$out_file.html"
+fi
+
+out_dir="$(dirname "$out_file")"
+[[ -d $out_dir ]] || { echo "astro-arc-share-record: no such folder: $out_dir" >&2; exit 1; }
+
+python3 "$BIN_DIR/share_record.py" "$gen_dir" --out "$out_file"

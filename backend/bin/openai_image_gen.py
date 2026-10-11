@@ -23,6 +23,7 @@ before relying on this for real budgeting.
 import json
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -120,7 +121,12 @@ PRICE_ESTIMATE_ASSUMPTION = (
 # would trade a *rare* moderation block for a *guaranteed* failure on every
 # render. A model missing from this set simply gets the default ("auto")
 # — the behavior this pipeline had before 2026-09-12.
-MODERATION_PARAM_MODELS = {"gpt-image-1-mini", "gpt-image-2"}
+# gpt-image-2.5-sunburst added 2026-10-08: it accepts the parameter (measured,
+# no 400) and it is the production model, which until then had always run at
+# the default. On the B5 filter test the most physical labelled-pass scene
+# rendered 1 of 3 at the default and 3 of 3 at "low", with nothing graphic in
+# any of them (verification/b5-provider-filter).
+MODERATION_PARAM_MODELS = {"gpt-image-1-mini", "gpt-image-2", "gpt-image-2.5-sunburst"}
 
 # "low" relaxes the safety classifier's threshold; it does NOT disable it.
 # Genuinely explicit content still blocks, and a block is still a hard
@@ -140,10 +146,27 @@ MODERATION_PARAM_MODELS = {"gpt-image-1-mini", "gpt-image-2"}
 # every time" and that "re-rendering the same prompt is always wasted spend".
 # Both are false, measured: during verification/people-off-2026-09-13, two
 # renders were refused on the first attempt and went through on a later one
-# with a byte-identical prompt, model and parameters. The retry loop in
-# generate() is earning its keep rather than burning money, and a single
-# refusal is not proof that a prompt can never render.
+# with a byte-identical prompt, model and parameters, so a single refusal is
+# not proof that a prompt can never render.
+#
+# CORRECTED AGAIN 2026-10-08. The line that stood here said "the retry loop in
+# generate() is earning its keep". There was no such loop: the only retry was
+# in sweep.py, so a refusal in production ended the day with no image
+# (astro-arc-generate runs under set -e). generate() now retries a safety
+# refusal itself -- see SAFETY_RETRIES. A refused request is not billed.
 MODERATION_LEVEL = "low"
+
+# How many more times a SAFETY refusal is retried with the identical request.
+# Only refusals: any other error (auth, quota, a bad parameter) is not random
+# and retrying it would only delay the failure. B5 measured the same prompt
+# refused 2 of 3 times at the default threshold, so two retries is the
+# smallest number that would have saved that day.
+SAFETY_RETRIES = 2
+
+
+def _is_safety_refusal(exc):
+    text = str(exc)
+    return "safety system" in text or "moderation_blocked" in text
 
 MODEL_CHOICES = [
     {"model": "gpt-image-2", "quality": "auto", "label": "GPT Image 2", "estCost": MODEL_COSTS["gpt-image-2"]["auto"]},
@@ -239,7 +262,16 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
     if model in MODERATION_PARAM_MODELS:
         payload["moderation"] = MODERATION_LEVEL
 
-    result = _request("/images/generations", payload=payload, method="POST", slot="image")
+    for attempt in range(1 + SAFETY_RETRIES):
+        try:
+            result = _request("/images/generations", payload=payload, method="POST", slot="image")
+            break
+        except RuntimeError as exc:
+            if not _is_safety_refusal(exc) or attempt == SAFETY_RETRIES:
+                raise
+            print(f"Astro-Arc: image refused by the safety system, retrying "
+                  f"({attempt + 1}/{SAFETY_RETRIES})", file=sys.stderr)
+            time.sleep(2)
 
     # The API's PNG goes to disk as-is, then ImageMagick fits it to the screen.
     # The raw render sits beside the output (same filesystem, so the fit never

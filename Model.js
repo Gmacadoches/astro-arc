@@ -121,7 +121,7 @@ function imageModelLabel(row) {
 }
 
 // What the NEXT generation will charge, given what is already cached. Stage 1
-// and Stage 1.5 are cached per period and the signature per birth chart, so a
+// and Stage 1.5's meaning are cached per period, so a
 // same-day re-run is far cheaper than a fresh day — putting that number on the
 // button is the difference between an informed click and a surprise.
 function nextRunLabel(nextRun) {
@@ -142,9 +142,9 @@ function projectedMonthlyCost(nextRun, frequency) {
 
   // Hourly is the one cadence that runs more than once inside a single period
   // of the READING. astro_engine keys its arc by local date whatever the
-  // schedule says, and Stage 1, Stage 1.5 and the visual signature all cache
+  // schedule says, and Stage 1 and Stage 1.5's meaning both cache
   // against that key — so the first run of each day pays for a fresh reading
-  // and the other 23 only re-roll Stage 2's imagery and the render. Charging
+  // and the other 23 only re-roll the material, Stage 2's imagery and the render. Charging
   // all 730 runs at the full rate overstated the month by about 40% at the
   // rates measured here ($19.57 against a real $13.77), which is exactly the
   // kind of invented number this project's cost rule exists to prevent.
@@ -471,7 +471,7 @@ function parseGeocodingResults(raw) {
         longitude: r.longitude,
         // The place's IANA zone. The birth time is civil time THERE, so the
         // chart needs it — and Open-Meteo already knows it, which is what let
-        // the timezonefinder package (and its 60 MB polygon database) go.
+        // the timezonefinder package (and its 63 MB polygon database) go.
         timezone: typeof r.timezone === "string" ? r.timezone : ""
       })
     }

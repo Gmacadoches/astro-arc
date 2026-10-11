@@ -1,0 +1,108 @@
+# WHO IS IN THE SCENE. Read fresh on every run — edit and the next
+# generation uses it, no restart, no code change.
+#
+# ---------------------------------------------------------------------------
+# WHY THIS FILE EXISTS
+#
+# Until 2026-09-20 these lived in registers.toml as a `human` family, and that
+# conflated two unrelated things. A register is WHAT THE SCENE IS MADE OF;
+# these are WHO IS IN IT. Because they shared one axis, the material registers
+# and the inhabitant configurations competed for the same slot, and every
+# interesting combination was inexpressible: a solitary figure in a mechanical
+# world, a crowd in an aquatic one, a man-beast among geological substance.
+# Picking `the solitary figure` gave you no material; picking `mechanical`
+# forbade the figure.
+#
+# Splitting them also removes registers.toml's last special case — the people
+# gate, which was the one thing in that file that was not simply a name under a
+# family.
+#
+# The two axes are rolled from different sources, and that is the point:
+#
+#   SUBSTANCE (registers.toml)  <- history rotation, for variety
+#   ACTOR     (this file)       <- the constellation, for meaning
+#
+# The actor is chosen by Stage 1.5 from the archetypal situation, because the
+# constellation already contains its own cast: the night-sea journey has a
+# traveller and a monster, the dragon-fight has a victor, the child born and
+# held has a child and whoever holds it. Measured over one install's first 12
+# days, 11 of 12 constellations already named an embodied subject and the
+# pipeline discarded every one of them. This file is what they arrive into.
+#
+# ---------------------------------------------------------------------------
+# HOW TO EDIT
+#
+#   Add a kind     -> add a key under [kinds]. That is all.
+#   Remove one     -> delete it. History that used it still reads back fine.
+#   Rename one     -> remove + add; the recency rotation keys on the exact
+#                     string, so a rename resets that kind's history.
+#
+# Keep the guidance to a span and a principle, never an inventory — the same
+# rule registers.toml's [guidance] table carries, and for the same measured
+# reason. A closed list of nouns replaces an open space with a menu.
+# ---------------------------------------------------------------------------
+
+[kinds]
+
+# Carried across verbatim from registers.toml's [guidance] on 2026-09-20. It is
+# the best-written block in that file and the reason it works is that it names
+# the obvious attractor, calls it the least interesting, and then gives the
+# whole span — which is exactly the shape the Stage 1.5 archetype fix uses too.
+man-beast = """A figure that is part human and part animal, drawn from any mythology and any era. The Greek ones — satyr, faun, centaur, minotaur — are the obvious reading and the least interesting; reach past them into the whole span: Mesopotamian lamassu, girtablullu and fish-cloaked apkallu; the jackal- and falcon-headed figures of Egyptian funerary art; the medieval bestiary's cynocephali, blemmyae, manticore and wodewose; Japanese tengu, kitsune and ushi-oni; Slavic leshy and volkodlak; Celtic selkie, pooka and the antlered horned-god figures; Norse wolf- and bear-skinned warriors; the Olmec were-jaguar; West African spider- and water-spirits; melusine, lamia, harpy, siren, sphinx, nagini, kinnara, and the foliate Green Man where the other half is plant rather than beast. Prefer the obscure and the regionally specific to the famous few. The hybrid is a fact of the figure's anatomy, rendered with the same weight and wear as everything else in the scene — never a costume, a mask, or a person wearing an animal. One or more part-human figures, with the hybrid anatomy as the subject rather than a detail."""
+
+solitary = """Exactly one person, alone in the frame, and the world around them does the rest of the work — do not add a companion, a witness or a crowd to give them something to react to. They may be the viewer's way into the scene, and an ordinary, unidealised figure serves that better than a striking one."""
+
+# Widened 2026-09-20 (second pass): it said "two or more PEOPLE", so two
+# machines meshed in a shared task had nowhere correct to go -- `automaton` is
+# singular and unattended by its own definition. Stage 1.5 typed them
+# figures-in-relation anyway and was right; the taxonomy was too narrow. The
+# kind is about relation through shared work, which is species-agnostic.
+#
+# Reframed 2026-09-20. This was "figures in relation — People in the plural,
+# related to each other", which is precisely the two-person drama STAGE2_SYSTEM
+# forbids: a contradiction that sat live in the config. The plural is kept; what
+# changes is that the relation runs through a shared task or object rather than
+# between two faces.
+#
+# Its verb list went 2026-10-10 (STYLE-OVERHAUL Prompt 1): "carrying, hauling,
+# hoisting, mending" reached Stage 2 as fixed text in every style and made the
+# shared thing always a chore. What the figures do now comes from the drawn
+# actor verbs, which span rest, play, ritual and travel as well as work.
+figures-in-relation = """Two or more figures — people, creatures, machines, spirits, or a mix of them — joined by one thing they are doing together or one thing they share. The relation is through the thing, never between the faces — nobody is reacting to anybody. Physical struggle counts, so long as the image shows the force and not the reason for it."""
+
+crowd = """Let the many carry cultural or social material, with one figure marked out from the rest. The crowd is one element, however many bodies are in it — do not reach a density requirement by multiplying faces."""
+
+handwork = """The body at close range and mid-task: hands, forearms, a tool being used, the work in progress, with the face out of frame or incidental. Agency without identity."""
+
+animal = """One creature, or a few, with their own purposes and no interest in being looked at. Working animals, wild ones, the domestic animal that has outlived its use. It is an actor, not a prop or a pet: it is doing something, or something is being done to it. Avoid the obvious companion species where a less sentimental one fits."""
+
+swarm = """Many bodies with one apparent will — insects, birds, fish, rodents. Consciousness without an individual, which is the only actor that can carry the undifferentiated states. The swarm counts as one element."""
+
+automaton = """A machine that keeps working, apparently of its own accord, with no one attending it. Agency without life and the coldest actor available: it is not a robot character and has no face to read, it simply has not stopped. Pre-electronic wherever the world allows — clockwork, weight-driven, water-driven, governed."""
+
+# Gated per style, and the gate is now live: `presence` is eligible only where
+# that style's charter has a `numinous` field describing how the numinous takes
+# a body (see presence_allowed). Silence is not permission, so an unchartered
+# style cannot have one. ghibli and cyberpunk qualify; the five styles still
+# running on the old `guidance` do not, until they are chartered.
+presence = """Something numinous that has a body. Not a glow, not a translucency, not a light — it is heavy, occupies space and is lit like everything else: a shape under cloth, a figure entirely wrapped, something the size of a building that is plainly alive. If it could be rendered as a light effect, it is wrong."""
+
+the-dead = """A body, a remnant, or something that was an actor and no longer is. It is acted upon rather than acting, and the relation still holds: something is still occupied with it, or has left it. Never gore; the fact of the body, not its injuries."""
+
+# A purely material image with no locus of experience at all. This was the
+# default for roughly 88% of generations and is now the exception, reachable
+# only when the constellation genuinely calls for it — petrification, the
+# sealed vessel, the tomb, the aftermath — and never on consecutive days.
+none = ""
+
+# Pairings that collapse into one thing, skipped when the substance register on
+# the left is chosen. Format: register = ["kind", ...].
+#
+# Empty since 2026-09-26. It held `mechanical = ["automaton"]` (the actor made
+# of the same material as the world, the all-one-thing risk) with a note to
+# revisit once the automaton could draw on a style charter's physics instead of
+# the register. Removed globally at Garrett's direction while chartering
+# cyberpunk, where a machine among machines is the world working as intended.
+# If a style starts collapsing into "a machine made of machine", this is the
+# change that did it.
+[exclude]
