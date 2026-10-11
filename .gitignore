@@ -30,3 +30,6 @@ __pycache__/
 TASK-*.md
 CONTEXT.md
 CHANGELOG.md
+
+# The style-overhaul plan (2026-10-10), a working note like TASK-*.md.
+STYLE-OVERHAUL.md
