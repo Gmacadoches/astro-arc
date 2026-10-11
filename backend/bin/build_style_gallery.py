@@ -24,6 +24,7 @@ Usage:
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -98,9 +99,13 @@ def main():
     for i, key in enumerate(wanted, start=1):
         label, guidance = lp.load_style_info(key)
         print("[%d/%d] %s" % (i, len(wanted), label), file=sys.stderr)
+        # Each world's own draws (verbs, space, condition, highlight mode), as
+        # production applies them; without this the gallery would show every
+        # world on the fallback lists.
+        style_dial, _ = lp.draw_style_choices(key, dial, [], period_key)
 
         amplification, amp_cost = lp.stage15_amplify(
-            stage1, stage1_model, period_key, config, cache=False, dial=dial,
+            stage1, stage1_model, period_key, config, cache=False, dial=style_dial,
             style_key=key, style_world=lp.load_style_world(key),
             register=args.register, secondary_register=args.secondary,
         )
@@ -111,7 +116,7 @@ def main():
             label, guidance,
             secondary_register=args.secondary,
             amplification=amplification,
-            dial=dial,
+            dial=style_dial,
             register_guidance=lp.load_register_line(key, args.register),
             secondary_register_guidance=lp.load_register_line(key, args.secondary),
             style_brief=lp.load_style_brief(key),
@@ -129,35 +134,43 @@ def main():
             thumbnail_jpeg(png, OUT_IMAGES / ("%s.jpg" % key), THUMB_PX, quality=86)
             png.unlink()
 
-        rows.append({"key": key, "label": label, "prompt": prompt, "rel": rel,
-                     "tags": tags, "guidance": guidance})
+        rows.append({"key": key, "label": label, "prompt": prompt, "rel": rel, "tags": tags})
 
     # --- the page ----------------------------------------------------------
+    # Rewritten 2026-10-10: it quoted each style's `guidance`, which the
+    # charters replaced. It now shows each world's era, myth and signature.
     out = [
-        "# Art styles",
+        "# The seven worlds",
         "",
-        "One sample per preset in [`backend/pipeline/styles.toml`](../backend/pipeline/styles.toml).",
+        "Each style in [`backend/pipeline/styles.toml`](../backend/pipeline/styles.toml) is a technique and a "
+        "**world**: a charter that says what the world is made of, who lives there, which myths its stories "
+        "come from, what its highlight is, and the one thing that marks a picture as unmistakably that world. "
+        "[`charter-schema.md`](charter-schema.md) describes every field.",
         "",
-        "Every one of these is the **same** reading, the",
-        "same Stage 1.5 objects, the same dial cell and the same two material",
-        "registers (`%s` + `%s`). Only the style differs — otherwise this would be" % (args.register, args.secondary),
-        "seven different scenes rather than a comparison of styles.",
-        "",
-        "Change the style from the widget's Style dropdown, or add your own preset",
-        "to `styles.toml` — it is read fresh on every generation.",
+        "Every image below is the **same day's reading** and the **same material registers** (`%s` + `%s`), "
+        "rendered at the same settings. Each world built its own scene from them: that is the point. Change "
+        "the style from the widget's Style dropdown; the file is read fresh on every generation."
+        % (args.register, args.secondary),
         "",
     ]
+    styles = lp.load_styles()
     for r in rows:
-        out += [
-            "## %s" % r["label"],
-            "",
-            "`%s`" % r["key"],
-            "",
-            "![%s](%s)" % (r["label"], r["rel"]),
-            "",
-            "> %s" % r["guidance"],
-            "",
-        ]
+        world = (styles.get(r["key"]) or {}).get("world") or {}
+        brief = (styles.get(r["key"]) or {}).get("brief") or {}
+        sig = (brief.get("signature") or brief.get("impossible") or "").split("\n")[0]
+        sig = re.sub(r"^[A-Z ]+ — ", "", sig).strip()
+        sig = re.sub(r"^applies to every image: ", "", sig)
+        sig = " ".join(re.split(r"(?<=\.)\s+", sig)[:2])
+        sig = sig[:1].upper() + sig[1:]
+        out += ["## %s" % r["label"], "", "`%s`" % r["key"], "", "![%s](%s)" % (r["label"], r["rel"]), ""]
+        if world.get("era"):
+            out += ["**The world.** %s" % world["era"], ""]
+        if world.get("myth"):
+            out += ["**Its stories come from:** %s" % world["myth"], ""]
+        if sig:
+            out += ["**What marks it.** %s" % sig, ""]
+        out += ["<details><summary>The prompt for this image</summary>", "", "> %s" % r["prompt"], "",
+                "</details>", ""]
     OUT_PAGE.write_text("\n".join(out) + "\n", encoding="utf-8")
 
     print("\nWrote %s and %d image(s)  ($%.4f)"

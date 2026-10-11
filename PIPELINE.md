@@ -1,14 +1,15 @@
 # How one image gets made
 
 One generation turns a birth chart and today's sky into a wallpaper and a
-matching desktop palette. At the High preset (`gpt-5.4` for writing,
-`gpt-image-2.5-sunburst` at `high`) a fresh day costs about $0.073 and a
-same-day re-run about $0.062: the reading and the day's meaning are cached, the
+matching desktop palette. At the Ultra preset (`gpt-5.4` for writing,
+`gpt-image-2.5-sunburst` at `high`) a fresh day costs about $0.077 and a
+same-day re-run about $0.066 (measured 2026-10-10: a run that re-drew the day's
+meaning charged $0.0724): the reading and the day's meaning are cached, the
 material, the prompt and the picture are remade. The render is most of the cost
 and most of the time. The panel's cost line projects the real figure for
 whatever preset is set.
 
-**At a glance:** $0.073 fresh run · $0.062 same-day re-run · ~40s render · 20 registers · 7 styles
+**At a glance:** $0.077 fresh run · $0.066 same-day re-run (Ultra) · ~40s render · 20 registers · 7 worlds
 
 Thirteen steps. Five of them call a language model: the reading, the meaning,
 the material, the prompt and the melodrama check. This document walks the

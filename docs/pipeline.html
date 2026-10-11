@@ -395,11 +395,11 @@
 <header class="mast">
 <div class="eyebrow">Astro-Arc · generation pipeline</div>
 <h1>How one image gets made</h1>
-<p class="standfirst">One generation turns a birth chart and today's sky into a wallpaper and a matching desktop palette. At the High preset (<code>gpt-5.4</code> for writing, <code>gpt-image-2.5-sunburst</code> at <code>high</code>) a fresh day costs about $0.073 and a same-day re-run about $0.062: the reading and the day's meaning are cached, the material, the prompt and the picture are remade. The render is most of the cost and most of the time. The panel's cost line projects the real figure for whatever preset is set.</p>
+<p class="standfirst">One generation turns a birth chart and today's sky into a wallpaper and a matching desktop palette. At the Ultra preset (<code>gpt-5.4</code> for writing, <code>gpt-image-2.5-sunburst</code> at <code>high</code>) a fresh day costs about $0.077 and a same-day re-run about $0.066 (measured 2026-10-10: a run that re-drew the day's meaning charged $0.0724): the reading and the day's meaning are cached, the material, the prompt and the picture are remade. The render is most of the cost and most of the time. The panel's cost line projects the real figure for whatever preset is set.</p>
 <p class="standfirst sub">Thirteen steps. Five of them call a language model: the reading, the meaning, the material, the prompt and the melodrama check. This document walks the whole path in order, and every step names the file that runs it, what it reads, what it writes, whether it is cached, and <strong>the one knob that changes it</strong> — so you can retune this thing without reading any Python.</p>
 <p class="standfirst sub">If you only read one section, read <a href="#tweak-it-without-touching-code">Tweak it without touching code</a>.</p>
 <p class="standfirst sub">&gt; This file is the source. <code>docs/pipeline.html</code> is generated from it by &gt; <code>backend/bin/build_pipeline_page.py</code> — edit here, run that, never edit the &gt; HTML. <code>build_pipeline_page.py --check</code> fails if the two have drifted.</p>
-<dl class="ledger"><div><dt>fresh run</dt><dd>$0.073</dd></div><div><dt>same-day re-run</dt><dd>$0.062</dd></div><div><dt>render</dt><dd>~40s</dd></div><div><dt>registers</dt><dd>20</dd></div><div><dt>styles</dt><dd>7</dd></div></dl>
+<dl class="ledger"><div><dt>fresh run</dt><dd>$0.077</dd></div><div><dt>same-day re-run (Ultra)</dt><dd>$0.066</dd></div><div><dt>render</dt><dd>~40s</dd></div><div><dt>registers</dt><dd>20</dd></div><div><dt>worlds</dt><dd>7</dd></div></dl>
 </header>
 <section class="section" id="the-pipeline">
 <h2>The pipeline</h2>
