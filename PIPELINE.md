@@ -94,8 +94,10 @@ Period keys: `YYYY-MM-DDTHH` · `YYYY-MM-DD` · ISO `%G-W%V` · `YYYY-MM`.
 [Astronomy Engine](https://github.com/cosinekitty/astronomy), vendored as one
 file, gives natal placements and today's transits to about an arcminute;
 `ephemeris.py` adds Placidus houses on top of it. It replaced pyswisseph, which
-needed compiling on every install, after a year of daily outputs compared
-identical on all but a handful of threshold days. It emits an `arc`: the moon sign
+needed compiling on every install, after the two were compared over 1900–2100
+and across four birth charts: no sign and no retrograde flag ever differed, and
+a full year of the pipeline's own outputs moved on only a handful of days where
+an aspect sat within an arcminute of its orb limit. It emits an `arc`: the moon sign
 and phase, the dominant transit, and a **texture** block — polarity,
 intensity, exposure, multiplicity — which is the raw material for step 3.
 

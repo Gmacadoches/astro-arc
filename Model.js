@@ -471,7 +471,7 @@ function parseGeocodingResults(raw) {
         longitude: r.longitude,
         // The place's IANA zone. The birth time is civil time THERE, so the
         // chart needs it — and Open-Meteo already knows it, which is what let
-        // the timezonefinder package (and its 60 MB polygon database) go.
+        // the timezonefinder package (and its 63 MB polygon database) go.
         timezone: typeof r.timezone === "string" ? r.timezone : ""
       })
     }
