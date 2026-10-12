@@ -16,6 +16,9 @@ var DEFAULT_CONFIG = {
   // costs nothing is the only safe thing to pick on someone's behalf;
   // an explicit "daily" in an existing config.json still wins over this.
   frequency: "manual",
+  // Hours between runs when frequency is "hourly"; ignored otherwise. See
+  // INTERVAL_HOURS_CHOICES.
+  intervalHours: 1,
   // "openai" — the legacy key `provider` superseded. It defaulted to "local"
   // (Stable Diffusion) long after that path stopped being offered in the UI,
   // which meant the default named a backend a new install could not reach.
@@ -54,6 +57,24 @@ var FREQUENCY_CHOICES = [
   { key: "monthly", label: "Monthly" },
   { key: "manual", label: "None" }
 ]
+
+// "Every N hours" under Hourly. Divisors of 24 only, mirroring
+// period_key.py's INTERVAL_HOURS: the slots then line up with the clock
+// (every 3 hours is 00, 03, 06 ...) and the last one of the day is as long as
+// the rest. 1 is plain hourly, with the same keys it always had.
+var INTERVAL_HOURS_CHOICES = [1, 2, 3, 4, 6, 8, 12]
+
+function intervalHours(value) {
+  var n = parseInt(value, 10)
+  return INTERVAL_HOURS_CHOICES.indexOf(n) >= 0 ? n : 1
+}
+
+// The cadence in words, for text like "/month at every 3 hours".
+function scheduleLabel(frequency, hours) {
+  if (frequency !== "hourly") return String(frequency)
+  var n = intervalHours(hours)
+  return n === 1 ? "hourly" : "every " + n + " hours"
+}
 
 // "aether" shells out to Omarchy's own theme generator for a richer theme
 // (it's what fixes the file-manager icon color, among other things — see
@@ -133,18 +154,19 @@ function nextRunLabel(nextRun) {
 // The log averages real runs, and same-day regenerations in it are mostly
 // cache hits, so averaging them reported a daily cost far below the truth —
 // $0.89/mo against an actual $5.60/mo in the case that prompted this.
-function projectedMonthlyCost(nextRun, frequency) {
+function projectedMonthlyCost(nextRun, frequency, hours) {
   if (!nextRun || typeof nextRun.full !== "number") return null
   // Note `in` rather than a falsy check: manual is 0 runs a month, and `||`
   // would have quietly turned that into the daily default — the one frequency
   // where the answer is "nothing" would have reported the largest number.
   var runs = (frequency in RUNS_PER_MONTH) ? RUNS_PER_MONTH[frequency] : RUNS_PER_MONTH.daily
+  if (frequency === "hourly") runs = runs / intervalHours(hours)
 
   // Hourly is the one cadence that runs more than once inside a single period
   // of the READING. astro_engine keys its arc by local date whatever the
   // schedule says, and Stage 1 and Stage 1.5's meaning both cache
   // against that key — so the first run of each day pays for a fresh reading
-  // and the other 23 only re-roll the material, Stage 2's imagery and the render. Charging
+  // and the rest (23 of them at every hour) only re-roll the material, Stage 2's imagery and the render. Charging
   // all 730 runs at the full rate overstated the month by about 40% at the
   // rates measured here ($19.57 against a real $13.77), which is exactly the
   // kind of invented number this project's cost rule exists to prevent.
@@ -263,6 +285,7 @@ function parseConfig(raw) {
       longitude: hasCoords ? lon : null,
       timezone: typeof data.timezone === "string" ? data.timezone : "",
       frequency: ["hourly", "daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
+      intervalHours: intervalHours(data.intervalHours),
       imageBackend: data.imageBackend === "local" ? "local" : "openai",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
       openaiQuality: typeof data.openaiQuality === "string" ? data.openaiQuality : "",
@@ -412,12 +435,13 @@ function formatBytes(bytes) {
 // this project's cost-estimate convention: null/"unknown" beats a
 // fabricated figure. Returns { estimatedBytes, knownCount } — knownCount
 // lets the caller show "estimate" vs. "no data yet" language.
-function estimateHistorySpace(reviewsIndex, retentionDays, frequency) {
+function estimateHistorySpace(reviewsIndex, retentionDays, frequency, hours) {
   var known = (reviewsIndex || []).filter(function(r) { return typeof r.sizeBytes === "number" })
   if (known.length === 0) return { estimatedBytes: null, knownCount: 0 }
 
   var avgBytes = known.reduce(function(sum, r) { return sum + r.sizeBytes }, 0) / known.length
   var intervalDays = FREQUENCY_INTERVAL_DAYS[frequency]
+  if (frequency === "hourly") intervalDays = intervalDays * intervalHours(hours)
   // No cadence means nothing to project from: on "manual" the number of entries
   // depends entirely on how often you click, so report the average size and say
   // the total is unknown rather than answering as if it were daily — which is
@@ -565,12 +589,18 @@ function isoWeekKey(date) {
 // this against lastRun.periodKey is a plain string check with no elapsed-
 // time math at all, so 11pm on one date and 1am the next both resolve to
 // their own date's key regardless of how few hours separate them.
-function currentPeriodKey(frequency, now) {
+//
+// `hours` is the Hourly interval: the key names the hour its slot starts on,
+// so at every 3 hours 14:05 falls in "T12". Ignored by the other frequencies.
+function currentPeriodKey(frequency, now, hours) {
   var d = now || new Date()
   if (frequency === "weekly") return isoWeekKey(d)
   if (frequency === "monthly") return d.getFullYear() + "-" + pad2(d.getMonth() + 1)
   var day = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
-  if (frequency === "hourly") return day + "T" + pad2(d.getHours())
+  if (frequency === "hourly") {
+    var n = intervalHours(hours)
+    return day + "T" + pad2(Math.floor(d.getHours() / n) * n)
+  }
   return day
 }
 
@@ -586,12 +616,12 @@ function currentPeriodKey(frequency, now) {
 //
 // Falls back to the stored key for a run old enough to predate generatedAt, or
 // one carrying a timestamp that won't parse.
-function runCoversPeriod(lastRun, frequency, now) {
+function runCoversPeriod(lastRun, frequency, now, hours) {
   if (!lastRun) return false
-  var currentKey = currentPeriodKey(frequency, now)
+  var currentKey = currentPeriodKey(frequency, now, hours)
   var generated = lastRun.generatedAt ? new Date(lastRun.generatedAt) : null
   if (generated && !isNaN(generated.getTime()))
-    return currentPeriodKey(frequency, generated) === currentKey
+    return currentPeriodKey(frequency, generated, hours) === currentKey
   return lastRun.periodKey === currentKey
 }
 
@@ -614,6 +644,9 @@ if (typeof module !== "undefined") {
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,
+    INTERVAL_HOURS_CHOICES: INTERVAL_HOURS_CHOICES,
+    intervalHours: intervalHours,
+    scheduleLabel: scheduleLabel,
     chatModelLabel: chatModelLabel,
     imageModelLabel: imageModelLabel,
     formatUsd: formatUsd,

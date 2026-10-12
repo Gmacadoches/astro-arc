@@ -63,6 +63,9 @@ config_json=$("$BIN_DIR/astro-arc-config" 2>/dev/null || echo '{}')
 cfg() { jq -r "$1" <<<"$config_json" 2>/dev/null; }
 
 frequency=$(cfg '.frequency // "manual"')
+# Only read under hourly. period_key.py falls back to 1 for anything it does
+# not offer, so a hand-edited value cannot produce an odd key.
+interval_hours=$(cfg '.intervalHours // 1')
 # `provider` is the global setting now (see astro-arc-config --set-provider);
 # `imageBackend` is the legacy key it supersedes. OpenAI is the only renderer:
 # the local Stable Diffusion path (image_gen.py) was removed on 2026-09-19,
@@ -85,9 +88,9 @@ background_size=$(cfg '.backgroundSize // "auto"')
 period_key_for() {
   local freq="$1" when="${2:-}"
   if [[ -n $when ]]; then
-    python3 "$BIN_DIR/period_key.py" "$freq" "$when" 2>/dev/null || true
+    python3 "$BIN_DIR/period_key.py" --interval-hours "$interval_hours" "$freq" "$when" 2>/dev/null || true
   else
-    python3 "$BIN_DIR/period_key.py" "$freq" 2>/dev/null || true
+    python3 "$BIN_DIR/period_key.py" --interval-hours "$interval_hours" "$freq" 2>/dev/null || true
   fi
 }
 
