@@ -38,6 +38,7 @@ still needs to know how many tokens a tier burns.
 
 import json
 import re
+import subprocess
 import sys
 import tomllib
 from datetime import datetime, timedelta, timezone
@@ -672,6 +673,31 @@ def catalog(width=1024, height=1024):
     }
 
 
+def parse_size(value, default_width, default_height):
+    """--size as the panel passes it: the raw backgroundSize setting, which
+    is "WIDTHxHEIGHT" or "auto" (the default). "auto" resolves the same way
+    astro-arc-generate resolves it, so the prices shown match what a run
+    would render. int() on "auto" used to raise after --refresh had already
+    fetched the list, so the panel got no JSON and the model list never
+    loaded. Anything unreadable keeps the defaults: the size only moves cost
+    estimates, never which models are listed."""
+    if value == "auto":
+        try:
+            value = subprocess.run(
+                [str(Path(__file__).parent / "astro-arc-detect-resolution")],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip() or "1920x1080"
+        except (OSError, subprocess.SubprocessError):
+            value = "1920x1080"
+    try:
+        width, height = (int(x) for x in value.split("x"))
+    except ValueError:
+        return default_width, default_height
+    if width <= 0 or height <= 0:
+        return default_width, default_height
+    return width, height
+
+
 def main():
     args = sys.argv[1:]
     # astro-arc-generate asks for this before deciding whether it can afford a
@@ -686,7 +712,7 @@ def main():
     width = height = 1024
     for i, a in enumerate(args):
         if a == "--size" and i + 1 < len(args):
-            width, height = (int(x) for x in args[i + 1].split("x"))
+            width, height = parse_size(args[i + 1], width, height)
     result = catalog(width, height)
     result["ok"] = True
     print(json.dumps(result, indent=2))
