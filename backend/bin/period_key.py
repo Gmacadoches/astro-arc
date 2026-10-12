@@ -4,7 +4,7 @@
 THIS FILE IS THE DEFINITION. Everything that needs a period key gets it from
 here — astro_engine.py, model_catalog.py and astro-arc-generate all call in.
 There is exactly one other implementation, `currentPeriodKey` in
-plugin/Model.js, because QML cannot call Python synchronously inside a
+Model.js, because QML cannot call Python synchronously inside a
 property binding. `--selftest` below checks that the two still agree; run it
 after touching either.
 
@@ -155,9 +155,9 @@ def _selftest():
     import subprocess
     from pathlib import Path
 
-    model_js = Path(__file__).resolve().parents[2] / "plugin" / "Model.js"
+    model_js = Path(__file__).resolve().parents[2] / "Model.js"
     if not shutil.which("node"):
-        print("node:    not installed — skipped (plugin/Model.js NOT verified)")
+        print("node:    not installed — skipped (Model.js NOT verified)")
     elif not model_js.exists():
         print("node:    %s not found — skipped" % model_js)
     else:
@@ -174,7 +174,7 @@ def _selftest():
             for (iso, freq, every, expected), got in zip(_CASES, json.loads(out.stdout)):
                 if got != expected:
                     failures.append("Model.js %s %-8s/%d -> %s, expected %s" % (iso, freq, every, got, expected))
-            print("node:    %d cases against plugin/Model.js" % len(_CASES))
+            print("node:    %d cases against Model.js" % len(_CASES))
 
     for freq, expected in (("hourly", "2026-09-13"), ("daily", "2026-09-13"), ("monthly", "2026-09")):
         got = cache_key(freq, datetime.fromisoformat("2026-09-13T14:05:00"))
