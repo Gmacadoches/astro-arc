@@ -1557,6 +1557,26 @@ WALLPAPER_RULE = ("WALLPAPER — The frame always has somewhere for the eye to g
                   "\"beyond\", \"in the distance\" or \"far off\".")
 
 
+# Appended to every image prompt after the style suffix. A desktop bar covers
+# the top of the wallpaper, and three renders in a row (2026-10-12) put heads
+# under it. The same rule written into WALLPAPER_RULE never reached the render:
+# Stage 2 only describes what is physically there, so it dropped the framing.
+# The line here goes to the image model verbatim. The first render with it had
+# the top fifth clear.
+HEADROOM_SUFFIX = ("Composition: a wide view with generous empty headroom. The top fifth of the "
+                   "image is plain background, sky or ceiling only, with no head, face or "
+                   "important detail in it.")
+
+
+def final_image_prompt(image_prompt, style_key, has_people):
+    """Stage 2's prompt plus the style suffix and HEADROOM_SUFFIX: exactly
+    what the image model is sent. sweep.py calls this too, so a sweep renders
+    the same prompt production would."""
+    style_suffix = load_style_suffix(style_key, has_people)
+    prompt = f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
+    return f"{prompt} {HEADROOM_SUFFIX}"
+
+
 def load_style_space(style_key):
     """`[<style>.space]`: 6-8 one-sentence depth recipes, or None for a style
     without one, which keeps its OPENNESS or DEPTH brief rule."""
@@ -2564,8 +2584,7 @@ def build(reading, config):
     # value through so a suffix_base/suffix_figures preset (see
     # load_style_suffix) only pays for figure-rendering instructions on a
     # generation that actually has a figure in it.
-    style_suffix = load_style_suffix(style_key, has_people)
-    final_prompt = f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
+    final_prompt = final_image_prompt(image_prompt, style_key, has_people)
 
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),

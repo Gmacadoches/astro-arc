@@ -368,8 +368,13 @@ def main():
                 style_label, style_guidance,
             )
 
-        suffix = lp.load_style_suffix(style_key, has_people)
-        final_prompt = f"{prompt}, {suffix}" if suffix else prompt
+        # Production's own join, so a sweep renders what a real run would.
+        # Guarded by hasattr so the harness still works against an older checkout.
+        if hasattr(lp, "final_image_prompt"):
+            final_prompt = lp.final_image_prompt(prompt, style_key, has_people)
+        else:
+            suffix = lp.load_style_suffix(style_key, has_people)
+            final_prompt = f"{prompt}, {suffix}" if suffix else prompt
 
         # One tier for every sample, the same one production uses. This used to
         # bump figures to "high" and default everything else to "medium", on the
