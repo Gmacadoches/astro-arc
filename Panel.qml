@@ -973,6 +973,47 @@ Panel {
     onLoadFailed: root.costsSummary = { total: 0, unknownCount: 0, generationCount: 0 }
   }
 
+  // ---- Reset usage: starts "Spent" over at zero (astro-arc-reset-usage).
+  // The old costs.json is kept beside it as costs-reset-<time>.json, so this
+  // is recoverable, but it still arms on the first click and reverts after 4s
+  // like Clear History: a total that quietly went to zero is easy to miss. ---
+  readonly property string resetUsageBin: binDir + "/astro-arc-reset-usage"
+  property bool resetUsageArmed: false
+  property string resetUsageError: ""
+
+  function resetUsageClicked() {
+    if (resetUsageProc.running) return
+    if (root.resetUsageArmed) {
+      root.resetUsageArmed = false
+      resetUsageArmTimer.stop()
+      root.resetUsageError = ""
+      resetUsageProc.running = true
+    } else {
+      root.resetUsageArmed = true
+      resetUsageArmTimer.restart()
+    }
+  }
+
+  Timer {
+    id: resetUsageArmTimer
+    interval: 4000
+    onTriggered: root.resetUsageArmed = false
+  }
+
+  Process {
+    id: resetUsageProc
+    command: [root.resetUsageBin]
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root.resetUsageError = String(text || "").trim() }
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.resetUsageError = ""
+        root.costsFile.reload()
+      } else if (root.resetUsageError === "") {
+        root.resetUsageError = "Reset failed."
+      }
+    }
+  }
+
   // ---- Themes Generated: every real generation, browsable and — since
   // astro-arc-generate now snapshots the live theme dir into each entry —
   // exportable as a standalone theme (astro-arc-save-theme) before the
@@ -1874,7 +1915,7 @@ Panel {
             // cost_estimate.py). Always available, no API call needed. -----
             Item {
               width: parent.width
-              height: spentText.implicitHeight
+              height: Math.max(spentText.implicitHeight, resetUsageBtn.implicitHeight)
 
               Text {
                 id: spentLabel
@@ -1891,7 +1932,8 @@ Panel {
                 id: spentText
                 anchors.left: spentLabel.right
                 anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
+                anchors.right: resetUsageBtn.left
+                anchors.rightMargin: Style.space(8)
                 anchors.verticalCenter: parent.verticalCenter
                 elide: Text.ElideRight
                 text: "$" + root.costsSummary.total.toFixed(4)
@@ -1901,6 +1943,27 @@ Panel {
                 font.family: root.bar.fontFamily
                 font.pixelSize: Style.font.bodySmall
               }
+
+              Button {
+                id: resetUsageBtn
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.resetUsageArmed ? "Confirm Reset?" : "Reset"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.resetUsageArmed ? (root.bar.urgent || "#f38ba8") : root.bar.foreground
+                onClicked: root.resetUsageClicked()
+              }
+            }
+
+            Text {
+              visible: root.resetUsageError !== ""
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: root.resetUsageError
+              color: root.bar.urgent || "#f38ba8"
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
             }
 
             PanelSeparator { foreground: root.bar.foreground }
