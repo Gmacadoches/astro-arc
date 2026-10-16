@@ -98,7 +98,9 @@ and place.
 Nothing generates on its own until you say so: **Schedule** starts at **None**,
 so the first theme is the one you ask for with **Regenerate**. Set it to Hourly,
 Daily, Weekly or Monthly once you know what a run costs you — the panel prices
-the month for whichever you pick.
+the month for whichever you pick. Hourly gets a second picker for every 1, 2,
+3, 4, 6, 8 or 12 hours, and the slots line up with the clock (every 3 hours
+runs in the 00:00, 03:00, 06:00 ... slots).
 
 A schedule only advances while you are logged in, because the widget itself is
 the scheduler. A locked screen still counts; being switched off, asleep or

@@ -278,11 +278,25 @@ Panel {
     }
   }
 
+  function commitIntervalHours(value) {
+    intervalHoursWriteProc.command = [root.configBin, "--set-interval-hours", value]
+    intervalHoursWriteProc.running = true
+  }
+
+  Process {
+    id: intervalHoursWriteProc
+    onExited: function(exitCode) {
+      if (exitCode === 0) root.configFile.reload()
+    }
+  }
+
   Connections {
     target: root
     function onConfigStateChanged() {
       if (frequencyDropdown.value !== root.configState.frequency)
         frequencyDropdown.value = root.configState.frequency
+      if (intervalHoursDropdown.value !== String(root.configState.intervalHours))
+        intervalHoursDropdown.value = String(root.configState.intervalHours)
     }
   }
 
@@ -343,12 +357,12 @@ Panel {
     // that.
     if (root.configState.frequency === "manual") return
 
-    var currentKey = Model.currentPeriodKey(root.configState.frequency)
+    var currentKey = Model.currentPeriodKey(root.configState.frequency, undefined, root.configState.intervalHours)
     // Model.runCoversPeriod, not a comparison against lastRun.periodKey: that
     // key was filed under whatever frequency was set when the run happened, so
     // comparing it across a frequency CHANGE made switching Daily -> Monthly
     // generate on the spot. See its comment in Model.js.
-    if (Model.runCoversPeriod(root.lastRun, root.configState.frequency)) return
+    if (Model.runCoversPeriod(root.lastRun, root.configState.frequency, undefined, root.configState.intervalHours)) return
     // Already tried this exact period this session (regardless of whether
     // it succeeded) — avoid hammering a misconfigured setup (e.g. no API
     // key) every autoGenerateCheckInterval; the next real period, or a
@@ -1757,14 +1771,14 @@ Panel {
                 // Stage 2 and the render actually ran, while a new day of the
                 // same settings costs $0.18.
                 text: {
-                  var e = Model.projectedMonthlyCost(root.modelCatalog.nextRun, root.configState.frequency)
+                  var e = Model.projectedMonthlyCost(root.modelCatalog.nextRun, root.configState.frequency, root.configState.intervalHours)
                   if (!e) return "Est. monthly: cost unknown for the current models"
                   var per = Model.formatUsd(e.perRun) + " per full run ("
                     + (e.source === "actual" ? "actual" : "est") + ")"
                   // With nothing scheduled there is no monthly figure to give —
                   // only what a run costs when you ask for one.
                   if (!e.scheduled) return "No recurring cost — generates only when you click. " + per
-                  return "Est. " + Model.formatUsd(e.perMonth) + "/month at " + root.configState.frequency
+                  return "Est. " + Model.formatUsd(e.perMonth) + "/month at " + Model.scheduleLabel(root.configState.frequency, root.configState.intervalHours)
                     + " · " + per
                 }
                 color: Qt.darker(root.bar.foreground, 1.3)
@@ -1945,7 +1959,7 @@ Panel {
             Text {
               width: parent.width
               wrapMode: Text.WordWrap
-              readonly property var estimate: Model.estimateHistorySpace(root.reviewsIndex, root.configState.historyRetentionDays, root.configState.frequency)
+              readonly property var estimate: Model.estimateHistorySpace(root.reviewsIndex, root.configState.historyRetentionDays, root.configState.frequency, root.configState.intervalHours)
               text: {
                 var e = estimate
                 var basis = " (based on " + e.knownCount + " saved generation" + (e.knownCount === 1 ? "" : "s") + ")"
@@ -2337,6 +2351,37 @@ Panel {
               })
               foreground: root.bar.foreground
               onChanged: function(value) { root.commitFrequency(value) }
+            }
+
+            // Every N hours, only under Hourly. A second small picker keeps
+            // the Schedule list at five entries instead of growing one per
+            // interval.
+            Text {
+              id: intervalEveryLabel
+              anchors.left: frequencyDropdown.right
+              anchors.leftMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              visible: root.configState.frequency === "hourly"
+              text: "every"
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            Dropdown {
+              id: intervalHoursDropdown
+              anchors.left: intervalEveryLabel.right
+              anchors.leftMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              width: Style.space(56)
+              visible: root.configState.frequency === "hourly"
+              showLabel: false
+              value: String(root.configState.intervalHours)
+              options: Model.INTERVAL_HOURS_CHOICES.map(function(n) {
+                return { value: String(n), label: n + "h" }
+              })
+              foreground: root.bar.foreground
+              onChanged: function(value) { root.commitIntervalHours(value) }
             }
           }
 

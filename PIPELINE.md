@@ -351,6 +351,7 @@ Everything else is one config file at
 | Knob | Does what |
 | --- | --- |
 | `frequency` | `hourly` / `daily` / `weekly` / `monthly` / `manual` |
+| `intervalHours` | under `hourly`, hours between runs: `1` / `2` / `3` / `4` / `6` / `8` / `12` |
 | `artStyle` | which styles.toml preset |
 | `stage1Model` / `stage2Model` | the writing models (Stage 1.5 runs on `stage1Model`) |
 | `openaiModel` / `openaiQuality` | the image model and tier |
