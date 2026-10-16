@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Starts the panel's API usage total ("Spent") over from zero by moving
+# astro-arc-generate's costs.json aside. The old log is kept next to it as
+# costs-reset-<UTC time>.json, so a reset clicked by mistake can be undone by
+# moving that file back. Nothing else reads costs.json: the model catalog's
+# measured costs live in their own cache and are not touched.
+#
+# Takes the same lock astro-arc-generate holds, so a reset can't land in the
+# middle of a run that is about to append its cost entry.
+#
+# Usage:
+#   astro-arc-reset-usage    (the panel's Reset button under API USAGE)
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"
+PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
+COSTS_FILE="$PIPELINE_STATE_DIR/costs.json"
+LOCK_FILE="$STATE_DIR/generate.lock"
+
+mkdir -p "$STATE_DIR"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "A generation is running; try again when it finishes." >&2
+  exit 2
+fi
+
+if [[ -f $COSTS_FILE ]]; then
+  mv "$COSTS_FILE" "$PIPELINE_STATE_DIR/costs-reset-$(date -u +%Y%m%dT%H%M%SZ).json"
+fi
