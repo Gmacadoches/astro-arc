@@ -90,3 +90,45 @@ These were not on the list, but they are the same kind of thing.
   - `"none" → soft`
   - `load_style_info` and `load_style_world` as functions, without their
     fallbacks
+
+## Approved verdicts (Oct 16, 2026)
+
+Garrett approved the verdicts above with these changes. They are the input to
+Prompt 2.
+
+1. **Delete as dead:** `DEFAULT_STAGE2_BRIEF`,
+   `DEFAULT_SIGNATURE`/`_default_signature`, `DEFAULT_HIGHLIGHT`,
+   `_global_verbs`, the `guidance` field, and the `or`/`is None` defaults in
+   Stage 2.
+2. **`SIGNATURE_KEYS`** moves into the validator. After ghibli's `impossible`
+   is renamed, only `signature` is accepted.
+3. **`_VERBS_*` / `_ACTOR_VERBS_*`:** stop seeding them in
+   `dial_from_texture` and delete the lists. `term_report.py` reads verbs from
+   the styles instead.
+4. **`SPACE_REPLACES_BRIEF`:** delete the `openness` brief key from ghibli and
+   the `depth` key from cyberpunk, then delete the skip logic. Prompts must not
+   change.
+5. **`CONDITIONS`:** keep the global wear scale and remove the unused
+   per-style `conditions` override.
+6. **`load_style_info`:** fold it into `load_style_world`. The label is read
+   for display only.
+7. **`load_style_world`:** an empty result is an error. A full `[registers]`
+   table is required, so delete the `load_register_line` fallback and the
+   empty `[guidance]` table in `registers.toml`.
+8. **Unknown style key:** do not just delete the fallback. Resolve the key once
+   when the config is read: fall back to the default style **and** show a
+   visible warning in the panel. Remove the per-loader unknown-key fallbacks
+   (`load_style_suffix` and the others).
+9. **`NO_TEXTURE_DIAL`:** production raises an error on a reading with no
+   texture. The replay scripts build an explicit dial for a named cell. The
+   missing intensity and exposure band defaults next to it also become errors,
+   provided production always supplies the bands.
+10. **Polarity `"none"` → soft** stays. Add a comment saying it is a defined
+    cell.
+11. `docs/decisions/2026-10-styles.md` is on this branch (commit `20489bb`).
+12. The `load_styles()`/`_load_actors()` cache stays in `fallback_audit.py`
+    only.
+
+**Check for Prompt 2.** Rerun `fallback_audit.py` and diff it against
+`baseline` (sha256 `c73cf142…a66a`). Item 4 must produce identical prompts.
+Any other difference must come from an item above.
