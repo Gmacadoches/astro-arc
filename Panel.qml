@@ -2511,28 +2511,84 @@ Panel {
             // so the label column was pure cost; Open moved to the row below,
             // where it sits with the other two things you can do to the
             // entry you picked.
+            //
+            // The thumbnail beside it is the selected generation's background
+            // (the same thumb.jpg the Browse All gallery uses), so a label like
+            // "Oct 11, 9:40 PM · Ukiyo-e" comes with a picture of which one
+            // that was. Hidden for entries built before thumbnails existed,
+            // and the picker takes the whole row again.
+            //
+            // The thumbnail costs the picker about a fifth of the row, which
+            // was enough to elide the end of "· Ukiyo-e · 8.6 MB". So the size
+            // left the label and sits under the picker as a caption: it's what
+            // you check before Clear History, not what you pick by.
             Item {
+              id: reviewPickerRow
               width: parent.width
-              height: reviewsDropdown.implicitHeight
+              height: Math.max(reviewPickerColumn.implicitHeight, reviewThumb.visible ? reviewThumb.height : 0)
 
-              Dropdown {
-                id: reviewsDropdown
+              readonly property var selectedReview: root.reviewForId(root.selectedReviewId)
+              readonly property string selectedThumbPath: selectedReview ? selectedReview.thumbPath : ""
+
+              Rectangle {
+                id: reviewThumb
                 anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(96, parent.width * 0.2)
+                height: Math.round(width * 9 / 16)
+                visible: reviewPickerRow.selectedThumbPath !== "" && reviewThumbImage.status !== Image.Error
+                color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.08)
+                border.width: 1
+                border.color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.25)
+
+                Image {
+                  id: reviewThumbImage
+                  anchors.fill: parent
+                  anchors.margins: parent.border.width
+                  source: reviewPickerRow.selectedThumbPath ? "file://" + reviewPickerRow.selectedThumbPath : ""
+                  fillMode: Image.PreserveAspectCrop
+                  asynchronous: true
+                  sourceSize.width: 320
+                }
+              }
+
+              Column {
+                id: reviewPickerColumn
+                anchors.left: reviewThumb.visible ? reviewThumb.right : parent.left
+                anchors.leftMargin: reviewThumb.visible ? Style.space(8) : 0
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: root.selectedReviewId
-                options: root.reviewsIndex.map(function(r) {
+                spacing: Style.space(4)
+
+                Dropdown {
+                  id: reviewsDropdown
+                  width: parent.width
+                  showLabel: false
+                  value: root.selectedReviewId
                   // cardCount was meaningful when a review could bundle
                   // several style variants for one reading (the Phase 3
                   // exploration batches); every review since is one real
-                  // generation, so it's redundant noise now. Size is null
-                  // (omitted) on an entry built before that field existed.
-                  var sizeSuffix = r.sizeBytes !== null ? " · " + Model.formatBytes(r.sizeBytes) : ""
-                  return { value: r.id, label: r.label + sizeSuffix }
-                })
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.selectedReviewId = value }
+                  // generation, so it's redundant noise now.
+                  options: root.reviewsIndex.map(function(r) {
+                    return { value: r.id, label: r.label }
+                  })
+                  foreground: root.bar.foreground
+                  onChanged: function(value) { root.selectedReviewId = value }
+                }
+
+                // Size is null on an entry built before that field existed,
+                // and the caption goes with it.
+                Text {
+                  width: parent.width
+                  visible: text !== ""
+                  text: reviewPickerRow.selectedReview && reviewPickerRow.selectedReview.sizeBytes !== null
+                    ? Model.formatBytes(reviewPickerRow.selectedReview.sizeBytes) + " on disk"
+                    : ""
+                  color: Qt.darker(root.bar.foreground, 1.3)
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                }
               }
             }
 

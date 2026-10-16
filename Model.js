@@ -324,8 +324,15 @@ function parseReviewsIndex(raw) {
     if (!Array.isArray(data)) return []
     return data.filter(function(r) { return r && r.id && r.path }).map(function(r) {
       var size = Number.isInteger(r.sizeBytes) ? r.sizeBytes : parseInt(r.sizeBytes, 10)
+      // thumb is a bare filename beside the entry's index.html (build_review.py
+      // writes "thumb.jpg"). Anything with a slash in it is ignored rather than
+      // resolved, so the panel never reads outside the entry's own directory.
+      // "" on an entry built before thumbnails existed.
+      var thumb = typeof r.thumb === "string" && r.thumb !== "" && r.thumb.indexOf("/") === -1 ? r.thumb : ""
+      var entryDir = String(r.path).replace(/\/[^\/]*$/, "")
       return {
         id: String(r.id),
+        thumbPath: thumb ? entryDir + "/" + thumb : "",
         label: normalizeReviewLabel(r.label || "Untitled"),
         createdAt: String(r.createdAt || ""),
         path: String(r.path),
