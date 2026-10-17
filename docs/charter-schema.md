@@ -76,8 +76,9 @@ charter, is meant to decide how a day feels.
 
 ## `[<style>.registers]`
 
-One line per register in `registers.toml` (20): what that substance means in
-this world. Read by both Stage 1.5 calls and Stage 2. May end with
+One line per register in `registers.toml` (20), all required: what that
+substance means in this world. There is no generic per-register line to fall
+back on. Read by both Stage 1.5 calls and Stage 2. May end with
 "Its highlight:" to say what form the highlight takes in that material.
 **Write it well:** a span and a principle with two examples; the line must not
 pull every register toward the same setting.
@@ -97,14 +98,17 @@ point where they hold.
 | Table | Controls | Write it well |
 |---|---|---|
 | `forbids` in `[<style>.world]` | read out last as "Never in this world" | Prefer saying what the world is. No shipped style uses it. |
-| `[<style>.conditions]` | replaces the condition list (newly made … ruined) | Only for a world that is always pristine or always ruined. |
+
+How worn things are (newly made … ruined) is the pipeline's wear scale, drawn
+per run and the same for every style; a charter cannot replace it.
 
 ## Warnings
 
 These never block a run:
 
 - a verb shared with another style's same array (fine if it is native to both)
-- a `[brief]` rule with no "failed response"
+- a `[brief]` rule other than `temper` with no "failed response" (`temper`
+  carries the dial's temper and is never written as a failure condition)
 - a `[brief]` rule that requires a mood or relationship
 
 ## Checking a charter
