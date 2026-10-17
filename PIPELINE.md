@@ -262,7 +262,7 @@ because that is what Stage 2 obeys. Every style has a **signature** rule:
 something in frame that could only exist in this world, and an image that
 could be relabelled as another style fails. The division Stage 2 is given:
 the registers decide what things are made of; the world decides what place
-this is and what lives there. See `docs/charter-schema.md` for every field.
+this is and what lives there. See `skills/astro-arc-style/SKILL.md` for every field.
 A new style with no charter falls back to ghibli's old rules, kept in one
 labelled block in `llm_pipeline.py`.
 
@@ -336,7 +336,7 @@ Five TOML files, read fresh on every run. No restart, no reinstall.
 | File | What it controls | Try this |
 | --- | --- | --- |
 | `pipeline/registers.toml` | the 20 materials a scene is built from, in five families | add one under the family it is made of |
-| `pipeline/styles/<key>.toml` (+ `<key>.jpg`) | the 7 shipped styles, one file each (user themes: `~/.config/astro-arc/styles/`): `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules, `registers` lines, `verbs`, `space`, `highlight_modes`, optional `light` and `conditions` (see `docs/charter-schema.md`) | edit a charter field, then sweep it and run `term_report.py` |
+| `pipeline/styles/<key>.toml` (+ `<key>.jpg`) | the 7 shipped styles, one file each (user themes: `~/.config/astro-arc/styles/`): `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules, `registers` lines, `verbs`, `space`, `highlight_modes` and `light` (see `skills/astro-arc-style/SKILL.md`) | edit a charter field, then sweep it and run `term_report.py` |
 | `pipeline/actors.toml` | the 11 actor kinds Stage 1.5 casts from, and register/actor pairs to exclude | reword a kind; keep it a span and a principle, never a list |
 | `pipeline/cliches.toml` | hard-blocked exact terms | add a word **only after** you see it repeat |
 | `pipeline/model-rates.toml` | model prices and the quality presets | add a model, or retune a preset |

@@ -147,7 +147,7 @@ def main():
         "Each style in [`backend/pipeline/styles/`](../backend/pipeline/styles/) is a technique and a "
         "**world**: a charter that says what the world is made of, who lives there, which myths its stories "
         "come from, what its highlight is, and the one thing that marks a picture as unmistakably that world. "
-        "[`charter-schema.md`](charter-schema.md) describes every field.",
+        "[`SKILL.md`](../skills/astro-arc-style/SKILL.md) describes every field.",
         "",
         "Every image below is the **same day's reading** and the **same material registers** (`%s` + `%s`), "
         "rendered at the same settings. Each world built its own scene from them: that is the point. Change "

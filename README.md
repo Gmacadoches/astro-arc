@@ -31,7 +31,7 @@ same day's reading, rendered in each:
 | ![A pilgrim leads a mule past a pelican larger than a horse, opening its breast over its young, with a snail-knight from the border in the reeds](docs/images/styles/illuminated.jpg) | | |
 
 **[What each world is, and how it was built →](docs/styles.md)** ·
-**[Make your own →](docs/charter-schema.md)**
+**[Make your own →](skills/astro-arc-style/SKILL.md)**
 
 ---
 
@@ -194,7 +194,7 @@ says which step each one changes:
 
 | File | What it controls |
 | --- | --- |
-| `backend/pipeline/styles/` | the seven shipped styles, one `<key>.toml` + `<key>.jpg` preview each: each one's technique and its world (see [`docs/charter-schema.md`](docs/charter-schema.md)) |
+| `backend/pipeline/styles/` | the seven shipped styles, one `<key>.toml` + `<key>.jpg` preview each: each one's technique and its world (see [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md)) |
 | `backend/pipeline/registers.toml` | the 20 material registers a scene is built from |
 | `backend/pipeline/actors.toml` | the kinds of actor a scene can have, from a lone person to a swarm |
 | `backend/pipeline/model-rates.toml` | model prices, quality presets, shortlists |
@@ -212,9 +212,9 @@ says which step each one changes:
   `master` only ever holds releases, and how updates find them.
 - [`docs/styles.md`](docs/styles.md) — the seven worlds, each rendered from
   the same reading and register, with what defines each one.
-- [`docs/charter-schema.md`](docs/charter-schema.md) — every field of a style's
-  world, what it controls, and how to write one well: the reference for making
-  your own style.
+- [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md) — every
+  field of a style, what it controls, and how to write one well: the agent
+  skill behind "Create your own style", readable by people too.
 
 Each script carries its own header comment explaining what it does and why it
 does it that way; that is the reference for anything PIPELINE.md does not cover.
