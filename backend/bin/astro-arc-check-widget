@@ -50,11 +50,11 @@ for candidate in qmlformat /usr/lib/qt6/bin/qmlformat; do
   [[ -x $candidate ]] && { qmlformat="$candidate"; break; }
 done
 if [[ -n $qmlformat ]]; then
-  for f in "$PLUGIN_DIR"/*.qml; do
+  for f in "$PLUGIN_DIR"/*.qml "$PLUGIN_DIR"/sections/*.qml; do
     if timeout 60 "$qmlformat" "$f" >/dev/null 2>&1; then
-      pass "$(basename "$f") parses"
+      pass "${f#"$PLUGIN_DIR"/} parses"
     else
-      fail "$(basename "$f") does not parse"
+      fail "${f#"$PLUGIN_DIR"/} does not parse"
     fi
   done
 else
@@ -71,7 +71,12 @@ const path = require("path");
 const dir = process.argv[2];
 const Model = require(path.join(dir, "Model.js"));
 let missing = [];
-for (const file of fs.readdirSync(dir).filter(f => f.endsWith(".qml"))) {
+// Panel.qml's visual sections live in sections/ and import Model.js too.
+const qmlFiles = [
+  ...fs.readdirSync(dir).filter(f => f.endsWith(".qml")),
+  ...fs.readdirSync(path.join(dir, "sections")).filter(f => f.endsWith(".qml")).map(f => "sections/" + f),
+];
+for (const file of qmlFiles) {
   const src = fs.readFileSync(path.join(dir, file), "utf8");
   const used = new Set([...src.matchAll(/\bModel\.([A-Za-z_][A-Za-z0-9_]*)/g)].map(m => m[1]));
   // `Model.js` appears in the import statement itself, not as a member access.
