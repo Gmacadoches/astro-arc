@@ -194,7 +194,7 @@ says which step each one changes:
 
 | File | What it controls |
 | --- | --- |
-| `backend/pipeline/styles.toml` | the seven styles: each one's technique and its world (see [`docs/charter-schema.md`](docs/charter-schema.md)) |
+| `backend/pipeline/styles/` | the seven shipped styles, one `<key>.toml` + `<key>.jpg` preview each: each one's technique and its world (see [`docs/charter-schema.md`](docs/charter-schema.md)) |
 | `backend/pipeline/registers.toml` | the 20 material registers a scene is built from |
 | `backend/pipeline/actors.toml` | the kinds of actor a scene can have, from a lone person to a swarm |
 | `backend/pipeline/model-rates.toml` | model prices, quality presets, shortlists |

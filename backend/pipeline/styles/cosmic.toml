@@ -1,0 +1,117 @@
+# CHARTER, 2026-10-10 (STYLE-OVERHAUL Prompt 4), from one grilling session
+# with Garrett. The decisions, so the reasoning survives the prose:
+#   - A BLEND (Q1 c): the mythic sky built the space-art way. Constellations
+#     are physical beings at planetary scale, lit by a real star, which keeps
+#     the rule every charter shares that the strange has a body.
+#   - 1970s SPACE ART, leaning on ROGER DEAN: floating islands with water
+#     falling off their edges, rock eroded into flowing contours, grown pod
+#     dwellings, serpent creatures; Foss hulls for hardware; Bonestell and
+#     McCall around them. Out: franchise designs, modern CGI gloss, NASA
+#     photo-realism. Dean's look is described, not just named, because the
+#     image model follows described outcomes better than artist names.
+#   - Dean's CONTENT (islands, dwellings, serpents) lives in the charter and
+#     his RENDERING in the suffix, so the suffix cannot force islands into
+#     every register (the cottage-kitchen collapse).
+#   - SIGNATURE: the land visibly hangs in space, plus one thing at celestial
+#     scale. TEMPER carries the dial's wonderTone, as in cyberpunk. THE
+#     IMPOSSIBLE and OPENNESS are not used; space recipes replace OPENNESS.
+#   - No motifs ruled out yet (Q2): too little testing to be tired of any.
+#     favoured_actors still demotes the lone suited figure facing the stars.
+# Research notes: verification/charter-cosmic/research.md.
+
+label = "Cosmic / Nebula"
+# guidance removed 2026-10-10: superseded by [cosmic.world]. It asked for
+# "energy, light, nebulae and dreamlike or symbolic forms", which is the
+# glowing-being territory the charter now rules out. In git.
+space = [
+  "from one floating island across the void to the next",
+  "up a waterfall pouring off an island's edge into the sky below",
+  "along a ring arcing away to its planet's limb",
+  "down the length of a vast hull",
+  "from a ledge under a ringed planet low on the horizon",
+  "through a natural rock arch onto open sky",
+  "along a skiff route threading between island stacks",
+  "from a station window down to the planet below",
+]
+# REWRITTEN twice 2026-10-10. Prompt 3 made it a 1970s paperback cover
+# (airbrushed gas, hard-edged acrylic solids, one hard star); Prompt 4 added
+# Roger Dean's rendering (flowing rounded rock, airbrushed orange-to-violet
+# skies, earth tones under a luminous sky). The original, for the record:
+# "ethereal cosmic art, nebula and starfield, dreamlike aurora colors, soft
+# glowing light, painterly, otherworldly".
+suffix = "A 1970s science-fiction paperback cover painting in the tradition of Roger Dean, Chris Foss and Chesley Bonestell. Rock and land are eroded into smooth, flowing, rounded contours, with organic curves rather than jagged edges; skies are smooth airbrushed bands of colour, warm orange through violet, or deep black spattered with fine white stars. Solid bodies — rock, ice, hull, hide — are hard-edged opaque acrylic with a crisp line between lit and shadowed sides, in earth tones of sage green, ochre and stone grey beneath a luminous sky. A single hard star is the key light and reflected planet-glow is the only fill. The slight grain and gentle colour banding of a printed cover. No text or title."
+
+
+[world]
+era = "The space age as 1970s paperback covers painted it: people living on rock that hangs in open sky and working among hulls someone else built. Technology is heavy, hand-flown and painted in hazard stripes, never sleek and never a touchscreen."
+materials = "Rock eroded into smooth, flowing, rounded contours; hull plate in banded colours; dwellings grown rather than built, shaped like gourds or seed pods with round windows. Everything is opaque and solid, and even ice and gas have a surface the light can find."
+physics = "Space with weather. Islands of rock float in open sky, water falls off their edges into nothing, and gravity is light enough for long leaps and slow falls. One star lights everything from one side and the far side is black. Nothing glows of its own accord except stars, fire and a craft's working lights, and nothing is translucent."
+society = "Scattered settlements on islands and stations, joined by small craft. People are known by the craft they fly and the island they come from. Authority is far away aboard something larger; the void and the star are close. Derelicts nobody now living built are salvaged, lived in, and visited as shrines."
+weather = "The sky is the weather, and it runs the whole range: an airbrushed band from warm orange to violet, a dust tide rolling in, an eclipse, a planet rising. Choose what the day calls for; black and starry is one choice among many, never the default."
+inhabitants = "People who fly, mine, farm, herd and keep watch on the islands and stations, in heavy suits worn like work clothes; and creatures shaped by low gravity and open sky, from flocks roosting under island overhangs to beasts of burden in harness."
+strangeness = "What would be impossible on a planet is ordinary here: land with no ground under it, two shadows from two suns. Nobody looks up at it, and it is lit like everything else."
+numinous = "The constellations are beings with bodies at the scale of worlds, and the stars' stories still happen to them. A star-being is physical — hull, rock, ice or hide — lit by a real star on one side and black on the other: the Hunter a derelict the size of a moon, the Silver River an actual ring of ice and dust. People leave offerings at their feet, mine their edges and steer by them. Never a glow, an outline of light or a translucent figure."
+dread = "This world at its darkest is the void being indifferent. Anything that keeps people alive out here can fail, and the large things do not notice: a tether parting with someone on the wrong end, a star swelling until it strips the world it lights. Shown by scale and distance, never by a face asking the viewer to grieve."
+favoured_actors = "This world is richest in crews working one craft together, the creatures of the islands and the updrafts, and constellation-beings in their bodies. A lone suited figure seen from behind, facing the stars, is this genre's most worn image and should not be the default."
+myth = "The sky myths of many peoples, in which the stars are beings and their stories are still happening: heroes and animals set among the stars, and the sky as a goddess's body with the sun's boat crossing it each night."
+highlight = "The thing the eye finds first, and it belongs to the sky: a constellation-being's body or a piece of one, or something made at celestial scale. It is solid, lit from one side by the star and black on the other; it does not glow or turn translucent. Today's kind of wrongness is given with this definition. Where its wrongness is size, choose a scale comparison native to this scene, never the same one twice, and put part of it in shot rather than shrinking it."
+highlight_modes = [
+  "a body the size of a world",
+  "a piece of a constellation fallen to the ground",
+  "awake when it should be inert",
+  "in the wrong orbit or the wrong sky",
+  "being used for a job it was never built for",
+]
+
+
+[brief]
+signature = "SIGNATURE — the land visibly hangs in space: a horizon or an island edge drops away into black void or a gradient sky, and at least one thing at celestial scale (a planet, a ring, a star-being) is in frame and named. A scene that could be taking place on Earth is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+
+[verbs]
+process_hard = ["drifting loose", "tearing free", "cracking apart", "venting into the void", "tumbling", "crumbling off the edge", "freezing solid", "boiling off", "searing", "shearing", "decompressing", "spinning out", "colliding with", "splintering", "sublimating", "burying under dust", "flaring", "sinking into the gulf", "engulfing", "splitting along its seam", "slipping its orbit", "eclipsing"]
+process_soft = ["orbiting", "turning slowly", "pouring off the edge", "trailing spray", "lifting", "sinking slowly", "frosting over", "glinting", "coasting", "unfolding", "thawing", "budding", "tilting toward the star", "casting long shadows", "wheeling", "cresting the horizon", "shedding frost", "rocking at anchor", "circling", "gathering dust", "breathing out vapour", "falling into step"]
+actor_hard.work = ["winching in", "clamping onto", "cranking shut", "towing", "boarding", "jacking open", "lashing down", "propping", "salvaging", "drilling into", "hooking a tether onto", "fending off"]
+actor_hard.rest = ["sleeping strapped into", "holding still behind", "sheltering in the lee of"]
+actor_hard.play = ["leaping between", "racing skiffs past", "daring the edge of"]
+actor_hard.ritual = ["keeping vigil at", "lighting a flare for", "laying a beacon at"]
+actor_hard.travel = ["jumping the gap to", "climbing hand over hand along", "falling slowly toward", "steering through", "kicking off from"]
+actor_soft.work = ["picking fruit from", "grading ore", "stitching", "repainting the stripes on", "coiling cable", "herding", "fuelling"]
+actor_soft.rest = ["dozing beside", "eating on the ledge of", "lying back on", "sharing a flask with"]
+actor_soft.play = ["tossing a ball in low gravity", "flying a kite off the edge of", "swimming in the falls of", "playing cards on"]
+actor_soft.ritual = ["leaving an offering at the foot of", "chalking star-signs on", "ringing a hull like a bell"]
+actor_soft.travel = ["drifting across to", "riding a serpent between", "sculling a skiff along", "walking the ring toward", "docking at"]
+
+
+[registers]
+"botanical" = "Plants grown where there is no ground: a garden under a dome, a tree rooted in the bare stone of an island with its roots hanging into the void. Each plant is either kept alive by someone or has found its own way into the light."
+"bodily and anatomical" = "The body under light gravity and hard light: a suited body where gear and limb are one, or a star-being's anatomy at the scale of terrain, a rib you could walk along. Clinical, never gore."
+"fungal and decaying" = "Slow rot in sealed places, because decay needs air and air is kept: bloom spreading round a sealed hatch, a derelict's bedding gone to spore."
+"animal and creaturely" = "Creatures shaped by low gravity and open sky: long serpents riding the updrafts between islands, slow grazers on island meadows. They keep their own routes and take no interest in being watched."
+"geological" = "Rock as Roger Dean paints it: eroded into smooth, flowing contours, arches, natural bridges and stacked mesas, and islands floating free with their undersides bare. Stone is what people stand on and also what they fall from."
+"metallic and ore" = "Metal as hull and as ore: banded plate in hazard colours, a seam glittering in an asteroid's face. Most metal here was mined out of the sky and hauled a long way."
+"glass and ceramic" = "Glass keeps the air in: a visor's curve holding a planet's reflection, round windows in grown dwellings. Fired clay belongs to the few who live where clay can be dug."
+"architectural" = "Dwellings grown rather than built, rounded and clustered on ledges and joined by rock bridges; and the shells of other people's structures, lived in from the inside."
+"domestic interior" = "Home is a rounded room with a round window onto open sky, lit from one side by the star: a bunk, a stove, a suit hung by the hatch."
+"mechanical" = "Machines with their casings off, heavy, hand-worked and painted in stripes: an airlock's wheel, a skiff's engine. Legible as machines."
+"industrial and infrastructural" = "Hauling and mining at the scale of worlds: tether lines strung between islands, docks hanging under a station. Everything is longer than it looks."
+"agricultural and cultivated" = "Food grown off-world: terraced plots on an island's crown, a herd grazing a meadow that ends at the void. The subject is the work and the yield."
+"aquatic" = "Water that falls off the edge: falls pouring from islands into nothing, a lake held in the hollow of floating rock. Water here is precious and visibly going somewhere."
+"atmospheric" = "The sky as a body of colour: airbrushed bands from orange to violet, an atmosphere's thin limb seen from above."
+"glacial and frozen" = "Ice at celestial scale: a ring of ice arcing across the sky, a comet's frozen head close enough to land on."
+"fire and ember" = "Fire is rare and precious where air is: a stove in a grown house, an engine burn seen from close beside it."
+"textile and fiber" = "Cloth here is suit, sail and shelter: heavy suit fabric, solar sails, canopies stretched between rock spires."
+"ritual object" = "Offerings at the feet of star-beings and in derelicts used as shrines: beacons, salvaged parts set out with care. The subject is the object and the hands it has passed through."
+"paper and inscription" = "Charts and logs kept by people who navigate by stars that are also beings: a hand-drawn star chart, names cut into a cockpit frame. Writing appears as marks and diagrams, never readable words."
+"instrument and measure" = "Navigation and survey: an orrery, a gauge reading the air left. To measure here is to find the way or to know how long there is."
+
+
+# LIGHT, 2026-10-10 (STYLE-OVERHAUL Prompt 2). The global light lines are
+# Earth-bound ("full day", "night"), which cosmic cannot satisfy. Each line is
+# a count or a failure condition, like the globals, and overrides the line for
+# that exposure band. The rest of cosmic's charter waits for Prompt 4.
+[light]
+lo = "The scene is on a body's night side, in eclipse, or deep inside a dust cloud. At least two thirds of the frame is black, and the only light is starlight, a distant star's rim or a body's own heat. A frame that is mostly lit is a failed response."
+mid = "A single hard star lights the scene from one side. A crisp line divides lit faces from dark ones, and both are substantial. A frame lit evenly from everywhere is a failed response."
+hi = "The scene faces a near star full on: every surface is lit and no face is hidden. A frame that is mostly dark, or lit mainly by glows of its own, is a failed response."

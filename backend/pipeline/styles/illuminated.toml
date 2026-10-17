@@ -1,0 +1,110 @@
+# Added 2026-09-07, same source/verification as ukiyoe above. The
+# diagram/symbol-friendly guidance is deliberate — historiated initials
+# and marginalia are a real historical genre for exactly this kind of
+# esoteric/diagrammatic content (illuminated manuscripts include actual
+# astrological/zodiac diagrams), so unlike the other representational
+# styles this one doesn't need a literal figure to feel authentic.
+#
+# Revised same day: the first version mentioned gold leaf being "used for
+# haloes" as a general technique note (unconditionally) and only gated
+# actual figure rendering with a positive "only if a person is already
+# part of the scene" clause — same mistake as Ghibli's first pass. A real
+# production run with zero people in the Stage 2 prompt still rendered 8
+# haloed figures around a table. Fixed the same way Ghibli was: moved the
+# halo mention into the conditional clause only, and added an explicit
+# "do not add a person, halo, or figure unless one is already described
+# above." Retested 0 of 3 on the exact prompt that triggered the bug
+# (previously 1 of 1 observed failures).
+
+# CHARTER, 2026-10-10 (STYLE-OVERHAUL Prompt 4, approved by Garrett): the manuscript page: labours of the months, bestiary, marginal hybrids reaching in from the border; the lone haloed figure demoted.
+# Brief is SIGNATURE + TEMPER (THE IMPOSSIBLE and OPENNESS no longer apply;
+# space recipes replace OPENNESS). The suffix is untouched, as Prompt 4 asks
+# for the four technique styles. Research: verification/charter-illuminated/research.md.
+
+label = "Illuminated Manuscript"
+suffix = "Illuminated manuscript style: hand-painted in jewel-toned mineral pigments — ultramarine blue, vermilion red, verdigris green — on a warm, slightly imperfect parchment ground, never pure white. Gold leaf is burnished to a mirror shine and reads as a reflective, raised surface, not flat yellow paint. The composition sits inside an ornate decorative border of vegetal scrollwork, small symbolic creatures, and fine linework diagrams, framing the central image without competing with it. Do not add a person, halo, or figure unless one is already described above — plenty of manuscript pages are a decorated object, diagram, or pattern with no one in them. Only if a person is explicitly part of the scene described above: render them flattened and stylized rather than naturalistically proportioned, in the manner of Byzantine icon painting, with a gold halo if the scene calls for it, never modern dress or realistic anatomy."
+# guidance removed 2026-10-10: superseded by the charter above. In git.
+space = [
+  "stacked fields climbing the page to a castle on the top edge",
+  "through a castle gate into a busy courtyard",
+  "along a river with mills to a walled town",
+  "from a hillside down onto a town inside its walls",
+  "across a harvest field to a line of trees and a church",
+  "down a cloister walk",
+  "a forest hunt running from the near margin into the trees",
+  "from a tower over a calendar of fields",
+]
+
+
+[world]
+era = "The high and late Middle Ages as the manuscript painters saw them: walled towns, castles, monasteries and fields worked through the turning year, under a sky of gold. Technology is the plough, the mill, the loom and the sword."
+materials = "Gold leaf, ultramarine and vermilion on parchment; things are flat, bright and outlined, and stone, wood, wool and iron are known by pattern rather than shading."
+physics = "The page is the world's edge: a border of vines, creatures and initials frames every scene, and things in the border are as alive as things in the picture and may reach into it. Space is stacked rather than deep: the far fields sit above the near ones. Gold is the sky's light; nothing else glows."
+society = "Lords, monks, peasants and townsfolk, each with their month's labour. The year turns from ploughing to harvest to the feast, and not all of it is work: hunting, dancing, tournaments and warming at the fire."
+weather = "The weather is the month: snow in January, rain in April, harvest heat in August, the winter fire. Pick the month the day calls for."
+inhabitants = "Peasants, monks, knights, pilgrims and townspeople; bestiary animals with their meanings; and the hybrids of the margins, half person and half snail or bird."
+strangeness = "The margin is full of the impossible and it is unremarkable: a rabbit jousting, a knight fighting a snail. Monsters from the edge of the known world are painted with the same care as a cow."
+numinous = "Saints, angels and the zodiac have bodies: a saint standing among the harvesters, the Twins in a roundel above the field. They are flat, gold-lit and outlined like everyone else; the halo's gold is the only glow."
+dread = "This world at its darkest is the Apocalypse and the Dance of Death: the beast rising from the sea, death leading the dancers. Flat, bright and orderly, which is what makes it terrible."
+favoured_actors = "Groups at the month's labour, processions, animals of the bestiary, and marginal hybrids. A lone haloed figure facing the viewer is this tradition's most worn image and should not be the default."
+myth = "Saints' legends, the bestiary (the pelican feeding its young with its blood, the whale mistaken for an island), Arthurian romance, and the zodiac and the children of the planets."
+highlight = "The thing the eye finds first, and it belongs to the page: a bestiary creature, a marginal hybrid stepped into the scene, a saint at work, or a zodiac figure come down. Today's kind of wrongness is given with this definition. Flat, outlined and lit by gold like everything else."
+highlight_modes = [
+  "a marginal hybrid stepped into the main picture",
+  "a bestiary creature doing what its legend says",
+  "a zodiac figure come down into its month",
+  "far too large for the page's scale",
+  "an animal doing a person's labour",
+]
+
+
+[brief]
+signature = "SIGNATURE — the page is in the world: a labour or feast of the month, a zodiac roundel, or a creature from the border reaching into the scene, named explicitly. A picture that could be any medieval-looking painting is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
+
+
+[verbs]
+process_hard = ["storming", "hailing", "blighting", "tumbling down", "breaking", "smiting", "shrivelling", "collapsing", "raging", "tolling", "spreading through", "darkening", "trampling", "overrunning", "eating through", "freezing hard", "burning", "rising from the sea", "falling from the sky", "splitting in two"]
+process_soft = ["turning gold", "growing", "fruiting", "ringing out", "climbing", "curling", "winding through", "greening", "swelling", "falling", "gleaming", "bubbling", "turning", "running clear", "roosting", "grazing", "basking", "spreading leaves", "waking", "resting"]
+actor_hard.work = ["ploughing", "threshing", "scything", "felling trees", "slaughtering a pig", "laying siege to", "fighting off"]
+actor_hard.rest = ["warming at the fire in", "sheltering in the porch of", "huddling under"]
+actor_hard.play = ["jousting", "hunting", "playing at ball against"]
+actor_hard.ritual = ["carrying a reliquary through", "keeping vigil", "tolling the bell for"]
+actor_hard.travel = ["riding to war past", "crossing the drawbridge of", "going on pilgrimage to", "driving cattle along", "climbing the walls of"]
+actor_soft.work = ["sowing", "pruning vines", "shearing sheep", "spinning", "baking", "reaping", "gathering grapes"]
+actor_soft.rest = ["feasting at", "dozing in the shade of", "warming feet at", "sitting by the hearth of"]
+actor_soft.play = ["dancing round", "playing a lute for", "flying a falcon over", "playing chess in"]
+actor_soft.ritual = ["processing to", "blessing the fields of", "singing the hours in"]
+actor_soft.travel = ["riding to market at", "travelling as pilgrims to", "crossing a bridge into", "leading a mule along", "boating on"]
+
+
+[registers]
+"botanical" = "Plants as the border and the garden: vine scrolls with flowers in the margin, an enclosed garden with a fountain. Every plant is flat, bright and outlined."
+"bodily and anatomical" = "The body as the medieval page knows it: the zodiac man with the signs on his limbs, a martyr's body calm in its legend. Flat and orderly, never gore."
+"fungal and decaying" = "Decay as memento mori: the three living meeting the three dead, a corpse in a tomb drawn as a lesson."
+"animal and creaturely" = "Animals of the bestiary and the farm: the pelican feeding its young, pigs fattening in an oak wood. Each animal carries its legend."
+"geological" = "Rock as the page draws it: stepped cliffs like stacked loaves, a hermit's cave in a hillside."
+"metallic and ore" = "Metal as armour, coin and bell: a knight's mail, a goldsmith's bench."
+"glass and ceramic" = "Stained glass and rock crystal: a church window in jewel colours, a reliquary's crystal window. Glass is coloured light."
+"architectural" = "Walled towns, castles and churches, stacked and bright: the duke's castle with its blue roofs above the fields, a cathedral being built with cranes."
+"domestic interior" = "A hall with a fire and a feast, a chamber with a bed under a canopy. The scene is open at the front like a stage."
+"mechanical" = "Medieval machines: a water mill's wheel, a treadwheel crane lifting stone."
+"industrial and infrastructural" = "Works of the town and the river: a bridge with houses on it, a quarry for the cathedral's stone."
+"agricultural and cultivated" = "The labours of the months: ploughing with oxen, the grape harvest. The subject is the season's work."
+"aquatic" = "Water as river, moat and sea: a moat round a castle, the sea with a whale mistaken for an island."
+"atmospheric" = "The sky is gold or deep blue with stars, sometimes with a zodiac arc across it."
+"glacial and frozen" = "Winter's month: snow on the roofs and the fields, a frozen pond with skaters."
+"fire and ember" = "Fire as hearth and hellmouth: a winter fire with people warming their legs, the hellmouth open in the margin."
+"textile and fiber" = "Cloth as tapestry and garment: a hanging behind a feast, a spinner at her distaff."
+"ritual object" = "Relics, reliquaries, processional crosses and books of hours, carried and venerated."
+"paper and inscription" = "The page itself: decorated initials, a scroll held by a figure, rubrics in red. Lettering is ornamental, never a readable sentence."
+"instrument and measure" = "Measure in the medieval world: an astrolabe, the calendar's zodiac roundel, a merchant's scales."

@@ -70,10 +70,12 @@ def main():
     period_key = reading["arc"]["periodKey"]
 
     styles = lp.load_styles()
-    wanted = [s.strip() for s in args.styles.split(",")] if args.styles else list(styles)
+    # The gallery documents the shipped set; a user's own themes are named explicitly.
+    shipped = [k for k, t in styles.items() if t.source == "shipped"]
+    wanted = [s.strip() for s in args.styles.split(",")] if args.styles else shipped
     wanted = [s for s in wanted if s in styles]
     if not wanted:
-        raise SystemExit("No matching styles in styles.toml.")
+        raise SystemExit("No matching styles.")
 
     # --- pin everything that is not the style ------------------------------
     dial = lp.dial_from_texture(reading["arc"].get("texture"))
@@ -142,7 +144,7 @@ def main():
     out = [
         "# The seven worlds",
         "",
-        "Each style in [`backend/pipeline/styles.toml`](../backend/pipeline/styles.toml) is a technique and a "
+        "Each style in [`backend/pipeline/styles/`](../backend/pipeline/styles/) is a technique and a "
         "**world**: a charter that says what the world is made of, who lives there, which myths its stories "
         "come from, what its highlight is, and the one thing that marks a picture as unmistakably that world. "
         "[`charter-schema.md`](charter-schema.md) describes every field.",

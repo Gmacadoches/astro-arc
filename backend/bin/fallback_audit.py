@@ -359,7 +359,7 @@ def main():
     parser.add_argument("--out", required=True, help="name of the verification folder")
     parser.add_argument("--styles", nargs="*", help="only these style keys (default: all shipped)")
     parser.add_argument("--no-cache", action="store_true",
-                        help="re-read styles.toml and actors.toml on every call, as production does")
+                        help="re-read the theme files and actors.toml on every call, as production does")
     parser.add_argument("--no-control", action="store_true", help="skip the unchartered control style")
     args = parser.parse_args()
 
@@ -372,7 +372,8 @@ def main():
         install_detectors()
         seed_stage1_cache(CONFIG)
 
-        shipped = [k for k in lp.load_styles() if k != CONTROL_STYLE]
+        # Shipped themes only: a user's own themes would change the baseline.
+        shipped = [k for k, t in lp.load_styles().items() if getattr(t, "source", None) == "shipped"]
         styles = args.styles or shipped
         registers = lp.load_registers()
 

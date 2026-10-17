@@ -2,7 +2,7 @@
 """Astro-Arc's three-stage LLM prompt pipeline — replaces the old
 symbol_map.py lookup-table approach. Nothing in here builds imagery from a
 fixed vocabulary anymore; the tables that remain (registers.toml,
-cliches.toml, styles.toml) are tuning constraints on an LLM, not content
+cliches.toml, styles/<key>.toml) are tuning constraints on an LLM, not content
 sources.
 
   Stage 1 (interpret): chart data -> psychological reading (Jungian/
@@ -51,6 +51,7 @@ metadata_out.json, for last-run.json and the review log to pick up.
 
 import hashlib
 import json
+import os
 import random
 import re
 import string
@@ -384,12 +385,98 @@ def load_cliches():
         return tomllib.load(f).get("terms", [])
 
 
+# One file per theme (decision 4): styles/<key>.toml plus a required
+# styles/<key>.jpg preview. The key is the file name. Shipped themes sit beside
+# the code; a user's own go in user_styles_dir().
+SHIPPED_STYLES_DIR = PIPELINE_DIR / "styles"
+
+
+def user_styles_dir():
+    """~/.config/astro-arc/styles, or under $XDG_CONFIG_HOME when it is set."""
+    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "astro-arc" / "styles"
+
+
+class Theme(dict):
+    """One theme: its file's TOML table, plus where it came from.
+
+    A dict, so every loader below reads it exactly as it read a styles.toml
+    table and the charter hash sees the same values. `valid`, `errors` and
+    `warnings` are validate_charter's verdict, worked out on first use because
+    the verb check reads every other theme too."""
+
+    def __init__(self, key, table, source, path, parse_error=None):
+        super().__init__(table)
+        self.key = key
+        self.source = source
+        self.path = path
+        self.preview = path.with_suffix(".jpg")
+        self.parse_error = parse_error
+        self._verdict = None
+
+    @property
+    def label(self):
+        label = self.get("label")
+        return label.strip() if isinstance(label, str) and label.strip() else self.key
+
+    def _validated(self):
+        if self._verdict is None:
+            self._verdict = validate_charter(self.key)
+        return self._verdict
+
+    @property
+    def errors(self):
+        return self._validated()[0]
+
+    @property
+    def warnings(self):
+        return self._validated()[1]
+
+    @property
+    def valid(self):
+        return not self.errors
+
+
+_STYLE_NOTICES = set()
+
+
+def _style_notice(line):
+    """A loader warning, printed once per process: load_styles() runs dozens
+    of times in one build()."""
+    if line not in _STYLE_NOTICES:
+        _STYLE_NOTICES.add(line)
+        print(f"astro-arc: warning: {line}", file=sys.stderr)
+
+
+def _read_theme(path, source):
+    try:
+        with open(path, "rb") as f:
+            return Theme(path.stem, tomllib.load(f), source, path)
+    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as e:
+        return Theme(path.stem, {}, source, path, parse_error=str(e))
+
+
 def load_styles():
-    path = PIPELINE_DIR / "styles.toml"
-    if not path.exists():
-        return {}
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+    """Every theme by key: the shipped ones, then the user's. Read fresh every
+    call, so an edit takes effect on the next run with no restart.
+
+    A user file whose key is a shipped theme's is ignored with a warning: a
+    shipped key always means the shipped theme. A file that does not parse
+    still loads, empty, so it can be listed as failing validation."""
+    themes = {path.stem: _read_theme(path, "shipped")
+              for path in sorted(SHIPPED_STYLES_DIR.glob("*.toml"))}
+    user_dir = user_styles_dir()
+    try:
+        user_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    for path in sorted(user_dir.glob("*.toml")):
+        if path.stem in themes:
+            _style_notice(f"user theme {path} has the key of a shipped theme "
+                          f"('{path.stem}') and is ignored; rename the file to use it")
+            continue
+        themes[path.stem] = _read_theme(path, "user")
+    return themes
 
 
 DEFAULT_STYLE = "symbolist"
@@ -397,16 +484,20 @@ DEFAULT_STYLE = "symbolist"
 
 def resolve_style_key(key):
     """The configured `artStyle`, resolved once when a run reads the config.
-    A key styles.toml does not have (stale, or a typo) falls back to
+    A key with no theme file (stale, deleted, or a typo) falls back to
     DEFAULT_STYLE with a warning rather than failing the day's image; this is
     the only place an unknown key is forgiven, and every loader below takes a
     resolved key."""
     if key and key in load_styles():
         return key
     if key:
-        print(f"astro-arc: warning: art style '{key}' is not in styles.toml; "
-              f"using '{DEFAULT_STYLE}'", file=sys.stderr)
+        print(f"astro-arc: warning: {missing_style_warning(key)}", file=sys.stderr)
     return DEFAULT_STYLE
+
+
+def missing_style_warning(key):
+    """What a run and the panel both say about a configured key with no theme."""
+    return f"art style '{key}' is not an installed theme; using '{DEFAULT_STYLE}'"
 
 
 def load_style_suffix(style_key, has_people=False):
@@ -508,7 +599,7 @@ def highlight_with_mode(highlight, dial):
 class _BriefValues(dict):
     """format_map source for brief rules: the dial's values by key, with an
     unknown or missing key left visible as "{key}" rather than raising, so a
-    typo in styles.toml shows up in the prompt instead of crashing a run."""
+    typo in a theme file shows up in the prompt instead of crashing a run."""
     def __init__(self, dial):
         super().__init__({k: v for k, v in (dial or {}).items() if isinstance(v, str)})
 
@@ -1438,8 +1529,8 @@ def _brief_keys(style_key):
 
 
 def validate_charter(style_key):
-    """(errors, warnings) for one style in styles.toml. An empty error list
-    means the charter is complete and the style can be used for a run."""
+    """(errors, warnings) for one theme. An empty error list means the charter
+    is complete, the preview exists, and the theme can be used for a run."""
     styles = load_styles()
     errors, warnings = [], []
 
@@ -1451,7 +1542,12 @@ def validate_charter(style_key):
 
     style = styles.get(style_key)
     if not isinstance(style, dict):
-        return [f"{style_key}: no such style in styles.toml"], []
+        return [f"{style_key}: no such theme"], []
+    if getattr(style, "parse_error", None):
+        return [f"{style_key}: {style.path.name} is not valid TOML: {style.parse_error}"], []
+    preview = getattr(style, "preview", None)
+    if preview is not None and not preview.is_file():
+        error("preview", f"{preview.name} is required beside {style.path.name}")
 
     if not _text(style.get("label")):
         error("label", "required")
@@ -1461,7 +1557,7 @@ def validate_charter(style_key):
     def table(name):
         value = style.get(name)
         if not isinstance(value, dict):
-            error(f"[{style_key}.{name}]", "table required")
+            error(f"[{name}]", "table required")
             return {}
         return value
 
@@ -1550,7 +1646,7 @@ def validate_charter(style_key):
 
     registers = style.get("registers")
     if not isinstance(registers, dict):
-        error(f"[{style_key}.registers]", "table required")
+        error("[registers]", "table required")
     else:
         for register in load_registers():
             if not _text(registers.get(register)):
@@ -1568,7 +1664,7 @@ def validate_charter(style_key):
     light = table("light")
     if light:
         if set(light) != set(EXPOSURE_BANDS):
-            error(f"[{style_key}.light]", f"needs exactly {', '.join(EXPOSURE_BANDS)} "
+            error("[light]", f"needs exactly {', '.join(EXPOSURE_BANDS)} "
                                          f"(has {', '.join(sorted(light)) or 'nothing'})")
         for band in EXPOSURE_BANDS:
             if band in light and not _text(light[band]):
@@ -2546,7 +2642,7 @@ def build(reading, config):
         "draws": draws,
         "avoidedConcepts": avoid,
         "artStyle": style_key,
-        # The display name for that key (styles.toml's own `label`), so
+        # The display name for that key (the theme file's own `label`), so
         # anything captioning a run — the "Themes Generated" entry's
         # title, the exported theme's README — can name the style the
         # way the Style dropdown does without re-reading the TOML.

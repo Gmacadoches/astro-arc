@@ -1,0 +1,92 @@
+# CHARTER, 2026-10-10 (STYLE-OVERHAUL Prompt 4, approved by Garrett): natural philosophy's engraved universe; the star chart runs from the edges into the world (physics + SIGNATURE), which is the look Garrett wanted kept. Revert point: verification/charter-engraving-before.
+# Brief is SIGNATURE + TEMPER (THE IMPOSSIBLE and OPENNESS no longer apply;
+# space recipes replace OPENNESS). The suffix is untouched, as Prompt 4 asks
+# for the four technique styles. Research: verification/charter-engraving/research.md.
+
+label = "Antique Engraving"
+suffix = "antique astronomical engraving, fine linework, star atlas illustration, sepia and ink tones, detailed etching"
+# guidance removed 2026-10-10: superseded by the charter above. In git.
+space = [
+  "a landscape in section, the cutaway ground in front and the country running back behind",
+  "across a harbour to a horizon ruled with latitude lines",
+  "from an observatory platform up into a figured sky",
+  "down a long hall of specimens and instruments",
+  "a bird's-eye plan of a town tilting into a view",
+  "along a voyage's coastline toward a cartouche-framed sea",
+  "up a stair of endless arches",
+  "through a demonstration's frame onto open country",
+]
+
+
+[world]
+era = "The engraved universe of the natural philosophers, from the first star atlases to the encyclopaedias: a world measured, labelled and cut open to show how it works, where the heavens are drawn as figures over the stars and the earth is drawn in section."
+materials = "Copper-plate line: everything is hatching, stipple and outline, and every material is known by its texture of lines. Brass instruments, stone, timber, sailcloth and paper are the common stuff, and the sky is a field of numbered stars."
+physics = "The star chart is part of the world, not only its frame: constellation figures, graticule lines and labelled stars run around the edges of the image and into it, merging with the land, the sea and the things in them. Cutaways open hills and bodies to show what is inside. Nothing glows; light is the white of the paper between the lines."
+society = "Observatories, workshops, ships, gardens and lecture halls, where people measure, collect and make. Days are not all work: a crowd gathers for an eclipse, travellers stop at an inn, a family walks out to see a comet."
+weather = "Weather is drawn both as diagram and as event: wind as a puffing head at a map's corner, a storm as massed hatching over a sea. Eclipses, comets and aurorae are weather here."
+inhabitants = "Astronomers, instrument makers, voyagers, gardeners and the curious public; animals as specimens and as living things in the plate; and the constellation figures themselves, who step half out of the chart into the scene."
+strangeness = "The cabinet of curiosities made true: a sea monster from a map's margin swimming in the real sea, a mountain cut open to show its fires. Nobody in the plate is surprised; it has been catalogued."
+numinous = "The constellations are the numinous: heroes and beasts drawn in line over the stars, with bodies that can enter the world, like the Bear walking the horizon or the Ship riding a real sea. They are drawn exactly like everything else, in hatching, never as a glow."
+dread = "This world at its darkest is the plate of catastrophe: an eclipse over a plague town, a prison of endless stairs. It is recorded, labelled and precise, and the precision is what makes it cold."
+favoured_actors = "Crews and companies working one instrument or one voyage, specimens and creatures, and constellation figures in the world. A lone scholar at a desk is the most worn image here and should not be the default."
+myth = "The Greco-Roman myths behind the constellations, Perseus and the sea monster among them, and the emblem books of the Hermetic philosophers, where the world above mirrors the world below."
+highlight = "The thing the eye finds first, drawn as a specimen or a demonstration: a creature, a constellation figure or a working of the world shown whole, labelled or cut open. Today's kind of wrongness is given with this definition. It is drawn in the same line as everything else."
+highlight_modes = [
+  "a constellation figure stepped down into the world",
+  "a creature from a map's margin, here in life",
+  "a thing shown in cutaway while it is still in use",
+  "far too large for its kind, with a measuring line beside it",
+  "a diagram's geometry built as a real structure",
+]
+
+
+[brief]
+signature = "SIGNATURE — the star chart is in the world: at least one named element of celestial cartography (a constellation figure, numbered stars, a graticule line, a cartouche) runs from the edge of the image into the scene and merges with it. A plate that could be any old etching is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
+
+
+[verbs]
+process_hard = ["erupting", "collapsing inward", "quaking", "plunging", "blazing", "keeling over", "foundering", "caving in", "rending", "unravelling", "blackening", "overflowing its banks", "raining down", "withering", "careening", "breaching", "spewing smoke", "crumbling to rubble", "smashing", "sundering", "gushing", "tilting off its axis"]
+process_soft = ["rotating", "revolving", "ticking", "swinging", "setting", "waxing", "waning", "branching", "spiralling", "flowing", "ebbing", "blossoming", "throwing a shadow", "balancing", "aligning", "crystallising", "mirroring", "germinating", "seeding", "floating on the tide", "unrolling", "converging"]
+actor_hard.work = ["winding a capstan", "hoisting", "sounding the depth", "chiselling", "quarrying", "harpooning", "felling", "dragging a net", "forging", "rowing hard against"]
+actor_hard.rest = ["waiting out the eclipse beside", "huddling at", "lying low under"]
+actor_hard.play = ["wrestling for sport", "fencing", "skating"]
+actor_hard.ritual = ["carrying relics in procession", "lighting beacon fires on", "taking an oath before"]
+actor_hard.travel = ["riding post toward", "sailing close-hauled past", "climbing the rigging of", "crossing on foot", "marching toward"]
+actor_soft.work = ["measuring", "grinding a lens", "engraving a plate", "pressing flowers", "cataloguing", "potting", "weaving"]
+actor_soft.rest = ["reading beside", "taking supper at", "resting on", "smoking a pipe at"]
+actor_soft.play = ["playing a viol at", "stargazing from", "feeding swans at", "dancing on"]
+actor_soft.ritual = ["laying flowers at", "keeping a feast at", "blessing"]
+actor_soft.travel = ["promenading along", "riding out to", "rowing across", "arriving by coach at", "walking out to"]
+
+
+[registers]
+"botanical" = "Plants as the herbalist and the gardener drew them: a specimen shown root, leaf and seed at once, a formal garden laid out in beds. Every plant is identifiable and could be labelled."
+"bodily and anatomical" = "The body as the anatomist's plate: a figure with its muscles lifted like a cloak, a skeleton leaning on a spade. Exact and calm, a demonstration, never gore."
+"fungal and decaying" = "Rot recorded with the same care as growth: a toadstool ring drawn as a specimen, a timber eaten into galleries by worms. Decay here is a subject of study."
+"animal and creaturely" = "Animals as the naturalist's specimens and the traveller's wonders: a rhinoceros drawn from a description, a whale on a beach with a crowd around it. Exotic and ordinary animals get the same line."
+"geological" = "The earth in section: a mountain cut open to show its veins and fires, strata drawn like the pages of a book. Stone is something to measure and to look inside."
+"metallic and ore" = "Metal as mine and instrument: a mine's shafts and windlasses in cutaway, brass rings of an armillary sphere. Metal is worked, measured and named."
+"glass and ceramic" = "Glass as the instrument of seeing: a telescope's lenses, the alembics of a laboratory. Glass makes the distant near and the small large."
+"architectural" = "Buildings drawn as elevations, plans and ruins: an observatory dome opened to the sky, a colonnade in perspective. Architecture shows its geometry."
+"domestic interior" = "A room as a study or a cabinet: shelves of specimens, a globe by the window. It always opens onto the world through a window or a door."
+"mechanical" = "Machines shown working and in exploded view: a mill's gears, a clock's escapement. Every part is drawn as if it could be built from the plate."
+"industrial and infrastructural" = "Works drawn as the encyclopaedia drew trades: a glassworks with its furnaces in section, an aqueduct striding across a valley. Each shows how it is done."
+"agricultural and cultivated" = "Husbandry as instruction: a field ploughed in demonstration, an orchard's grafting shown step by step. The subject is the method and the yield."
+"aquatic" = "Water as the cartographer and the engineer drew it: a coastline with its soundings, a fountain's pipes in section. Seas carry ships and monsters alike."
+"atmospheric" = "Air as diagram and as event: a comet's tail across a town, a storm's winds drawn as lines. The sky is charted as carefully as the land."
+"glacial and frozen" = "Ice as the polar voyagers drew it: a ship locked in a frozen sea, snowflakes drawn as six-sided specimens."
+"fire and ember" = "Fire as furnace and as catastrophe: a volcano's eruption in section, an alchemist's athanor. Fire is a force to be shown at work."
+"textile and fiber" = "Cloth as sail and as trade: a loom in exploded view, a ship's canvas full of wind. Fibre is drawn by its weave."
+"ritual object" = "The emblems and instruments of the Hermetic philosophers: a sigil engraved on a plate, an orrery used as an altar. Ritual objects are drawn like instruments."
+"paper and inscription" = "Paper as the plate's own world: banners, cartouches and labels that carry the names of things, a book open on a lectern. Lettering is ornamental and partly legible, never a sentence."
+"instrument and measure" = "Measure is this world's heart: quadrants, astrolabes, rulers and graticules. To measure is to make the world readable."

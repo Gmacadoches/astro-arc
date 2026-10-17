@@ -182,7 +182,7 @@ register could only reach the prompt as an adjective: with the reading pinned,
 20 registers came back as one scene.
 
 A style can say what each register means in its world, in its
-`[<style>.registers]` table; that line goes to steps 6 and 7. A style without
+`[registers]` table; that line goes to steps 6 and 7. A style without
 one falls back to `registers.toml`'s `[guidance]`, which is empty by design.
 
 ## 5. Stage 1.5 — the meaning
@@ -255,7 +255,7 @@ signature" that tried to fix one was removed on 2026-10-08: with and without
 it, the prompts differed no more than two draws with it.)
 
 **The style decides the world, not just the look.** All seven styles have a
-charter in `styles.toml` (era, materials, physics, society, weather,
+charter in its `styles/<key>.toml` (era, materials, physics, society, weather,
 inhabitants, strangeness, the numinous, dread, favoured actors, myth,
 highlight) and their own **brief rules**, phrased as failure conditions
 because that is what Stage 2 obeys. Every style has a **signature** rule:
@@ -336,7 +336,7 @@ Five TOML files, read fresh on every run. No restart, no reinstall.
 | File | What it controls | Try this |
 | --- | --- | --- |
 | `pipeline/registers.toml` | the 20 materials a scene is built from, in five families | add one under the family it is made of |
-| `pipeline/styles.toml` | the 7 styles: `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules, `registers` lines, `verbs`, `space`, `highlight_modes`, optional `light` and `conditions` (see `docs/charter-schema.md`) | edit a charter field, then sweep it and run `term_report.py` |
+| `pipeline/styles/<key>.toml` (+ `<key>.jpg`) | the 7 shipped styles, one file each (user themes: `~/.config/astro-arc/styles/`): `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules, `registers` lines, `verbs`, `space`, `highlight_modes`, optional `light` and `conditions` (see `docs/charter-schema.md`) | edit a charter field, then sweep it and run `term_report.py` |
 | `pipeline/actors.toml` | the 11 actor kinds Stage 1.5 casts from, and register/actor pairs to exclude | reword a kind; keep it a span and a principle, never a list |
 | `pipeline/cliches.toml` | hard-blocked exact terms | add a word **only after** you see it repeat |
 | `pipeline/model-rates.toml` | model prices and the quality presets | add a model, or retune a preset |
@@ -352,7 +352,7 @@ Everything else is one config file at
 | --- | --- |
 | `frequency` | `hourly` / `daily` / `weekly` / `monthly` / `manual` |
 | `intervalHours` | under `hourly`, hours between runs: `1` / `2` / `3` / `4` / `6` / `8` / `12` |
-| `artStyle` | which styles.toml preset |
+| `artStyle` | which theme (a file name under `styles/`) |
 | `stage1Model` / `stage2Model` | the writing models (Stage 1.5 runs on `stage1Model`) |
 | `openaiModel` / `openaiQuality` | the image model and tier |
 | `captionModel` | the melodrama judge; unset means `gpt-4o-mini`, the model it was calibrated on |
@@ -382,7 +382,7 @@ cells across registers.
 
 Put its name under the family it is made of in `registers.toml` and you are
 done — the rotation list and the family lookup are derived from that. For a
-world style, add a line for it under `[<style>.registers]` too, or it reaches
+world style, add a line for it under `[registers]` too, or it reaches
 that world by name alone.
 
 ### Change something and measure it
