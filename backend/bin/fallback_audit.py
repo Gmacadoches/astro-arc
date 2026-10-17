@@ -17,9 +17,10 @@ Output, under ~/.local/state/omarchy/astro-arc/verification/<out>/:
                   and the Stage 2 user prompt
   prompts.sha256  sha256 of prompts.jsonl, the whole set in one hash
   fallbacks.json  every fallback that fired, with the styles it fired for
-  control.jsonl   the same capture for a synthetic style with no charter at
-                  all; a positive control that proves each detector can fire.
-                  Not part of the hash.
+  control.jsonl   a synthetic style with no charter at all. Before
+                  charter-required it proved each detector could fire; now it
+                  proves build() refuses an unchartered style. Not part of
+                  the hash.
 
 Pipeline state (history, the Stage 1 and 1.5 caches) is redirected to a
 temporary directory, so the real archive is neither read nor written.

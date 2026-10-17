@@ -82,9 +82,8 @@ automaton = """A machine that keeps working, apparently of its own accord, with 
 
 # Gated per style, and the gate is now live: `presence` is eligible only where
 # that style's charter has a `numinous` field describing how the numinous takes
-# a body (see presence_allowed). Silence is not permission, so an unchartered
-# style cannot have one. ghibli and cyberpunk qualify; the five styles still
-# running on the old `guidance` do not, until they are chartered.
+# a body (see presence_allowed). Silence is not permission: a charter whose
+# `numinous` says nothing cannot have one.
 presence = """Something numinous that has a body. Not a glow, not a translucency, not a light — it is heavy, occupies space and is lit like everything else: a shape under cloth, a figure entirely wrapped, something the size of a building that is plainly alive. If it could be rendered as a light effect, it is wrong."""
 
 the-dead = """A body, a remnant, or something that was an actor and no longer is. It is acted upon rather than acting, and the relation still holds: something is still occupied with it, or has left it. Never gore; the fact of the body, not its injuries."""

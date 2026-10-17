@@ -117,6 +117,10 @@ def main():
     used_constellations, used_kinds = [], []
 
     for i, (key, stage1, dial) in enumerate(days, start=1):
+        if "verbs" not in dial:
+            # A day with no stored dial: draw from the style's own charter,
+            # as build() does for every run.
+            dial, _ = lp.draw_style_choices(style_key, dial, history, key)
         avoid_arch = list(reversed(used_constellations))[:lp.AMPLIFY_AVOID_WINDOW]
         avoid_kind = list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW]
         # Registers first: as of 2026-09-26 they are a Stage 1.5 input.
