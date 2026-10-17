@@ -1499,7 +1499,9 @@ def validate_charter(style_key):
             for name in sorted(fields - allowed):
                 error(f"[brief] {key}", f"{{{name}}} is not a value the dial supplies "
                                         f"({', '.join(sorted(allowed))})")
-            if "failed response" not in rule.lower():
+            # TEMPER carries the dial's temper ({wonderTone}); it is not a
+            # rule with a failure condition and is never written as one.
+            if key != "temper" and "failed response" not in rule.lower():
                 warn(f"[brief] {key}", 'has no "failed response" condition')
             words = set(re.findall(r"[a-z]+", re.sub(r"\{[^}]*\}", " ", rule.lower())))
             if words & moods:
