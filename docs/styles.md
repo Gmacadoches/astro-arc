@@ -4,6 +4,8 @@ Each style in [`backend/pipeline/styles/`](../backend/pipeline/styles/) is a tec
 
 Every image below is the **same day's reading** and the **same material register** (`aquatic`), rendered at the same settings. Each world built its own scene from them: that is the point. Change the style from the widget's Style dropdown; the file is read fresh on every generation.
 
+Want a world that isn't here? [Make your own](#an-eighth-world-yours) with your Omarchy agent: it takes one line.
+
 ## Studio Ghibli
 
 `ghibli`
@@ -129,3 +131,22 @@ Every image below is the **same day's reading** and the **same material register
 > A pilgrim leads a mule along the riverbank under a gold sky, one hand on a bulging scrip stuffed with salt-cakes, the other steadying a fish-drying frame where the sea-dragon’s emptied skin rings out in the wind. Over the frame towers a pelican, larger than horse and man, roosting on the crossbeam and opening its own breast above a nest of half-fledged young. Beside the path the spit of shingle fruits the false island’s bare back-bones into the shallows; upstream, mills step the river toward a walled town, while a snail-knight from the vine border noses into the reeds.
 
 </details>
+
+## An eighth world: yours
+
+The seven above are the shipped set. Yours sits beside them in the same
+dropdown, in the same format, and goes through the same pipeline.
+
+Pick **Create your own style…** in the Style dropdown, describe the world in
+one line, and click **Create with** *your agent*. Your Omarchy default agent
+opens in a terminal with the
+[`astro-arc-style`](../skills/astro-arc-style/SKILL.md) skill and builds the
+world with you: its era and materials, who lives there, what its myths are,
+how it goes dark, and the one thing that marks a picture as unmistakably
+yours. It checks the result against your own recent days before it renders
+the preview, and it asks before anything costs money. With no agent set,
+**Copy prompt** and **Import theme…** do the same through any web chat.
+
+The finished style is two files in `~/.config/astro-arc/styles/`: `<key>.toml`
+and its `<key>.jpg` preview. Send both to share it.
+

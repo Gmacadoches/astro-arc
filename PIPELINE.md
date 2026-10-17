@@ -9,7 +9,7 @@ material, the prompt and the picture are remade. The render is most of the cost
 and most of the time. The panel's cost line projects the real figure for
 whatever preset is set.
 
-**At a glance:** $0.077 fresh run · $0.066 same-day re-run (Ultra) · ~40s render · 20 registers · 7 worlds
+**At a glance:** $0.077 fresh run · $0.066 same-day re-run (Ultra) · ~40s render · 20 registers · 7 worlds, plus your own
 
 Thirteen steps. Five of them call a language model: the reading, the meaning,
 the material, the prompt and the melodrama check. This document walks the
@@ -157,14 +157,17 @@ regenerate differs:
 - **condition**: how worn things are (newly made, kept, worn, failing,
   ruined), weighted toward the far end on hard days. Wear used to be required
   in five places at once, and every image came back weathered.
-- **light**: a style's own `[light]` lines replace the global ones, which
-  assume an Earth sky (cosmic and cyberpunk have their own).
+- **light**: the exposure band's line comes from the style's own `[light]`
+  table (`lo` / `mid` / `hi`), required in every style. There are no global
+  light lines: an Earth sky is wrong for cosmic, and a dusk-only palette needs
+  to say what a bright day looks like in its world.
 
 The draws go into the history entry and are shown on the run page.
 
-The constants survive as `NO_TEXTURE_DIAL`, the fallback for a reading with no
-texture block at all. (A `pipelineMode: "legacy"` setting that pinned the dial
-back to them was removed on 2026-09-13.)
+A reading with no texture block is an error, not a neutral default: there is
+no fallback dial. (`NO_TEXTURE_DIAL` was deleted in October 2026, and a
+`pipelineMode: "legacy"` setting that pinned the dial was removed on
+2026-09-13.)
 
 ## 4. Registers — what the scene is made of
 
@@ -181,9 +184,9 @@ Until 2026-09-26 they were picked after the scene had already been cast, so a
 register could only reach the prompt as an adjective: with the reading pinned,
 20 registers came back as one scene.
 
-A style can say what each register means in its world, in its
-`[registers]` table; that line goes to steps 6 and 7. A style without
-one falls back to `registers.toml`'s `[guidance]`, which is empty by design.
+Every style says what each of the 20 registers means in its world, in its
+`[registers]` table; that line goes to steps 6 and 7. A missing line is a
+validation error, not a silent gap.
 
 ## 5. Stage 1.5 — the meaning
 
@@ -205,8 +208,8 @@ that world's terms where one fits. The actor is named as who they are, not
 what they are doing; the activity is drawn later.
 
 Cached in `pipeline/amplifications/<periodKey>.json`, invalidated by
-`STAGE15_SCHEMA_VERSION` and keyed on a hash of the style's charter, so **a
-regenerate never changes the day's meaning**, and editing a charter does.
+`STAGE15_SCHEMA_VERSION` and keyed on a hash of the style's `[world]` table, so
+**a regenerate never changes the day's meaning**, and editing the world does.
 `presence` is only eligible in a style whose charter says how the numinous
 takes a body.
 
@@ -244,7 +247,10 @@ bolted-on item.
 Everything above converges here: the reading, the meaning and its actor, the
 objects and the highlight with its definition and prominence, both registers with their style lines, the dial's
 composition brief, the style's world, the concept tags of the last 8
-generations to avoid, and any hard-blocked terms.
+generations to avoid, and any hard-blocked terms. It is **not** given the
+style's label: "Studio Ghibli" is a dropdown name, and the world charter alone
+decides the scene (a prompts-only comparison over 7 styles found no studio,
+artist or film names either way, and no world lost).
 
 Its rules, in short: describe only what is physically there, never what it
 means; concrete and oddly specific over generically mystical; things must be
@@ -263,8 +269,9 @@ something in frame that could only exist in this world, and an image that
 could be relabelled as another style fails. The division Stage 2 is given:
 the registers decide what things are made of; the world decides what place
 this is and what lives there. See `skills/astro-arc-style/SKILL.md` for every field.
-A new style with no charter falls back to ghibli's old rules, kept in one
-labelled block in `llm_pipeline.py`.
+There is no fallback: a style with a missing or invalid field fails loudly,
+naming the style and the field, and never generates (see [Styles are
+files](#styles-are-files)).
 
 ## 8. The melodrama check
 
@@ -285,10 +292,12 @@ strict judge must never cost the day its image.
 
 **Runs:** `openai_image_gen.py` · **Cost:** ~$0.042 · **Cache:** — · **Knob:** `openaiModel`, `openaiQuality`
 
-The style suffix is appended — its technique, plus, in the styles that define
-`suffix_figures` (ghibli, cyberpunk), how that style draws people when a figure
-is in frame — and the prompt is rendered at the
-configured tier, every image, people or not.
+The style suffix is appended by `final_image_prompt()` — its technique, plus,
+in the styles that define `suffix_figures` (ghibli, cyberpunk), how that style
+draws people when a figure is in frame — and the prompt is rendered at the
+configured tier, every image, people or not. Production, `sweep.py` and every
+other harness join the prompt through that one function, so a test sends
+exactly what a real run sends.
 
 The model is sent `moderation: "low"` where it accepts it, and a **safety
 refusal is retried** up to twice with the identical request. Refusals are not
@@ -329,6 +338,58 @@ applied as the `astro-arc` theme too.
 
 ---
 
+## Styles are files
+
+**Runs:** `load_styles()`, `validate_charter()` · **Cost:** free · **Knob:** `artStyle`, `~/.config/astro-arc/styles/`
+
+A style is one self-contained file: `<key>.toml` plus a required `<key>.jpg`
+preview. Everything about how a world looks lives in that file (its world
+charter, brief rules, a line per register, verbs, depth recipes, highlight
+modes, `[light]` and the technique suffix). Everything that holds for every
+style (the meaning machinery, the wallpaper rule, exposure bands, registers,
+actor kinds, the wear scale) lives once in the pipeline. No style-specific
+field exists outside a style's file, and there are no neutral fallbacks.
+
+`load_styles()` reads two folders:
+
+| Folder | What is there |
+| --- | --- |
+| `backend/pipeline/styles/` | the 7 shipped styles |
+| `~/.config/astro-arc/styles/` (`$XDG_CONFIG_HOME` respected) | the user's own, untouched by `omarchy plugin update`. A file with a shipped key is ignored with a warning |
+
+Every file goes through `validate_charter()` on load. The Style dropdown is
+built from the result: shipped styles by label, the user's as "<label>
+(custom)", and an invalid one as "(Failed Validation)", which cannot generate.
+
+**Making one is a conversation with your own agent, not a form.** The panel's
+**Create your own style…** takes a one-line idea and runs
+`astro-arc-style agent create`, which opens the user's Omarchy default agent
+(`omarchy-agent-prompt`) in a terminal, briefed with the
+`astro-arc-style` skill (`skills/astro-arc-style/SKILL.md`). The skill is
+the schema, the writing rules and the workflow; the agent follows it:
+
+```sh
+astro-arc-style validate <file>   # free: every error, naming the field
+astro-arc-style preview  <file>   # prompts only: a real hard day and soft day, 3 registers each
+astro-arc-style meaning  <file>   # replays the last 8 real days; a blind judge scores hard/soft,
+                                  #   near-duplicates and "favourite scene"; PASS or FAIL
+astro-arc-style render   <file>   # the preview image, at the user's own image settings
+```
+
+Each command that calls a model prints its projected cost and spends nothing
+without the user's yes. With no default agent set, **Copy prompt** builds one
+self-contained prompt (the skill plus the idea) for any web chat, and
+**Import theme…** brings the TOML back, saves it in the user folder and
+validates it. **Fix with AI** / **Copy fix prompt** do the same for a style
+that failed validation, with its errors attached. The plugin itself never asks
+a model to write a style, and has no API fallback for it.
+
+The panel also links the skill into each agent's skills folder (`~/.claude`,
+`~/.codex`, `~/.agents`, `~/.pi/agent`, `~/.hermes`, where they exist) on load,
+so any agent session can make or fix a style without the panel.
+
+---
+
 ## Tweak it without touching code
 
 Five TOML files, read fresh on every run. No restart, no reinstall.
@@ -336,7 +397,7 @@ Five TOML files, read fresh on every run. No restart, no reinstall.
 | File | What it controls | Try this |
 | --- | --- | --- |
 | `pipeline/registers.toml` | the 20 materials a scene is built from, in five families | add one under the family it is made of |
-| `pipeline/styles/<key>.toml` (+ `<key>.jpg`) | the 7 shipped styles, one file each (user themes: `~/.config/astro-arc/styles/`): `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules, `registers` lines, `verbs`, `space`, `highlight_modes` and `light` (see `skills/astro-arc-style/SKILL.md`) | edit a charter field, then sweep it and run `term_report.py` |
+| `pipeline/styles/<key>.toml` (+ `<key>.jpg`) | the 7 shipped styles, one file each (your own: `~/.config/astro-arc/styles/`, [made with your agent](#styles-are-files)): `label`, `suffix_base` / `suffix_figures` (or `suffix`), and per style a `world` charter, `brief` rules, `registers` lines, `verbs`, `space`, `highlight_modes` and `light` (see `skills/astro-arc-style/SKILL.md`) | edit a charter field, then sweep it and run `term_report.py` |
 | `pipeline/actors.toml` | the 11 actor kinds Stage 1.5 casts from, and register/actor pairs to exclude | reword a kind; keep it a span and a principle, never a list |
 | `pipeline/cliches.toml` | hard-blocked exact terms | add a word **only after** you see it repeat |
 | `pipeline/model-rates.toml` | model prices and the quality presets | add a model, or retune a preset |
@@ -352,7 +413,7 @@ Everything else is one config file at
 | --- | --- |
 | `frequency` | `hourly` / `daily` / `weekly` / `monthly` / `manual` |
 | `intervalHours` | under `hourly`, hours between runs: `1` / `2` / `3` / `4` / `6` / `8` / `12` |
-| `artStyle` | which theme (a file name under `styles/`) |
+| `artStyle` | which style: a file name (no `.toml`) in either styles folder |
 | `stage1Model` / `stage2Model` | the writing models (Stage 1.5 runs on `stage1Model`) |
 | `openaiModel` / `openaiQuality` | the image model and tier |
 | `captionModel` | the melodrama judge; unset means `gpt-4o-mini`, the model it was calibrated on |
