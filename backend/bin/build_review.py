@@ -85,7 +85,7 @@ def _theme_css_vars(theme_dir):
 
 def _style_label(style_key):
     """Resolves a style key (e.g. "ghibli") to its theme's label (e.g.
-    "Hand-Painted Anime") for display. Falls back to the raw key if the theme is
+    "Studio Ghibli") for display. Falls back to the raw key if the theme is
     gone or can't be read, rather than hiding the art style entirely."""
     if not style_key:
         return None
