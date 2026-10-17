@@ -38,7 +38,7 @@
 #                     string, so a rename resets that kind's history.
 #
 # Keep the guidance to a span and a principle, never an inventory — the same
-# rule registers.toml's [guidance] table carries, and for the same measured
+# rule a style's [<style>.registers] lines follow, and for the same measured
 # reason. A closed list of nouns replaces an open space with a menu.
 # ---------------------------------------------------------------------------
 

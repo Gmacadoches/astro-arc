@@ -7,7 +7,8 @@
 # are built from. Each image gets a primary register and usually a secondary,
 # and the day's chart decides whether the pair collides or coheres.
 #
-# These are NAMES, not vocabularies, and that is deliberate — see [guidance].
+# These are NAMES, not vocabularies, and that is deliberate — see the note at
+# the end of this file.
 #
 # ---------------------------------------------------------------------------
 # HOW TO EDIT
@@ -79,21 +80,17 @@ made = [
   "instrument and measure",
 ]
 
-# Optional per-register steer, passed to Stage 2 alongside the register name.
-# Mirrors styles.toml's `guidance` field and exists for the same narrow reason:
-# a name whose obvious reading is much smaller than its real territory has to
-# be told so.
+# What each register means in a given world is that style's job: every style
+# has a line per register in its [<style>.registers] table, and the validator
+# requires all of them. The generic [guidance] table that used to sit here
+# (empty since its one entry, man-beast, moved to actors.toml on 2026-09-20)
+# was removed 2026-10-16.
 #
-# THIS IS NOT A VOCABULARY LIST, AND MUST NOT BECOME ONE. A register is a
-# region of image-space, and the model's own vocabulary for one is far larger
-# than any list written here; handing it 50 nouns replaces an open space with a
-# closed menu and every image starts being assembled from the same words. That
-# is the failure this project has already measured twice — see cliches.toml's
-# header ("do not pre-seed it with guesses"), and AVOID_WINDOW's cut from 14 to
-# 8 once a 40-item negative list turned out to steer less than the register
-# pair was.
-#
-# So: write guidance ONLY for a register with a demonstrated narrow attractor,
-# keep it to a span and a principle rather than an inventory, and let anything
-# listed read as a starting point the model is expected to reach past.
-[guidance]
+# Its rule still holds for those lines. A register is a region of image-space,
+# and the model's own vocabulary for one is far larger than any list written
+# here; handing it 50 nouns replaces an open space with a closed menu and every
+# image starts being assembled from the same words. That is the failure this
+# project has already measured twice -- see cliches.toml's header ("do not
+# pre-seed it with guesses"), and AVOID_WINDOW's cut from 14 to 8 once a
+# 40-item negative list turned out to steer less than the register pair was.
+# So: a span and a principle, never an inventory.

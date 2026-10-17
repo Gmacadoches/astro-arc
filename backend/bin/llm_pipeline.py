@@ -376,30 +376,6 @@ def actor_excluded_for(register):
     return set((_load_actors().get("exclude") or {}).get(register, []))
 
 
-def load_register_guidance(register):
-    """Optional per-register steer from registers.toml's [guidance] table —
-    "" for the registers that have none, which is most of them by design.
-
-    It exists for a narrow reason: a register whose obvious reading is much smaller than
-    its real territory has to be told so. `man-beast` is the case that
-    prompted it — the word lands on minotaurs and satyrs and stops, when the
-    register is meant to span every part-human figure in world myth.
-
-    Deliberately NOT a vocabulary list per register. See registers.toml's
-    [guidance] header for why that trade goes the way it does.
-    """
-    if not register:
-        return ""
-    path = PIPELINE_DIR / "registers.toml"
-    if not path.exists():
-        return ""
-    try:
-        with open(path, "rb") as f:
-            return tomllib.load(f).get("guidance", {}).get(register, "")
-    except (tomllib.TOMLDecodeError, OSError):
-        return ""
-
-
 def load_cliches():
     path = PIPELINE_DIR / "cliches.toml"
     if not path.exists():
@@ -1311,8 +1287,9 @@ def load_style_verbs(style_key):
 # Step 5). Wear used to be a constant -- the highlight, THE IMPOSSIBLE, the
 # soft/lo actor relation and both charters all required it -- so every image
 # came back weathered. Hard days lean to the far end, soft days to the near
-# one; nothing is ruled out on either. A style may replace the list with a
-# `conditions` array (a pristine world, a ruined one), drawn evenly.
+# one; nothing is ruled out on either. The scale is the pipeline's, the same
+# for every style (the per-style `conditions` override went 2026-10-16,
+# unused).
 CONDITIONS = ("newly made", "kept and cared for", "worn with long use", "failing", "ruined")
 _CONDITION_WEIGHTS = {
     "hard": {"newly made": 1, "kept and cared for": 1, "worn with long use": 3, "failing": 3, "ruined": 3},
@@ -1325,14 +1302,6 @@ _CONDITION_WEIGHTS = {
 CONDITION_HOW = ("Show it through the shape and state of things already named — what is "
                  "missing, fallen, new, kept or half-built — not through surface words like worn, "
                  "weathered, cracked, mossy or patched, and not with extra words of its own.")
-
-
-def load_style_conditions(style_key):
-    values = _style_table(style_key, "conditions")
-    if not isinstance(values, list):
-        return None
-    values = [str(v).strip() for v in values if str(v).strip()]
-    return values or None
 
 
 # Invariant, the same for every style with a [space] array: it keeps what
@@ -1414,9 +1383,8 @@ def draw_style_choices(style_key, dial, history, period_key):
     # decides.
     dial["light"] = str(_style_table(style_key, "light")[dial["exposureBand"]]).strip()
 
-    conditions = load_style_conditions(style_key) or list(CONDITIONS)
     used = _recent_draws(history, style_key, "condition")
-    pool = [c for c in conditions if c not in used] or conditions
+    pool = [c for c in CONDITIONS if c not in used] or list(CONDITIONS)
     weights = _CONDITION_WEIGHTS["hard" if hard else "soft"]
     draws["condition"] = rng.choices(pool, weights=[weights.get(c, 1) for c in pool])[0]
     dial["condition"] = draws["condition"]
@@ -1925,17 +1893,12 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
 
 
 def load_register_line(style_key, register):
-    """What this register means in this style's world: the style's own
-    `[<style>.registers]` line when it has one, else registers.toml's generic
-    [guidance] entry, else "". The style line REPLACES the generic one rather
-    than adding to it, because it is the more specific answer to the same
-    question."""
+    """What this register means in this style's world: the style's
+    `[<style>.registers]` line. validate_charter requires one for every
+    register, so there is no generic fallback."""
     if not register:
         return ""
-    lines = (load_styles().get(style_key) or {}).get("registers")
-    if isinstance(lines, dict) and str(lines.get(register) or "").strip():
-        return str(lines[register]).strip()
-    return load_register_guidance(register)
+    return str(load_styles()[style_key]["registers"][register]).strip()
 
 
 def stage15_material(stage1_result, meaning, model, config, dial=None, style_key=None,

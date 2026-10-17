@@ -336,20 +336,21 @@ def main():
             kwargs["amplification"] = sample_amp
         if dial is not None:
             kwargs["dial"] = dial
-        if hasattr(lp, "load_register_guidance"):
-            # Production passes this (see llm_pipeline.build); without it a sweep
-            # of a register that HAS guidance measures a prompt production never
-            # sends. Guarded by hasattr so the harness still runs against a
-            # pre-guidance build of the pipeline, same as the kwargs above.
-            if hasattr(lp, "load_register_line"):
-                guidance = lp.load_register_line(style_key, primary)
-                sec_guidance = lp.load_register_line(style_key, secondary)
-                if sec_guidance:
-                    kwargs["secondary_register_guidance"] = sec_guidance
-            else:
-                guidance = lp.load_register_guidance(primary)
-            if guidance:
-                kwargs["register_guidance"] = guidance
+        # Production passes these (see llm_pipeline.build); without them a
+        # sweep measures a prompt production never sends. Guarded by hasattr
+        # so the harness still runs against an older build of the pipeline,
+        # same as the kwargs above.
+        if hasattr(lp, "load_register_line"):
+            guidance = lp.load_register_line(style_key, primary)
+            sec_guidance = lp.load_register_line(style_key, secondary)
+            if sec_guidance:
+                kwargs["secondary_register_guidance"] = sec_guidance
+        elif hasattr(lp, "load_register_guidance"):
+            guidance = lp.load_register_guidance(primary)
+        else:
+            guidance = ""
+        if guidance:
+            kwargs["register_guidance"] = guidance
         if hasattr(lp, "load_style_brief"):
             # Production passes the style's own brief rules (see build());
             # stage2_image_prompt refuses to run without them.
