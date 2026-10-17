@@ -108,8 +108,6 @@ def _style(style_key):
 
 
 def install_detectors():
-    original_world = lp.load_style_world
-
     # --- load_style_brief: the unchartered branch and the default signature.
     # _default_signature is only ever called from load_style_brief, so which
     # branch called it follows from whether the style has a [brief] table.
@@ -146,17 +144,6 @@ def install_detectors():
         if not result:
             AUDIT.hit("load_style_world", 'returned "" (no [world] charter)')
     _wrap("load_style_world", after_world)
-
-    def after_info(result, style_key):
-        styles = lp.load_styles()
-        if style_key not in styles:
-            AUDIT.hit("load_style_info", "unknown key, fell back to symbolist")
-        key = style_key if style_key in styles else "symbolist"
-        if not original_world(key):
-            how = ("charter missing, `guidance` used" if (styles.get(key) or {}).get("guidance")
-                   else "charter missing, no `guidance` either: style line dropped")
-            AUDIT.hit("load_style_info", how)
-    _wrap("load_style_info", after_info)
 
     def after_suffix(result, style_key, has_people=False):
         if style_key not in lp.load_styles():

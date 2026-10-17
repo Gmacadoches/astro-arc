@@ -26,7 +26,7 @@ Two rules hold for every field, because this project has measured both:
 
 | Field | Controls | Write it well |
 |---|---|---|
-| `label` | the name in the Style dropdown | Short and recognisable. |
+| `label` | the name in the Style dropdown, the review page and history's `artStyleLabel`. **Display-only: never sent to any model**; Stage 2 gets the `[world]` charter alone | Short and recognisable. |
 | `suffix`, or `suffix_base` + `suffix_figures` | appended to every image prompt: the technique. `suffix_figures` is added only when a person is in frame | Describe what the finished frame **looks like** (line, shadow, light source, grain), not how it was made; artist names and process words are weakly followed. **Technique only:** name no objects, weather or places, because anything named in the suffix appears in every image. A thin strip at the top of the wallpaper is covered by the desktop bar, so the technique must not crop figures at the top edge. |
 | `space` | 6–8 depth recipes; one is drawn per run, sent with the WALLPAPER rule | Each recipe a different way this world shows depth, one sentence, a place not a mood. |
 

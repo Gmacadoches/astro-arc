@@ -528,14 +528,6 @@ def load_style_world(style_key):
     return "\n".join(parts)
 
 
-def load_style_info(style_key):
-    """(label, world) for the style: what Stage 2 is told about the world it
-    is painting in, so it does not invent imagery the style has no
-    vocabulary for and can take content from the style rather than only
-    rendering."""
-    return load_styles()[style_key]["label"], load_style_world(style_key)
-
-
 # ---------------------------------------------------------------------------
 # Rolling history (concept-level anti-repetition + register rotation)
 # ---------------------------------------------------------------------------
@@ -2246,7 +2238,7 @@ def stage2_system():
 
 
 def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_model,
-                         style_label=None, style_guidance=None, secondary_register=None,
+                         style_world=None, secondary_register=None,
                          amplification=None, dial=None, register_guidance=None,
                          style_brief=None, secondary_register_guidance=None,
                          highlight=None):
@@ -2274,8 +2266,11 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         ]
 
 
-    if style_label and style_guidance:
-        user_lines.append(f"Rendering style for this image: {style_label} — {style_guidance}")
+    # The world charter only. The style's `label` is display-only and never
+    # reaches a model: a prompts-only comparison (decision 3,
+    # docs/decisions/2026-10-styles.md) found no loss without it.
+    if style_world:
+        user_lines.append(f"Rendering style for this image: {style_world}")
     if register:
         user_lines.append(f"Primary material register (the scene's protagonist material): {register}")
     if register_guidance:
@@ -2436,14 +2431,14 @@ def build(reading, config):
     # because the dial they change is one of its inputs.
     dial, draws = draw_style_choices(style_key, dial, history, period_key)
     register, secondary_register = pick_registers(history, registers, dial["registerCohesion"])
+    style_world = load_style_world(style_key)
     amplification, stage15_cost = stage15_amplify(
         stage1, stage1_model, period_key, config, dial=dial,
-        style_key=style_key, style_world=load_style_world(style_key),
+        style_key=style_key, style_world=style_world,
         register=register, secondary_register=secondary_register,
         avoid_material=recent_material(history),
     )
     avoid = avoid_concepts(history)
-    style_label, style_guidance = load_style_info(style_key)
 
     # The melodrama rule, enforced before the image call as B4 specified. It was
     # built and calibrated on 2026-09-20 (21/21 against Garrett's labels) but
@@ -2459,7 +2454,7 @@ def build(reading, config):
     for _attempt in range(1 + CAPTION_RESAMPLES):
         image_prompt, concept_tags, has_people, attempt_cost = stage2_image_prompt(
             stage1, register, avoid, cliches, stage2_model,
-            style_label, style_guidance,
+            style_world,
             secondary_register=secondary_register,
             amplification=amplification,
             dial=dial,
@@ -2548,7 +2543,7 @@ def build(reading, config):
         # anything captioning a run — the "Themes Generated" entry's
         # title, the exported theme's README — can name the style the
         # way the Style dropdown does without re-reading the TOML.
-        "artStyleLabel": style_label,
+        "artStyleLabel": load_styles()[style_key]["label"],
         "imagePrompt": image_prompt,
         "finalPrompt": final_prompt,
         # Cost of the chat calls this run actually made — None means

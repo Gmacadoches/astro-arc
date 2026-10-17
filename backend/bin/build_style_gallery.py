@@ -97,7 +97,7 @@ def main():
     rows, total = [], 0.0
 
     for i, key in enumerate(wanted, start=1):
-        label, guidance = lp.load_style_info(key)
+        label, world = lp.load_styles()[key]["label"], lp.load_style_world(key)
         print("[%d/%d] %s" % (i, len(wanted), label), file=sys.stderr)
         # Each world's own draws (verbs, space, condition, highlight mode), as
         # production applies them; without this the gallery would show every
@@ -106,14 +106,14 @@ def main():
 
         amplification, amp_cost = lp.stage15_amplify(
             stage1, stage1_model, period_key, config, cache=False, dial=style_dial,
-            style_key=key, style_world=lp.load_style_world(key),
+            style_key=key, style_world=world,
             register=args.register, secondary_register=args.secondary,
         )
         total += amp_cost or 0.0
 
         prompt, tags, has_people, cost = lp.stage2_image_prompt(
             stage1, args.register, [], cliches, stage2_model,
-            label, guidance,
+            world,
             secondary_register=args.secondary,
             amplification=amplification,
             dial=style_dial,
