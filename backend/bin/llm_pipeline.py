@@ -642,12 +642,7 @@ def load_style_brief(style_key):
     if not isinstance(brief, dict):
         # Unchartered: ghibli's fallback rules, plus the default signature.
         return list(DEFAULT_STAGE2_BRIEF) + [_default_signature(style_key)]
-    # A style with a [space] array gets today's drawn space line and the
-    # WALLPAPER rule instead of its own fixed depth rule (see
-    # draw_style_choices); keeping both would hand Stage 2 the old fixed
-    # distance on top of the new one.
-    skip = SPACE_REPLACES_BRIEF if load_style_space(style_key) else ()
-    rules = [str(v).strip() for k, v in brief.items() if k not in skip and str(v).strip()]
+    rules = [str(v).strip() for v in brief.values() if str(v).strip()]
     if not any(k in brief for k in SIGNATURE_KEYS):
         rules.append(_default_signature(style_key))
     return rules
@@ -1534,9 +1529,6 @@ def load_style_conditions(style_key):
     values = [str(v).strip() for v in values if str(v).strip()]
     return values or None
 
-
-# The brief rules a [space] array replaces, by their key in [<style>.brief].
-SPACE_REPLACES_BRIEF = ("openness", "depth")
 
 # Invariant, the same for every style with a [space] array: it keeps what
 # OPENNESS and DEPTH were for (a wallpaper must not be claustrophobic) without

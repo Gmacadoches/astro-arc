@@ -503,20 +503,21 @@ highlight_modes = [
 # written for this world. Each is phrased as a count and a failure condition
 # because the brief is the part Stage 2 obeys, and mood words are not obeyed.
 #
-# THE IMPOSSIBLE: until it existed wonder was only DESCRIBED in the charter
-# and nothing required it, so a world of walking machines reliably produced a
-# plausible flour mill. A charter says what MAY exist; only the brief makes
-# something appear. {wonderTone} is filled from the dial. (A {wonder}
-# scale line went on 2026-10-09: prominence is now a style-neutral brief line
-# about the highlight, sent to every style.)
+# THE IMPOSSIBLE (`signature`): until it existed wonder was only DESCRIBED in
+# the charter and nothing required it, so a world of walking machines reliably
+# produced a plausible flour mill. A charter says what MAY exist; only the
+# brief makes something appear. (A {wonder} scale line went on 2026-10-09:
+# prominence is now a style-neutral brief line about the highlight, sent to
+# every style.)
 #
-# OPENNESS: these are wallpapers; an enclosed room reads as claustrophobic at
-# desktop size however good its content. "Open means depth, not daylight" was
-# added 2026-09-26: without it, dark cells resolved "half the frame open" as
-# a lit sky.
+# 2026-10-16 (charter-required): the key was `impossible` and it carried the
+# temper inline ("What temper it is in: {wonderTone}"). It is now `signature`,
+# and the temper is a TEMPER rule like every other style's. OPENNESS went the
+# same day: [ghibli.space] and the WALLPAPER rule had replaced it since
+# 2026-10-10, and it was skipped on every run.
 [ghibli.brief]
-impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable; it may be the highlight. Give it this world's own form: a machine that is plainly alive or awake, a spirit holding a job, a creature far too large for its kind, or a building that walks or flies. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
-openness ="OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
+signature = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable; it may be the highlight. Give it this world's own form: a machine that is plainly alive or awake, a spirit holding a job, a creature far too large for its kind, or a building that walks or flies. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
 
 # LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
 # for word when they were removed from the pipeline (decision 4). Rewrite
@@ -583,11 +584,10 @@ actor_soft.travel = ["riding", "leading by the hand", "cycling past", "wading ac
 [ghibli]
 label = "Studio Ghibli"
 # SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1). One recipe is drawn per run,
-# never one of this style's last 2, and replaces OPENNESS in the brief together
+# never one of this style's last 2, and replaced OPENNESS in the brief together
 # with the WALLPAPER rule every [space] style shares (see
-# llm_pipeline.WALLPAPER_RULE). OPENNESS stays in [ghibli.brief] for the
-# record and is skipped while this array exists. One fixed recipe, "half the
-# frame open distance", put far off / distance / beyond into 29 of 33 days.
+# llm_pipeline.WALLPAPER_RULE). One fixed recipe, "half the frame open
+# distance", put far off / distance / beyond into 29 of 33 days.
 space = [
   "a wide low horizon under an enormous sky, the near ground filling the bottom third",
   "looking up a steep slope or terraced hillside toward its crest",
@@ -739,12 +739,10 @@ highlight_modes = [
 
 # BRIEF, 2026-09-26. Cyberpunk's own rules in place of ghibli's (see
 # [ghibli.brief]); decided in the chartering session.
-#   depth  -- replaces OPENNESS. Reworded 2026-10-08: it named the canyon first,
-#             and the canyon then appeared in 15 of 20 frames (2 of 10 without
-#             the rule). The canyon is now one depth source among several.
-#             Original note: Keeps the wallpaper from being claustrophobic,
-#             which was OPENNESS's real job, without demanding sky: this world
-#             is enclosed density, and "half the frame open" argued with it.
+#   depth  -- REMOVED 2026-10-16. [cyberpunk.space] and the WALLPAPER rule
+#             replaced it on 2026-10-10 and it was skipped on every run since.
+#             Its 2026-10-08 finding stands: naming the canyon first put it in
+#             15 of 20 frames, so no depth source may lead.
 #   neon   -- the charter's neon was optional and was skipped in 36/36 renders.
 #             Shape, not words: generated lettering comes out as nonsense.
 #   tended -- REMOVED 2026-10-08. Prompt-only arm sweeps (verification/
@@ -761,7 +759,6 @@ highlight_modes = [
 # and the mandatory anomaly, and the risk observed in the (a) renders ran
 # toward fantasy, not toward the plausible.
 [cyberpunk.brief]
-depth = "DEPTH — applies to every image: the eye must travel a long way into the frame, along whatever this place offers — a market aisle running back under awnings, a flooded underpass, a run of rooftops and water tanks, a platform and its tracks, a corridor of doors, a stair falling away, or a canyon between towers. The canyon is one source of depth among many, not the default. Layer behind layer, each smaller and hazier than the last. It does not need sky. At least three distinct layers of distance must be visible behind the nearest subject. A shallow scene with a wall close behind the subject is a failed response, and so is a close-up that crops the city out."
 neon = "NEON AFTER DARK — whenever the light line below puts the scene at night or below where daylight reaches, the main light in the frame is neon: bent glass tube in colour, on its brackets, tinting the haze and every wet surface. Name at least two neon fixtures and the shape each one traces, invented for this scene, never what words it spells. A dark frame lit only by lamps, bulbs or candles is a failed response, and so is a sign made mostly of words. By day the tube may still be there, unlit."
 temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
 # signature, 2026-10-10 (Prompt 4): replaces the default signature rule.
@@ -831,9 +828,8 @@ actor_soft.travel = ["riding pillion through", "strolling through", "waiting on 
 
 [cyberpunk]
 label = "Cyberpunk"
-# SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1) -- see [ghibli] space. Replaces
-# DEPTH, which is kept in [cyberpunk.brief] for the record and skipped while
-# this array exists. DEPTH's 2026-10-08 rewording already found that naming one
+# SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1) -- see [ghibli] space. Replaced
+# the DEPTH brief rule (removed 2026-10-16). DEPTH's 2026-10-08 rewording already found that naming one
 # depth source first made it the default; a draw makes every source the
 # default in turn.
 space = [
@@ -863,7 +859,7 @@ space = [
 # Medium is Q54 (a): painterly anime illustration with concept painting's
 # colour and glow. The old film/anime A/B is moot. Figures take the colour, line
 # and gear detail of the portrait references (Q59), but frames stay scenes:
-# DEPTH still requires distance.
+# the space line still requires distance.
 #
 # The `signature = false` switch set here on 2026-10-08 (Q57) is gone: the
 # natal visual signature was removed from the pipeline for every style the
