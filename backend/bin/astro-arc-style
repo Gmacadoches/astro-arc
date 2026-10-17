@@ -1,0 +1,764 @@
+#!/usr/bin/env python3
+"""Create your own style: the commands the astro-arc-style skill drives
+(skills/astro-arc-style/SKILL.md), and the ones the panel's Style picker runs.
+
+    astro-arc-style validate <file> [--json]
+        validate_charter on the file, as plain text an agent can act on.
+        Exits 1 on errors.
+    astro-arc-style preview <file> [--yes]
+        Prompts only (no images): a real hard day and a real soft day, three
+        registers each, drawn from the theme. Prints the prompts.
+    astro-arc-style meaning <file> [--yes] [--json]
+        Replays the last 8 real days prompts-only, then one blind judge call
+        on the user's Stage 2 model. Exits 1 on FAIL.
+    astro-arc-style render <file> [--n N] [--model M] [--quality Q] [--yes]
+                           [--estimate] [--json]
+        Renders the theme at the user's image model, quality and size
+        unless told otherwise. Shows the cost and waits for a yes. With one
+        render it becomes <key>.jpg; with more, pick one with `choose`.
+    astro-arc-style choose <file> <image>
+        IMAGE becomes the theme's preview, <key>.jpg beside the file.
+    astro-arc-style import (--file PATH | --clipboard | --choose-file)
+        Save a theme into the user folder and validate it. JSON out.
+    astro-arc-style create-prompt <idea> [--copy]
+    astro-arc-style fix-prompt <file> [--copy]
+        One self-contained prompt for a web chat model: the skill, plus the
+        idea or the broken file and its errors.
+    astro-arc-style agent create <idea> | agent fix <file>
+        Brief the user's Omarchy default agent in a new terminal. Exits 3
+        when no default agent is set.
+    astro-arc-style install-skill
+        Link the skill where Omarchy's agents read skills.
+
+Everything that calls a model shows its projected cost first and spends
+nothing without --yes (or a "y" at a terminal). The plugin itself never asks
+a model to write a theme; the user's own agent or chat does that.
+"""
+
+import argparse
+import json
+import random
+import re
+import shutil
+import subprocess
+import sys
+import tomllib
+from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import llm_pipeline as lp  # noqa: E402
+import model_catalog as mc  # noqa: E402
+from cost_estimate import chat_call_cost  # noqa: E402
+from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
+from openai_image_gen import generate as openai_generate  # noqa: E402
+from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
+from replay_days import load_days, replay  # noqa: E402
+from style_catalog import PREVIEW_PX  # noqa: E402
+
+PLUGIN_ROOT = Path(__file__).resolve().parents[2]
+SKILL_DIR = PLUGIN_ROOT / "skills" / "astro-arc-style"
+SKILL_FILE = SKILL_DIR / "SKILL.md"
+THIS = Path(__file__).resolve()
+VERIFY_ROOT = STATE_DIR / "verification"
+
+# Where Omarchy links its own agent skills (its migrations do the same for
+# the omarchy and diagnose-crash skills): each agent's folder, if that agent
+# has ever run here.
+SKILL_HOMES = (".agents", ".claude", ".codex", ".pi/agent", ".hermes")
+
+MEANING_DAYS = 8
+MEANING_PASS = {"polarity": 6, "duplicates": 1, "favourite": 2}
+IMPORT_MAX_BYTES = 256 * 1024
+
+
+class StyleError(Exception):
+    pass
+
+
+def load_config():
+    try:
+        return json.loads(CONFIG_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def theme_key(file):
+    """Load FILE as a theme for this process, by its file name."""
+    path = Path(file).expanduser()
+    if not path.is_file():
+        raise StyleError(f"{path} is not a file")
+    if path.suffix != ".toml":
+        raise StyleError(f"{path.name}: a theme file is <key>.toml")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", path.stem):
+        raise StyleError(f"{path.name}: the key (the file name) must be lowercase "
+                         "letters, digits and hyphens, e.g. art-deco-posters.toml")
+    try:
+        return lp.add_draft_theme(path)
+    except ValueError as e:
+        raise StyleError(str(e)) from None
+
+
+def is_preview_error(line):
+    return ": preview: " in line
+
+
+def confirm(args, cost_line):
+    # stderr under --json, so stdout stays one JSON document.
+    out = sys.stderr if getattr(args, "json", False) else sys.stdout
+    print(cost_line, file=out)
+    if args.yes:
+        return True
+    if sys.stdin.isatty():
+        return input("Spend it? [y/N] ").strip().lower() in ("y", "yes")
+    print("Nothing spent. Re-run with --yes once the user has agreed to this cost.", file=out)
+    return False
+
+
+def usd(cost):
+    return "cost unknown (no rate for this model)" if cost is None else f"about ${cost:.2f}"
+
+
+def chat_cost(model, stage15_calls, stage2_calls):
+    """Projected dollars for that many Stage 1.5 and Stage 2 calls, or None."""
+    a, _ = mc.stage_cost("stage15", model)
+    b, _ = mc.stage_cost("stage2", model)
+    if (stage15_calls and a is None) or (stage2_calls and b is None):
+        return None
+    return (a or 0) * stage15_calls + (b or 0) * stage2_calls
+
+
+def real_days(limit):
+    """The last `limit` days with a cached reading and a real texture."""
+    return load_days(limit, "soft/mid/1/mid", textured_only=True)
+
+
+# ---- validate ------------------------------------------------------------
+
+def cmd_validate(args):
+    key = theme_key(args.file)
+    errors, warnings = lp.validate_charter(key)
+    if args.json:
+        print(json.dumps({"key": key, "errors": errors, "warnings": warnings}, indent=2))
+        return 1 if errors else 0
+    strip = lambda line: line.split(": ", 1)[1] if line.startswith(key + ": ") else line  # noqa: E731
+    print(f"{args.file}: {len(errors)} error(s), {len(warnings)} warning(s)")
+    if errors:
+        print("\nERRORS (the theme cannot be used until each is fixed):")
+        for line in errors:
+            print(f"  - {strip(line)}")
+            if is_preview_error(line):
+                print(f"    Fix last: `{THIS.name} render {args.file}` makes one, or "
+                      f"`{THIS.name} choose {args.file} <image>` uses an image you have.")
+    if warnings:
+        print("\nWARNINGS (allowed; fix each unless it is deliberate):")
+        for line in warnings:
+            print(f"  - {strip(line)}")
+    theme = lp.load_styles()[key]
+    if not errors and theme.source == "user":
+        print(f"\nValid. It shows in the Style dropdown as \"{theme.label} (custom)\".")
+    elif not errors and theme.source == "shipped":
+        print("\nValid (a shipped theme).")
+    elif not errors:
+        print(f"\nValid. Copy it into {lp.user_styles_dir()}/ to use it; "
+              f"it then shows in the Style dropdown as \"{theme.label} (custom)\".")
+    return 1 if errors else 0
+
+
+def require_usable(key):
+    """Refuse a theme with any error except the missing preview, which is what
+    `render` and `choose` are for."""
+    errors, _ = lp.validate_charter(key)
+    errors = [e for e in errors if not is_preview_error(e)]
+    if errors:
+        raise StyleError("the theme has errors; fix them first (run `validate`):\n  "
+                         + "\n  ".join(errors))
+
+
+# ---- shared: prompts for one real day ------------------------------------
+
+def day_prompts(key, day, registers, config, history):
+    """Stage 1.5 (the day's meaning once, the material per register) and
+    Stage 2 for one real day on theme `key`, as build() runs them. Returns
+    ([record], cost). `history` is the caller's in-memory history; nothing
+    production owns is read or written."""
+    date, stage1, dial = day
+    model1 = config.get("stage1Model") or "gpt-4o-mini"
+    model2 = config.get("stage2Model") or "gpt-4o-mini"
+    world = lp.load_style_world(key)
+    base = {k: v for k, v in dial.items() if k not in ("verbs", "actorVerbs", "activity", "space",
+                                                       "light", "condition", "highlightMode")}
+    meaning, cost = lp.stage15_meaning(stage1, model1, date, config, cache=False, dial=base,
+                                       avoid_archetypes=[], avoid_kinds=[],
+                                       style_key=key, style_world=world)
+    cost = cost or 0.0
+    out = []
+    for primary, secondary in registers:
+        d, draws = lp.draw_style_choices(key, base, history, date)
+        material, c = lp.stage15_material(stage1, meaning, model1, config, dial=d, style_key=key,
+                                          style_world=world, register=primary,
+                                          secondary_register=secondary,
+                                          avoid_material=lp.recent_material(history))
+        cost += c or 0.0
+        amp = {**meaning, **material}
+        prompt, tags, has_people, c = lp.stage2_image_prompt(
+            stage1, primary, [], lp.load_cliches(), model2, world,
+            secondary_register=secondary, amplification=amp, dial=d,
+            register_guidance=lp.load_register_line(key, primary),
+            secondary_register_guidance=lp.load_register_line(key, secondary),
+            style_brief=lp.load_style_brief(key), highlight=lp.load_style_highlight(key))
+        cost += c or 0.0
+        history.insert(0, {"artStyle": key, "draws": draws, "register": primary,
+                           "objects": amp.get("objects") or [], "highlight": amp.get("anomaly") or ""})
+        out.append({"day": date, "polarity": d["polarity"], "exposure": d["exposureBand"],
+                    "register": primary, "secondary": secondary, "hasPeople": has_people,
+                    "actorKind": amp.get("actorKind"), "prompt": prompt,
+                    "finalPrompt": lp.final_image_prompt(prompt, key, has_people)})
+    return out, cost
+
+
+def register_spread(n, seed):
+    """n (primary, secondary) pairs whose primaries cover every family before
+    any repeats; the secondary from another family, as a colliding day's."""
+    rng = random.Random(seed)
+    families = lp._load_register_families()
+    names = list(families)
+    rng.shuffle(names)
+    pairs = []
+    for i in range(n):
+        fam = names[i % len(names)]
+        primary = rng.choice(families[fam])
+        other = names[(i + 1) % len(names)]
+        pairs.append((primary, rng.choice(families[other])))
+    return pairs
+
+
+def save_record(kind, key, record):
+    out = VERIFY_ROOT / f"style-{kind}"
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"{key}-{datetime.now():%Y%m%d-%H%M%S}.json"
+    path.write_text(json.dumps(record, indent=2))
+    return path
+
+
+# ---- preview -------------------------------------------------------------
+
+def cmd_preview(args):
+    key = theme_key(args.file)
+    require_usable(key)
+    config = load_config()
+    days = real_days(30)
+    hard = next((d for d in reversed(days) if d[2]["polarity"] == "hard"), None)
+    soft = next((d for d in reversed(days) if d[2]["polarity"] != "hard"), None)
+    picked = [d for d in (hard, soft) if d]
+    if not picked:
+        raise StyleError("no cached daily readings yet; generate a wallpaper first")
+    model = config.get("stage2Model") or "gpt-4o-mini"
+    n = 3 * len(picked)
+    cost = chat_cost(model, len(picked) + n, n)
+    if not confirm(args, f"preview: {n} prompts, no images, on {model}: {usd(cost)}"):
+        return 2
+    pairs = register_spread(n, key)
+    history, records, spent = [], [], 0.0
+    for i, day in enumerate(picked):
+        recs, c = day_prompts(key, day, pairs[3 * i:3 * i + 3], config, history)
+        records += recs
+        spent += c
+    print(f"\nTechnique (the suffix, added to every prompt):\n  {lp.load_style_suffix(key, True)}\n")
+    for i, r in enumerate(records, 1):
+        print(f"[{i}] {r['polarity']} day {r['day']} · light {r['exposure']} · "
+              f"{r['register']} + {r['secondary']} · actor {r['actorKind']}")
+        print(f"    {r['prompt']}\n")
+    path = save_record("preview", key, {"theme": str(Path(args.file).resolve()), "prompts": records})
+    print(f"spent ${spent:.3f}; saved to {path}")
+    return 0
+
+
+# ---- meaning -------------------------------------------------------------
+
+JUDGE_SYSTEM = """You judge image prompts written for one visual theme of a daily wallpaper. Each day's wallpaper is meant to show that day's astrological reading as a scene, so different days should look different, and a day under strain should look like one.
+
+You get the prompts in random order, with no dates and no readings. Return a JSON object:
+
+{"prompts": [{"id": <id>, "polarity": "hard" | "soft", "why": "<one short sentence>"}],
+ "favourite_scene": "<one sentence>" | null,
+ "favourite_ids": [<id>, ...],
+ "near_duplicates": [{"ids": [<id>, <id>], "why": "<one short sentence>"}]}
+
+polarity: "hard" if the day was under strain (danger, loss, conflict, pressure, decay, struggle, something failing or turning against someone), "soft" if it was not (ease, care, rest, play, plenty, things going on calmly). Judge by what happens in the scene and how it is lit, not by the theme's usual look. Every prompt gets one.
+
+favourite_scene: this theme's default picture, if it has one: a composition (setting, central subject and what it is doing) that keeps coming back across these prompts whatever the day. null if no composition recurs. favourite_ids: the prompts that are that picture.
+
+near_duplicates: pairs that would make nearly the same wallpaper: the same setting, the same central figure or object, doing the same thing. Sharing the theme's look, its materials or one motif is not a duplicate."""
+
+
+def judge(records, config):
+    model = config.get("stage2Model") or "gpt-4o-mini"
+    order = list(range(len(records)))
+    random.SystemRandom().shuffle(order)
+    ids = {str(i + 1): records[j] for i, j in enumerate(order)}
+    user = "\n\n".join(f"Prompt {i}:\n{r['imagePrompt']}" for i, r in ids.items())
+    result, usage = lp._chat_json(model, JUDGE_SYSTEM, user, "stage2", temperature=0.2)
+    return ids, result, chat_call_cost(model, usage)
+
+
+def judge_cost(model, records_words=8 * 170):
+    rate = mc.load_rates().get("chat", {}).get(model)
+    if not rate:
+        return None
+    tokens_in = len(JUDGE_SYSTEM.split()) * 1.4 + records_words * 1.4
+    return (tokens_in * rate["input"] + 1500 * rate["output"]) / 1_000_000
+
+
+def score(ids, result):
+    by_id = {str(p.get("id")): p for p in result.get("prompts") or [] if isinstance(p, dict)}
+    rows = []
+    for i, rec in ids.items():
+        real = "hard" if rec.get("dialPolarity") == "hard" else "soft"
+        guess = (by_id.get(i) or {}).get("polarity")
+        rows.append({"id": i, "day": rec["day"], "real": real, "guess": guess,
+                     "correct": guess == real, "why": (by_id.get(i) or {}).get("why", ""),
+                     "prompt": rec["imagePrompt"]})
+    favourite = {str(x) for x in result.get("favourite_ids") or []} & set(ids)
+    dups = [d for d in result.get("near_duplicates") or []
+            if isinstance(d, dict) and len({str(x) for x in d.get("ids") or []} & set(ids)) == 2]
+    correct = sum(r["correct"] for r in rows)
+    checks = {
+        "polarity": correct >= MEANING_PASS["polarity"],
+        "duplicates": len(dups) <= MEANING_PASS["duplicates"],
+        "favourite": len(favourite) <= MEANING_PASS["favourite"],
+    }
+    return {"pass": all(checks.values()), "checks": checks, "correct": correct, "total": len(rows),
+            "duplicates": dups, "favourite": sorted(favourite, key=int),
+            "favouriteScene": result.get("favourite_scene"), "rows": rows}
+
+
+def cmd_meaning(args):
+    key = theme_key(args.file)
+    require_usable(key)
+    config = load_config()
+    days = real_days(MEANING_DAYS)
+    if len(days) < MEANING_DAYS:
+        raise StyleError(f"needs {MEANING_DAYS} days of cached readings with a texture; "
+                         f"this machine has {len(days)}")
+    model1 = config.get("stage1Model") or "gpt-4o-mini"
+    model2 = config.get("stage2Model") or "gpt-4o-mini"
+    replay_cost = chat_cost(model1, 2 * MEANING_DAYS, 0)
+    s2 = chat_cost(model2, 0, MEANING_DAYS)
+    jc = judge_cost(model2)
+    total = None if None in (replay_cost, s2, jc) else replay_cost + s2 + jc
+    if not confirm(args, f"meaning: {MEANING_DAYS} real days prompts-only ({model1} / {model2}) "
+                         f"and one judge call on {model2}: {usd(total)}"):
+        return 2
+    log = (lambda *_: None) if args.json else print
+    rows, spent = replay(key, days, config, redraw=True, log=log)
+    ids, result, jcost = judge(rows, config)
+    spent += jcost or 0.0
+    verdict = score(ids, result)
+    verdict.update({"theme": key, "file": str(Path(args.file).resolve()), "judgeModel": model2,
+                    "days": [d[0] for d in days], "spent": round(spent, 4)})
+    verdict["record"] = str(save_record("meaning", key, {**verdict, "judge": result}))
+    if args.json:
+        print(json.dumps(verdict, indent=2))
+    else:
+        print_verdict(verdict)
+    return 0 if verdict["pass"] else 1
+
+
+def print_verdict(v):
+    ok = lambda b: "ok" if b else "FAIL"  # noqa: E731
+    c = v["checks"]
+    print(f"\nMEANING: {'PASS' if v['pass'] else 'FAIL'}  ({v['theme']}, judged by {v['judgeModel']})")
+    print(f"  hard/soft read correctly  {v['correct']}/{v['total']}  "
+          f"(needs {MEANING_PASS['polarity']})   {ok(c['polarity'])}")
+    print(f"  near-duplicate pairs      {len(v['duplicates'])}    "
+          f"(at most {MEANING_PASS['duplicates']})   {ok(c['duplicates'])}")
+    print(f"  favourite scene           {len(v['favourite'])}/{v['total']}  "
+          f"(at most {MEANING_PASS['favourite']})   {ok(c['favourite'])}")
+    if v.get("favouriteScene"):
+        print(f"  the theme's favourite scene: {v['favouriteScene']}")
+    rows = {r["id"]: r for r in v["rows"]}
+    wrong = [r for r in v["rows"] if not r["correct"]]
+    if wrong:
+        print("\nRead wrong (a fix: make the dread, the hard verbs and the light carry strain; "
+              "check no rule forces one mood):")
+        for r in wrong:
+            print(f"  [{r['id']}] a {r['real']} day read as {r['guess']}: {r['why']}\n      {r['prompt']}")
+    if v["duplicates"]:
+        print("\nNear-duplicates (a fix: something in the charter is acting as a menu; "
+              "replace the repeated noun with a span and a principle):")
+        for d in v["duplicates"]:
+            a, b = (str(x) for x in d["ids"])
+            print(f"  [{a}] + [{b}]: {d.get('why', '')}\n      {rows[a]['prompt']}\n      {rows[b]['prompt']}")
+    if not c["favourite"]:
+        print("\nFavourite-scene prompts (a fix: the signature, highlight or a register line "
+              "is forcing one composition; give it a span):")
+        for i in v["favourite"]:
+            print(f"  [{i}] {rows[i]['prompt']}")
+    print(f"\nspent ${v['spent']:.3f}; record: {v['record']}")
+
+
+# ---- render and choose ---------------------------------------------------
+
+def set_preview(file, image):
+    file = Path(file).expanduser().resolve()
+    preview = file.with_suffix(".jpg")
+    tmp = preview.with_name(f".{preview.name}.tmp.jpg")
+    try:
+        thumbnail_jpeg(Path(image), tmp, PREVIEW_PX)
+        tmp.replace(preview)
+    except ImageError as e:
+        raise StyleError(str(e)) from e
+    finally:
+        tmp.unlink(missing_ok=True)
+    return preview
+
+
+def cmd_choose(args):
+    theme_key(args.file)
+    if not Path(args.image).is_file():
+        raise StyleError(f"{args.image} is not a file")
+    print(f"preview: {set_preview(args.file, args.image)}")
+    return 0
+
+
+def render_settings(args, config):
+    model = args.model or config.get("openaiModel") or "gpt-image-1-mini"
+    quality = args.quality or config.get("openaiQuality") or "medium"
+    size = config.get("backgroundSize") or "1600x900"
+    if not re.fullmatch(r"\d+x\d+", size):  # "auto"
+        size = "1600x900"
+    return model, quality, size
+
+
+def render_cost(n, config, model, quality, size):
+    w, h = (int(x) for x in size.split("x"))
+    image, _ = mc.image_cost(model, quality, mc.render_size_for(w, h))
+    text = chat_cost(config.get("stage1Model") or "gpt-4o-mini", 1 + n, 0)
+    s2 = chat_cost(config.get("stage2Model") or "gpt-4o-mini", 0, n)
+    if None in (image, text, s2):
+        return None
+    return image * n + text + s2
+
+
+def cmd_render(args):
+    key = theme_key(args.file)
+    config = load_config()
+    model, quality, size = render_settings(args, config)
+    n = max(1, args.n)
+    cost = render_cost(n, config, model, quality, size)
+    line = f"render: {n} image(s) on {model}, quality {quality}, {size}, plus their prompts: {usd(cost)}"
+    if args.estimate:
+        print(json.dumps({"cost": cost, "n": n, "model": model, "quality": quality, "size": size,
+                          "line": line}) if args.json else line)
+        return 0
+    require_usable(key)
+    if args.json:
+        # The panel shows the cost itself (--estimate), then passes --yes.
+        if not args.yes:
+            print(json.dumps({"ok": False, "error": "needs --yes", "line": line}))
+            return 2
+    elif not confirm(args, line):
+        return 2
+    days = real_days(1)
+    if not days:
+        raise StyleError("no cached daily readings yet; generate a wallpaper first")
+    records, spent = day_prompts(key, days[-1], register_spread(n, key + "render"), config, [])
+    file = Path(args.file).expanduser().resolve()
+    w, h = (int(x) for x in size.split("x"))
+    stamp = f"{datetime.now():%Y%m%d-%H%M%S}"
+    images = []
+    for i, rec in enumerate(records, 1):
+        out = file.with_name(f"{key}-render-{stamp}-{i}.png")
+        try:
+            _, info = openai_generate(rec["finalPrompt"], out, model, quality, w, h)
+        except Exception as e:  # noqa: BLE001 — report it; the others may still render
+            print(f"render {i} failed: {str(e)[:200]}", file=sys.stderr)
+            continue
+        spent += info.get("cost") or 0.0
+        out.with_suffix(".txt").write_text(rec["finalPrompt"] + "\n")
+        images.append(str(out))
+    if not images:
+        raise StyleError("no render succeeded")
+    preview = str(set_preview(file, images[0])) if len(images) == 1 else ""
+    if args.json:
+        print(json.dumps({"ok": True, "images": images, "preview": preview, "spent": round(spent, 4)}))
+        return 0
+    for p in images:
+        print(f"rendered: {p}")
+    if preview:
+        print(f"preview: {preview}")
+    else:
+        print(f"Show them to the user, then: {THIS.name} choose {args.file} <image>")
+    print(f"spent ${spent:.3f}")
+    return 0
+
+
+# ---- import --------------------------------------------------------------
+
+def strip_fences(text):
+    """A chat model's reply: (the TOML inside a ``` block if there is one,
+    the <key>.toml it named before the block, or None)."""
+    m = re.search(r"```[a-zA-Z]*\n(.*?)```", text, re.S)
+    if not m:
+        return text.strip() + "\n", None
+    named = re.findall(r"([a-z0-9][a-z0-9-]*)\.toml", text[:m.start()])
+    return m.group(1).strip() + "\n", (named[-1] if named else None)
+
+
+def slug(text):
+    s = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return s[:40].strip("-")
+
+
+def read_clipboard():
+    try:
+        proc = subprocess.run(["wl-paste", "--no-newline", "--type", "text"],
+                              capture_output=True, timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        raise StyleError("couldn't read the clipboard") from None
+    data = proc.stdout[:IMPORT_MAX_BYTES + 1]
+    if len(data) > IMPORT_MAX_BYTES:
+        raise StyleError("the clipboard holds more than a theme file could")
+    return data.decode("utf-8", "replace")
+
+
+def choose_file():
+    if not shutil.which("zenity"):
+        raise StyleError("choosing a file needs zenity, which is not installed")
+    proc = subprocess.run(["zenity", "--file-selection", "--title=Choose a theme file",
+                           "--file-filter=Theme files | *.toml *.txt", "--file-filter=All files | *"],
+                          capture_output=True, text=True)
+    # zenity exits 1 when the dialog is closed or cancelled.
+    return (proc.stdout.strip() or None) if proc.returncode == 0 else None
+
+
+def fix_block(errors):
+    return ("My Astro-Arc theme failed validation. Fix every error below and return the whole "
+            "corrected TOML file in one code block, nothing else.\n\n"
+            + "\n".join(f"- {e.split(': ', 1)[1] if ': ' in e else e}" for e in errors) + "\n")
+
+
+def cmd_import(args):
+    name = None
+    if args.clipboard:
+        text = read_clipboard()
+    else:
+        path = args.file or choose_file()
+        if not path:
+            print(json.dumps({"ok": True, "cancelled": True}))
+            return 0
+        path = Path(path).expanduser()
+        if path.stat().st_size > IMPORT_MAX_BYTES:
+            raise StyleError(f"{path.name} is larger than a theme file could be")
+        text = path.read_text(errors="replace")
+        name = path.stem
+    text, named = strip_fences(text)
+    name = name or named
+    try:
+        table = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        table = {}
+    key = slug(name) if name else ""
+    if not key or key in ("theme", "style", "untitled"):
+        key = slug(str(table.get("label", ""))) or "my-style"
+    shipped = {p.stem for p in lp.SHIPPED_STYLES_DIR.glob("*.toml")}
+    if key in shipped:
+        key += "-custom"
+    folder = lp.user_styles_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / f"{key}.toml"
+    replaced = target.exists()
+    if replaced:
+        shutil.copy2(target, target.with_name(f"{key}.toml.prev"))
+    target.write_text(text)
+    errors, warnings = lp.validate_charter(theme_key(target))
+    blocking = [e for e in errors if not is_preview_error(e)]
+    print(json.dumps({
+        "ok": True, "key": key, "path": str(target), "replaced": replaced,
+        "label": lp.load_styles()[key].label, "errors": blocking, "warnings": warnings,
+        "needsPreview": any(is_preview_error(e) for e in errors),
+        "fixBlock": fix_block(blocking) if blocking else "",
+    }, indent=2))
+    return 0
+
+
+# ---- prompts for a web chat, and briefs for the default agent ------------
+
+def skill_text():
+    text = SKILL_FILE.read_text()
+    return re.sub(r"\A---\n.*?\n---\n", "", text, flags=re.S).strip()
+
+
+WEB_FOOTER = """You are a chat model with no access to my machine, so skip every workflow step that runs a command: I will import the file in Astro-Arc's panel, which validates it and makes the preview. Do workflow steps 1 and 2 in your head, check the file against every rule, then reply with exactly two things: one line naming the file (<key>.toml), and the whole TOML file in one code block."""
+
+
+def create_prompt(idea):
+    return (f"Write an Astro-Arc theme from this idea: \"{idea}\".\n\n"
+            "Everything you need is in the guide below.\n\n"
+            f"<guide>\n{skill_text()}\n</guide>\n\n{WEB_FOOTER}\n")
+
+
+def fix_prompt(file):
+    key = theme_key(file)
+    errors, _ = lp.validate_charter(key)
+    errors = [e for e in errors if not is_preview_error(e)]
+    return (f"This Astro-Arc theme fails validation. Fix it using the guide below, keeping "
+            f"everything that already works.\n\nErrors:\n"
+            + "\n".join(f"- {e.split(': ', 1)[1]}" for e in errors)
+            + f"\n\nThe file, {Path(file).name}:\n```toml\n{Path(file).read_text()}```\n\n"
+            f"<guide>\n{skill_text()}\n</guide>\n\n{WEB_FOOTER}\n")
+
+
+def copy(text):
+    try:
+        subprocess.run(["wl-copy"], input=text.encode(), check=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        raise StyleError("couldn't copy to the clipboard (wl-copy)") from None
+
+
+def cmd_create_prompt(args):
+    text = create_prompt(args.idea)
+    if args.copy:
+        copy(text)
+        print(json.dumps({"ok": True, "chars": len(text)}))
+    else:
+        print(text)
+    return 0
+
+
+def cmd_fix_prompt(args):
+    text = fix_prompt(args.file)
+    if args.copy:
+        copy(text)
+        print(json.dumps({"ok": True, "chars": len(text)}))
+    else:
+        print(text)
+    return 0
+
+
+def agent_brief(kind, target):
+    folder = lp.user_styles_dir()
+    if kind == "create":
+        task = (f"Create an Astro-Arc theme (a style for the Astro-Arc wallpaper plugin) from this idea:\n\n"
+                f"  {target}\n\nWrite it into {folder}/.")
+    else:
+        key = theme_key(target)
+        errors, _ = lp.validate_charter(key)
+        task = (f"Fix my Astro-Arc theme {Path(target).resolve()}. It fails validation:\n\n"
+                + "\n".join(f"  - {e.split(': ', 1)[1]}" for e in errors)
+                + "\n\nKeep everything that already works.")
+    return f"""{task}
+
+Use the astro-arc-style skill: it has the schema, the writing rules and the workflow, step by step. If your harness has no skill mechanism, read the skill file directly and follow it:
+
+  {SKILL_FILE}
+
+Its command is {THIS}. Ask me before every step that costs money; each one prints its cost first."""
+
+
+def default_agent():
+    try:
+        return subprocess.run(["omarchy-default-agent"], capture_output=True, text=True,
+                              timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def cmd_agent(args):
+    agent = default_agent()
+    if not agent:
+        print(json.dumps({"ok": False, "noAgent": True,
+                          "error": "No default agent is set in Omarchy."}))
+        return 3
+    brief = agent_brief(args.kind, args.target)
+    folder = lp.user_styles_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    # omarchy-agent opens its own terminal; detached so the panel never waits.
+    subprocess.Popen(["omarchy-agent-prompt", brief], cwd=folder, start_new_session=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    print(json.dumps({"ok": True, "agent": agent}))
+    return 0
+
+
+# ---- install-skill -------------------------------------------------------
+
+def cmd_install_skill(args):
+    home = Path.home()
+    linked = []
+    for base in SKILL_HOMES:
+        root = home / base
+        if not root.is_dir():
+            continue
+        link = root / "skills" / SKILL_DIR.name
+        if link.exists() and not link.is_symlink():
+            print(f"skipped {link}: something that is not our link is already there", file=sys.stderr)
+            continue
+        if link.is_symlink() and link.resolve() == SKILL_DIR.resolve():
+            continue
+        link.parent.mkdir(parents=True, exist_ok=True)
+        if link.is_symlink():
+            link.unlink()
+        link.symlink_to(SKILL_DIR)
+        linked.append(str(link))
+    for p in linked:
+        print(f"linked {p}")
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="astro-arc-style", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("validate")
+    p.add_argument("file")
+    p.add_argument("--json", action="store_true")
+    for name in ("preview", "meaning"):
+        p = sub.add_parser(name)
+        p.add_argument("file")
+        p.add_argument("--yes", action="store_true")
+        p.add_argument("--json", action="store_true")
+    p = sub.add_parser("render")
+    p.add_argument("file")
+    p.add_argument("--n", type=int, default=1)
+    p.add_argument("--model")
+    p.add_argument("--quality")
+    p.add_argument("--yes", action="store_true")
+    p.add_argument("--estimate", action="store_true", help="print the projected cost and stop")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("choose")
+    p.add_argument("file")
+    p.add_argument("image")
+    p = sub.add_parser("import")
+    g = p.add_mutually_exclusive_group(required=True)
+    g.add_argument("--file")
+    g.add_argument("--clipboard", action="store_true")
+    g.add_argument("--choose-file", action="store_true")
+    p = sub.add_parser("create-prompt")
+    p.add_argument("idea")
+    p.add_argument("--copy", action="store_true")
+    p = sub.add_parser("fix-prompt")
+    p.add_argument("file")
+    p.add_argument("--copy", action="store_true")
+    p = sub.add_parser("agent")
+    p.add_argument("kind", choices=("create", "fix"))
+    p.add_argument("target", help="the idea (create) or the theme file (fix)")
+    sub.add_parser("install-skill")
+    args = ap.parse_args()
+
+    handler = {"validate": cmd_validate, "preview": cmd_preview, "meaning": cmd_meaning,
+               "render": cmd_render, "choose": cmd_choose, "import": cmd_import,
+               "create-prompt": cmd_create_prompt, "fix-prompt": cmd_fix_prompt,
+               "agent": cmd_agent, "install-skill": cmd_install_skill}[args.cmd]
+    try:
+        return handler(args)
+    except (StyleError, lp.PipelineError) as e:
+        if getattr(args, "json", False) or args.cmd in ("import", "agent") or getattr(args, "copy", False):
+            print(json.dumps({"ok": False, "error": str(e)}))
+        else:
+            print(f"astro-arc-style: {e}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

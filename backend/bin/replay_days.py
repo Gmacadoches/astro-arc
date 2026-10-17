@@ -49,11 +49,12 @@ VERIFY_ROOT = STATE_DIR / "verification"
 CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 
-def load_days(limit, cell):
+def load_days(limit, cell, textured_only=False):
     """(key, stage1, dial) newest-last, each with the dial that actually
     applied that day rather than one recomputed from today's Moon. The base
     dial comes from the day's own stored texture; `cell` (sweep.py's format)
-    stands in for a day that has none (see sweep.dial_for_day)."""
+    stands in for a day that has none (see sweep.dial_for_day), or with
+    `textured_only` the day is skipped, so every dial is one a day really had."""
     out, filled_days = [], []
     for path in sorted(READINGS_DIR.glob("*.json")):
         key = path.stem
@@ -66,48 +67,32 @@ def load_days(limit, cell):
         if not all(reading.get(k) for k in ("reading", "distillation", "narrativePosition")):
             continue
         dial, source = dial_for_day(STATE_DIR, key, cell)
+        if textured_only and source != "texture":
+            continue
         filled_days.append((key, source))
         out.append((key, reading, dial))
     report_filled(filled_days[-limit:], cell)
     return out[-limit:]
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--days", type=int, default=8)
-    ap.add_argument("--out", default="day-variation")
-    ap.add_argument("--cell", default="soft/mid/1/mid",
-                    help="dial cell for a day with no usable stored texture: polarity/intensityBand/multiplicity/exposureBand, as sweep.py --cell")
-    ap.add_argument("--style", default=None)
-    ap.add_argument("--quality", default="medium")
-    ap.add_argument("--no-image", action="store_true")
-    ap.add_argument("--yes", action="store_true")
-    args = ap.parse_args()
+# The dial keys draw_style_choices fills from a charter. A stored day carries
+# the draws of the style it ran on; replaying it on another theme (--redraw,
+# and astro-arc-style meaning) drops them so that theme draws its own.
+STYLE_DRAW_KEYS = ("verbs", "actorVerbs", "activity", "space", "light", "condition", "highlightMode")
 
-    config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
-    style_key = args.style or config.get("artStyle") or "symbolist"
-    lp.require_charter(style_key)
+
+def replay(style_key, days, config, out_dir=None, render=False, quality="medium",
+           redraw=False, log=print):
+    """Replay `days` (load_days) on `style_key` in date order, with the
+    recency pressure accumulating as it would in production. Returns
+    (rows, spent). Writes one JSON per day (and the render) under `out_dir`
+    when it is given; nothing production owns is ever written."""
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     stage2_model = config.get("stage2Model") or "gpt-4o-mini"
     image_model = config.get("openaiModel") or "gpt-image-1-mini"
     width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
-
-    days = load_days(args.days, args.cell)
-    if not days:
-        print(f"No cached daily readings under {READINGS_DIR}.")
-        return 1
-
-    per = 0.012 if args.no_image else 0.025
-    print(f"{len(days)} days on {style_key}, everything varying "
-          f"({'prompts only' if args.no_image else 'with renders'})")
-    print(f"projected cost: about ${len(days) * per:.2f}")
-    if not args.yes:
-        print("\nDry run. Re-run with --yes to spend it.")
-        return 0
-
-    out_dir = VERIFY_ROOT / args.out
-    out_dir.mkdir(parents=True, exist_ok=True)
+    if out_dir is not None:
+        out_dir.mkdir(parents=True, exist_ok=True)
 
     registers = lp.load_registers()
     style_world = lp.load_style_world(style_key)
@@ -117,6 +102,8 @@ def main():
     used_constellations, used_kinds = [], []
 
     for i, (key, stage1, dial) in enumerate(days, start=1):
+        if redraw:
+            dial = {k: v for k, v in dial.items() if k not in STYLE_DRAW_KEYS}
         if "verbs" not in dial:
             # A day with no stored dial: draw from the style's own charter,
             # as build() does for every run.
@@ -159,6 +146,8 @@ def main():
             "anomalyType": amp.get("anomalyType", ""),
             "anomaly": amp.get("anomaly", ""),
             "polarity": (dial.get("tonalDirection") or "")[:14],
+            # The day's real hard/soft, from its stored texture.
+            "dialPolarity": dial.get("polarity", ""),
             "hasPeople": has_people, "promptWords": len(prompt.split()),
             "conceptTags": "|".join(tags), "imagePrompt": prompt,
             # The whole amplification and the final prompt, so a batch can be
@@ -175,21 +164,60 @@ def main():
             "artStyle": style_key,
         }
 
-        if not args.no_image:
+        if render:
             try:
                 _, info = openai_generate(final, out_dir / f"{stem}.png",
-                                          image_model, args.quality, width, height)
+                                          image_model, quality, width, height)
                 total += info.get("cost") or 0.0
             except Exception as exc:  # noqa: BLE001 — one bad render must not end the run
                 row["imageError"] = str(exc)[:200]
                 print(f"    render failed: {str(exc)[:120]}", file=sys.stderr)
 
-        (out_dir / f"{stem}.json").write_text(json.dumps(row, indent=2))
+        if out_dir is not None:
+            (out_dir / f"{stem}.json").write_text(json.dumps(row, indent=2))
         rows.append(row)
         history.insert(0, {"register": primary, "secondaryRegister": secondary,
                            "conceptTags": tags,
                            "timestamp": datetime.now(timezone.utc).isoformat()})
-        print(f"  {key}  {primary[:22]:22} {row['actorKind']:20} {row['family'][:26]}")
+        log(f"  {key}  {primary[:22]:22} {row['actorKind']:20} {row['family'][:26]}")
+    return rows, total
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--days", type=int, default=8)
+    ap.add_argument("--out", default="day-variation")
+    ap.add_argument("--cell", default="soft/mid/1/mid",
+                    help="dial cell for a day with no usable stored texture: polarity/intensityBand/multiplicity/exposureBand, as sweep.py --cell")
+    ap.add_argument("--style", default=None)
+    ap.add_argument("--quality", default="medium")
+    ap.add_argument("--no-image", action="store_true")
+    ap.add_argument("--redraw", action="store_true",
+                    help="draw verbs, light, space and the rest from --style instead of reusing each day's stored draws")
+    ap.add_argument("--yes", action="store_true")
+    args = ap.parse_args()
+
+    config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+    style_key = args.style or config.get("artStyle") or "symbolist"
+    lp.require_charter(style_key)
+
+    days = load_days(args.days, args.cell)
+    if not days:
+        print(f"No cached daily readings under {READINGS_DIR}.")
+        return 1
+
+    per = 0.012 if args.no_image else 0.025
+    print(f"{len(days)} days on {style_key}, everything varying "
+          f"({'prompts only' if args.no_image else 'with renders'})")
+    print(f"projected cost: about ${len(days) * per:.2f}")
+    if not args.yes:
+        print("\nDry run. Re-run with --yes to spend it.")
+        return 0
+
+    out_dir = VERIFY_ROOT / args.out
+    rows, total = replay(style_key, days, config, out_dir=out_dir,
+                         render=not args.no_image, quality=args.quality, redraw=args.redraw)
 
     cols = ["day", "register", "secondary", "actorKind", "actor", "family",
             "anomalyType", "hasPeople", "promptWords", "conceptTags"]

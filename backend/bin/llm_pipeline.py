@@ -476,7 +476,29 @@ def load_styles():
                           f"('{path.stem}') and is ignored; rename the file to use it")
             continue
         themes[path.stem] = _read_theme(path, "user")
+    for path in _DRAFT_THEME_FILES:
+        source = "user" if path.parent == user_dir.resolve() else "draft"
+        themes[path.stem] = _read_theme(path, source)
     return themes
+
+
+# Theme files outside both folders that load_styles() reads too, for the rest
+# of this process: astro-arc-style's draft, which may be written anywhere.
+_DRAFT_THEME_FILES = []
+
+
+def add_draft_theme(path):
+    """Load one more theme file, by its file name, from wherever it is. It
+    takes the place of a user theme with the same key; a shipped key raises
+    ValueError, because a shipped key always means the shipped theme."""
+    path = Path(path).resolve()
+    if path.parent == SHIPPED_STYLES_DIR.resolve():
+        return path.stem  # a shipped theme, already loaded as itself
+    if (SHIPPED_STYLES_DIR / f"{path.stem}.toml").exists():
+        raise ValueError(f"'{path.stem}' is the key of a shipped theme; rename {path.name}")
+    if path not in _DRAFT_THEME_FILES:
+        _DRAFT_THEME_FILES.append(path)
+    return path.stem
 
 
 DEFAULT_STYLE = "symbolist"
@@ -1528,6 +1550,27 @@ def _brief_keys(style_key):
     return {k for k, v in dial.items() if isinstance(v, str)}
 
 
+# Studio and franchise names a theme's model-facing text must not use (the
+# skill's rule; decision 10 is the open question for the shipped ghibli
+# suffix). Historical artists and periods are fine and not listed. A living
+# artist cannot be listed at all, so the skill carries that rule alone.
+PROTECTED_NAMES = ("ghibli", "miyazaki", "pixar", "disney", "dreamworks", "marvel",
+                   "star wars", "pokemon", "pokémon", "nintendo", "warhammer",
+                   "studio trigger", "makoto shinkai")
+
+
+def _theme_strings(value, path=""):
+    """Every string in a theme table, with its field path."""
+    if isinstance(value, str):
+        yield path, value
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            yield from _theme_strings(v, f"{path}.{k}" if path else str(k))
+    elif isinstance(value, list):
+        for v in value:
+            yield from _theme_strings(v, path)
+
+
 def validate_charter(style_key):
     """(errors, warnings) for one theme. An empty error list means the charter
     is complete, the preview exists, and the theme can be used for a run."""
@@ -1669,6 +1712,16 @@ def validate_charter(style_key):
         for band in EXPOSURE_BANDS:
             if band in light and not _text(light[band]):
                 error(f"[light] {band}", "must be non-empty text")
+
+    named = {}
+    for field, text in _theme_strings({k: v for k, v in style.items() if k != "label"}):
+        low = text.lower()
+        for name in PROTECTED_NAMES:
+            if re.search(rf"\b{re.escape(name)}\b", low):
+                named.setdefault(field.split(".")[0], set()).add(name)
+    for field, names in sorted(named.items()):
+        warn(field, f"names a protected studio or franchise ({', '.join(sorted(names))}); "
+                    "describe what the frame looks like instead")
 
     return errors, warnings
 
