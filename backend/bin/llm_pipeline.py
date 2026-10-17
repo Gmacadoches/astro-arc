@@ -451,6 +451,14 @@ def load_style_suffix(style_key, has_people=False):
     return preset.get("suffix", "")
 
 
+def final_image_prompt(image_prompt, style_key, has_people):
+    """Stage 2's prompt joined with the style suffix: exactly what the image
+    model is sent. build() and the sweep/replay harnesses all call this, so a
+    sweep renders the prompt production would."""
+    style_suffix = load_style_suffix(style_key, has_people)
+    return f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
+
+
 # The order the charter's fields are read out to Stage 2. Fixed here rather
 # than taken from the file so every style presents its world the same way, and
 # so adding a field to one charter does not silently change another's shape.
@@ -2474,8 +2482,7 @@ def build(reading, config):
     # value through so a suffix_base/suffix_figures preset (see
     # load_style_suffix) only pays for figure-rendering instructions on a
     # generation that actually has a figure in it.
-    style_suffix = load_style_suffix(style_key, has_people)
-    final_prompt = f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
+    final_prompt = final_image_prompt(image_prompt, style_key, has_people)
 
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),

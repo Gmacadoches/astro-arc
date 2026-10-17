@@ -28,8 +28,7 @@ CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 
 def render(prompt, style, has_people, out_dir, stem, config):
-    suffix = lp.load_style_suffix(style, has_people)
-    final = f"{prompt}, {suffix}" if suffix else prompt
+    final = lp.final_image_prompt(prompt, style, has_people)
     model = config.get("openaiModel") or "gpt-image-1-mini"
     quality = config.get("openaiQuality") or "medium"
     width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))

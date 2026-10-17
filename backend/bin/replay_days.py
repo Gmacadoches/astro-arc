@@ -149,8 +149,7 @@ def main():
             style_world, **kwargs)
         total += c2 or 0.0
 
-        suffix = lp.load_style_suffix(style_key, has_people)
-        final = f"{prompt}, {suffix}" if suffix else prompt
+        final = lp.final_image_prompt(prompt, style_key, has_people)
         stem = f"{i:02d}_{key}"
 
         row = {

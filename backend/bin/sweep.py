@@ -413,8 +413,8 @@ def main():
                 style_world,
             )
 
-        suffix = lp.load_style_suffix(style_key, has_people)
-        final_prompt = f"{prompt}, {suffix}" if suffix else prompt
+        # Production's own join, so a sweep renders what a real run would.
+        final_prompt = lp.final_image_prompt(prompt, style_key, has_people)
 
         # One tier for every sample, the same one production uses. This used to
         # bump figures to "high" and default everything else to "medium", on the

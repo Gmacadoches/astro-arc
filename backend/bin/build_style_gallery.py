@@ -123,7 +123,7 @@ def main():
             highlight=lp.load_style_highlight(key),
         )
         total += cost or 0.0
-        final = prompt + ", " + lp.load_style_suffix(key, has_people)
+        final = lp.final_image_prompt(prompt, key, has_people)
 
         rel = "images/styles/%s.jpg" % key
         if not args.no_image:
