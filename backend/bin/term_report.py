@@ -17,8 +17,8 @@ suffix is identical on every sample and would count as a repeat.
 Reports, for each sweep:
   - how many prompts use each verb phrase from any verb list the pipeline offers
     (inflected forms only, with the phrase's particle or object word nearby):
-    STAGE2_SYSTEM's own actor verbs and every [<style>.verbs] array in
-    styles.toml (the global verb lists went 2026-10-16)
+    STAGE2_SYSTEM's own actor verbs and every theme's [verbs] array in
+    the theme files (the global verb lists went 2026-10-16)
   - how many prompts contain each tracked attractor term
   - what the actor is doing: work, or rest, play, ritual or travel. Classified
     by the configured Stage 2 model, because no word list

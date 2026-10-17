@@ -40,7 +40,6 @@ from paths import GENERATIONS_DIR, GENERATIONS_INDEX  # noqa: E402
 IMAGE_REL = "theme/backgrounds/background.png"
 THUMB_REL = "thumb.jpg"
 THUMB_PX = 640
-STYLES_FILE = Path(__file__).resolve().parents[1] / "pipeline" / "styles.toml"
 
 # Same fixed palette this page always used, kept as the fallback for a
 # review built before --theme-dir existed (no snapshot to read a real
@@ -85,21 +84,14 @@ def _theme_css_vars(theme_dir):
 
 
 def _style_label(style_key):
-    """Resolves a style key (e.g. "ghibli") to its pipeline/styles.toml
-    label (e.g. "Studio Ghibli") for display — falls back to the raw key
-    if styles.toml can't be read or doesn't have it, rather than hiding
-    the art style entirely."""
+    """Resolves a style key (e.g. "ghibli") to its theme's label (e.g.
+    "Studio Ghibli") for display. Falls back to the raw key if the theme is
+    gone or can't be read, rather than hiding the art style entirely."""
     if not style_key:
         return None
-    try:
-        with STYLES_FILE.open("rb") as f:
-            styles = tomllib.load(f)
-        preset = styles.get(style_key)
-        if preset:
-            return preset.get("label", style_key)
-    except (tomllib.TOMLDecodeError, OSError):
-        pass
-    return style_key
+    from llm_pipeline import load_styles  # noqa: PLC0415 - only when a page names a style
+    theme = load_styles().get(style_key)
+    return theme.label if theme else style_key
 
 
 PAGE_TEMPLATE = """<!doctype html><html><head><meta charset="utf-8">

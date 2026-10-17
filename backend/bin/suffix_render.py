@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Render a sweep's Stage 2 prompts again under the style suffix as it is
-NOW in styles.toml — so two renders of the same prompt differ only in the
+NOW in its theme file — so two renders of the same prompt differ only in the
 suffix. Written for STYLE-OVERHAUL Prompt 3 (suffix rewrites); a fresh sweep
 would redraw the material and the prompt and confound the comparison.
 
