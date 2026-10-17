@@ -33,3 +33,6 @@ CHANGELOG.md
 
 # The style-overhaul plan (2026-10-10), a working note like TASK-*.md.
 STYLE-OVERHAUL.md
+
+# /brag launch-video output (video, stills, share copy): local, not plugin code.
+brag-output/
