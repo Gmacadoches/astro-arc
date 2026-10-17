@@ -53,6 +53,7 @@ import hashlib
 import json
 import random
 import re
+import string
 import time
 import sys
 import tomllib
@@ -414,6 +415,23 @@ def load_styles():
         return {}
     with open(path, "rb") as f:
         return tomllib.load(f)
+
+
+DEFAULT_STYLE = "symbolist"
+
+
+def resolve_style_key(key):
+    """The configured `artStyle`, resolved once when a run reads the config.
+    A key styles.toml does not have (stale, or a typo) falls back to
+    DEFAULT_STYLE with a warning rather than failing the day's image; this is
+    the only place an unknown key is forgiven, and every loader below takes a
+    resolved key."""
+    if key and key in load_styles():
+        return key
+    if key:
+        print(f"astro-arc: warning: art style '{key}' is not in styles.toml; "
+              f"using '{DEFAULT_STYLE}'", file=sys.stderr)
+    return DEFAULT_STYLE
 
 
 def load_style_suffix(style_key, has_people=False):
@@ -1634,6 +1652,194 @@ def draw_style_choices(style_key, dial, history, period_key):
     return dial, draws
 
 
+# ---- The charter validator (charter-required, 2026-10-16) ------------------
+#
+# The one place that says what a complete charter is (decision 2 in
+# docs/decisions/2026-10-styles.md). There are no neutral fallbacks any more:
+# the loaders above read a charter as if it were complete, and build() refuses
+# a style this finds errors in before anything is billed. Each error names the
+# style, the field and the rule, so whoever wrote the charter can fix it from
+# the message alone. Warnings are choices the schema allows but advises
+# against (decision 8); they are printed and never block a run.
+
+# The [world] fields a charter must have: everything Stage 2 reads out except
+# `forbids` (optional; no shipped style uses it), plus the highlight.
+CHARTER_WORLD_FIELDS = tuple(k for k, _ in _CHARTER_FIELDS if k != "forbids") + (
+    "highlight", "highlight_modes")
+
+
+def _text(value):
+    return str(value).strip() if isinstance(value, str) else ""
+
+
+def _flat_verbs(value):
+    """A verb array as one list, the actor tables' activities concatenated."""
+    if isinstance(value, dict):
+        return [v for group in value.values() if isinstance(group, list) for v in group]
+    return list(value) if isinstance(value, list) else []
+
+
+def _brief_keys(style_key):
+    """The dial keys a brief rule may use as {placeholders}: the string values
+    of a real dial after this style's draws, which is exactly what
+    _BriefValues hands format_map."""
+    texture = {"polarity": "soft", "intensityBand": "mid", "exposureBand": "mid", "multiplicity": 0}
+    dial = dial_from_texture(texture)
+    try:
+        dial, _ = draw_style_choices(style_key, dial, [], "validate")
+    except Exception:  # an incomplete charter; its errors are reported elsewhere
+        pass
+    return {k for k, v in dial.items() if isinstance(v, str)}
+
+
+def validate_charter(style_key):
+    """(errors, warnings) for one style in styles.toml. An empty error list
+    means the charter is complete and the style can be used for a run."""
+    styles = load_styles()
+    errors, warnings = [], []
+
+    def error(field, rule):
+        errors.append(f"{style_key}: {field}: {rule}")
+
+    def warn(field, note):
+        warnings.append(f"{style_key}: {field}: {note}")
+
+    style = styles.get(style_key)
+    if not isinstance(style, dict):
+        return [f"{style_key}: no such style in styles.toml"], []
+
+    if not _text(style.get("label")):
+        error("label", "required")
+    if not (_text(style.get("suffix")) or _text(style.get("suffix_base"))):
+        error("suffix", "a `suffix` or a `suffix_base` is required")
+
+    def table(name):
+        value = style.get(name)
+        if not isinstance(value, dict):
+            error(f"[{style_key}.{name}]", "table required")
+            return {}
+        return value
+
+    world = table("world")
+    for key in CHARTER_WORLD_FIELDS:
+        if key == "highlight_modes":
+            continue
+        if not _text(world.get(key)):
+            error(f"[world] {key}", "required")
+    if world:
+        modes = world.get("highlight_modes")
+        lo, hi = HIGHLIGHT_MODES_LEN
+        if not isinstance(modes, list):
+            error("[world] highlight_modes", f"required, an array of {lo} to {hi} kinds of wrongness")
+        else:
+            modes = [_text(m) for m in modes]
+            if not all(modes):
+                error("[world] highlight_modes", "every entry must be non-empty text")
+            elif not lo <= len(modes) <= hi:
+                error("[world] highlight_modes", f"has {len(modes)} entries; it needs {lo} to {hi}")
+
+    brief = table("brief")
+    if brief:
+        for key in ("signature", "temper"):
+            if not _text(brief.get(key)):
+                error(f"[brief] {key}", "required")
+        allowed = _brief_keys(style_key)
+        moods = _CAPTION_EMOTION | _CAPTION_MOTIVE | _CAPTION_SIDES
+        for key, rule in brief.items():
+            rule = _text(rule)
+            if not rule:
+                error(f"[brief] {key}", "must be non-empty text")
+                continue
+            fields = {f for _, f, _, _ in string.Formatter().parse(rule) if f}
+            for name in sorted(fields - allowed):
+                error(f"[brief] {key}", f"{{{name}}} is not a value the dial supplies "
+                                        f"({', '.join(sorted(allowed))})")
+            if "failed response" not in rule.lower():
+                warn(f"[brief] {key}", 'has no "failed response" condition')
+            words = set(re.findall(r"[a-z]+", re.sub(r"\{[^}]*\}", " ", rule.lower())))
+            if words & moods:
+                warn(f"[brief] {key}", "requires a mood or relationship "
+                                       f"({', '.join(sorted(words & moods))}); allowed, "
+                                       "but it is the creator's choice, not the chart's")
+
+    verbs = table("verbs")
+    if verbs:
+        lo, hi = VERB_ARRAY_LEN
+        for name in VERB_ARRAYS:
+            raw = verbs.get(name)
+            field = f"[verbs] {name}"
+            if name.startswith("actor_"):
+                if not isinstance(raw, dict):
+                    error(field, f"required, a table keyed by activity ({', '.join(ACTIVITIES)})")
+                    continue
+                unknown = sorted(set(raw) - set(ACTIVITIES))
+                if unknown:
+                    error(field, f"unknown activity {', '.join(unknown)}; use {', '.join(ACTIVITIES)}")
+                present = {k for k in ACTIVITIES if isinstance(raw.get(k), list) and raw.get(k)}
+                missing = [k for k in ("work", "rest", "travel") if k not in present]
+                if missing or not ({"play", "ritual"} & present):
+                    error(field, "needs work, rest and travel, plus play or ritual"
+                                 + (f" (missing {', '.join(missing)})" if missing else ""))
+            elif not isinstance(raw, list):
+                error(field, f"required, an array of {lo} to {hi} verbs")
+                continue
+            values = [_text(v) for v in _flat_verbs(raw)]
+            if not all(values):
+                error(field, "every entry must be non-empty text")
+            if not lo <= len(values) <= hi:
+                error(field, f"has {len(values)} entries; it needs {lo} to {hi}")
+            repeats = sorted({v for v in values if v and values.count(v) > 1})
+            if repeats:
+                error(field, f"repeats {', '.join(repeats)}")
+            for other, other_style in styles.items():
+                if other == style_key or not isinstance(other_style, dict):
+                    continue
+                theirs = other_style.get("verbs")
+                if not isinstance(theirs, dict):
+                    continue
+                shared = sorted(set(values) & {_text(v) for v in _flat_verbs(theirs.get(name))} - {""})
+                if shared:
+                    warn(field, f"shares {', '.join(shared)} with {other}'s {name}")
+
+    registers = style.get("registers")
+    if not isinstance(registers, dict):
+        error(f"[{style_key}.registers]", "table required")
+    else:
+        for register in load_registers():
+            if not _text(registers.get(register)):
+                error(f"[registers] {register}", "required (one line per register in registers.toml)")
+
+    space = style.get("space")
+    lo, hi = SPACE_ARRAY_LEN
+    if not isinstance(space, list):
+        error("space", f"required, an array of {lo} to {hi} depth recipes")
+    elif not all(_text(v) for v in space):
+        error("space", "every recipe must be non-empty text")
+    elif not lo <= len(space) <= hi:
+        error("space", f"has {len(space)} recipes; it needs {lo} to {hi}")
+
+    light = table("light")
+    if light:
+        if set(light) != set(EXPOSURE_BANDS):
+            error(f"[{style_key}.light]", f"needs exactly {', '.join(EXPOSURE_BANDS)} "
+                                         f"(has {', '.join(sorted(light)) or 'nothing'})")
+        for band in EXPOSURE_BANDS:
+            if band in light and not _text(light[band]):
+                error(f"[light] {band}", "must be non-empty text")
+
+    return errors, warnings
+
+
+def require_charter(style_key):
+    """validate_charter for a run: print the warnings, refuse on any error."""
+    errors, warnings = validate_charter(style_key)
+    for line in warnings:
+        print(f"astro-arc: style warning: {line}", file=sys.stderr)
+    if errors:
+        raise PipelineError(f"Style '{style_key}' has an incomplete charter and cannot be used "
+                            "for a run:\n  " + "\n  ".join(errors))
+
+
 # The anomaly (2026-09-12, was "intrusion"): it used to be an object from "a
 # completely different world... a different century, a different technology, a
 # different order of reality." That produced a genuine category error no rendering
@@ -2478,7 +2684,8 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
 def build(reading, config):
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     stage2_model = config.get("stage2Model") or "gpt-4o-mini"
-    style_key = config.get("artStyle") or "symbolist"
+    style_key = resolve_style_key(config.get("artStyle"))
+    require_charter(style_key)
     period_key = reading["arc"]["periodKey"]
 
     # The dial has to exist BEFORE Stage 1.5, because it sets how many objects to

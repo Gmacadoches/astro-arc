@@ -178,6 +178,8 @@ def main():
     if args.stage2_model:
         config["stage2Model"] = args.stage2_model
     style_key = args.style or config.get("artStyle") or "symbolist"
+    if hasattr(lp, "require_charter"):
+        lp.require_charter(style_key)
     image_model = args.image_model or config.get("openaiModel") or "gpt-image-1-mini"
     size = args.size or config.get("backgroundSize") or "1600x900"
     width, height = (int(x) for x in size.split("x"))

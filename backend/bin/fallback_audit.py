@@ -278,6 +278,22 @@ def install_stubs(state_dir, cache_styles, control_style):
         actors = lp._load_actors()
         lp._load_actors = lambda: actors
 
+    # build() validates the charter on every run. Validate each style once
+    # instead, so 1,120 runs do not print the same warnings 1,120 times, and
+    # keep the warnings for fallbacks.json. Errors still refuse the run.
+    if hasattr(lp, "require_charter"):
+        checked = {}
+
+        def require_charter(style_key):
+            if style_key not in checked:
+                checked[style_key] = lp.validate_charter(style_key)
+            errors, _ = checked[style_key]
+            if errors:
+                raise lp.PipelineError(f"Style '{style_key}' has an incomplete charter: "
+                                       + "; ".join(errors))
+        lp.require_charter = require_charter
+        AUDIT.charters = checked
+
 
 def seed_stage1_cache(config):
     lp.READINGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -318,6 +334,18 @@ def run_style(style_key, registers, out):
             AUDIT.registers = (primary, secondary)
             AUDIT.captured = []
             reading = {"arc": {"periodKey": PERIOD_KEY, "frequency": "daily", "texture": texture}}
+            if style_key == CONTROL_STYLE and hasattr(lp, "require_charter"):
+                # Since charter-required, an unchartered style must be refused
+                # before anything is billed. That refusal is the control.
+                try:
+                    lp.build(reading, config)
+                except lp.PipelineError as exc:
+                    AUDIT.hit("require_charter", "refused the unchartered control")
+                    out.write(json.dumps({"style": style_key, "cell": cell_name, "primary": primary,
+                                          "secondary": secondary, "refused": str(exc)},
+                                         sort_keys=True, ensure_ascii=False) + "\n")
+                    continue
+                raise SystemExit("the unchartered control was not refused")
             lp.build(reading, config)
             if len(AUDIT.captured) != 1:
                 raise SystemExit(f"{style_key} {cell_name}: expected one Stage 2 call, "
@@ -374,6 +402,8 @@ def main():
         "chatCalls": dict(AUDIT.chat_calls),
         "firedForShippedStyles": shipped_fired,
         "firedOnlyForControl": control_only,
+        "charterWarnings": {k: w for k, (_, w) in sorted(getattr(AUDIT, "charters", {}).items())
+                            if k != CONTROL_STYLE},
         "seconds": round(time.monotonic() - started, 1),
     }
     (out_dir / "fallbacks.json").write_text(json.dumps(summary, indent=2, sort_keys=True))

@@ -87,6 +87,7 @@ def main():
 
     config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
     style_key = args.style or config.get("artStyle") or "symbolist"
+    lp.require_charter(style_key)
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     stage2_model = config.get("stage2Model") or "gpt-4o-mini"
     image_model = config.get("openaiModel") or "gpt-image-1-mini"
