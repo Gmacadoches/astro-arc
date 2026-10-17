@@ -53,6 +53,7 @@ Panel {
     costsFile.reload()
     loadModelCatalogIfStale()
     loadStyleCatalog()
+    defaultAgentProc.running = true
   }
 
   function openFromHotkey() {
@@ -949,6 +950,14 @@ Panel {
 
   function pickArtStyle(value) {
     root.styleActionStatus = ""
+    if (value === Model.STYLE_CREATE || value === Model.STYLE_IMPORT) {
+      root.styleCreateMode = value === Model.STYLE_CREATE ? "create" : "import"
+      root.styleImportResult = null
+      root.styleNoAgent = false
+      styleDropdown.value = root.shownStyleKey
+      return
+    }
+    root.styleCreateMode = ""
     var row = Model.findStyle(root.styleCatalog, value)
     if (row && !row.valid) {
       root.inspectedStyleKey = value
@@ -964,13 +973,191 @@ Panel {
     artStyleWriteProc.running = true
   }
 
-  // "Fix with AI" and "Copy fix prompt" both copy the theme's file path and
-  // its errors for now; Prompt 5 gives each its real job.
-  function copyStyleFix(row) {
+  // ---- Create your own style (decision 9). The plugin never asks a model
+  // to write a theme: "Create" briefs the user's Omarchy default agent with
+  // the astro-arc-style skill, "Copy prompt" builds one self-contained prompt
+  // for a web chat, and "Import theme" brings the chat's TOML back in. All of
+  // it is backend/bin/astro-arc-style. ------------------------------------
+  readonly property string styleBin: binDir + "/astro-arc-style"
+  // "", "create" or "import": which of the two forms is open.
+  property string styleCreateMode: ""
+  property string styleIdeaDraft: ""
+  // omarchy-default-agent's answer; "" when none is set.
+  property string defaultAgent: ""
+  // An agent launch found no default agent: the form shows the copy path.
+  property bool styleNoAgent: false
+  // astro-arc-style import's JSON: {key, path, label, errors, needsPreview, fixBlock, ...}.
+  property var styleImportResult: null
+  // render --estimate's JSON for the theme being given a preview.
+  property var styleRenderEstimate: null
+  property string styleRenderKey: ""
+
+  function setStyleStatus(text, isError) {
+    root.styleActionStatus = text
+    root.styleActionStatusIsError = isError === true
+  }
+
+  function runStyle(proc, args) {
+    if (proc.running) return
+    root.styleActionStatus = ""
+    proc.command = [root.python, root.styleBin].concat(args)
+    proc.running = true
+  }
+
+  function createStyleWithAgent() {
+    var idea = root.styleIdeaDraft.trim()
+    if (idea === "") { setStyleStatus("Describe the style in one line first.", true); return }
+    root.runStyle(styleAgentProc, ["agent", "create", idea])
+  }
+
+  function copyCreatePrompt() {
+    var idea = root.styleIdeaDraft.trim()
+    if (idea === "") { setStyleStatus("Describe the style in one line first.", true); return }
+    styleCopyProc.doneText = "Copied. Paste it into any chat model, then bring its reply back with Import theme."
+    root.runStyle(styleCopyProc, ["create-prompt", idea, "--copy"])
+  }
+
+  // Replaces Prompt 4's stubs: "Fix with AI" briefs the default agent with
+  // the file and its errors, "Copy fix prompt" does the same for a web chat.
+  function fixStyleWithAgent(row) {
     if (!row) return
-    Quickshell.execDetached(["wl-copy", Model.styleFixText(row)])
-    root.styleActionStatus = "Copied the theme file's path and its errors to the clipboard."
-    root.styleActionStatusIsError = false
+    root.runStyle(styleAgentProc, ["agent", "fix", row.path])
+  }
+
+  function copyStyleFixPrompt(row) {
+    if (!row) return
+    styleCopyProc.doneText = "Copied. Paste it into your chat model, then Import theme with the corrected file."
+    root.runStyle(styleCopyProc, ["fix-prompt", row.path, "--copy"])
+  }
+
+  function copyImportErrors() {
+    if (!root.styleImportResult) return
+    Quickshell.execDetached(["wl-copy", root.styleImportResult.fixBlock])
+    setStyleStatus("Copied. Paste it back into your chat.", false)
+  }
+
+  function importStyle(fromClipboard) {
+    root.styleImportResult = null
+    root.runStyle(styleImportProc, ["import", fromClipboard ? "--clipboard" : "--choose-file"])
+  }
+
+  // A preview by render: the cost first (--estimate), then a click to spend it.
+  function estimateStyleRender(row) {
+    if (!row) return
+    root.styleRenderKey = row.key
+    root.styleRenderEstimate = null
+    root.runStyle(styleEstimateProc, ["render", row.path, "--estimate", "--json"])
+  }
+
+  function renderStylePreview() {
+    var row = Model.findStyle(root.styleCatalog, root.styleRenderKey)
+    var path = row ? row.path : (root.styleImportResult ? root.styleImportResult.path : "")
+    if (path === "") return
+    root.runStyle(styleRenderProc, ["render", path, "--yes", "--json"])
+  }
+
+  function styleRenderButtonText() {
+    if (styleRenderProc.running) return "Rendering…"
+    var e = root.styleRenderEstimate
+    if (!e) return "Render a preview"
+    return "Render a preview (" + (typeof e.cost === "number" ? "about " + Model.formatUsd(e.cost) : "cost unknown") + ")"
+  }
+
+  function parseStyleJson(text) {
+    try { return JSON.parse(String(text || "")) } catch (e) { return null }
+  }
+
+  // Install/update: link the skill where Omarchy's agents read skills. Run on
+  // every load, so an update (which needs a shell restart) re-links it.
+  Component.onCompleted: Quickshell.execDetached([root.python, root.styleBin, "install-skill"])
+
+  Process {
+    id: defaultAgentProc
+    command: ["omarchy-default-agent"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.defaultAgent = String(text || "").trim()
+    }
+  }
+
+  Process {
+    id: styleAgentProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) {
+          root.setStyleStatus(Model.agentLabel(r.agent) + " is opening in a terminal with the astro-arc-style skill. "
+            + "It asks before anything that costs money.", false)
+        } else if (r && r.noAgent) {
+          root.defaultAgent = ""
+          root.styleNoAgent = true
+          root.setStyleStatus("No default agent is set in Omarchy, so use Copy prompt with any chat model instead "
+            + "(or set one with: omarchy default agent).", true)
+        } else {
+          root.setStyleStatus((r && r.error) || "Couldn't open the agent.", true)
+        }
+      }
+    }
+  }
+
+  Process {
+    id: styleCopyProc
+    property string doneText: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) root.setStyleStatus(styleCopyProc.doneText, false)
+        else root.setStyleStatus((r && r.error) || "Couldn't build the prompt.", true)
+      }
+    }
+  }
+
+  Process {
+    id: styleImportProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok && r.cancelled) return
+        if (!r || !r.ok) { root.setStyleStatus((r && r.error) || "Couldn't import the theme.", true); return }
+        root.styleImportResult = r
+        root.styleRenderKey = r.key
+        root.styleRenderEstimate = null
+        root.loadStyleCatalog()
+        if (r.errors.length === 0 && r.needsPreview) root.runStyle(styleEstimateProc, ["render", r.path, "--estimate", "--json"])
+        if (r.errors.length === 0 && !r.needsPreview)
+          root.setStyleStatus("“" + r.label + "” is ready: pick it from the Style list.", false)
+      }
+    }
+  }
+
+  Process {
+    id: styleEstimateProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.styleRenderEstimate = root.parseStyleJson(text)
+    }
+  }
+
+  Process {
+    id: styleRenderProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) {
+          root.setStyleStatus("Preview rendered (spent " + Model.formatUsd(r.spent) + "). The theme is ready: pick it from the Style list.", false)
+          root.styleRenderEstimate = null
+          root.styleImportResult = null
+          root.stylePreviewVersion++
+          root.loadStyleCatalog()
+        } else {
+          root.setStyleStatus((r && r.error) || "The render failed.", true)
+        }
+      }
+    }
   }
 
   // Both write <key>.jpg into a user theme's folder; shipped previews are
@@ -1026,6 +1213,8 @@ Panel {
         try { result = JSON.parse(String(text || "")) } catch (e) {}
         if (result && result.ok && result.cancelled) return
         if (result && result.ok) {
+          root.styleImportResult = null
+          root.styleRenderEstimate = null
           root.styleActionStatus = "Preview updated."
           root.styleActionStatusIsError = false
           root.stylePreviewVersion++
@@ -2622,9 +2811,7 @@ Panel {
               anchors.verticalCenter: parent.verticalCenter
               showLabel: false
               value: root.shownStyleKey
-              options: root.styleCatalog.map(function(s) {
-                return { value: s.key, label: Model.styleOptionLabel(s) }
-              })
+              options: Model.styleDropdownOptions(root.styleCatalog)
               foreground: root.bar.foreground
               onChanged: function(value) { root.pickArtStyle(value) }
             }
@@ -2720,19 +2907,39 @@ Panel {
               spacing: Style.space(8)
 
               Button {
-                text: "Fix with AI"
+                visible: !Model.styleOnlyNeedsPreview(root.failedStyle) && root.defaultAgent !== ""
+                text: styleAgentProc.running ? "Opening…" : "Fix with AI"
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
-                onClicked: root.copyStyleFix(root.failedStyle)
+                enabled: !styleAgentProc.running
+                onClicked: root.fixStyleWithAgent(root.failedStyle)
               }
 
               Button {
+                visible: !Model.styleOnlyNeedsPreview(root.failedStyle)
                 text: "Copy fix prompt"
                 bordered: true
                 fontSize: Style.font.caption
                 foreground: root.bar.foreground
-                onClicked: root.copyStyleFix(root.failedStyle)
+                enabled: !styleCopyProc.running
+                onClicked: root.copyStyleFixPrompt(root.failedStyle)
+              }
+
+              // Missing only its preview: render one, cost shown first.
+              Button {
+                visible: root.failedStyle !== null && root.failedStyle.source === "user"
+                  && Model.styleOnlyNeedsPreview(root.failedStyle)
+                text: root.styleRenderKey === (root.failedStyle ? root.failedStyle.key : "") && root.styleRenderEstimate
+                  ? root.styleRenderButtonText() : "Render a preview…"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !styleRenderProc.running && !styleEstimateProc.running
+                onClicked: {
+                  if (root.styleRenderKey === root.failedStyle.key && root.styleRenderEstimate) root.renderStylePreview()
+                  else root.estimateStyleRender(root.failedStyle)
+                }
               }
 
               // A missing preview is itself a validation error, so a failed
@@ -2745,6 +2952,239 @@ Panel {
                 foreground: root.bar.foreground
                 enabled: !stylePreviewProc.running
                 onClicked: root.changeStylePreview(root.failedStyle.key)
+              }
+            }
+          }
+
+          // ---- Create your own style: one line, then the default agent or a
+          // prompt for any chat model. -------------------------------------
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.styleCreateMode === "create"
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: "Describe the style in one line"
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.bodySmall
+            }
+
+            ClipboardSafeField {
+              id: styleIdeaField
+              width: parent.width
+              maximumLength: 200
+              placeholderText: "e.g. 1920s art deco travel posters"
+              foreground: root.bar.foreground
+              font.family: root.bar.fontFamily
+              text: root.styleIdeaDraft
+              onTextChanged: root.styleIdeaDraft = text
+              Keys.onReturnPressed: root.defaultAgent !== "" ? root.createStyleWithAgent() : root.copyCreatePrompt()
+              Keys.onEnterPressed: root.defaultAgent !== "" ? root.createStyleWithAgent() : root.copyCreatePrompt()
+            }
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: root.defaultAgent !== "" && !root.styleNoAgent
+                ? "Create opens " + Model.agentLabel(root.defaultAgent) + " in a terminal to write the theme with you. "
+                  + "Checking it and rendering its preview use your API key, and it asks before each. "
+                  + "Copy prompt is for a chat model on the web instead."
+                : "No default agent is set in Omarchy. Copy prompt puts everything a chat model needs on the "
+                  + "clipboard; paste it into any chat, then bring the file it writes back with Import theme."
+              color: Qt.darker(root.bar.foreground, 1.5)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Row {
+              spacing: Style.space(8)
+
+              Button {
+                visible: root.defaultAgent !== "" && !root.styleNoAgent
+                text: styleAgentProc.running ? "Opening…" : "Create with " + Model.agentLabel(root.defaultAgent)
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !styleAgentProc.running
+                onClicked: root.createStyleWithAgent()
+              }
+
+              Button {
+                text: "Copy prompt"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !styleCopyProc.running
+                onClicked: root.copyCreatePrompt()
+              }
+
+              Button {
+                text: "Import theme…"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                onClicked: { root.styleCreateMode = "import"; root.styleImportResult = null }
+              }
+
+              Button {
+                text: "Close"
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                onClicked: root.styleCreateMode = ""
+              }
+            }
+          }
+
+          // ---- Import theme: the TOML a chat model wrote, from the clipboard
+          // or a file, saved to ~/.config/astro-arc/styles and validated. ----
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.styleCreateMode === "import"
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: "Copy the theme your chat model wrote (the whole TOML file, code fences are fine), "
+                + "or choose a .toml file. It is saved to your styles folder and checked."
+              color: Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Row {
+              spacing: Style.space(8)
+
+              Button {
+                text: styleImportProc.running ? "Importing…" : "Import from clipboard"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !styleImportProc.running
+                onClicked: root.importStyle(true)
+              }
+
+              Button {
+                text: "Choose file…"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !styleImportProc.running
+                onClicked: root.importStyle(false)
+              }
+
+              Button {
+                text: "Close"
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                onClicked: { root.styleCreateMode = ""; root.styleImportResult = null }
+              }
+            }
+
+            // Failed: the errors as one block to paste back into the chat.
+            Column {
+              width: parent.width
+              spacing: Style.space(6)
+              visible: root.styleImportResult !== null && root.styleImportResult.errors.length > 0
+
+              Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: root.styleImportResult
+                  ? "“" + root.styleImportResult.label + "” was saved but failed validation. Paste this back into your chat:"
+                  : ""
+                color: root.bar.urgent || "#f38ba8"
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Rectangle {
+                width: parent.width
+                height: importErrorsText.implicitHeight + Style.space(12)
+                color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.06)
+                border.width: 1
+                border.color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.2)
+
+                Text {
+                  id: importErrorsText
+                  anchors.fill: parent
+                  anchors.margins: Style.space(6)
+                  wrapMode: Text.WordWrap
+                  text: root.styleImportResult ? root.styleImportResult.fixBlock : ""
+                  color: root.bar.foreground
+                  font.family: "monospace"
+                  font.pixelSize: Style.font.caption
+                }
+              }
+
+              Row {
+                spacing: Style.space(8)
+
+                Button {
+                  text: "Copy errors"
+                  bordered: true
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  onClicked: root.copyImportErrors()
+                }
+
+                Button {
+                  visible: root.defaultAgent !== ""
+                  text: styleAgentProc.running ? "Opening…" : "Fix with AI"
+                  bordered: true
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  enabled: !styleAgentProc.running
+                  onClicked: root.fixStyleWithAgent(root.styleImportResult)
+                }
+              }
+            }
+
+            // Valid but for its preview: render one (cost first) or pick an image.
+            Column {
+              width: parent.width
+              spacing: Style.space(6)
+              visible: root.styleImportResult !== null && root.styleImportResult.errors.length === 0
+                && root.styleImportResult.needsPreview
+
+              Text {
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: root.styleImportResult
+                  ? "“" + root.styleImportResult.label + "” is valid. It needs a preview image: render one "
+                    + "with your image model and settings"
+                    + (root.styleRenderEstimate && root.styleRenderEstimate.line ? " (" + root.styleRenderEstimate.model
+                       + ", " + root.styleRenderEstimate.quality + ")" : "")
+                    + ", or choose an image you have."
+                  : ""
+                color: Qt.darker(root.bar.foreground, 1.3)
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Row {
+                spacing: Style.space(8)
+
+                Button {
+                  text: root.styleRenderButtonText()
+                  bordered: true
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  enabled: root.styleRenderEstimate !== null && !styleRenderProc.running
+                  onClicked: root.renderStylePreview()
+                }
+
+                Button {
+                  text: stylePreviewProc.running ? "Choosing…" : "Choose an image…"
+                  bordered: true
+                  fontSize: Style.font.caption
+                  foreground: root.bar.foreground
+                  enabled: !stylePreviewProc.running && !styleRenderProc.running
+                  onClicked: root.changeStylePreview(root.styleImportResult.key)
+                }
               }
             }
           }

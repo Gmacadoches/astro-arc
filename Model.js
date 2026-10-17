@@ -137,12 +137,33 @@ function missingStyleWarning(key) {
   return "art style '" + key + "' is not an installed theme; using '" + DEFAULT_ART_STYLE + "'"
 }
 
-// What "Fix with AI" and "Copy fix prompt" put on the clipboard for now: the
-// theme file and what is wrong with it. Prompt 5 replaces both actions.
-function styleFixText(row) {
-  if (!row) return ""
-  return "Theme file: " + row.path + "\n\nValidation errors:\n"
-    + (row.errors || []).map(function(e) { return "- " + e }).join("\n") + "\n"
+// The Style dropdown's two actions, listed after the themes. Their values can
+// never be a theme key (keys are lowercase letters, digits and hyphens).
+var STYLE_CREATE = "__create__"
+var STYLE_IMPORT = "__import__"
+
+function styleDropdownOptions(rows) {
+  return (rows || []).map(function(s) { return { value: s.key, label: styleOptionLabel(s) } })
+    .concat([{ value: STYLE_CREATE, label: "Create your own style…" },
+             { value: STYLE_IMPORT, label: "Import theme…" }])
+}
+
+// A failed theme whose only error is the missing preview: it needs an image,
+// not a fix.
+function styleOnlyNeedsPreview(row) {
+  var errors = (row && row.errors) || []
+  return errors.length > 0 && errors.every(function(e) { return e.indexOf(": preview: ") !== -1 })
+}
+
+// omarchy-default-agent's names, as Omarchy's own menu shows them.
+var AGENT_NAMES = {
+  pi: "Pi", omp: "Oh My Pi", opencode: "OpenCode", claude: "Claude Code", codex: "Codex",
+  crush: "Crush", grok: "Grok", gemini: "Gemini", openclaw: "OpenClaw", hermes: "Hermes",
+  copilot: "GitHub Copilot", muse: "Muse Code", "cursor-agent": "Cursor CLI"
+}
+
+function agentLabel(agent) {
+  return AGENT_NAMES[agent] || agent || ""
 }
 
 // ---- Model catalog labels -------------------------------------------------
@@ -696,7 +717,11 @@ if (typeof module !== "undefined") {
     findStyle: findStyle,
     reviewStyleKey: reviewStyleKey,
     missingStyleWarning: missingStyleWarning,
-    styleFixText: styleFixText,
+    STYLE_CREATE: STYLE_CREATE,
+    STYLE_IMPORT: STYLE_IMPORT,
+    styleDropdownOptions: styleDropdownOptions,
+    styleOnlyNeedsPreview: styleOnlyNeedsPreview,
+    agentLabel: agentLabel,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,
