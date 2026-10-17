@@ -22,7 +22,7 @@ myths and rules: what lives there, how it goes dark, what the eye should find
 first, and the one thing that marks a picture as unmistakably that world. The
 same day's reading, rendered in each:
 
-| Studio Ghibli | Cyberpunk | Cosmic |
+| Hand-Painted Anime | Cyberpunk | Cosmic |
 | --- | --- | --- |
 | ![A river god in work clothes wades past a beached handcart, dragging a net of washbasins and stove lids](docs/images/styles/ghibli.jpg) | ![A carp with a camera lens grown into its skull noses a storm-drain grate while a junction-box spirit receives incense](docs/images/styles/cyberpunk.jpg) | ![The constellation Cancer as a world-sized crab of rock and hull plate over a floating island, its water pouring off the edge into violet space](docs/images/styles/cosmic.jpg) |
 | **Antique Engraving** | **Ukiyo-e** | **Symbolist** |

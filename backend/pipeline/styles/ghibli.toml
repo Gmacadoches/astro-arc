@@ -136,7 +136,7 @@
 # keep out Ghibli's near-realist films. Research:
 # verification/charter-ghibli/research.md.
 
-label = "Studio Ghibli"
+label = "Hand-Painted Anime"
 # SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1). One recipe is drawn per run,
 # never one of this style's last 2, and replaced OPENNESS in the brief together
 # with the WALLPAPER rule every [space] style shares (see

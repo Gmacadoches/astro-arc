@@ -4,11 +4,11 @@ Each style in [`backend/pipeline/styles/`](../backend/pipeline/styles/) is a tec
 
 Every image below is the **same day's reading** and the **same material register** (`aquatic`), rendered at the same settings. Each world built its own scene from them: that is the point. Change the style from the widget's Style dropdown; the file is read fresh on every generation.
 
-## Studio Ghibli
+## Hand-Painted Anime
 
 `ghibli`
 
-![Studio Ghibli](images/styles/ghibli.jpg)
+![Hand-Painted Anime](images/styles/ghibli.jpg)
 
 **The world.** Early-industrial in feeling, with engineering that is impossible and that nobody minds: machines walk, fly and have faces, and a building may have legs. Everything is hand-built, far oversized for its job, and kept running by someone who loves it. Technology here is a character, not a backdrop.
 
