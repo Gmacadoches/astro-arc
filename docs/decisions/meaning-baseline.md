@@ -19,19 +19,12 @@ no dates or readings. Records (every prompt, the judge's reply) are in
 | cyberpunk | **FAIL** | 7/8 | 0 | 4/8 | $0.28 | `cyberpunk-20261017-091612.json` |
 | engraving | PASS | 7/8 | 0 | 0/8 | $0.25 | `engraving-20261017-091423.json` |
 | ghibli | PASS | 7/8 | 0 | 2/8 | $0.26 | `ghibli-20261017-091604.json` |
-| illuminated | not run | | | | | |
-| symbolist | not run | | | | | |
-| ukiyoe | not run | | | | | |
+| illuminated | PASS | 8/8 | 1 | 0/8 | $0.24 | `illuminated-20261017-102735.json` |
+| symbolist | PASS | 6/8 | 0 | 0/8 | $0.24 | `symbolist-20261017-102806.json` |
+| ukiyoe | PASS | 8/8 | 0 | 2/8 | $0.24 | `ukiyoe-20261017-102939.json` |
 
-**Not run: illuminated, symbolist, ukiyoe.** The OpenAI account ran out of
-credit during their replays (429 `credit_balance_exhausted`), so nothing was
-recorded for them. Run them once credit is added and fill in their rows:
-
-```sh
-for k in illuminated symbolist ukiyoe; do
-  backend/bin/astro-arc-style meaning backend/pipeline/styles/$k.toml --yes
-done
-```
+illuminated, symbolist and ukiyoe ran later the same day, after OpenAI credit
+was added; the same 8 days.
 
 ## Failures
 
@@ -39,10 +32,24 @@ done
 
 ## Notes
 
-- Hard/soft is the strongest signal: every theme run reads 7 or 8 of 8 right.
+- Six of seven pass. Two pass at the edge of the bar: symbolist reads
+  hard/soft 6/8, illuminated has 1 near-duplicate pair. ukiyoe's favourite
+  scene is 2/8 (a post-road station seen from a boat), also at the edge.
+- Hard/soft is the strongest signal: six of seven themes read 7 or 8 of 8
+  right; symbolist reads 6.
   The misses: engraving, a soft day read hard (the day's material was rot in a
   ship's stores); cyberpunk, a hard day read soft (shelter and sleep under the
   dark); ghibli, a soft day read hard (the highlight's wrongness read as
   menace).
 - The registers walk in cold-start order (botanical, bodily, ...) because the
   replay's history starts empty; the same 8 registers for every theme.
+
+## Created themes (the create-your-own-style verification)
+
+Two themes written from one line each, through the two create paths, then
+`preview`, `meaning` and `render` on the same 8 days:
+
+| Theme | Path | Verdict | Hard/soft right | Near-dup pairs | Favourite scene |
+|---|---|---|---|---|---|
+| deco-travel | default agent (Claude Code) with the skill | PASS | 8/8 | 0 | 0/8 |
+| persian-miniature | Copy prompt, a fresh model with no tools | PASS | 8/8 | 0 | 0/8 |

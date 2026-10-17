@@ -37,6 +37,7 @@ still needs to know how many tokens a tier burns.
 """
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -150,6 +151,17 @@ def load_learned_usage():
         return {}
 
 
+def _write_learned(learned):
+    """Write the file whole, by rename. Written in place, a second process
+    reading it mid-write got a partial file, load_learned_usage() read that
+    as {}, and its next write replaced every measurement with one entry: two
+    parallel astro-arc-style runs did exactly that on 2026-10-17."""
+    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = LEARNED_USAGE_FILE.with_name(f".{LEARNED_USAGE_FILE.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(learned, indent=2))
+    tmp.replace(LEARNED_USAGE_FILE)
+
+
 def usage_key(model, quality, size):
     """Token consumption depends on all three, so a measurement is only valid
     for the exact combination it was measured on."""
@@ -185,8 +197,7 @@ def record_usage(model, quality, size, usage):
         "history": history,
         "measuredAt": datetime.now(timezone.utc).isoformat(),
     }
-    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    _write_learned(learned)
     return learned[usage_key(model, quality, size)]
 
 
@@ -231,8 +242,7 @@ def record_stage_usage(stage, model, usage):
         "reasoningTokens": reasoning,
         "measuredAt": datetime.now(timezone.utc).isoformat(),
     }
-    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    _write_learned(learned)
     return stages[stage][model]
 
 
@@ -388,8 +398,7 @@ def get_capability(model, name, learned=None):
 def set_capability(model, name, value):
     learned = load_learned_usage()
     learned.setdefault("capabilities", {}).setdefault(model, {})[name] = value
-    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    _write_learned(learned)
     return value
 
 

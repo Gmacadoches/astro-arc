@@ -759,6 +759,13 @@ def main():
                "agent": cmd_agent, "install-skill": cmd_install_skill}[args.cmd]
     try:
         return handler(args)
+    except (OSError, TimeoutError) as e:  # a stalled or dropped API connection
+        e = StyleError(f"the API connection failed ({e}); nothing after it ran, so re-run the command")
+        if getattr(args, "json", False) or args.cmd in ("import", "agent"):
+            print(json.dumps({"ok": False, "error": str(e)}))
+        else:
+            print(f"astro-arc-style: {e}", file=sys.stderr)
+        return 1
     except (StyleError, lp.PipelineError) as e:
         if getattr(args, "json", False) or args.cmd in ("import", "agent") or getattr(args, "copy", False):
             print(json.dumps({"ok": False, "error": str(e)}))
