@@ -39,6 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
+from sweep import texture_for_cell  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import STATE_DIR  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402
@@ -48,9 +49,11 @@ VERIFY_ROOT = STATE_DIR / "verification"
 CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 
-def load_days(limit):
+def load_days(limit, cell):
     """(key, stage1, dial) newest-last, each with the dial that actually
-    applied that day rather than one recomputed from today's Moon."""
+    applied that day rather than one recomputed from today's Moon. `cell`
+    (sweep.py's format) builds the dial underneath, for a day with no stored
+    dial."""
     out = []
     for path in sorted(READINGS_DIR.glob("*.json")):
         key = path.stem
@@ -62,7 +65,7 @@ def load_days(limit):
             continue
         if not all(reading.get(k) for k in ("reading", "distillation", "narrativePosition")):
             continue
-        dial = dict(lp.NO_TEXTURE_DIAL)
+        dial = lp.dial_from_texture(texture_for_cell(cell))
         meta = STATE_DIR / f"pipeline-meta-{key}.json"
         if meta.exists():
             try:
@@ -79,6 +82,8 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--days", type=int, default=8)
     ap.add_argument("--out", default="day-variation")
+    ap.add_argument("--cell", default="soft/mid/1/mid",
+                    help="dial cell for each day: polarity/intensityBand/multiplicity/exposureBand, as sweep.py --cell. A day's stored dial, where it has one, overrides it")
     ap.add_argument("--style", default=None)
     ap.add_argument("--quality", default="medium")
     ap.add_argument("--no-image", action="store_true")
@@ -93,7 +98,7 @@ def main():
     image_model = config.get("openaiModel") or "gpt-image-1-mini"
     width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
 
-    days = load_days(args.days)
+    days = load_days(args.days, args.cell)
     if not days:
         print(f"No cached daily readings under {READINGS_DIR}.")
         return 1

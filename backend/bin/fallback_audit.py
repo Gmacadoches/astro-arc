@@ -208,7 +208,7 @@ def install_detectors():
             AUDIT.hit("DEFAULT_STAGE2_BRIEF", "stage2_image_prompt, style_brief is None")
         if not kwargs.get("highlight"):
             AUDIT.hit("DEFAULT_HIGHLIGHT", "stage2_image_prompt, `highlight or DEFAULT_HIGHLIGHT`")
-        d = dial or lp.NO_TEXTURE_DIAL
+        d = dial or getattr(lp, "NO_TEXTURE_DIAL", {})
         if not d.get("prominence"):
             AUDIT.hit("stage2_image_prompt", "`prominence or _PROMINENCE_BY_INTENSITY['mid']`")
         if hasattr(lp, "_VERBS_HARD"):
@@ -216,7 +216,8 @@ def install_detectors():
                 AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "global process verbs reached Stage 2 verbatim")
             if d.get("actorVerbs") in (*lp._ACTOR_VERBS_HARD.values(), *lp._ACTOR_VERBS_SOFT.values()):
                 AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "global actor verbs reached Stage 2 verbatim")
-        if "verbs" in lp.NO_TEXTURE_DIAL and d.get("verbs") == lp.NO_TEXTURE_DIAL["verbs"]:
+        no_texture = getattr(lp, "NO_TEXTURE_DIAL", {})
+        if "verbs" in no_texture and d.get("verbs") == no_texture["verbs"]:
             AUDIT.hit("NO_TEXTURE_DIAL", "its fixed verbs reached Stage 2")
         if d.get("light") and d.get("light") in getattr(lp, "_LIGHT_BY_EXPOSURE", {}).values():
             AUDIT.hit("_LIGHT_BY_EXPOSURE", "global light line reached Stage 2 (style has no [light] line for the band)")
@@ -335,6 +336,16 @@ def run_style(style_key, registers, out):
             AUDIT.registers = (primary, secondary)
             AUDIT.captured = []
             reading = {"arc": {"periodKey": PERIOD_KEY, "frequency": "daily", "texture": texture}}
+            if texture is None and not hasattr(lp, "NO_TEXTURE_DIAL"):
+                # Since 2026-10-16 a reading with no texture is broken, and
+                # build() must refuse it. Recorded in fallbacks.json, not in
+                # prompts.jsonl, which holds only prompts that were sent.
+                try:
+                    lp.build(reading, config)
+                except lp.PipelineError:
+                    AUDIT.hit("dial_from_texture", "refused a reading with no texture")
+                    continue
+                raise SystemExit(f"{style_key}: a reading with no texture was not refused")
             if style_key == CONTROL_STYLE and hasattr(lp, "require_charter"):
                 # Since charter-required, an unchartered style must be refused
                 # before anything is billed. That refusal is the control.

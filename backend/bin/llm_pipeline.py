@@ -1188,7 +1188,7 @@ _ACTOR_SITE_RELATION = {
 # entirely agentless: eroding, spilling, settling and ripening are processes, and
 # only "being mended" and "being carried" imply a hand, both passively and
 # off-stage. The one genuinely conscious verb in the whole codebase was
-# "watching", reachable only from the deprecated NO_TEXTURE_DIAL.
+# "watching", reachable only from the pre-dial constants (deleted 2026-10-16).
 #
 # Two constraints from the melodrama audit are baked in here rather than left to
 # the prompt: "fleeing" is out of the hard list, because it is the most
@@ -1196,58 +1196,36 @@ _ACTOR_SITE_RELATION = {
 # job is to react; and "watching"/"listening to" are kept only in the sense of
 # attending to a thing at work, never to a face.
 
-# What a reading with NO texture block degrades to — an old reading-*.json from
-# before the texture existed, or a hand-pinned input. These are the pre-dial
-# constants, and until 2026-09-13 they were also a user-facing choice
-# (`pipelineMode: "legacy"`), which is why they used to be called LEGACY_DIAL.
-#
-# That choice was removed. Selecting it disabled the one mechanism this whole
-# project is built on — the chart deciding what the image looks like — so
-# "legacy" was an option to make Astro-Arc stop being Astro-Arc, and it was the
-# DEFAULT, meaning every fresh install got the behaviour the project had already
-# decided was wrong. The constants stay because the missing-texture path is
-# real and still needs an answer.
-NO_TEXTURE_DIAL = {
-    "mode": "no-texture",
-    "sites": 3,
-    "objectRange": (4, 7),
-    "thingRange": (6, 10),
-    "wordRange": (90, 130),
-    # No verbs: draw_style_choices draws them from the active style's own
-    # [verbs], as on any other run. The actor layers have no pre-dial
-    # equivalent to degrade to, so this gets the most neutral cell of each
-    # rather than nothing: a missing texture must not also mean a missing
-    # actor, or the degraded path quietly reverts to the object-strewn output
-    # this work exists to fix.
-    "registerCohesion": "collide",
-    "spatial": None,
-    "light": None,
-    "prominence": _PROMINENCE_BY_INTENSITY["mid"],
-    "wonderTone": _WONDER_BY_POLARITY["soft"],
-    "anomalyRelation": _ACTOR_ANOMALY_RELATION[("soft", "mid")],
-    "objectRelation": _ACTOR_OBJECT_RELATION[("soft", "mid")],
-    "siteRelation": _ACTOR_SITE_RELATION[("soft", "mid")],
-    "tonalDirection": None,
-}
+# A reading with no texture is a broken reading, not a cell (2026-10-16).
+# astro_engine.compute_texture always returns polarity, both bands and
+# multiplicity, and astro-arc-generate always runs astro_engine, so a missing
+# texture or band means something upstream failed. It used to degrade to
+# NO_TEXTURE_DIAL, a fixed pre-dial cell that sent Stage 2 no light line at
+# all; it is now an error. Harnesses that replay old days name a cell instead
+# (replay_days.py and replay_amplify.py --cell).
+TEXTURE_KEYS = ("polarity", "intensityBand", "exposureBand", "multiplicity")
 
 
 def dial_from_texture(texture):
     """The day's imperatives. `texture` is arc["texture"] from astro_engine.
-
-    Falls back to NO_TEXTURE_DIAL only when there is no texture to read at all.
-    """
+    A missing texture, or one missing any of TEXTURE_KEYS, is an error."""
     if not texture:
-        return dict(NO_TEXTURE_DIAL)
+        raise PipelineError("The reading has no texture; astro_engine always computes one, "
+                            "so the reading is broken. Regenerate it.")
+    missing = [k for k in TEXTURE_KEYS if texture.get(k) is None]
+    if missing:
+        raise PipelineError(f"The reading's texture is missing {', '.join(missing)}; "
+                            "astro_engine always supplies them, so the reading is broken.")
 
-    polarity = texture.get("polarity") or "soft"
-    # A day with no aspect in orb (1 in 365) is a defined cell, not an exception:
-    # soft at minimum intensity. An exception branch is how a neutral day ends up
-    # looking like a crash.
+    polarity = texture["polarity"]
+    # A day with no aspect in orb (1 in 365) is a defined cell, not a fallback:
+    # astro_engine says "none", and it reads as soft at minimum intensity. An
+    # exception branch is how a neutral day ends up looking like a crash.
     if polarity == "none":
         polarity = "soft"
-    intensity_band = texture.get("intensityBand") or "lo"
-    exposure_band = texture.get("exposureBand") or "mid"
-    multiplicity = texture.get("multiplicity") or 0
+    intensity_band = texture["intensityBand"]
+    exposure_band = texture["exposureBand"]
+    multiplicity = texture["multiplicity"]
 
     for max_hits, sites, objects, things, words in _DENSITY_BY_MULTIPLICITY:
         if multiplicity <= max_hits:
@@ -1409,7 +1387,7 @@ def draw_style_choices(style_key, dial, history, period_key):
     dial = dict(dial)
     draws = {}
     rng = _style_rng(period_key, style_key, history)
-    hard = (dial.get("polarity") or "soft") == "hard"
+    hard = dial["polarity"] == "hard"
 
     verbs = load_style_verbs(style_key)
     process = verbs["process_hard" if hard else "process_soft"]
@@ -1433,10 +1411,8 @@ def draw_style_choices(style_key, dial, history, period_key):
         dial["space"] = draws["space"]
 
     # The style's light line for today's exposure band. Not a draw: the band
-    # decides. A reading with no texture has no band and gets no light line.
-    band = dial.get("exposureBand")
-    if band:
-        dial["light"] = str(_style_table(style_key, "light")[band]).strip()
+    # decides.
+    dial["light"] = str(_style_table(style_key, "light")[dial["exposureBand"]]).strip()
 
     conditions = load_style_conditions(style_key) or list(CONDITIONS)
     used = _recent_draws(history, style_key, "condition")
@@ -1824,7 +1800,7 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     Returns (result_dict, cost) — cost is None on a cache hit.
     """
     if dial is None:
-        dial = dict(NO_TEXTURE_DIAL)
+        raise PipelineError("Stage 1.5 needs the day's dial (dial_from_texture)")
     natal_hash = _natal_hash(config)
     # The charter is an input as well as the style key: editing it must
     # re-draw that day's meaning, not serve one written for the old wording.
@@ -1984,7 +1960,7 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
 
     Returns (result_dict, cost)."""
     if dial is None:
-        dial = dict(NO_TEXTURE_DIAL)
+        raise PipelineError("Stage 1.5 needs the day's dial (dial_from_texture)")
     object_lo, object_hi = dial["objectRange"]
     system_prompt = (
         STAGE15_MATERIAL_SYSTEM

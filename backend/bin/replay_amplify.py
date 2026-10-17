@@ -43,6 +43,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
+from sweep import texture_for_cell  # noqa: E402
 from paths import STATE_DIR  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402  — one definition, shared
 
@@ -57,8 +58,10 @@ def load_config():
     return json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
 
 
-def load_days():
+def load_days(cell):
     """(key, stage1_result, dial) per cached daily reading, oldest first.
+    `cell` (sweep.py's format) builds the dial underneath, for a day with no
+    stored dial.
 
     The dial comes from that day's pipeline-meta rather than being recomputed:
     recomputing it from today's Moon would pair a day's reading with a tonal
@@ -75,7 +78,7 @@ def load_days():
             continue
         if not all(reading.get(k) for k in ("reading", "distillation", "narrativePosition")):
             continue
-        dial = dict(lp.NO_TEXTURE_DIAL)
+        dial = lp.dial_from_texture(texture_for_cell(cell))
         meta_path = STATE_DIR / f"pipeline-meta-{key}.json"
         if meta_path.exists():
             try:
@@ -192,6 +195,8 @@ def main():
                     help="comma-separated. archetype: control,rule,full. "
                          "actor-kind: A-chart,B-dial,C-hybrid,D-constrained")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--cell", default="soft/mid/1/mid",
+                    help="dial cell for each day: polarity/intensityBand/multiplicity/exposureBand, as sweep.py --cell. A day's stored dial, where it has one, overrides it")
     ap.add_argument("--seed", type=int, default=0, help="for arm B's tie-breaking")
     ap.add_argument("--veto-window", type=int, default=None,
                     help="override ACTOR_VETO_WINDOW: how many recent kinds are blocked")
@@ -203,7 +208,7 @@ def main():
     model = args.model or config.get("stage1Model") or "gpt-4o-mini"
     if args.veto_window is not None:
         lp.ACTOR_VETO_WINDOW = args.veto_window
-    days = load_days()
+    days = load_days(args.cell)
     default_arms = "A-chart,B-dial,C-hybrid,D-constrained" if args.axis == "actor-kind" else "rule,full"
     arms = [a.strip() for a in (args.arms or default_arms).split(",") if a.strip()]
     out_name = args.out or ("b6-actor-kind" if args.axis == "actor-kind" else "b0-archetype-range")
