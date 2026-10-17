@@ -297,10 +297,12 @@ def _band(value, cuts):
 def compute_texture(transit_bodies, natal_bodies, moon_phase_angle, transit_names=("moon",)):
     """The four axes, plus the full hit list find_dominant_transit throws away.
 
-    Returns None only if there is nothing to measure at all. A day with no aspect
-    in orb (1 day in 365) is a DEFINED cell — soft at minimum intensity — not an
-    exception branch, because an exception branch is how a neutral day ends up
-    looking like a crash.
+    Always returns a texture with polarity, intensityBand, exposureBand and
+    multiplicity set; llm_pipeline.dial_from_texture treats a texture without
+    them as a broken reading. A day with no aspect in orb (1 day in 365) is a
+    DEFINED cell — polarity "none", intensity band "lo", read as soft at minimum
+    intensity — not an exception branch, because an exception branch is how a
+    neutral day ends up looking like a crash.
     """
     hits = []
     for t_name in transit_names:
