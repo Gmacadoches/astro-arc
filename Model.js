@@ -3,6 +3,13 @@
 // Kept side-effect free and module.exports-able so it can be unit tested
 // the same way weather/Model.js is.
 
+// The Style dropdown is built from the theme files themselves
+// (backend/bin/style_catalog.py): shipped themes in backend/pipeline/styles/,
+// the user's own in ~/.config/astro-arc/styles/. Only the default key is
+// known here; it is what a config with no style, or with a key whose theme is
+// gone, falls back to (llm_pipeline.DEFAULT_STYLE says the same).
+var DEFAULT_ART_STYLE = "symbolist"
+
 var DEFAULT_CONFIG = {
   birthDate: "",
   birthTime: "",
@@ -30,7 +37,7 @@ var DEFAULT_CONFIG = {
   stage1Model: "gpt-4o-mini",
   stage2Model: "gpt-4o-mini",
   backgroundSize: "auto",
-  artStyle: "symbolist",
+  artStyle: DEFAULT_ART_STYLE,
   themeGenerator: "built-in",
   // true — change only the wallpaper and leave the user's theme colors alone.
   // Most people already run a theme they chose, often several theme plugins;
@@ -99,21 +106,44 @@ var THEME_GENERATOR_CHOICES = [
   { key: "aether", label: "Aether (Omarchy)" }
 ]
 
-// Kept in sync by hand with pipeline/styles.toml — same reasoning as
-// OPENAI_MODEL_CHOICES below: QML can't read TOML directly, and this list
-// changes rarely enough that hand-sync is simpler than a live bridge.
-// Curated down to 5 then back up to 7 on 2026-09-07 — see styles.toml's
-// own header comment and CHANGELOG.md for what changed and why. Add more
-// here (and in styles.toml) freely.
-var ART_STYLE_CHOICES = [
-  { key: "symbolist", label: "Symbolist / Visionary" },
-  { key: "engraving", label: "Antique Engraving" },
-  { key: "cosmic", label: "Cosmic / Nebula" },
-  { key: "ghibli", label: "Studio Ghibli" },
-  { key: "cyberpunk", label: "Cyberpunk" },
-  { key: "ukiyoe", label: "Ukiyo-e" },
-  { key: "illuminated", label: "Illuminated Manuscript" }
-]
+// One catalog row's dropdown label. A user theme says so; a theme that fails
+// validation stays listed, so a broken file is visible rather than missing.
+function styleOptionLabel(row) {
+  if (!row) return ""
+  var label = row.label || row.key
+  if (row.source === "user") label += " (custom)"
+  if (!row.valid) label += " (Failed Validation)"
+  return label
+}
+
+// Shipped themes first, then the user's, each alphabetical by label.
+function sortStyleCatalog(rows) {
+  return (rows || []).slice().sort(function(a, b) {
+    var sa = a.source === "user" ? 1 : 0
+    var sb = b.source === "user" ? 1 : 0
+    if (sa !== sb) return sa - sb
+    return String(a.label).localeCompare(String(b.label))
+  })
+}
+
+function findStyle(rows, key) {
+  for (var i = 0; i < (rows || []).length; i++)
+    if (rows[i].key === key) return rows[i]
+  return null
+}
+
+// The warning a run prints for the same case (llm_pipeline.missing_style_warning).
+function missingStyleWarning(key) {
+  return "art style '" + key + "' is not an installed theme; using '" + DEFAULT_ART_STYLE + "'"
+}
+
+// What "Fix with AI" and "Copy fix prompt" put on the clipboard for now: the
+// theme file and what is wrong with it. Prompt 5 replaces both actions.
+function styleFixText(row) {
+  if (!row) return ""
+  return "Theme file: " + row.path + "\n\nValidation errors:\n"
+    + (row.errors || []).map(function(e) { return "- " + e }).join("\n") + "\n"
+}
 
 // ---- Model catalog labels -------------------------------------------------
 // Rows come from backend/bin/model_catalog.py. Cost is deliberately allowed to
@@ -292,7 +322,7 @@ function parseConfig(raw) {
       stage1Model: typeof data.stage1Model === "string" && data.stage1Model !== "" ? data.stage1Model : "gpt-4o-mini",
       stage2Model: typeof data.stage2Model === "string" && data.stage2Model !== "" ? data.stage2Model : "gpt-4o-mini",
       backgroundSize: data.backgroundSize === "auto" || (typeof data.backgroundSize === "string" && SIZE_PATTERN.test(data.backgroundSize)) ? data.backgroundSize : "auto",
-      artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist",
+      artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : DEFAULT_ART_STYLE,
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
       // Only an explicit false turns it off, matching astro-arc-generate.
       backgroundOnly: data.backgroundOnly !== false,
@@ -341,6 +371,14 @@ function normalizeReviewLabel(label) {
   return out === "" ? String(label) : out
 }
 
+// The theme a generation was made in, as a catalog key, or "".
+function reviewStyleKey(review, rows) {
+  if (!review) return ""
+  if (review.artStyle) return review.artStyle
+  var matches = (rows || []).filter(function(r) { return r.label === review.artStyleLabel })
+  return matches.length === 1 ? matches[0].key : ""
+}
+
 function parseReviewsIndex(raw) {
   try {
     var data = JSON.parse(String(raw || "[]"))
@@ -363,7 +401,12 @@ function parseReviewsIndex(raw) {
         periodKey: typeof r.periodKey === "string" ? r.periodKey : null,
         hasThemeSnapshot: !!r.hasThemeSnapshot,
         sizeBytes: isNaN(size) ? null : size,
-        conceptTags: Array.isArray(r.conceptTags) ? r.conceptTags.filter(function(t) { return typeof t === "string" }) : []
+        conceptTags: Array.isArray(r.conceptTags) ? r.conceptTags.filter(function(t) { return typeof t === "string" }) : [],
+        // artStyle (the key) is only in entries built after 2026-10-17; older
+        // ones have the label alone, which reviewStyleKey matches instead.
+        artStyle: typeof r.artStyle === "string" ? r.artStyle : "",
+        artStyleLabel: typeof r.artStyleLabel === "string" ? r.artStyleLabel : "",
+        imagePath: r.hasThemeSnapshot ? entryDir + "/theme/backgrounds/background.png" : ""
       }
     })
   } catch (e) {
@@ -647,7 +690,13 @@ if (typeof module !== "undefined") {
   module.exports = {
     DEFAULT_CONFIG: DEFAULT_CONFIG,
     OPENAI_MODEL_CHOICES: OPENAI_MODEL_CHOICES,
-    ART_STYLE_CHOICES: ART_STYLE_CHOICES,
+    DEFAULT_ART_STYLE: DEFAULT_ART_STYLE,
+    styleOptionLabel: styleOptionLabel,
+    sortStyleCatalog: sortStyleCatalog,
+    findStyle: findStyle,
+    reviewStyleKey: reviewStyleKey,
+    missingStyleWarning: missingStyleWarning,
+    styleFixText: styleFixText,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,

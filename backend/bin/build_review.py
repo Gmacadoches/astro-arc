@@ -434,6 +434,8 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         "distillation": meta.get("distillation") or "",
         "narrativePosition": meta.get("narrativePosition") or "",
         "artStyleLabel": _style_label(meta.get("artStyle")) or "",
+        # The key too, so the panel can offer this render as its theme's preview.
+        "artStyle": meta.get("artStyle") or "",
     })
     GENERATIONS_INDEX.parent.mkdir(parents=True, exist_ok=True)
     GENERATIONS_INDEX.write_text(json.dumps(index, indent=2))
