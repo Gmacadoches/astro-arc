@@ -87,7 +87,11 @@ AUDIT = Audit()
 def _wrap(name, after):
     """Replace lp.<name> with a wrapper that calls the original, then
     after(result, *args, **kwargs). Module globals are looked up at call time,
-    so every caller inside llm_pipeline goes through the wrapper."""
+    so every caller inside llm_pipeline goes through the wrapper. A symbol the
+    pipeline no longer has (charter-required removed most of them) is skipped:
+    its detector has nothing left to watch."""
+    if not hasattr(lp, name):
+        return
     original = getattr(lp, name)
 
     def wrapper(*args, **kwargs):
@@ -124,7 +128,7 @@ def install_detectors():
 
     # --- the highlight
     def after_highlight(result, style_key):
-        if result is lp.DEFAULT_HIGHLIGHT:
+        if result is getattr(lp, "DEFAULT_HIGHLIGHT", object()):
             AUDIT.hit("DEFAULT_HIGHLIGHT", "load_style_highlight, charter has no highlight")
     _wrap("load_style_highlight", after_highlight)
 
@@ -168,8 +172,10 @@ def install_detectors():
         for key in ("polarity", "intensityBand", "exposureBand"):
             if not texture.get(key):
                 AUDIT.hit("dial_from_texture", f"missing {key}, `or` default used")
-        AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "dial_from_texture seeds dial verbs from the globals")
-        AUDIT.hit("_LIGHT_BY_EXPOSURE", "dial_from_texture seeds dial light from the global table")
+        if hasattr(lp, "_VERBS_HARD"):
+            AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "dial_from_texture seeds dial verbs from the globals")
+        if hasattr(lp, "_LIGHT_BY_EXPOSURE"):
+            AUDIT.hit("_LIGHT_BY_EXPOSURE", "dial_from_texture seeds dial light from the global table")
     _wrap("dial_from_texture", after_dial)
 
     original_draw = lp.draw_style_choices
@@ -204,13 +210,14 @@ def install_detectors():
         d = dial or lp.NO_TEXTURE_DIAL
         if not d.get("prominence"):
             AUDIT.hit("stage2_image_prompt", "`prominence or _PROMINENCE_BY_INTENSITY['mid']`")
-        if d.get("verbs") in (lp._VERBS_HARD, lp._VERBS_SOFT):
-            AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "global process verbs reached Stage 2 verbatim")
-        if d.get("actorVerbs") in (*lp._ACTOR_VERBS_HARD.values(), *lp._ACTOR_VERBS_SOFT.values()):
-            AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "global actor verbs reached Stage 2 verbatim")
-        if d.get("verbs") == lp.NO_TEXTURE_DIAL["verbs"]:
+        if hasattr(lp, "_VERBS_HARD"):
+            if d.get("verbs") in (lp._VERBS_HARD, lp._VERBS_SOFT):
+                AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "global process verbs reached Stage 2 verbatim")
+            if d.get("actorVerbs") in (*lp._ACTOR_VERBS_HARD.values(), *lp._ACTOR_VERBS_SOFT.values()):
+                AUDIT.hit("_VERBS_*/_ACTOR_VERBS_*", "global actor verbs reached Stage 2 verbatim")
+        if "verbs" in lp.NO_TEXTURE_DIAL and d.get("verbs") == lp.NO_TEXTURE_DIAL["verbs"]:
             AUDIT.hit("NO_TEXTURE_DIAL", "its fixed verbs reached Stage 2")
-        if d.get("light") and d.get("light") in lp._LIGHT_BY_EXPOSURE.values():
+        if d.get("light") and d.get("light") in getattr(lp, "_LIGHT_BY_EXPOSURE", {}).values():
             AUDIT.hit("_LIGHT_BY_EXPOSURE", "global light line reached Stage 2 (style has no [light] line for the band)")
         if not d.get("light"):
             AUDIT.hit("stage2_image_prompt", "no light line at all")
@@ -223,7 +230,7 @@ def install_detectors():
 def _space_skip_active(style_key):
     brief = _style(style_key).get("brief")
     return (isinstance(brief, dict) and bool(lp.load_style_space(style_key))
-            and any(k in brief for k in lp.SPACE_REPLACES_BRIEF))
+            and any(k in brief for k in getattr(lp, "SPACE_REPLACES_BRIEF", ())))
 
 
 # ---------------------------------------------------------------------------

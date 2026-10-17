@@ -1245,20 +1245,11 @@ _WONDER_BY_POLARITY = {
     "soft": "It is at peace, which is not the same as friendly. It is occupied with its own business and indifferent to being watched.",
 }
 
-_LIGHT_BY_EXPOSURE = {
-    # Rewritten 2026-09-26 as a count and a failure condition. The old line was
-    # a mood ("most of the frame is unlit or obscured") and mood words are not
-    # obeyed: across the cyberpunk (a) sweeps and ghibli's darkest cell, lo
-    # cells came back overcast day, sunset, or full sun.
-    "lo": "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response.",
-    # "Raking, partial light" until 2026-10-10: "raking" was copied into 32% of
-    # 56 cross-style prompts. Same meaning, no adjective to copy.
-    "mid": "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response.",
-    # Rewritten 2026-09-26 to match "lo": a count and a failure condition. Once
-    # lo was fixed, cyberpunk's rain-and-neon pulled hi cells to dusk and sunset
-    # (cp-a4-*), because a mood line gives nothing to push back with.
-    "hi": "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response.",
-}
+# The exposure bands astro_engine sorts a day into. The light line for each
+# band lives in the style's own `[<style>.light]` table since 2026-10-16
+# (decisions 4 and 2): the global lines assumed an Earth sky, and every style
+# now carries its own, so the pipeline keeps only the band names.
+EXPOSURE_BANDS = ("lo", "mid", "hi")
 
 # The anomaly is present EVERY day; what varies is how the world treats it. A
 # switch would leave roughly half the year with no puncture at all, and those are
@@ -1409,7 +1400,7 @@ def dial_from_texture(texture):
         # each array to draw from without re-reading the texture.
         "polarity": polarity,
         "intensityBand": intensity_band,
-        # For a style's own [light] lines (draw_style_choices).
+        # Picks the line from the style's [light] table (draw_style_choices).
         "exposureBand": exposure_band,
         "sites": sites,
         "objectRange": objects,
@@ -1422,7 +1413,6 @@ def dial_from_texture(texture):
         "spatial": _SPATIAL_BY_INTENSITY[intensity_band],
         "prominence": _PROMINENCE_BY_INTENSITY[intensity_band],
         "wonderTone": _WONDER_BY_POLARITY["hard" if polarity == "hard" else "soft"],
-        "light": _LIGHT_BY_EXPOSURE[exposure_band],
         "anomalyRelation": _ACTOR_ANOMALY_RELATION[(polarity, intensity_band)],
         "objectRelation": _ACTOR_OBJECT_RELATION[(polarity, intensity_band)],
         "siteRelation": _ACTOR_SITE_RELATION[(polarity, intensity_band)],
@@ -1631,12 +1621,11 @@ def draw_style_choices(style_key, dial, history, period_key):
         draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
         dial["space"] = draws["space"]
 
-    # A style's own light lines, where the global ones assume an Earth sky
-    # (STYLE-OVERHAUL Prompt 2). Not a draw: the exposure band decides.
-    light = _style_table(style_key, "light")
+    # The style's light line for today's exposure band. Not a draw: the band
+    # decides. A reading with no texture has no band and gets no light line.
     band = dial.get("exposureBand")
-    if isinstance(light, dict) and band and str(light.get(band) or "").strip():
-        dial["light"] = str(light[band]).strip()
+    if band:
+        dial["light"] = str(_style_table(style_key, "light")[band]).strip()
 
     conditions = load_style_conditions(style_key) or list(CONDITIONS)
     used = _recent_draws(history, style_key, "condition")

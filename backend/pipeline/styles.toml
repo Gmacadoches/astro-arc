@@ -50,6 +50,14 @@ highlight_modes = [
 signature = "SIGNATURE — at least one impossible apparatus, or a body partly turned into something else, is named explicitly and doing something. It may be the highlight. A scene that could be an ordinary painting of an ordinary room is a failed response."
 temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
 
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[symbolist.light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
+
 [symbolist.verbs]
 process_hard = ["dissolving", "petrifying", "unspooling", "hardening", "devouring", "fracturing", "entangling", "sealing over", "wilting", "consuming", "strangling", "liquefying", "ossifying", "crumbling", "tightening", "closing in", "bleeding into", "caging", "spreading like a stain", "tarnishing"]
 process_soft = ["opening like a flower", "transforming", "merging", "floating", "weaving itself", "breathing", "singing softly", "growing feathers", "melting into", "branching into", "twining", "brooding", "pouring slowly", "hovering", "paling", "maturing", "echoing", "doubling", "sleeping", "unwinding"]
@@ -130,6 +138,14 @@ highlight_modes = [
 [engraving.brief]
 signature = "SIGNATURE — the star chart is in the world: at least one named element of celestial cartography (a constellation figure, numbered stars, a graticule line, a cartouche) runs from the edge of the image into the scene and merges with it. A plate that could be any old etching is a failed response."
 temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[engraving.light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
 
 [engraving.verbs]
 process_hard = ["erupting", "collapsing inward", "quaking", "plunging", "blazing", "keeling over", "foundering", "caving in", "rending", "unravelling", "blackening", "overflowing its banks", "raining down", "withering", "careening", "breaching", "spewing smoke", "crumbling to rubble", "smashing", "sundering", "gushing", "tilting off its axis"]
@@ -501,6 +517,14 @@ highlight_modes = [
 [ghibli.brief]
 impossible = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable; it may be the highlight. Give it this world's own form: a machine that is plainly alive or awake, a spirit holding a job, a creature far too large for its kind, or a building that walks or flies. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    What temper it is in: {wonderTone}\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
 openness ="OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or a distance that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out."
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[ghibli.light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
 
 # VERBS, 2026-10-10 (STYLE-OVERHAUL Prompt 1). Each run draws 3 process verbs
 # and 3 actor verbs from the day's polarity, never one this style drew in its
@@ -903,6 +927,14 @@ highlight_modes = [
 signature = "SIGNATURE — at least one thing marks this as Edo Japan, named explicitly: a post-road station, a wooden bridge, a lacquered shop sign or a yōkai. It may be the highlight. A print that could be any landscape is a failed response."
 temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
 
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[ukiyoe.light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
+
 [ukiyoe.verbs]
 process_hard = ["lashing", "surging", "curling over", "battering", "sweeping away", "burning down", "capsizing", "uprooting", "pelting", "whipping", "howling through", "swamping", "ripping", "drowning", "avalanching", "smouldering", "gusting", "falling in", "snapping", "breaking over"]
 process_soft = ["falling softly", "floating downstream", "scattering petals", "swirling", "misting over", "glimmering", "fluttering", "bending in the wind", "blooming", "piling up", "melting", "curling up", "lapping", "dripping from the eaves", "hanging still", "climbing the sky", "fading into mist", "swelling", "opening", "sparkling"]
@@ -1000,6 +1032,14 @@ highlight_modes = [
 [illuminated.brief]
 signature = "SIGNATURE — the page is in the world: a labour or feast of the month, a zodiac roundel, or a creature from the border reaching into the scene, named explicitly. A picture that could be any medieval-looking painting is a failed response."
 temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[illuminated.light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
 
 [illuminated.verbs]
 process_hard = ["storming", "hailing", "blighting", "tumbling down", "breaking", "smiting", "shrivelling", "collapsing", "raging", "tolling", "spreading through", "darkening", "trampling", "overrunning", "eating through", "freezing hard", "burning", "rising from the sea", "falling from the sky", "splitting in two"]
