@@ -5,6 +5,13 @@ painted) and a **charter** (what world it shows). This is every field a charter
 can have, what reads it, and the one rule that matters most when writing it.
 It is the contract a future "create your own style" feature generates against.
 
+**A charter is required.** There are no neutral fallbacks: every table and
+field below is required unless it is listed under Optional.
+`llm_pipeline.validate_charter` is the single definition of a complete
+charter. A style with any error cannot be used for a run, and each error names
+the style, the field and the rule. The validator also prints warnings for
+choices the schema allows but advises against (see Warnings).
+
 Two rules hold for every field, because this project has measured both:
 
 - **A list is a menu.** Whatever a field names, the model copies. "The size of
@@ -20,13 +27,13 @@ Two rules hold for every field, because this project has measured both:
 | Field | Controls | Write it well |
 |---|---|---|
 | `label` | the name in the Style dropdown | Short and recognisable. |
-| `suffix`, or `suffix_base` + `suffix_figures` | appended to every image prompt: the technique. `suffix_figures` is added only when a person is in frame | Describe what the finished frame **looks like** (line, shadow, light source, grain), not how it was made; artist names and process words are weakly followed. Never put content here: anything named in the suffix appears in every image. |
-| `space` | 6–8 depth recipes; one is drawn per run and replaces OPENNESS / DEPTH | Each recipe a different way this world shows depth, one sentence, a place not a mood. |
-| `guidance` | legacy one-line world description, used only when the style has no `[world]` | Replace with a charter. |
+| `suffix`, or `suffix_base` + `suffix_figures` | appended to every image prompt: the technique. `suffix_figures` is added only when a person is in frame | Describe what the finished frame **looks like** (line, shadow, light source, grain), not how it was made; artist names and process words are weakly followed. **Technique only:** name no objects, weather or places, because anything named in the suffix appears in every image. A thin strip at the top of the wallpaper is covered by the desktop bar, so the technique must not crop figures at the top edge. |
+| `space` | 6–8 depth recipes; one is drawn per run, sent with the WALLPAPER rule | Each recipe a different way this world shows depth, one sentence, a place not a mood. |
 
 ## `[<style>.world]`
 
-Sent to Stage 1.5 (both calls) and Stage 2, in this order.
+Sent to Stage 1.5 (both calls) and Stage 2, in this order. All 13 fields are
+required.
 
 | Field | Controls | Write it well |
 |---|---|---|
@@ -51,9 +58,14 @@ dial's values as `{placeholders}`, most often `{wonderTone}`.
 
 | Key | Controls | Write it well |
 |---|---|---|
-| `signature` | something in frame that could only exist in this world (ghibli's `impossible` does this job) | End with "…is a failed response". Let it be the highlight or the actor, so it costs no words. |
-| `temper` | carries the day's hard/soft temper to the highlight | `TEMPER — … in this temper: {wonderTone}`. |
-| any other key | a style-specific rule (cyberpunk's `neon`) | A count and a failure condition. Keys `openness` and `depth` are skipped while the style has a `space` array. |
+| `signature` (required) | something in frame that could only exist in this world | End with "…is a failed response". Let it be the highlight or the actor, so it costs no words. |
+| `temper` (required) | carries the day's hard/soft temper to the highlight | `TEMPER — … in this temper: {wonderTone}`. |
+| any other key | a style-specific rule (cyberpunk's `neon`) | A count and a failure condition. |
+
+A `{placeholder}` must be a value the dial supplies; the validator lists them
+when one is not. Forcing a mood or a relationship in a rule (grief, rescue, a
+villain) is allowed as the creator's choice, but it warns: the chart, not the
+charter, is meant to decide how a day feels.
 
 ## `[<style>.verbs]`
 
@@ -70,16 +82,35 @@ this world. Read by both Stage 1.5 calls and Stage 2. May end with
 **Write it well:** a span and a principle with two examples; the line must not
 pull every register toward the same setting.
 
+## `[<style>.light]`
+
+Exactly `lo`, `mid` and `hi`: the light line Stage 2 gets for each exposure
+band. There are no global light lines. **Write it well:** a count and a
+failure condition, like every other rule. A palette that implies a time of day
+(a dusk-only city, a world under one star) needs light lines that agree with
+it, or the day's exposure band and the palette argue. The pre-2026-10-16
+global lines (night / one clear direction / full day) are a good starting
+point where they hold.
+
 ## Optional
 
 | Table | Controls | Write it well |
 |---|---|---|
-| `[<style>.light]` `lo` / `mid` / `hi` | replaces the global light line for that exposure band | Only when the global lines (night / raking light / full day) cannot hold in this world. A count and a failure condition. |
+| `forbids` in `[<style>.world]` | read out last as "Never in this world" | Prefer saying what the world is. No shipped style uses it. |
 | `[<style>.conditions]` | replaces the condition list (newly made … ruined) | Only for a world that is always pristine or always ruined. |
+
+## Warnings
+
+These never block a run:
+
+- a verb shared with another style's same array (fine if it is native to both)
+- a `[brief]` rule with no "failed response"
+- a `[brief]` rule that requires a mood or relationship
 
 ## Checking a charter
 
 ```sh
+python3 -c 'import sys; sys.path.insert(0, "backend/bin"); import llm_pipeline as lp; print(lp.validate_charter("<style>"))'
 sweep.py --out mine-before --style <style> --pairs --rotate-cells --registers <8, across all five families>
 # edit the charter
 sweep.py --out mine-after  ... (same)
