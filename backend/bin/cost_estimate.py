@@ -29,7 +29,7 @@ def _rates(kind):
 class _LazyRates(dict):
     """Looks like the old module-level dict, but re-reads the TOML on each
     access so a hand edit takes effect without a restart — the same contract
-    registers.toml and styles.toml have."""
+    registers.toml and the theme files have."""
 
     def __init__(self, kind):
         super().__init__()

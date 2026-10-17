@@ -1,0 +1,338 @@
+# Rewritten 2026-09-07 from actual research (see CHANGELOG.md), not general
+# impression — the original suffix wrongly called for "watercolor" character
+# rendering. Ghibli characters are flat cel-shaded (solid base color, one
+# hard-edged darker shadow tone, crisp clean outlines) — backgrounds are the
+# painted half, in opaque poster paint/gouache (not watercolor), wet-into-wet
+# for soft skies/clouds then sharp detail added as it dries. Keep that
+# character/background technique split if this is revised again.
+#
+# Revised again same day: the first version described character rendering
+# unconditionally, which the image model read as an instruction to include
+# a person — confirmed via a 3-sample test, it invented an unrequested
+# figure in a purely architectural Stage 2 prompt 2 of 3 times. The
+# character clause is now explicitly gated behind "only if a person is
+# already part of the scene" and leads with the background description
+# instead (which applies to every image, figure or not). Re-tested 0 of 3
+# on the same architectural prompt, and confirmed it still renders figures
+# correctly when a base prompt actually calls for them.
+#
+# guidance rewritten 2026-09-08 (external review of a user-requested
+# quality dossier — see CHANGELOG.md/CONTEXT.md): everything above fixed
+# *rendering* (suffix wording), but the real failure mode observed on
+# no-figure registers (e.g. a bare "architectural" prompt that read as
+# Magritte-style surrealism, not Ghibli) was a *content* problem — "Ghibli"
+# is not just a rendering technique like an engraving or a color-grade you
+# can apply to any subject, it's an authored world (nature reclaiming
+# structures, weather as presence, humble objects treated with reverence,
+# rural vernacular architecture, wide low horizons). Stage 2 was never
+# told any of that — the old guidance only said what to avoid. Widened
+# guidance from a pure prohibition into a vocabulary Stage 2 can actually
+# draw content from, on top of the retained prohibition.
+#
+# suffix split into suffix_base/suffix_figures 2026-09-08 (same review):
+# hasPeople is already computed by Stage 2 and already used for the
+# image-quality tier — this preset now also uses it for suffix assembly
+# (see load_style_suffix()/build() in llm_pipeline.py). suffix_figures is
+# appended only when a figure is actually in the prompt, so the character-
+# rendering clause below is no longer dead text on the ~88% of real ghibli
+# generations that have no person in them. This also retires the negative-
+# instruction hack ("do not add a person... unless one is already
+# described above") from 2026-09-07 above: a suffix that never mentions
+# character rendering on a figure-free generation cannot itself induce an
+# uninvited figure, so the sentence is now structurally unnecessary — kept
+# it in this comment, not in suffix_base, so the historical lesson (an
+# unconditional character-rendering description reads as an instruction to
+# include one) isn't lost. Re-tested against the same kind of real
+# figure-free architectural prompt that originally triggered the bug: 0/3
+# figure-injections with the negative sentence removed, confirming the
+# structural fix alone (not the negative sentence) is what's actually
+# doing the work now.
+#
+# suffix_base/suffix_figures rewritten 2026-09-08 (same review, immediate
+# follow-up): the 2026-09-07 research above was correct about the actual
+# technique (flat cel-shaded characters vs. gouache/wet-into-wet
+# backgrounds) but was written in process vocabulary — "opaque gouache/
+# poster color," "wet-into-wet," "tonal layering," naming background
+# painter Kazuo Oga by name — which describes *how a human made it*, not
+# what the finished frame looks like. An image model has weak associations
+# for process/medium/artist-name terminology (a background painter is far
+# more thinly represented in training data than the films themselves) and
+# much stronger ones for described visual outcomes. Rewritten to keep the
+# same research-grounded technique distinction but state it as what's
+# actually visible in frame: saturated layered greenery, hard-edged sunlit
+# cumulus clouds, visible brushwork, clear foreground/middle/horizon
+# depth, heightened-not-muted color for the background half; flat color/
+# single hard shadow/crisp outlines stated plainly (already outcome-
+# language, barely changed) for the figure half. Net effect on suffix
+# length: unchanged (~52 words) on the ~88% of generations with no figure
+# — the word-count win from the split above was already banked by cutting
+# suffix_figures entirely on those, not by this rewrite — and down from
+# ~120 to ~83 words combined on a generation that does have one.
+#
+# guidance revised again 2026-09-08 (register-collapse fix, found during
+# the 12-register verification sweep the widened-guidance rewrite above
+# was itself supposed to validate): fixed Ghibli-recognizability
+# comprehensively (12/12 real renders read as genuinely Ghibli, including
+# the exact "architectural" failure case that motivated the rewrite), but
+# 5 of the 10 non-figure/crowd registers (geological, bodily and
+# anatomical, mechanical, atmospheric, ritual object) collapsed into the
+# same cozy domestic-kitchen scene regardless of assigned register — the
+# guidance's own "recurring subjects" list was strong and specific enough
+# to out-compete "material register to draw from" for content invention.
+# Reframed guidance from "recurring subjects" (read as a substitute
+# content menu) to "qualities for rendering whatever your register calls
+# for" (a texture/mood layer applied to the register's own subject, never
+# a replacement for it), with an explicit instruction not to default to a
+# domestic interior. Paired with a matching addition to STAGE2_SYSTEM
+# itself (register names the subject; the style's world textures it) so
+# the same fix applies to every world-style, not just this one. Re-tested
+# the 5 failed registers plus 2 controls (domestic interior, crowd / the
+# collective) against the same fixed reading/signature as the original
+# sweep — see CHANGELOG.md for the result.
+# guidance extended again 2026-09-09 (symbolic-depth work — see
+# CHANGELOG.md and TASK-symbolic-depth.md): the pipeline now requires every
+# image to carry an "intrusion", an object belonging to a different world
+# from the rest of the scene, present and unexplained. The concern was that
+# ghibli is the worst-case style for that — its world is pastoral warmth
+# and reverence for humble detail, which sands a strange object down into
+# charm — and that the fix would be to switch styles.
+#
+# That concern turns out to be wrong about Ghibli specifically, and the
+# correction belongs in guidance rather than in a style change: this world
+# is *full* of the genuinely strange treated as utterly ordinary. A castle
+# walking on chicken legs, a bathhouse staffed by gods, a cat that is also
+# a bus, an abandoned sky-city, a rusting biplane in a flower field. What
+# makes those read as Ghibli rather than as generic fantasy is that they
+# are heavy, weathered, physically solid and mundanely lit, and that the
+# characters are not astonished by them. That is exactly the register an
+# intrusion needs, so the guidance now names it — without it, Stage 2 reads
+# the rest of this world description as "keep everything homely" and quietly
+# drops the intrusion or turns it into something twee.
+# CHARTER, 2026-09-20. Replaces this preset's `guidance`, which is deleted
+# below. Every prohibition that field carried is preserved here, because each
+# one was a measured fix and not an opinion: no abstract energy-beings (the
+# style cannot render them), do not default to a cottage kitchen (the
+# 2026-09-08 register-collapse bug, where 5 of 10 non-figure registers turned
+# into the same domestic scene), and scenes are not obliged to be warm.
+#
+# The old field had to be a world, a prohibition and a plea in one paragraph.
+# The charter separates those, and `forbids` is the part that must survive
+# verbatim in substance -- if a register collapses again, look there first.
+# WEAR, 2026-10-10 (STYLE-OVERHAUL Prompt 1): "heavy and worn" (physics) and
+# "heavy, weathered" (strangeness) went, with the same words in the highlight,
+# THE IMPOSSIBLE and the global relation and highlight text. Wear was required
+# in five places at once, so every image came back gritty and the image model
+# painted the same grainy stone in every style. How worn things are is now the
+# dial's `condition`, drawn per run (llm_pipeline.draw_style_choices); a
+# [ghibli] `conditions` array would override its range. Later the same day
+# era's "patched" and materials' "softened by moss" went too: the after-sweep
+# traced patched and moss in the objects to those two words.
+# RE-CHARTERED 2026-10-10 (STYLE-OVERHAUL Prompt 4, grilled with Garrett):
+# materials lead with wood, paper, tile, cloth and stone (iron and enamel only
+# where a machine needs them -- the sweeps put riveted iron on everything);
+# society and inhabitants gain the days that are not work; favoured_actors
+# demotes the lone soot-marked mechanic, this project's own attractor; every
+# field cut to at most two examples. Sources: Miyazaki 1984-2023 plus Pom Poko;
+# keep out Ghibli's near-realist films. Research:
+# verification/charter-ghibli/research.md.
+
+label = "Hand-Painted Anime"
+# SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1). One recipe is drawn per run,
+# never one of this style's last 2, and replaced OPENNESS in the brief together
+# with the WALLPAPER rule every [space] style shares (see
+# llm_pipeline.WALLPAPER_RULE). One fixed recipe, "half the frame open
+# distance", put far off / distance / beyond into 29 of 33 days.
+space = [
+  "a wide low horizon under an enormous sky, the near ground filling the bottom third",
+  "looking up a steep slope or terraced hillside toward its crest",
+  "from a ridge or rooftop down into a valley or town",
+  "under a forest canopy with one break opening onto light beyond",
+  "across water — a lake, a flooded field, the sea — to a far shore",
+  "from the air, out of a flying machine or a high tower, the land laid out below",
+  "one close place — a streambed, a doorway, the foot of a tree — with a single gap showing what lies past it",
+  "along a road, rail line or river running away into the land",
+]
+
+# suffix_base split 2026-09-20: TECHNIQUE ONLY. It used to also mandate
+# "towering cumulus clouds with hard-edged sunlit tops against a deep blue sky"
+# and "warm naturalistic low sunlight" on EVERY ghibli image, which made it the
+# last fixed instruction overriding a variable one. Measured: on the darkest
+# cell available (hard/hi, exposure lo) the dial asked for "most of the frame
+# unlit or obscured" and a strangeness that is "dangerous, diseased or
+# grieving", and the render came back a sunny meadow with a friendly turtle.
+# The suffix was vetoing both the light axis and the wonder tone, and probably
+# always had been.
+#
+# Weather, palette and time of day now come from the dial (light, wonderTone)
+# and from the charter's `weather`, which describes a RANGE rather than one
+# state. What stays here is what is true of a ghibli frame at any hour: layered
+# opaque paint, visible brushwork, heightened colour, and -- added explicitly,
+# because this is what stops a dark day going grey and grimdark -- saturation
+# that survives shadow. Mononoke's night forest is dark and still richly
+# coloured.
+#
+# RISK, stated plainly: the cumulus-against-blue clause was one of the
+# strongest recognisability cues, and the 2026-09-08 sweep put ghibli at 12/12.
+# If recognisability drops, this is the change that did it, and the fix is to
+# move that clause into the charter's `weather` as a bright-day option rather
+# than back into the suffix.
+# REWRITTEN 2026-10-10 (STYLE-OVERHAUL Prompt 3). The ghibli, cyberpunk and
+# cosmic suffixes all asked for saturated, painterly, hazy digital
+# illustration, close to the image model's default look, while the four
+# styles that render distinctly each name a medium far from it. The three new
+# suffixes differ from each other in line, shadow and light source: ghibli is
+# 35mm hand-painted film, daylight-true colour, coloured shadows, light only
+# from sun, sky or fire. The previous suffix_base, for the record:
+# "Studio Ghibli feature-film animation style. Hand-painted backgrounds in
+# layered opaque paint with visible brushwork in foliage, stone, cloth and
+# water; forms built from stacked paint rather than smooth digital gradients;
+# colour heightened rather than muted, and still saturated in shadow, in rain
+# and at night rather than draining to grey; fine detail held even in the
+# darkest parts of the frame." suffix_figures is unchanged.
+# REVISED again 2026-10-10 (Prompt 4): the Prompt 3 renders showed the model
+# ignoring "shot on 35mm film", "slight film grain" and "softness toward the
+# edges"; the last sentence now states the visible result instead.
+suffix_base = "A frame from a hand-drawn Studio Ghibli feature film of the 1980s and 90s. Backgrounds are hand-painted in opaque poster colour with visible brushwork; colour is natural and daylight-true — leaf greens, sky blues, warm earth, soft greys under overcast — never neon and never chrome. Shadows are coloured and transparent, never black. Light comes from the sun, the sky or a fire, never from glowing objects. Visible grain over flat areas of sky and wall; the whole frame slightly soft, warm and faded, like an old cinema print; no digital crispness, bloom, lens flare or glossy sheen."
+suffix_figures = " Figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
+# guidance removed 2026-09-20: superseded by [ghibli.world] above. Its
+# world-description became the charter's fields; its prohibitions went to
+# `forbids`, which was itself removed later the same day -- see the note
+# in the charter block for where each one went. Both are in git history.
+
+
+[world]
+era = "Early-industrial in feeling, with engineering that is impossible and that nobody minds: machines walk, fly and have faces, and a building may have legs. Everything is hand-built, far oversized for its job, and kept running by someone who loves it. Technology here is a character, not a backdrop."
+materials = "Wood, paper, tile, cloth, thatch and cut stone carry most of this world, with iron and enamel only where a machine needs them. These ordinary materials are what the impossible things are made of: a flying machine of canvas and bicycle parts, a walking house of scavenged roofing."
+physics = "Impossible things obey ordinary physics. They have weight, they cast shadows, they rust, they are lit like everything else, and the ground takes their load. Nothing glows of its own accord, nothing is translucent, and nothing floats without a visible reason; a thing that could be rendered as a light effect does not belong here. The wonder is that something enormous and impossible is also solid."
+society = "Small settlements where people are known by name, the weather and the land are close, and institutions are distant. Spirits, gods and creatures share the place and hold jobs in it, and no one finds this worth remarking on. Days here are not all work: people wait for a bus in the rain, bathe, eat together at a long table, and fly for the joy of it."
+weather = "Weather is a presence and often a threat, and it runs the whole range, from hard-edged cumulus over deep blue to rain that means it, fog, snow, dusk and full night. Wind moves through everything. Pick the weather the day calls for rather than defaulting to fine; this world is at least as itself in bad weather as in good."
+inhabitants = "Children on the edge of growing up, the old, and working people known by name; creatures the size of houses with their own purposes; spirits that have taken a shape and a trade; machines someone looks after that may be awake. They are as often at a meal, a bath or a journey as at work."
+strangeness = "The genuinely strange is completely unremarkable: unexplained machinery left standing in a meadow, a creature the size of a house asleep among ordinary trees. Such things are physically solid and lit exactly like everything around them, and nobody in the frame is astonished by them."
+numinous = "Spirits are ordinary residents. They take a body, a size and a job, like a river that is also somebody or a soot-coloured swarm that carries coal. They are solid, they leave prints, and they are lit like everything else; people greet them, avoid them or work alongside them without comment. Never a glow, a mist or a translucency: if it could be painted as a light effect it is not one of these."
+dread = "This world at its darkest is this one with the other face turned out: a god maimed or boiling with something under the skin, industry eating the forest for good reasons. Violence is sudden, physical and costly and never relished by the frame. Nobody here is simply good or simply bad, and the image should not tell you whom to side with."
+favoured_actors = "This world is richest in creatures with their own purposes, part-human figures, spirits holding a trade, swarms, and machines that may be awake. A lone ordinary person, and above all a lone soot-marked mechanic at a machine, is the least interesting inhabitant available and should not be the default."
+# myth, 2026-10-10 (STYLE-OVERHAUL Prompt 2): where this world's stories come
+# from. Stage 1.5's meaning keeps Jung and Neumann as the lens for what kind of
+# situation a day is, and looks for its form here. Placeholder wording from the
+# overhaul plan; Prompt 4 re-grills it.
+myth = "Shinto kami, the spirits of particular places and the gods of rivers, hills and forests; Japanese folklore of tricksters, shapeshifters and the child spirited away into a world of spirits; and the European fairy tale these films also draw on, of witches' apprentices, cursed shapes and castles that move."
+# highlight added 2026-10-09: the thing the eye goes to first. This is the
+# "anomaly" wording every style used to share (wrong in one way, larger or
+# older, solid, unexplained, cropped if enormous), moved here because it is
+# this world's logic and not a universal one. Tested under the old name across
+# the 2026-09 sweeps; reworded only to stand alone.
+# REWRITTEN 2026-10-10 (STYLE-OVERHAUL Prompt 1). It named "the size of a barn
+# or a hillside" and offered only two wrongnesses (far larger, far older and
+# more worn), and the review found barn in 21 of 33 days and ancient/older in
+# 37 of 52 highlights across six styles. The kind of wrongness is now drawn per
+# run from highlight_modes, the scale comparison is left to the scene, and wear
+# is the dial's condition. "Never modern, manufactured or electronic" stays:
+# that is this world's, whatever the mode.
+highlight = "One thing, native to this world and made of its own materials, that is wrong in exactly one way; today's kind of wrongness is given with this definition. Whatever the wrongness, it is never modern, manufactured or electronic. It is solid and lit like everything else; it does not glow, float, shimmer or look magical. Nothing in the scene explains why it is there. Where its wrongness is size, choose a scale comparison native to this scene, never the same one twice, and put part of it in shot, close (the foot of it, one edge, the shadow it throws) rather than shrinking it or pushing it to the back of the frame."
+# One drawn per run, never one of ghibli's last 2.
+highlight_modes = [
+  "far too large for its kind",
+  "far older than everything around it",
+  "awake when it should be inert",
+  "in the wrong element (a boat in a tree, a house on a river)",
+  "one of a crowd where there should be only one",
+  "being used for a job it was never built for",
+]
+# `forbids` removed 2026-09-20 at Garrett's direction: a poorly introduced
+# control from too far back in the iteration process. A charter says what
+# a world IS; it should not need a list of what it is not.
+#
+# What went with it, so the history is not lost: the no-energy-beings ban
+# (now carried by `physics`, which says a thing renderable as a light
+# effect does not belong here), the 2026-09-08 cottage-kitchen rule, and a
+# clause that was permission rather than prohibition -- that scenes here
+# are not obliged to be warm and may hold dread, decay and blight. Some of
+# that permission survives in `weather`. If ghibli drifts pleasant, or if a
+# register collapses into a kitchen again, this is the change that did it.
+
+
+# BRIEF, 2026-09-26. Stage 2's style-specific rules, moved here verbatim from
+# stage2_image_prompt, where they were hardcoded for every style. They were
+# written for this world. Each is phrased as a count and a failure condition
+# because the brief is the part Stage 2 obeys, and mood words are not obeyed.
+#
+# THE IMPOSSIBLE (`signature`): until it existed wonder was only DESCRIBED in
+# the charter and nothing required it, so a world of walking machines reliably
+# produced a plausible flour mill. A charter says what MAY exist; only the
+# brief makes something appear. (A {wonder} scale line went on 2026-10-09:
+# prominence is now a style-neutral brief line about the highlight, sent to
+# every style.)
+#
+# 2026-10-16 (charter-required): the key was `impossible` and it carried the
+# temper inline ("What temper it is in: {wonderTone}"). It is now `signature`,
+# and the temper is a TEMPER rule like every other style's. OPENNESS went the
+# same day: [ghibli.space] and the WALLPAPER rule had replaced it since
+# 2026-10-10, and it was skipped on every run.
+[brief]
+signature = "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, and nothing in the scene treats it as remarkable; it may be the highlight. Give it this world's own form: a machine that is plainly alive or awake, a spirit holding a job, a creature far too large for its kind, or a building that walks or flies. Build it from this world's own materials, give it real weight, light it like everything else, and let the actor treat it the way they would a wall. An image in which everything could exist is a failed response.\n    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a cart, a gate — close enough in frame to measure it against. A huge thing photographed alone is just a texture; it only becomes huge beside something that is not."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
+
+
+# VERBS, 2026-10-10 (STYLE-OVERHAUL Prompt 1). Each run draws 3 process verbs
+# and 3 actor verbs from the day's polarity, never one this style drew in its
+# last 2 runs (llm_pipeline.draw_style_choices). They replace the global
+# _VERBS_* and _ACTOR_VERBS_* lists, which every style shared and which put
+# spill, feed and bear down into a third to a half of all prompts.
+#   process_*: things happening to things, with no one doing them.
+#   actor_*:   what the actor does, as tables keyed by activity (work, rest,
+#              play, ritual, travel; play or ritual may be absent). A run draws
+#              one activity, then 3 verbs from it, because a chore in every
+#              frame was part of the shared scene skeleton: with one mixed
+#              array Stage 2 still picked the chore (83-92% working).
+# 20-30 entries per array, validated on load. No verb is shared with
+# cyberpunk's same array unless it is native to both (flooding, steaming,
+# cooking).
+[verbs]
+process_hard = ["flooding", "silting up", "rusting through", "buckling", "sagging under", "splitting", "scorching", "smothering", "choking", "tearing loose", "swallowing", "toppling", "gnawing at", "rotting through", "washing out", "burying", "souring", "cracking open", "overgrowing", "scouring", "flattening", "boiling over"]
+process_soft = ["drying", "steaming", "sprouting through", "ripening", "swaying", "trickling", "warming", "settling", "drifting", "bobbing", "filling", "draining clear", "shading", "sheltering", "rustling", "cooling", "rising", "flowering", "nesting in", "gathering dew", "rippling", "unfurling"]
+actor_hard.work = ["hauling", "bailing", "shoring up", "chopping free", "dragging", "wrestling with", "cranking", "hammering", "beating back", "holding down", "cutting loose", "pumping", "shovelling", "shouldering", "roping", "digging out", "damming", "carrying off"]
+actor_hard.rest = ["sheltering under", "huddling in", "waiting out"]
+actor_hard.play = ["racing", "flying kites into", "sledging down"]
+actor_hard.ritual = ["ringing", "scattering salt over"]
+actor_hard.travel = ["fording", "scrambling up", "pushing through", "poling across"]
+actor_soft.work = ["cooking", "hanging out washing", "polishing", "sweeping", "oiling", "picking", "tying", "kneading", "airing out", "stacking"]
+actor_soft.rest = ["napping beside", "sharing food with", "dozing against", "eating lunch on", "sitting out"]
+actor_soft.play = ["sketching", "fishing", "whittling", "splashing in", "playing tag around", "flying a kite from"]
+actor_soft.ritual = ["leaving an offering at", "hanging a paper charm on", "lighting a lantern for"]
+actor_soft.travel = ["riding", "leading by the hand", "cycling past", "wading across", "walking home past"]
+
+
+# REGISTERS, 2026-10-10 (STYLE-OVERHAUL Prompt 4): ghibli had none of its own.
+# One span-and-principle line per register, at most two examples, no example
+# noun repeated across lines. "glass and ceramic" avoids the word ceramic,
+# which Prompt 3's check showed paints jars blue-and-white.
+[registers]
+"botanical" = "Plants as a force that reclaims: a camphor tree wider than a house, a vine swallowing a stone wall. Green is never decoration here; it is winning slowly, or being cut back by hand."
+"bodily and anatomical" = "The bodies of the large and the strange as terrain: the flank of a boar god, the ribs of a creature that has lain down for good. Bodies are warm, heavy and breathing, and when hurt they are plainly hurt, never gory."
+"fungal and decaying" = "Rot as the forest's other life: a spore-forest grown over a ruin, a fallen trunk going soft under shelf fungus. Decay here is alive and has its own spirits; it is neither clean nor evil."
+"animal and creaturely" = "Animals with their own business: a cat that might be more than a cat, a heron that watches too long. The large ones are gods or nearly; the small ones go about their day and perform for no one."
+"geological" = "Stone that holds the land up and the old powers in: a cliff a village is built into, a stone gate half-sunk on a hillside. Rock is solid, lit by the weather, and often carved by people long gone."
+"metallic and ore" = "Metal as the stuff of mines and machines: a mining town's tracks and ore carts, a cast-iron stove in a witch's kitchen. It rusts, it is fixed by hand, and it is never chrome."
+"glass and ceramic" = "Glass in a household's hands: a greenhouse in an overgrown garden, the bottle-glass windows of a hill town. It catches daylight; nothing made of glass glows of its own accord."
+"architectural" = "Buildings that look grown into their places: a bathhouse stacked up a hillside, a moving castle of scavenged roofs and chimneys. Every building is lived in and shows it."
+"domestic interior" = "A home is a kitchen, a stair and a window: a farmhouse hearth, an attic bedroom. It always opens onto the world through a window or a door, and is never the setting for a register that is not this one."
+"mechanical" = "Machines built by hand and oversized for their jobs: an ornithopter's beating wings, a lift worked by a spirit at the wheel. Legible as machines, and possibly awake."
+"industrial and infrastructural" = "Works that feed a town and eat a forest: an ironworks on a lake, a railway laid across flooded water. Industry has people in it, good reasons, and a cost."
+"agricultural and cultivated" = "Land worked by hand: paddies stepped down a valley, a kitchen garden behind a farmhouse. The subject is the season's work and its yield."
+"aquatic" = "Water as weather and as somebody: a river god choked with refuse, a sea that has risen over a town. Water moves, floods and carries the sky in it."
+"atmospheric" = "Sky as the biggest presence in frame: cumulus building over deep blue, a storm wall advancing across a field. Wind is visible in grass, cloth and hair."
+"glacial and frozen" = "Cold as hardship and as quiet: a mountain pass in snow, frost on a carriage window. Ice belongs to weather and to high places."
+"fire and ember" = "Fire as a household creature and as a disaster: a hearth fire that talks, a town burning under bombers. Every flame has fuel and a place."
+"textile and fiber" = "Cloth on the move: laundry on a line, an airship's canvas skin. It catches wind and light and is always in use."
+"ritual object" = "The small shrines that sit everywhere: a roadside stone figure in a red bib, a shrine rope round a great tree. Offerings are modest and well kept."
+"paper and inscription" = "Paper as charm, letter and contract: a talisman stuck to a doorway, a name signed away in a spirit's ledger. Writing shows as marks, never readable words."
+"instrument and measure" = "Instruments of flight and trade: an altimeter's dial in a cockpit, a market scale. To measure here is to fly safely or to trade fairly."

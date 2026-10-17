@@ -1,14 +1,19 @@
 # Style charter schema
 
-A style in `backend/pipeline/styles.toml` is a **technique** (how the image is
-painted) and a **charter** (what world it shows). This is every field a charter
-can have, what reads it, and the one rule that matters most when writing it.
-It is the contract a future "create your own style" feature generates against.
+A style (a theme) is one file, `<key>.toml`, with a preview image `<key>.jpg`
+beside it; the file name is the key. Shipped themes live in
+`backend/pipeline/styles/`, your own in `~/.config/astro-arc/styles/` (under
+`$XDG_CONFIG_HOME` if set). A user file with a shipped theme's key is ignored
+with a warning. A theme is a **technique** (how the image is painted) and a
+**charter** (what world it shows). This is every field a charter can have, what
+reads it, and the one rule that matters most when writing it. It is the
+contract a future "create your own style" feature generates against.
 
 **A charter is required.** There are no neutral fallbacks: every table and
 field below is required unless it is listed under Optional.
 `llm_pipeline.validate_charter` is the single definition of a complete
-charter. A style with any error cannot be used for a run, and each error names
+charter. The preview `<key>.jpg` is required too. A style with any error cannot be used
+for a run (the panel lists it as "(Failed Validation)"), and each error names
 the style, the field and the rule. The validator also prints warnings for
 choices the schema allows but advises against (see Warnings).
 
@@ -22,15 +27,15 @@ Two rules hold for every field, because this project has measured both:
   "Make it feel open" is ignored; "at least half the frame is open, and a
   sealed close-up is a failed response" is not.
 
-## `[<style>]`
+## Top-level keys
 
 | Field | Controls | Write it well |
 |---|---|---|
-| `label` | the name in the Style dropdown | Short and recognisable. |
+| `label` | the name in the Style dropdown, the review page and history's `artStyleLabel`. **Display-only: never sent to any model**; Stage 2 gets the `[world]` charter alone | Short and recognisable. |
 | `suffix`, or `suffix_base` + `suffix_figures` | appended to every image prompt: the technique. `suffix_figures` is added only when a person is in frame | Describe what the finished frame **looks like** (line, shadow, light source, grain), not how it was made; artist names and process words are weakly followed. **Technique only:** name no objects, weather or places, because anything named in the suffix appears in every image. A thin strip at the top of the wallpaper is covered by the desktop bar, so the technique must not crop figures at the top edge. |
 | `space` | 6–8 depth recipes; one is drawn per run, sent with the WALLPAPER rule | Each recipe a different way this world shows depth, one sentence, a place not a mood. |
 
-## `[<style>.world]`
+## `[world]`
 
 Sent to Stage 1.5 (both calls) and Stage 2, in this order. All 13 fields are
 required.
@@ -51,7 +56,7 @@ required.
 | `highlight` | what the thing the eye finds first is in this world | A principle, plus "today's kind of wrongness is given with this definition" when there are modes. Name no size comparison. |
 | `highlight_modes` | 4–6 kinds of wrongness; one drawn per run | Each a different kind, not a different size. |
 
-## `[<style>.brief]`
+## `[brief]`
 
 Rules appended to Stage 2's composition brief, in file order. They may use the
 dial's values as `{placeholders}`, most often `{wonderTone}`.
@@ -67,14 +72,14 @@ when one is not. Forcing a mood or a relationship in a rule (grief, rescue, a
 villain) is allowed as the creator's choice, but it warns: the chart, not the
 charter, is meant to decide how a day feels.
 
-## `[<style>.verbs]`
+## `[verbs]`
 
 | Field | Controls | Write it well |
 |---|---|---|
 | `process_hard`, `process_soft` | 20–30 each; 3 drawn per run from the day's polarity. Things happening with no one doing them | Verbs this world's physics allows; share none with another style's same array unless native to both. |
 | `actor_hard.<activity>`, `actor_soft.<activity>` | activities `work`, `rest`, `play`, `ritual`, `travel` (work, rest and travel required, plus play or ritual); 20–30 in total per polarity. One activity is drawn per run, then 3 of its verbs | Give the non-work activities as much life as the work. |
 
-## `[<style>.registers]`
+## `[registers]`
 
 One line per register in `registers.toml` (20), all required: what that
 substance means in this world. There is no generic per-register line to fall
@@ -83,7 +88,7 @@ back on. Read by both Stage 1.5 calls and Stage 2. May end with
 **Write it well:** a span and a principle with two examples; the line must not
 pull every register toward the same setting.
 
-## `[<style>.light]`
+## `[light]`
 
 Exactly `lo`, `mid` and `hi`: the light line Stage 2 gets for each exposure
 band. There are no global light lines. **Write it well:** a count and a
@@ -97,7 +102,7 @@ point where they hold.
 
 | Table | Controls | Write it well |
 |---|---|---|
-| `forbids` in `[<style>.world]` | read out last as "Never in this world" | Prefer saying what the world is. No shipped style uses it. |
+| `forbids` in `[world]` | read out last as "Never in this world" | Prefer saying what the world is. No shipped style uses it. |
 
 How worn things are (newly made … ruined) is the pipeline's wear scale, drawn
 per run and the same for every style; a charter cannot replace it.

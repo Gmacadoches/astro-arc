@@ -70,10 +70,12 @@ def main():
     period_key = reading["arc"]["periodKey"]
 
     styles = lp.load_styles()
-    wanted = [s.strip() for s in args.styles.split(",")] if args.styles else list(styles)
+    # The gallery documents the shipped set; a user's own themes are named explicitly.
+    shipped = [k for k, t in styles.items() if t.source == "shipped"]
+    wanted = [s.strip() for s in args.styles.split(",")] if args.styles else shipped
     wanted = [s for s in wanted if s in styles]
     if not wanted:
-        raise SystemExit("No matching styles in styles.toml.")
+        raise SystemExit("No matching styles.")
 
     # --- pin everything that is not the style ------------------------------
     dial = lp.dial_from_texture(reading["arc"].get("texture"))
@@ -97,7 +99,7 @@ def main():
     rows, total = [], 0.0
 
     for i, key in enumerate(wanted, start=1):
-        label, guidance = lp.load_style_info(key)
+        label, world = lp.load_styles()[key]["label"], lp.load_style_world(key)
         print("[%d/%d] %s" % (i, len(wanted), label), file=sys.stderr)
         # Each world's own draws (verbs, space, condition, highlight mode), as
         # production applies them; without this the gallery would show every
@@ -106,14 +108,14 @@ def main():
 
         amplification, amp_cost = lp.stage15_amplify(
             stage1, stage1_model, period_key, config, cache=False, dial=style_dial,
-            style_key=key, style_world=lp.load_style_world(key),
+            style_key=key, style_world=world,
             register=args.register, secondary_register=args.secondary,
         )
         total += amp_cost or 0.0
 
         prompt, tags, has_people, cost = lp.stage2_image_prompt(
             stage1, args.register, [], cliches, stage2_model,
-            label, guidance,
+            world,
             secondary_register=args.secondary,
             amplification=amplification,
             dial=style_dial,
@@ -123,7 +125,7 @@ def main():
             highlight=lp.load_style_highlight(key),
         )
         total += cost or 0.0
-        final = prompt + ", " + lp.load_style_suffix(key, has_people)
+        final = lp.final_image_prompt(prompt, key, has_people)
 
         rel = "images/styles/%s.jpg" % key
         if not args.no_image:
@@ -142,7 +144,7 @@ def main():
     out = [
         "# The seven worlds",
         "",
-        "Each style in [`backend/pipeline/styles.toml`](../backend/pipeline/styles.toml) is a technique and a "
+        "Each style in [`backend/pipeline/styles/`](../backend/pipeline/styles/) is a technique and a "
         "**world**: a charter that says what the world is made of, who lives there, which myths its stories "
         "come from, what its highlight is, and the one thing that marks a picture as unmistakably that world. "
         "[`charter-schema.md`](charter-schema.md) describes every field.",

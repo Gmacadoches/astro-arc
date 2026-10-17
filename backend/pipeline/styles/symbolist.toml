@@ -1,0 +1,92 @@
+# CHARTER, 2026-10-10 (STYLE-OVERHAUL Prompt 4, approved by Garrett): Varo and Carrington's concrete dream-world: inner things built as outer ones; glowing orbs and abstraction ruled out by physics.
+# Brief is SIGNATURE + TEMPER (THE IMPOSSIBLE and OPENNESS no longer apply;
+# space recipes replace OPENNESS). The suffix is untouched, as Prompt 4 asks
+# for the four technique styles. Research: verification/charter-symbolist/research.md.
+
+label = "Symbolist / Visionary"
+suffix = "painterly, visionary symbolist painting in the tradition of Odilon Redon, Remedios Varo, Leonora Carrington, and Hilma af Klint's illuminated visions — strange, hand-painted, not digital or photographic"
+# guidance removed 2026-10-10: superseded by the charter above. In git.
+space = [
+  "through a tower window onto a desert plain",
+  "down a long vaulted corridor of doors",
+  "across a still sea to an island of dark trees",
+  "up a spiral stair to an observatory",
+  "along a road that becomes a woman's hair",
+  "through an open kitchen onto a moonlit garden",
+  "across a plaza with a single strange vehicle",
+  "from a balcony over a city of towers",
+]
+
+
+[world]
+era = "No single era: the dream-world of the Symbolist and Surrealist painters, where towers, vehicles and kitchens from old Europe and old Mexico house rites nobody explains. Its technology is handmade and impossible, like a bicycle that weaves as it rides or a tower that spins thread."
+materials = "Wood grain, threadwork, feathers, stone, glass and cloth, painted finely with visible texture; bodies merge with these materials at their edges. Everything is solid enough to touch."
+physics = "Inner things are built as outer ones: a feeling is a tower, a memory is a room. Things change into each other at their edges, slowly and in plain sight. Light comes from a window, a candle or a lamp, and nothing glows of its own accord."
+society = "Small closed communities, like a household of women or a tower of scholars, keeping rites and crafts that are never explained. Days here are rites, meals, journeys and games as much as work."
+weather = "Weather is a mood made physical: a sky with the grain of wood, a still yellow dusk. Pick what the day calls for."
+inhabitants = "Elongated cloaked people with heart-shaped faces, hybrid animal-women, scholars, weavers and travellers; owls and white horses; and beings who are partly furniture or partly plant."
+strangeness = "Strangeness is the medium: nothing here is ordinary and nobody is surprised. The rule is that every strange thing is a concrete thing doing something, never a symbol floating free."
+numinous = "The numinous is a craft practised in plain sight: the world's mantle being woven in a tower, a star caught in a cage and fed. It has a body and a workplace, never a glow, an aura or pure abstraction."
+dread = "This world at its darkest is enclosure: a room with no door, a figure slowly turning into furniture, an island of the dead approached by boat. Calm and exact, never gory."
+favoured_actors = "Pairs and households sharing one rite or craft, hybrid figures, animals with purposes, and the numinous at work. A lone figure gazing into the distance is this tradition's most worn image and should not be the default."
+myth = "Alchemy and Hermeticism, Celtic and Mexican folklore, Theosophy, and Greek myth as the Symbolists painted it: the work of transformation, the descent to the underworld, the weaving of fate."
+highlight = "The thing the eye finds first: an inner state built as a concrete apparatus, room or body. Today's kind of wrongness is given with this definition. It is solid, finely painted and lit like everything else."
+highlight_modes = [
+  "a person partly become an object",
+  "an apparatus that does an impossible job",
+  "a room that is also a body",
+  "an animal performing a rite",
+  "a small thing at the scale of a building",
+]
+
+
+[brief]
+signature = "SIGNATURE — at least one impossible apparatus, or a body partly turned into something else, is named explicitly and doing something. It may be the highlight. A scene that could be an ordinary painting of an ordinary room is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
+
+
+[verbs]
+process_hard = ["dissolving", "petrifying", "unspooling", "hardening", "devouring", "fracturing", "entangling", "sealing over", "wilting", "consuming", "strangling", "liquefying", "ossifying", "crumbling", "tightening", "closing in", "bleeding into", "caging", "spreading like a stain", "tarnishing"]
+process_soft = ["opening like a flower", "transforming", "merging", "floating", "weaving itself", "breathing", "singing softly", "growing feathers", "melting into", "branching into", "twining", "brooding", "pouring slowly", "hovering", "paling", "maturing", "echoing", "doubling", "sleeping", "unwinding"]
+actor_hard.work = ["spinning", "grinding", "stirring", "sewing shut", "pruning back", "winding", "pushing against"]
+actor_hard.rest = ["hiding inside", "waiting within", "curled asleep in"]
+actor_hard.play = ["playing chess against", "riding a strange vehicle round", "dancing with"]
+actor_hard.ritual = ["performing a rite over", "anointing", "reading aloud from"]
+actor_hard.travel = ["pedalling through", "sailing across", "climbing toward", "descending into", "crossing"]
+actor_soft.work = ["weaving", "embroidering", "distilling", "gardening", "weighing", "spinning wool"]
+actor_soft.rest = ["sleeping in", "reclining on", "taking tea with", "dreaming in"]
+actor_soft.play = ["playing music for", "playing cards with", "telling stories to", "feeding birds at"]
+actor_soft.ritual = ["lighting candles for", "pouring a libation over", "consecrating"]
+actor_soft.travel = ["riding through", "rowing toward", "walking in procession to", "setting out from", "gliding toward"]
+
+
+[registers]
+"botanical" = "Plants that are half something else: a flower with a face, a tree whose branches are threads. Growth here is slow transformation."
+"bodily and anatomical" = "The body as a place things happen: hair that becomes a road, a chest that opens like a cabinet. Calm and exact, never gore."
+"fungal and decaying" = "Decay as alchemy's first stage: a still-life going black and soft, mould spreading like a map across a wall."
+"animal and creaturely" = "Animals as companions in the rite: an owl reading over a shoulder, a white horse standing indoors. They have their own purposes."
+"geological" = "Stone as a dreamed landscape: a desert of smooth rock, a cliff carved into a stair that goes nowhere."
+"metallic and ore" = "Metal as the alchemist's work: a lead weight turning gold at one edge, a brass apparatus of rings and cogs."
+"glass and ceramic" = "Glass as vessel and lens: a bell jar holding a small weather, a lens through which another room is seen."
+"architectural" = "Towers, cloisters and halls that are also instruments: a tower that spins thread from its windows, a corridor of doors that open onto skies."
+"domestic interior" = "Kitchens and bedrooms as laboratories of the soul: a kitchen where the stew is a sky, a bed that is a boat. Always opens onto a window or a door."
+"mechanical" = "Machines made of wood, cloth and feathers that do impossible jobs: a vehicle pedalled through a forest, a loom that weaves light into cloth."
+"industrial and infrastructural" = "Works on a dream's scale: a mill grinding stars into flour, a water channel running uphill."
+"agricultural and cultivated" = "Strange husbandry: a garden of glass flowers tended with tweezers, a field ploughed by a hybrid."
+"aquatic" = "Water as passage and mirror: a boat crossing a still sea to an island of dark trees, a still lake holding a different sky."
+"atmospheric" = "Air with texture: a sky like wood grain, a wind made of threads."
+"glacial and frozen" = "Cold as stillness: a figure frozen mid-gesture in a block of clear ice, frost growing like lace across a window."
+"fire and ember" = "Fire as transformation: an athanor's slow fire, a candle whose flame is a small figure."
+"textile and fiber" = "Thread as the world's substance: the mantle of the world being embroidered, a tapestry whose figures step out."
+"ritual object" = "Instruments of a private rite: a cage for a star, a chalice that pours light. Each is concrete, handled and used."
+"paper and inscription" = "Books and diagrams that are alive: a book whose pages are birds, a chart unrolling into a road. Writing appears as marks, never a readable sentence."
+"instrument and measure" = "Instruments of the inner world: a scale weighing a heart against a feather, a clock with hands of branches."

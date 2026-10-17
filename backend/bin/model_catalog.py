@@ -79,7 +79,7 @@ _NOT_CHAT_RE = re.compile(
 def load_rates():
     """pipeline/model-rates.toml, read fresh every call so a hand edit takes
     effect on the next generation with no restart — same contract as
-    registers.toml and styles.toml."""
+    registers.toml and the theme files."""
     path = PIPELINE_DIR / "model-rates.toml"
     if not path.exists():
         return {"chat": {}, "image": {}, "image_qualities": {}, "hierarchy": {}}

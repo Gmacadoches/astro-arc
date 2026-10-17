@@ -337,7 +337,7 @@ def main():
         jobs = [(r, None) for r in registers]
 
     cliches = lp.load_cliches()
-    style_label, style_guidance = lp.load_style_info(style_key)
+    style_world = lp.load_style_world(style_key)
 
     results = []
     total_cost = 0.0
@@ -403,18 +403,18 @@ def main():
         try:
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
                 stage1, primary, [], cliches, stage2_model,
-                style_label, style_guidance, **kwargs
+                style_world, **kwargs
             )
         except TypeError:
             # Older pipeline signature (pre-Task 3/4) — fall back so the
             # harness can still produce a baseline on unmodified code.
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
                 stage1, primary, [], cliches, stage2_model,
-                style_label, style_guidance,
+                style_world,
             )
 
-        suffix = lp.load_style_suffix(style_key, has_people)
-        final_prompt = f"{prompt}, {suffix}" if suffix else prompt
+        # Production's own join, so a sweep renders what a real run would.
+        final_prompt = lp.final_image_prompt(prompt, style_key, has_people)
 
         # One tier for every sample, the same one production uses. This used to
         # bump figures to "high" and default everything else to "medium", on the

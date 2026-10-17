@@ -108,8 +108,6 @@ def _style(style_key):
 
 
 def install_detectors():
-    original_world = lp.load_style_world
-
     # --- load_style_brief: the unchartered branch and the default signature.
     # _default_signature is only ever called from load_style_brief, so which
     # branch called it follows from whether the style has a [brief] table.
@@ -146,17 +144,6 @@ def install_detectors():
         if not result:
             AUDIT.hit("load_style_world", 'returned "" (no [world] charter)')
     _wrap("load_style_world", after_world)
-
-    def after_info(result, style_key):
-        styles = lp.load_styles()
-        if style_key not in styles:
-            AUDIT.hit("load_style_info", "unknown key, fell back to symbolist")
-        key = style_key if style_key in styles else "symbolist"
-        if not original_world(key):
-            how = ("charter missing, `guidance` used" if (styles.get(key) or {}).get("guidance")
-                   else "charter missing, no `guidance` either: style line dropped")
-            AUDIT.hit("load_style_info", how)
-    _wrap("load_style_info", after_info)
 
     def after_suffix(result, style_key, has_people=False):
         if style_key not in lp.load_styles():
@@ -372,7 +359,7 @@ def main():
     parser.add_argument("--out", required=True, help="name of the verification folder")
     parser.add_argument("--styles", nargs="*", help="only these style keys (default: all shipped)")
     parser.add_argument("--no-cache", action="store_true",
-                        help="re-read styles.toml and actors.toml on every call, as production does")
+                        help="re-read the theme files and actors.toml on every call, as production does")
     parser.add_argument("--no-control", action="store_true", help="skip the unchartered control style")
     args = parser.parse_args()
 
@@ -385,7 +372,8 @@ def main():
         install_detectors()
         seed_stage1_cache(CONFIG)
 
-        shipped = [k for k in lp.load_styles() if k != CONTROL_STYLE]
+        # Shipped themes only: a user's own themes would change the baseline.
+        shipped = [k for k, t in lp.load_styles().items() if getattr(t, "source", None) == "shipped"]
         styles = args.styles or shipped
         registers = lp.load_registers()
 

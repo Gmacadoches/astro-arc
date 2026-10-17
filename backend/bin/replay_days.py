@@ -110,7 +110,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     registers = lp.load_registers()
-    style_label, style_world = lp.load_style_info(style_key)
+    style_world = lp.load_style_world(style_key)
     cliches = lp.load_cliches()
 
     history, rows, total = [], [], 0.0
@@ -129,7 +129,7 @@ def main():
         amp, c1 = lp.stage15_amplify(
             stage1, stage1_model, key, config, cache=False, dial=dial,
             avoid_archetypes=avoid_arch, avoid_kinds=avoid_kind,
-            style_key=style_key, style_world=lp.load_style_world(style_key),
+            style_key=style_key, style_world=style_world,
             register=primary, secondary_register=secondary,
         )
         total += c1 or 0.0
@@ -146,11 +146,10 @@ def main():
             kwargs["secondary_register"] = secondary
         prompt, tags, has_people, c2 = lp.stage2_image_prompt(
             stage1, primary, avoid_tags, cliches, stage2_model,
-            style_label, style_world, **kwargs)
+            style_world, **kwargs)
         total += c2 or 0.0
 
-        suffix = lp.load_style_suffix(style_key, has_people)
-        final = f"{prompt}, {suffix}" if suffix else prompt
+        final = lp.final_image_prompt(prompt, style_key, has_people)
         stem = f"{i:02d}_{key}"
 
         row = {

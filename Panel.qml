@@ -52,6 +52,7 @@ Panel {
     reviewsIndexFile.reload()
     costsFile.reload()
     loadModelCatalogIfStale()
+    loadStyleCatalog()
   }
 
   function openFromHotkey() {
@@ -903,11 +904,138 @@ Panel {
     }
   }
 
-  // ---- Art style: which pipeline/styles.toml preset Stage 2's prompt is
-  // suffixed with. -----------------------------------------------------
+  // ---- Art style: which theme the run is built for. The dropdown is built
+  // from the theme files themselves (backend/bin/style_catalog.py): shipped
+  // ones in backend/pipeline/styles/, the user's own in
+  // ~/.config/astro-arc/styles/. A theme that fails validation stays listed
+  // but is never written to the config; picking it shows what is wrong. ------
+  readonly property string styleCatalogBin: binDir + "/style_catalog.py"
+  property var styleCatalog: []
+  property bool styleCatalogLoaded: false
+  // The loader's own warnings (stderr), e.g. a user file ignored because it
+  // has a shipped theme's key.
+  property string styleCatalogNotice: ""
+  // A failed theme picked from the list to see its errors. The config keeps
+  // the theme it had.
+  property string inspectedStyleKey: ""
+  property string styleActionStatus: ""
+  property bool styleActionStatusIsError: false
+  // Bumped after a preview is rewritten, so the Image reloads the same path.
+  property int stylePreviewVersion: 0
+
+  // A configured key with no theme (a deleted user theme, say). A run falls
+  // back to the default and says so on stderr (resolve_style_key); the panel
+  // selects the default and says the same thing where it can be seen.
+  readonly property bool configuredStyleMissing: root.styleCatalogLoaded
+    && !Model.findStyle(root.styleCatalog, root.configState.artStyle)
+  readonly property string shownStyleKey: root.configuredStyleMissing
+    ? Model.DEFAULT_ART_STYLE : root.configState.artStyle
+  readonly property var shownStyle: Model.findStyle(root.styleCatalog, root.shownStyleKey)
+  // The failed theme whose errors are on show: the one picked from the list,
+  // or the configured one if its file has broken since it was chosen.
+  readonly property var failedStyle: {
+    var picked = Model.findStyle(root.styleCatalog, root.inspectedStyleKey)
+    if (picked && !picked.valid) return picked
+    return root.shownStyle && !root.shownStyle.valid ? root.shownStyle : null
+  }
+
+  onShownStyleKeyChanged: styleDropdown.value = root.shownStyleKey
+
+  function loadStyleCatalog() {
+    if (styleCatalogProc.running) return
+    root.styleCatalogNotice = ""
+    styleCatalogProc.running = true
+  }
+
+  function pickArtStyle(value) {
+    root.styleActionStatus = ""
+    var row = Model.findStyle(root.styleCatalog, value)
+    if (row && !row.valid) {
+      root.inspectedStyleKey = value
+      styleDropdown.value = root.shownStyleKey
+      return
+    }
+    root.inspectedStyleKey = ""
+    root.commitArtStyle(value)
+  }
+
   function commitArtStyle(value) {
     artStyleWriteProc.command = [root.configBin, "--set-art-style", value]
     artStyleWriteProc.running = true
+  }
+
+  // "Fix with AI" and "Copy fix prompt" both copy the theme's file path and
+  // its errors for now; Prompt 5 gives each its real job.
+  function copyStyleFix(row) {
+    if (!row) return
+    Quickshell.execDetached(["wl-copy", Model.styleFixText(row)])
+    root.styleActionStatus = "Copied the theme file's path and its errors to the clipboard."
+    root.styleActionStatusIsError = false
+  }
+
+  // Both write <key>.jpg into a user theme's folder; shipped previews are
+  // read-only and style_catalog.py refuses them.
+  function setStylePreview(key, imagePath) {
+    if (stylePreviewProc.running) return
+    root.styleActionStatus = ""
+    stylePreviewProc.command = [root.python, root.styleCatalogBin, "--set-preview", key, imagePath]
+    stylePreviewProc.running = true
+  }
+
+  function changeStylePreview(key) {
+    if (stylePreviewProc.running) return
+    root.styleActionStatus = ""
+    stylePreviewProc.command = [root.python, root.styleCatalogBin, "--change-preview", key]
+    stylePreviewProc.running = true
+  }
+
+  Process {
+    id: styleCatalogProc
+    command: [root.python, root.styleCatalogBin]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var rows = JSON.parse(String(text || ""))
+          if (Array.isArray(rows)) {
+            root.styleCatalog = Model.sortStyleCatalog(rows)
+            root.styleCatalogLoaded = true
+            return
+          }
+        } catch (e) {}
+        root.styleCatalogNotice = "Couldn't read the theme list"
+      }
+    }
+    // Only the loader's warnings, never a parse failure reported above.
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var lines = String(text || "").trim().split("\n").filter(function(l) { return l !== "" })
+        if (lines.length > 0) root.styleCatalogNotice = lines
+          .map(function(l) { return l.replace(/^astro-arc: warning: /, "") }).join("\n")
+      }
+    }
+  }
+
+  Process {
+    id: stylePreviewProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var result = null
+        try { result = JSON.parse(String(text || "")) } catch (e) {}
+        if (result && result.ok && result.cancelled) return
+        if (result && result.ok) {
+          root.styleActionStatus = "Preview updated."
+          root.styleActionStatusIsError = false
+          root.stylePreviewVersion++
+          root.loadStyleCatalog()
+        } else {
+          root.styleActionStatus = (result && result.error) ? result.error : "Could not set the preview."
+          root.styleActionStatusIsError = true
+        }
+      }
+    }
   }
 
   Process {
@@ -2469,9 +2597,8 @@ Panel {
             font.pixelSize: Style.font.caption
           }
 
-          // ---- Style: label left, dropdown right — no longer locked;
-          // options come from pipeline/styles.toml (mirrored in Model.js
-          // as ART_STYLE_CHOICES). -----------------------------------------
+          // ---- Style: label left, dropdown right. Options come from the
+          // theme files (style_catalog.py); see loadStyleCatalog. -----------
           Item {
             width: parent.width
             height: Math.max(styleLabel.implicitHeight, styleDropdown.implicitHeight)
@@ -2494,13 +2621,142 @@ Panel {
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
               showLabel: false
-              value: root.configState.artStyle
-              options: Model.ART_STYLE_CHOICES.map(function(s) {
-                return { value: s.key, label: s.label }
+              value: root.shownStyleKey
+              options: root.styleCatalog.map(function(s) {
+                return { value: s.key, label: Model.styleOptionLabel(s) }
               })
               foreground: root.bar.foreground
-              onChanged: function(value) { root.commitArtStyle(value) }
+              onChanged: function(value) { root.pickArtStyle(value) }
             }
+          }
+
+          Text {
+            visible: root.configuredStyleMissing
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: "Warning: " + Model.missingStyleWarning(root.configState.artStyle) + "."
+            color: root.bar.urgent || "#f38ba8"
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          Text {
+            visible: root.styleCatalogNotice !== ""
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: root.styleCatalogNotice
+            color: root.bar.urgent || "#f38ba8"
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          // The selected theme's preview, and for a user theme the way to
+          // change it. Shipped previews are read-only.
+          Item {
+            id: stylePreviewRow
+            width: parent.width
+            visible: root.shownStyle !== null && root.failedStyle === null
+            height: Math.max(stylePreviewFrame.visible ? stylePreviewFrame.height : 0, changePreviewBtn.implicitHeight)
+
+            Rectangle {
+              id: stylePreviewFrame
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+              width: Math.min(128, parent.width * 0.3)
+              height: Math.round(width * 9 / 16)
+              visible: root.shownStyle !== null && root.shownStyle.preview !== "" && stylePreviewImage.status !== Image.Error
+              color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.08)
+              border.width: 1
+              border.color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.25)
+
+              Image {
+                id: stylePreviewImage
+                anchors.fill: parent
+                anchors.margins: parent.border.width
+                source: root.shownStyle && root.shownStyle.preview
+                  ? "file://" + root.shownStyle.preview + "?v=" + root.stylePreviewVersion : ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+                sourceSize.width: 320
+              }
+            }
+
+            Button {
+              id: changePreviewBtn
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              visible: root.shownStyle !== null && root.shownStyle.source === "user"
+              text: stylePreviewProc.running ? "Choosing…" : "Change preview"
+              bordered: true
+              fontSize: Style.font.caption
+              foreground: root.bar.foreground
+              enabled: !stylePreviewProc.running
+              onClicked: root.changeStylePreview(root.shownStyleKey)
+            }
+          }
+
+          // A theme that failed validation: what is wrong, and the two ways
+          // to get it fixed.
+          Column {
+            width: parent.width
+            spacing: Style.space(6)
+            visible: root.failedStyle !== null
+
+            Text {
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: root.failedStyle
+                ? "“" + root.failedStyle.label + "” failed validation and can't be used for a generation"
+                  + (root.failedStyle.key === root.shownStyleKey ? " (it is the configured style, so runs will fail until it is fixed)" : "")
+                  + ":\n" + root.failedStyle.errors.map(function(e) { return "• " + e }).join("\n")
+                : ""
+              color: root.bar.urgent || "#f38ba8"
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+
+            Row {
+              spacing: Style.space(8)
+
+              Button {
+                text: "Fix with AI"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                onClicked: root.copyStyleFix(root.failedStyle)
+              }
+
+              Button {
+                text: "Copy fix prompt"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                onClicked: root.copyStyleFix(root.failedStyle)
+              }
+
+              // A missing preview is itself a validation error, so a failed
+              // user theme needs this here too.
+              Button {
+                visible: root.failedStyle !== null && root.failedStyle.source === "user"
+                text: stylePreviewProc.running ? "Choosing…" : "Change preview"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !stylePreviewProc.running
+                onClicked: root.changeStylePreview(root.failedStyle.key)
+              }
+            }
+          }
+
+          Text {
+            visible: root.styleActionStatus !== ""
+            width: parent.width
+            wrapMode: Text.WordWrap
+            text: root.styleActionStatus
+            color: root.styleActionStatusIsError ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.caption
           }
 
           PanelSeparator { foreground: root.bar.foreground }
@@ -2867,6 +3123,41 @@ Panel {
                   onClicked: root.confirmSaveTheme()
                 }
               }
+            }
+
+            // The selected generation as its theme's preview. User themes
+            // only: a shipped theme's preview ships with the code.
+            Item {
+              id: reviewPreviewRow
+              width: parent.width
+              readonly property var review: root.reviewForId(root.selectedReviewId)
+              readonly property var theme: Model.findStyle(root.styleCatalog, Model.reviewStyleKey(review, root.styleCatalog))
+              visible: !root.themeNamePromptOpen && review !== null && review.imagePath !== ""
+                && theme !== null && theme.source === "user"
+              height: visible ? setPreviewBtn.implicitHeight : 0
+
+              Button {
+                id: setPreviewBtn
+                anchors.left: parent.left
+                text: stylePreviewProc.running ? "Setting…"
+                  : "Set as preview for “" + (reviewPreviewRow.theme ? reviewPreviewRow.theme.label : "") + "”"
+                bordered: true
+                fontSize: Style.font.caption
+                foreground: root.bar.foreground
+                enabled: !stylePreviewProc.running
+                onClicked: root.setStylePreview(reviewPreviewRow.theme.key, reviewPreviewRow.review.imagePath)
+              }
+            }
+
+            // Set as preview reports here too, beside the entry it acted on.
+            Text {
+              visible: reviewPreviewRow.visible && root.styleActionStatus !== ""
+              width: parent.width
+              wrapMode: Text.WordWrap
+              text: root.styleActionStatus
+              color: root.styleActionStatusIsError ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
             }
 
             Text {

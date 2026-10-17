@@ -39,7 +39,7 @@
 #                                          detects the focused monitor at
 #                                          generation time (see
 #                                          astro-arc-detect-resolution)
-#   --set-art-style <key>                 which pipeline/styles.toml preset
+#   --set-art-style <key>                 which theme (pipeline/styles/<key>.toml or a user theme)
 #                                          Stage 2's prompt is suffixed with
 #   --set-provider <openai>                 which AI provider everything else is
 #                                          scoped to — the key you paste, which
