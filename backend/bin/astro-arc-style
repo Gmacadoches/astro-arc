@@ -512,12 +512,17 @@ def slug(text):
 
 
 def read_clipboard():
+    """The clipboard as text, read the way the panel's fields paste (#10992):
+    at most IMPORT_MAX_BYTES and 2 seconds, so a hostile clipboard owner can
+    neither stall the import nor fill memory."""
+    cmd = (f"timeout 2 wl-paste --no-newline --type text 2>/dev/null "
+           f"| head -c {IMPORT_MAX_BYTES + 1}")
     try:
-        proc = subprocess.run(["wl-paste", "--no-newline", "--type", "text"],
-                              capture_output=True, timeout=2)
+        data = subprocess.run(["sh", "-c", cmd], capture_output=True, timeout=5).stdout
     except (OSError, subprocess.TimeoutExpired):
         raise StyleError("couldn't read the clipboard") from None
-    data = proc.stdout[:IMPORT_MAX_BYTES + 1]
+    if not data.strip():
+        raise StyleError("the clipboard is empty; copy the theme your chat wrote first")
     if len(data) > IMPORT_MAX_BYTES:
         raise StyleError("the clipboard holds more than a theme file could")
     return data.decode("utf-8", "replace")
@@ -553,8 +558,10 @@ def cmd_import(args):
             raise StyleError(f"{path.name} is larger than a theme file could be")
         text = path.read_text(errors="replace")
         name = path.stem
+    if not text.strip():
+        raise StyleError("there is no theme to import: the text is empty")
     text, named = strip_fences(text)
-    name = name or named
+    name = named or name
     try:
         table = tomllib.loads(text)
     except tomllib.TOMLDecodeError:

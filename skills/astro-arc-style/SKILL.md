@@ -129,9 +129,12 @@ lines are a good start where they hold.
 | `process_hard`, `process_soft` | 20–30 each | Things happening with no one doing them; 3 drawn per day by polarity. |
 | `actor_hard.<activity>`, `actor_soft.<activity>` | 20–30 in total per polarity | What the actor does. Activities: `work`, `rest`, `travel` required, plus `play` or `ritual` (or both). One activity is drawn per day, then 3 of its verbs. |
 
-Verbs this world's physics allows. No repeats within an array. Give rest,
-play, travel and ritual as much life as work. A verb shared with another
-theme's same array warns; fine when it is native to both. A verb that takes
+Verbs this world's physics allows, and specific to it: "silting up",
+"jamming its points", "gilding" rather than generic motion and change
+("drifting", "flooding", "hauling", "settling"), which every theme reaches
+for and which then warns as shared with another theme's same array (fine
+when it is native to both). No repeats within an array. Give rest, play,
+travel and ritual as much life as work. A verb that takes
 an object ends ready for one ("smoking a pipe at", "rowing across").
 
 ### `[registers]`
