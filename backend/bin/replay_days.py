@@ -39,7 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
-from sweep import texture_for_cell  # noqa: E402
+from sweep import dial_for_day, report_filled  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import STATE_DIR  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402
@@ -51,10 +51,10 @@ CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 def load_days(limit, cell):
     """(key, stage1, dial) newest-last, each with the dial that actually
-    applied that day rather than one recomputed from today's Moon. `cell`
-    (sweep.py's format) builds the dial underneath, for a day with no stored
-    dial."""
-    out = []
+    applied that day rather than one recomputed from today's Moon. The base
+    dial comes from the day's own stored texture; `cell` (sweep.py's format)
+    stands in for a day that has none (see sweep.dial_for_day)."""
+    out, filled_days = [], []
     for path in sorted(READINGS_DIR.glob("*.json")):
         key = path.stem
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", key):
@@ -65,15 +65,10 @@ def load_days(limit, cell):
             continue
         if not all(reading.get(k) for k in ("reading", "distillation", "narrativePosition")):
             continue
-        dial = lp.dial_from_texture(texture_for_cell(cell))
-        meta = STATE_DIR / f"pipeline-meta-{key}.json"
-        if meta.exists():
-            try:
-                stored = (json.loads(meta.read_text()).get("dial") or {})
-                dial.update({k: v for k, v in stored.items() if v is not None})
-            except (json.JSONDecodeError, OSError):
-                pass
+        dial, source = dial_for_day(STATE_DIR, key, cell)
+        filled_days.append((key, source))
         out.append((key, reading, dial))
+    report_filled(filled_days[-limit:], cell)
     return out[-limit:]
 
 
@@ -83,7 +78,7 @@ def main():
     ap.add_argument("--days", type=int, default=8)
     ap.add_argument("--out", default="day-variation")
     ap.add_argument("--cell", default="soft/mid/1/mid",
-                    help="dial cell for each day: polarity/intensityBand/multiplicity/exposureBand, as sweep.py --cell. A day's stored dial, where it has one, overrides it")
+                    help="dial cell for a day with no usable stored texture: polarity/intensityBand/multiplicity/exposureBand, as sweep.py --cell")
     ap.add_argument("--style", default=None)
     ap.add_argument("--quality", default="medium")
     ap.add_argument("--no-image", action="store_true")
