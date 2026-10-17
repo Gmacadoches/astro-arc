@@ -369,14 +369,15 @@ built from the result: shipped styles by label, the user's as "<label>
 the schema, the writing rules and the workflow; the agent follows it:
 
 ```sh
-astro-arc-style validate <file>   # free: every error, naming the field
-astro-arc-style preview  <file>   # prompts only: a real hard day and soft day, 3 registers each
-astro-arc-style meaning  <file>   # replays the last 8 real days; a blind judge scores hard/soft,
-                                  #   near-duplicates and "favourite scene"; PASS or FAIL
-astro-arc-style render   <file>   # the preview image, at the user's own image settings
+astro-arc-style validate <file>  # free; names each bad field
+astro-arc-style preview  <file>  # 6 prompts: a hard + a soft day
+astro-arc-style meaning  <file>  # last 8 days, blind judge: PASS/FAIL
+astro-arc-style render   <file>  # the preview image, your settings
 ```
 
-Each command that calls a model prints its projected cost and spends nothing
+`meaning` scores whether hard days still read hard and soft days soft, how
+many prompts are near-duplicates, and how often the style falls back on one
+favourite scene. Each command that calls a model prints its projected cost and spends nothing
 without the user's yes. With no default agent set, **Copy prompt** builds one
 self-contained prompt (the skill plus the idea) for any web chat, and
 **Import theme…** brings the TOML back, saves it in the user folder and

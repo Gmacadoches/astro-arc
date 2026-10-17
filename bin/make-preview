@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Builds preview.jpg, the one image the Omarchy plugin marketplace shows
+# (it reads preview.* from the repo root; detail view up to 1600px wide).
+# 1920x1080: the hero, six of the shipped worlds, and a "your own world" card.
+#   bin/make-preview [out.jpg]
+set -euo pipefail
+R=$(cd "$(dirname "$0")/.." && pwd); OUT=${1:-$R/preview.jpg}; T=$(mktemp -d)
+F=/usr/share/fonts/noto
+SERIF=$F/NotoSerifDisplay-Medium.ttf
+ITAL=$F/NotoSerifDisplay-Italic.ttf
+SANS=$F/NotoSans-Medium.ttf
+G=4  # gutter
+BG='#0e1220'; GOLD='#cf9a45'; INK='#e2e6ef'; SOFT='#a3abbd'
+
+tile() { # src label out
+  magick "$1" -resize 480x270^ -gravity center -extent 480x270 \
+    \( -size 480x90 gradient:'rgba(0,0,0,0)-rgba(0,0,0,0.78)' \) -gravity south -composite \
+    -font "$SANS" -pointsize 21 -fill "$INK" -gravity southwest -annotate +16+12 "$2" "$3"
+}
+S=$R/backend/pipeline/styles
+tile $S/ghibli.jpg      "Studio Ghibli"          $T/a.png
+tile $S/cyberpunk.jpg   "Cyberpunk"              $T/b.png
+tile $S/cosmic.jpg      "Cosmic / Nebula"        $T/c.png
+tile $S/engraving.jpg   "Antique Engraving"      $T/d.png
+tile $S/symbolist.jpg   "Symbolist / Visionary"  $T/e.png
+tile $S/illuminated.jpg "Illuminated Manuscript" $T/f.png
+
+# Your own: dark card
+magick -size 480x270 xc:"$BG" \
+  -fill none -stroke "$GOLD" -strokewidth 2 -draw "roundrectangle 14,14 465,255 10,10" -stroke none \
+  -font "$SERIF" -pointsize 34 -fill "$GOLD" -gravity northwest -annotate +34+36 "+ Your own world" \
+  -font "$SANS" -pointsize 20 -fill "$INK" -annotate +34+100 "Describe it in one line." \
+  -fill "$SOFT" -annotate +34+132 "Your Omarchy agent builds it" \
+  -annotate +34+160 "with you, checks it, and" \
+  -annotate +34+188 "renders its preview." \
+  $T/g.png
+
+# Hero with title
+magick $R/docs/images/hero.jpg -resize 1440x810^ -gravity center -extent 1440x810 \
+  \( -size 1440x330 gradient:'rgba(8,10,20,0)-rgba(8,10,20,0.88)' \) -gravity south -composite \
+  -font "$SERIF" -pointsize 92 -fill "$INK" -gravity southwest -annotate +56+150 "Astro-Arc" \
+  -font "$ITAL" -pointsize 38 -fill "$INK" -annotate +60+92 "Your birth chart and today's sky, painted as a new desktop every day." \
+  -font "$SANS" -pointsize 22 -fill "$GOLD" -annotate +62+44 "UKIYO-E  ·  ONE OF SEVEN WORLDS, OR ONE YOU MAKE" \
+  $T/hero.png
+
+magick -size 1920x1080 xc:"$BG" \
+  $T/hero.png -geometry +0+0 -composite \
+  $T/a.png -geometry +1440+0 -composite \
+  $T/b.png -geometry +1440+270 -composite \
+  $T/c.png -geometry +1440+540 -composite \
+  $T/d.png -geometry +0+810 -composite \
+  $T/e.png -geometry +480+810 -composite \
+  $T/f.png -geometry +960+810 -composite \
+  $T/g.png -geometry +1440+810 -composite \
+  -fill "$BG" -draw "rectangle 1438,0 1441,1080" -draw "rectangle 0,808 1920,811" \
+  -draw "rectangle 1440,268 1920,271" -draw "rectangle 1440,538 1920,541" \
+  -draw "rectangle 478,810 481,1080" -draw "rectangle 958,810 961,1080" \
+  -strip -interlace JPEG -sampling-factor 4:2:0 -quality 88 "$OUT"
+rm -rf "$T"
