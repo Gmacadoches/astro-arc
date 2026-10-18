@@ -133,7 +133,7 @@ Column {
         : ""
     color: section.keyState.validating
       ? Qt.darker(panel.bar.foreground, 1.5)
-      : (section.keyState.validation && section.keyState.validation.ok ? "#a6e3a1" : (panel.bar.urgent || "#f38ba8"))
+      : (section.keyState.validation && section.keyState.validation.ok ? Color.accent : (panel.bar.urgent || Color.urgent))
     font.family: panel.bar.fontFamily
     font.pixelSize: Style.font.caption
   }

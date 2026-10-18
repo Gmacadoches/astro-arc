@@ -15,7 +15,7 @@ Column {
   property alias styleDropdown: styleDropdown
 
   readonly property color dim: Qt.darker(panel.bar.foreground, 1.3)
-  readonly property color urgent: panel.bar.urgent || "#f38ba8"
+  readonly property color urgent: panel.bar.urgent || Color.urgent
 
   width: parent.width
   spacing: Style.space(10)

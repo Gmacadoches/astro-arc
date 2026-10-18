@@ -100,7 +100,7 @@ Column {
     visible: panel.birthError !== ""
     width: parent.width
     text: panel.birthError
-    color: panel.bar.urgent || "#f38ba8"
+    color: panel.bar.urgent || Color.urgent
     font.family: panel.bar.fontFamily
     font.pixelSize: Style.font.caption
   }

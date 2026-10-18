@@ -3,7 +3,7 @@ import qs.Commons
 import qs.Ui
 import "../Model.js" as Model
 
-// Advanced popout, top: Background only, Provider, and the one API key
+// Advanced popout, top: Background only, Animated background, Provider, and the one API key
 // that is written to every slot (the per-stage rows further down override it).
 Column {
   id: section
@@ -24,6 +24,19 @@ Column {
     foreground: panel.bar.foreground
     fontFamily: panel.bar.fontFamily
     onClicked: panel.commitBackgroundOnly(!panel.configState.backgroundOnly)
+  }
+
+  // The panel's own look: the solar system behind every view.
+  Toggle {
+    width: parent.width
+    label: panel.configState.animatedBackground ? "Animated background (on)" : "Animated background (off)"
+    description: panel.configState.animatedBackground
+      ? "The orbits behind the panel move while it's open"
+      : "The orbits behind the panel are drawn still"
+    checked: panel.configState.animatedBackground
+    foreground: panel.bar.foreground
+    fontFamily: panel.bar.fontFamily
+    onClicked: panel.commitAnimatedBackground(!panel.configState.animatedBackground)
   }
 
   // ---- Provider: the global setting everything else is scoped

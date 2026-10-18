@@ -183,7 +183,7 @@ Column {
     width: parent.width
     wrapMode: Text.WordWrap
     text: panel.styleActionStatus
-    color: panel.styleActionStatusIsError ? (panel.bar.urgent || "#f38ba8") : view.dim
+    color: panel.styleActionStatusIsError ? (panel.bar.urgent || Color.urgent) : view.dim
     font.family: panel.bar.fontFamily
     font.pixelSize: Style.font.caption
   }

@@ -15,6 +15,26 @@ PanelHero {
   readonly property bool drilledIn: panel.view !== "main"
   readonly property string agentName: Model.agentLabel(panel.defaultAgent)
 
+  // Where the main view's ✦ sits, for the sun of the orbits behind the
+  // panel. Taken on the main view and kept, so a back button in its place
+  // doesn't move the sun; measured once from any view so it starts somewhere.
+  property point starCenter: Qt.point(0, 0)
+  function latchStar() {
+    if (!drilledIn || starCenter.x === 0)
+      starCenter = Qt.point(starMetrics.advanceWidth / 2, height / 2)
+  }
+  onHeightChanged: latchStar()
+  onDrilledInChanged: latchStar()
+  Component.onCompleted: latchStar()
+
+  TextMetrics {
+    id: starMetrics
+    text: "✦"
+    font.family: panel.bar.fontFamily
+    font.pixelSize: Style.font.display
+    onAdvanceWidthChanged: hero.latchStar()
+  }
+
   width: parent.width
   title: {
     switch (panel.view) {
@@ -53,7 +73,7 @@ PanelHero {
         font.pixelSize: Style.font.display
       }
 
-      PanelActionButton {
+      PanelIconButton {
         id: backBtn
         visible: hero.drilledIn
         iconText: "󰅁"
@@ -67,7 +87,7 @@ PanelHero {
     }
   }
   trailingControl: Component {
-    PanelActionButton {
+    PanelIconButton {
       visible: !hero.drilledIn
       iconText: "󰒓"
       bordered: true

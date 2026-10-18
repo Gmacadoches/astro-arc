@@ -29,7 +29,7 @@ Column {
         var n = (panel.modelCatalog.image || []).length + (panel.modelCatalog.chat || []).length
         return n + " reachable" + (panel.modelCatalog.stale ? " · over a day old" : "")
       }
-      color: panel.modelCatalogError !== "" ? (panel.bar.urgent || "#f38ba8") : Qt.darker(panel.bar.foreground, 1.3)
+      color: panel.modelCatalogError !== "" ? (panel.bar.urgent || Color.urgent) : Qt.darker(panel.bar.foreground, 1.3)
       font.family: panel.bar.fontFamily
       font.pixelSize: Style.font.caption
     }

@@ -34,7 +34,7 @@ Column {
       text: panel.clearHistoryArmed ? "Confirm Clear?" : "Clear History"
       bordered: true
       fontSize: Style.font.caption
-      foreground: panel.clearHistoryArmed ? (panel.bar.urgent || "#f38ba8") : panel.bar.foreground
+      foreground: panel.clearHistoryArmed ? (panel.bar.urgent || Color.urgent) : panel.bar.foreground
       onClicked: panel.clearHistoryClicked()
     }
   }

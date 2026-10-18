@@ -123,7 +123,7 @@ Item {
     // Swallow clicks on the fade so they don't land on a half-hidden chip.
     MouseArea { anchors.fill: parent; enabled: nav.shown }
 
-    PanelActionButton {
+    PanelIconButton {
       id: navButton
       anchors.verticalCenter: parent.verticalCenter
       anchors.left: nav.forward ? undefined : parent.left

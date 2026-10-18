@@ -551,10 +551,14 @@ Panel {
   onFailedStyleChanged: if (fixOpen && failedStyle === null) goBack()
 
   // A control loses focus when its view hides; whatever changed the view,
-  // the keys must still reach the catcher afterwards.
-  onViewChanged: Qt.callLater(function() {
-    if (root.opened && !root.navCurrentItem()) keyCatcher.forceActiveFocus()
-  })
+  // the keys must still reach the catcher afterwards. The new view fades in;
+  // the orbits behind it stay where they are.
+  onViewChanged: {
+    viewFade.restart()
+    Qt.callLater(function() {
+      if (root.opened && !root.navCurrentItem()) keyCatcher.forceActiveFocus()
+    })
+  }
 
   function navCandidates() {
     var out = []
@@ -1612,6 +1616,17 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
+  // ---- Animated background: whether the orbits behind the panel move.
+  function commitAnimatedBackground(value) {
+    animatedBackgroundWriteProc.command = [root.configBin, "--set-animated-background", value ? "true" : "false"]
+    animatedBackgroundWriteProc.running = true
+  }
+
+  Process {
+    id: animatedBackgroundWriteProc
+    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+  }
+
   // ---- History retention: how many days of "Themes Generated" entries
   // astro-arc-generate keeps before astro-arc-prune-history deletes them,
   // every run. Never affects a theme already exported via Save Selected
@@ -2059,9 +2074,37 @@ Panel {
     // this scrolls inside its view.
     contentHeight: panel.fittedContentHeight(heroSection.implicitHeight + root.viewGap + root.mainViewHeight)
 
+    // ---- The solar system behind every view (sections/OrbitBackground.qml).
+    // Exactly one, beneath the views, pinned to the card inside its border:
+    // switching views never touches it.
+    OrbitBackground {
+      x: -panel.padding
+      y: -panel.padding
+      width: panel.contentWidth - Border.left(panel.borderSpec) - Border.right(panel.borderSpec)
+      height: panel.contentHeight - Border.top(panel.borderSpec) - Border.bottom(panel.borderSpec)
+      radius: Math.max(0, Style.cornerRadius - Border.left(panel.borderSpec))
+      unit: Style.spaceReal(1)
+      sunX: panel.padding + heroSection.starCenter.x
+      sunY: panel.padding + heroSection.starCenter.y
+      active: root.opened
+      animated: root.configState.animatedBackground
+      accent: Color.accent
+      foreground: root.bar.foreground
+    }
+
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+
+      NumberAnimation {
+        id: viewFade
+        targets: [heroSection, viewArea]
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: 160
+        easing.type: Easing.OutCubic
+      }
       blocked: root.editingLocation
       onCloseRequested: root.navEscape()
       // Tab stays inside the panel now, cycling its controls (it used to

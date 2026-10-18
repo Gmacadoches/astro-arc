@@ -32,7 +32,7 @@ PanelWindow {
 
   Rectangle {
     anchors.fill: parent
-    color: "#cc000000"
+    color: Util.alpha(Color.background, 0.8)
     z: -1
   }
 
@@ -42,8 +42,8 @@ PanelWindow {
     width: Math.min(parent.width - Style.space(16) * 2, 720)
     height: Math.min(parent.height - Style.space(16) * 2, 860)
     radius: 14
-    color: panel.bar ? panel.bar.background : "#11111b"
-    border.color: Qt.darker(panel.bar ? panel.bar.foreground : "#cdd6f4", 2.4)
+    color: panel.bar ? panel.bar.background : Color.popups.background
+    border.color: Qt.darker(panel.bar ? panel.bar.foreground : Color.foreground, 2.4)
     border.width: 1
 
     // Escape-to-close lives here, not on the PanelWindow. PanelWindow has no
@@ -71,7 +71,7 @@ PanelWindow {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           text: "Advanced settings"
-          color: panel.bar ? panel.bar.foreground : "#cdd6f4"
+          color: panel.bar ? panel.bar.foreground : Color.foreground
           font.family: panel.bar ? panel.bar.fontFamily : "sans"
           font.pixelSize: Style.font.body
           font.bold: true
@@ -82,7 +82,7 @@ PanelWindow {
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
           text: "Close"
-          foreground: panel.bar ? panel.bar.foreground : "#cdd6f4"
+          foreground: panel.bar ? panel.bar.foreground : Color.foreground
           onClicked: panel.advancedOpen = false
         }
       }
@@ -91,7 +91,7 @@ PanelWindow {
         width: parent.width
         wrapMode: Text.WordWrap
         text: "Everything the panel itself doesn't need. A model picked under a stage overrides the quality preset, which will then read \"Custom\".Costs marked (est) are published rates applied to token counts measured from real runs; (actual) means this exact combination has been measured on this machine."
-        color: Qt.darker(panel.bar ? panel.bar.foreground : "#cdd6f4", 1.3)
+        color: Qt.darker(panel.bar ? panel.bar.foreground : Color.foreground, 1.3)
         font.family: panel.bar ? panel.bar.fontFamily : "sans"
         font.pixelSize: Style.font.caption
       }

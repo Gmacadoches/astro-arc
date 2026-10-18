@@ -52,7 +52,7 @@ Column {
       text: panel.resetUsageArmed ? "Confirm Reset?" : "Reset"
       bordered: true
       fontSize: Style.font.caption
-      foreground: panel.resetUsageArmed ? (panel.bar.urgent || "#f38ba8") : panel.bar.foreground
+      foreground: panel.resetUsageArmed ? (panel.bar.urgent || Color.urgent) : panel.bar.foreground
       onClicked: panel.resetUsageClicked()
     }
   }
@@ -62,7 +62,7 @@ Column {
     width: parent.width
     wrapMode: Text.WordWrap
     text: panel.resetUsageError
-    color: panel.bar.urgent || "#f38ba8"
+    color: panel.bar.urgent || Color.urgent
     font.family: panel.bar.fontFamily
     font.pixelSize: Style.font.caption
   }

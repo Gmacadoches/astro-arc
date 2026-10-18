@@ -43,6 +43,8 @@ var DEFAULT_CONFIG = {
   // Most people already run a theme they chose, often several theme plugins;
   // repainting all of it every day is the opt-in, not the default.
   backgroundOnly: true,
+  // The solar system behind the panel moves; false draws it still.
+  animatedBackground: true,
   historyRetentionDays: 30,
   maxCostPerImage: 0,
   provider: "openai"
@@ -365,6 +367,7 @@ function parseConfig(raw) {
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
       // Only an explicit false turns it off, matching astro-arc-generate.
       backgroundOnly: data.backgroundOnly !== false,
+      animatedBackground: data.animatedBackground !== false,
       historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
         ? data.historyRetentionDays : 30,
       // 0 (or anything unparseable) means no ceiling.
