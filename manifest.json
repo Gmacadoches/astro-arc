@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "garrett.astro-arc",
   "name": "Astro-Arc",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "license": "AGPL-3.0-or-later",
   "author": "Garrett McDaniel",
-  "description": "Your birth chart and today's sky, painted as a new desktop every day in one of seven worlds, from Studio Ghibli to Edo woodblock to 1970s space art. It can also set your theme from the palette of each new background, daily or whenever you like. Runs from the Omarchy bar when you tell it to. Some of the images may strike a chord in your soul; we are not responsible if you get hooked. Uses an OpenAI API key, and works with any OpenAI model your key can reach.",
+  "description": "Your birth chart and today's sky, painted as a new desktop every day. Pick one of seven worlds, from Studio Ghibli to Edo woodblock to 1970s space art, or make your own: describe it in one line and your Omarchy default agent builds the style with you. Each image can set your theme from its own palette, and is archived with the reading behind it, shareable as one file or exportable as an Omarchy theme. Runs from the bar on your schedule, using your OpenAI API key, from about a cent a run.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "Astro-Arc",
-    "description": "Daily wallpaper and theme from your birth chart",
+    "description": "Daily wallpaper and theme from your birth chart, in seven worlds or your own",
     "category": "Info",
     "allowMultiple": false,
     "defaultSection": "right"

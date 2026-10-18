@@ -17,8 +17,8 @@ suffix is identical on every sample and would count as a repeat.
 Reports, for each sweep:
   - how many prompts use each verb phrase from any verb list the pipeline offers
     (inflected forms only, with the phrase's particle or object word nearby):
-    the global _VERBS_* and _ACTOR_VERBS_* lists, STAGE2_SYSTEM's own actor
-    verbs, and every [<style>.verbs] array in styles.toml
+    STAGE2_SYSTEM's own actor verbs and every theme's [verbs] array in
+    the theme files (the global verb lists went 2026-10-16)
   - how many prompts contain each tracked attractor term
   - what the actor is doing: work, or rest, play, ritual or travel. Classified
     by the configured Stage 2 model, because no word list
@@ -180,9 +180,6 @@ def verb_sources():
             if p and phrase_pattern(p):
                 sources.setdefault(p, set()).add(name)
 
-    for name in ("_VERBS_HARD", "_VERBS_SOFT", "_ACTOR_VERBS_HARD", "_ACTOR_VERBS_SOFT"):
-        if hasattr(lp, name):
-            add(_split(getattr(lp, name)), name)
     m = re.search(r"Something is being ([^.]+)\.", lp.STAGE2_SYSTEM)
     if m:
         add(_split(m.group(1).replace(" and ", ", ")), "STAGE2_SYSTEM")
@@ -284,7 +281,7 @@ def main():
     used = sorted((b for b in sources if any(m["verbs"][b] for _, m in runs)),
                   key=lambda b: -max(m["verbs"][b] / m["n"] for _, m in runs))
     for b in used:
-        lists = ",".join(sorted(x.replace("_VERBS_", "V_").replace("_ACTOR", "A") for x in sources[b]))
+        lists = ",".join(sorted(sources[b]))
         label = f"{b} [{lists}]"
         if len(label) > 33:
             label = label[:32] + "…"

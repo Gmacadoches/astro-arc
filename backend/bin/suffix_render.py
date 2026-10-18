@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Render a sweep's Stage 2 prompts again under the style suffix as it is
-NOW in styles.toml — so two renders of the same prompt differ only in the
+NOW in its theme file — so two renders of the same prompt differ only in the
 suffix. Written for STYLE-OVERHAUL Prompt 3 (suffix rewrites); a fresh sweep
 would redraw the material and the prompt and confound the comparison.
 
@@ -28,8 +28,7 @@ CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 
 def render(prompt, style, has_people, out_dir, stem, config):
-    suffix = lp.load_style_suffix(style, has_people)
-    final = f"{prompt}, {suffix}" if suffix else prompt
+    final = lp.final_image_prompt(prompt, style, has_people)
     model = config.get("openaiModel") or "gpt-image-1-mini"
     quality = config.get("openaiQuality") or "medium"
     width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))

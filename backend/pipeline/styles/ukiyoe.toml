@@ -1,0 +1,103 @@
+# Added 2026-09-07 from a user-supplied reference guide
+# (~/Downloads/art-style-guides.md), cross-checked against independent
+# research before use (see CHANGELOG.md for sources) — flat color planes
+# and confident black key-block outlines are the real technique, not
+# painterly shading; bokashi is a specific hand-inked gradient reserved
+# for skies/water only, never used as a general softening effect. The
+# "do not add a person... unless already described above" sentence was
+# added after the same day's illuminated-manuscript figure-injection bug
+# (see below) — applied here proactively even though this exact suffix
+# hadn't been observed failing.
+
+# CHARTER, 2026-10-10 (STYLE-OVERHAUL Prompt 4, approved by Garrett): Edo Japan's floating world: post roads, wooden wards, yōkai and kaidan; courtesan portraits and the great wave demoted.
+# Brief is SIGNATURE + TEMPER (THE IMPOSSIBLE and OPENNESS no longer apply;
+# space recipes replace OPENNESS). The suffix is untouched, as Prompt 4 asks
+# for the four technique styles. Research: verification/charter-ukiyoe/research.md.
+
+label = "Ukiyo-e"
+suffix = "Ukiyo-e Japanese woodblock print style: flat, unmodulated color fields bordered by confident, uniform-weight black outlines (the hand-carved key-block line), never digitally smooth or painterly-blended within a shape. Skies, water, and distant landscape may use bokashi — a soft hand-inked gradient — but this is the only place gradients belong; everything else stays flat. Compositions favor asymmetrical framing, bold cropping at the frame's edge, and a high oblique viewpoint rather than single-point perspective. Rain, snow, water, and textile patterns render as repeating graphic motifs (parallel diagonal lines for rain, stylized wave crests) rather than naturalistic texture. Palette leans toward deep indigo and Prussian blue alongside warm earth tones and muted reds. Do not add a person or figure unless one is already described above — many ukiyo-e prints are pure landscape, still life, or pattern with no one in them. Only if a person is explicitly part of the scene described above: render them with the same flat color planes and confident outline as everything else, never photorealistic shading."
+# guidance removed 2026-10-10: superseded by the charter above. In git.
+space = [
+  "a high oblique view down onto a road winding through a post station",
+  "across a wide river to a bridge and the town beyond",
+  "along a coast with waves rising in the foreground",
+  "up a mountain pass with travellers strung along it",
+  "through a teahouse opening onto weather",
+  "from a boat on the water toward the shore",
+  "down a crowded street hung with banners",
+  "across a snowy temple yard to the gate",
+]
+
+
+[world]
+era = "Edo Japan's floating world, 1603 to 1868: post roads and ferries, wooden cities on rivers, kabuki and festivals, and a supernatural that walks the same streets after dark. Technology is wood, paper, rope and lacquer, carried by hand and on horseback."
+materials = "Wood, paper, tile, straw, silk and lacquer, rendered as flat colour inside a carved outline; water and textiles become repeating pattern. Iron is for blades and kettles, not machines."
+physics = "Weather and landscape are drawn as pattern: rain in parallel lines, waves curling into claws. Ghosts and yōkai are as solid and outlined as people and cast no light of their own; lanterns, fires and the moon are the only lights."
+society = "Travellers on the great roads, townspeople in crowded wards, fishermen, farmers, actors and pilgrims. Days are full of things that are not work: a stop at a teahouse, a crowd caught on a bridge by sudden rain, fireworks over the river, blossom-viewing."
+weather = "Weather is the event: sudden rain, snow on a temple roof, wind tearing at umbrellas, a full moon over water, mist hiding the far shore. Pick the weather the day calls for."
+inhabitants = "Travellers, porters, ferrymen and townspeople, warriors and actors; foxes, cats and herons; and the yōkai and ghosts who share the roads after dark."
+strangeness = "The supernatural is part of the world's traffic: a parade of a hundred demons crossing a street, a cat that dances when no one looks. People react to it as they would to weather."
+numinous = "Kami and yōkai have bodies and outlines like everyone else: a giant skeleton rising over a palace wall, a river god under a bridge. They are drawn in the same flat colour and line, never as a glow or a blur."
+dread = "This world at its darkest is the ghost of the wronged returning, a fire sweeping a wooden ward, a tidal wave over a village. Drawn with the same flat calm as everything else, which is what makes it frightening."
+favoured_actors = "Crowds on bridges and roads, travellers in groups, animals and yōkai, and teams at shared work. A lone courtesan's portrait, and a mountain framed by a great wave, are this tradition's most worn images and should not be the default."
+myth = "Japanese folklore and kaidan ghost tales, yōkai, Shinto kami, Buddhist hells and heavens, and heroic legends like the warrior who killed the earth spider."
+highlight = "The thing the eye finds first, and it belongs to the floating world: a yōkai, a ghost, a kami in its body, or a sight that stops a whole street. Today's kind of wrongness is given with this definition. Drawn in the same flat colour and key-block line as everything else."
+highlight_modes = [
+  "a yōkai at enormous scale",
+  "a ghost going about the business it had in life",
+  "an animal that is plainly more than an animal",
+  "a parade of the supernatural through an ordinary street",
+  "the weather itself with a body",
+]
+
+
+[brief]
+signature = "SIGNATURE — at least one thing marks this as Edo Japan, named explicitly: a post-road station, a wooden bridge, a lacquered shop sign or a yōkai. It may be the highlight. A print that could be any landscape is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+
+# LIGHT, 2026-10-16 (charter-required): the global light lines, copied word
+# for word when they were removed from the pipeline (decision 4). Rewrite
+# them only for a reason this world has.
+[light]
+lo = "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response."
+mid = "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response."
+
+
+[verbs]
+process_hard = ["lashing", "surging", "curling over", "battering", "sweeping away", "burning down", "capsizing", "uprooting", "pelting", "whipping", "howling through", "swamping", "ripping", "drowning", "avalanching", "smouldering", "gusting", "falling in", "snapping", "breaking over"]
+process_soft = ["falling softly", "floating downstream", "scattering petals", "swirling", "misting over", "glimmering", "fluttering", "bending in the wind", "blooming", "piling up", "melting", "curling up", "lapping", "dripping from the eaves", "hanging still", "climbing the sky", "fading into mist", "swelling", "opening", "sparkling"]
+actor_hard.work = ["rowing against", "heaving nets", "carrying a palanquin", "fighting a fire", "tying down", "holding an umbrella against", "drawing a sword against"]
+actor_hard.rest = ["crouching under the eaves of", "huddling round a brazier at", "waiting at"]
+actor_hard.play = ["sumo wrestling", "flying kites in", "throwing snowballs at"]
+actor_hard.ritual = ["carrying a portable shrine through", "ringing a temple bell", "making an offering at"]
+actor_hard.travel = ["crossing a bridge in", "hurrying along", "climbing the pass toward", "struggling through", "being ferried across"]
+actor_soft.work = ["pounding rice", "dyeing cloth", "grilling eels", "hawking", "planting rice", "carving"]
+actor_soft.rest = ["drinking tea at", "resting at a teahouse", "smoking a long pipe on", "sitting on the veranda of"]
+actor_soft.play = ["viewing blossoms under", "watching fireworks over", "playing the shamisen", "dancing at"]
+actor_soft.ritual = ["visiting a shrine", "hanging a prayer slip on", "releasing lanterns on"]
+actor_soft.travel = ["walking the post road to", "riding a horse along", "strolling across", "boarding a ferry at", "pulling a cart along"]
+
+
+[registers]
+"botanical" = "Plants as the season's sign: cherry blossom over a crowd, pines bent by wind on a cliff road. Each print knows its season by what is in flower."
+"bodily and anatomical" = "The body as the kabuki and kaidan prints show it: an actor's tattooed back, a ghost's long hair and hanging hands. Strong pose and pattern, never gore."
+"fungal and decaying" = "Decay as the ghost prints know it: a ruined temple with grass on its roof, a lantern rotted until a face appears in it. Rot is where the dead come back."
+"animal and creaturely" = "Animals that are often more than they seem: a fox at a crossroads, carp crowding a river. Some of them are yōkai."
+"geological" = "Mountains and cliffs as the landscape prints build them: a peak seen from every station, a cliff road with travellers on it. Rock is shaped by line and flat colour."
+"metallic and ore" = "Metal is for swords, kettles and temple bells: a sword's edge in a duel, a bronze bell in a snowy yard. It is rare and precious."
+"glass and ceramic" = "Fired clay and the few glass things of Edo: sake flasks at a teahouse, a glass wind-chime on a summer veranda. Each is a small, handled thing."
+"architectural" = "Wooden Japan seen from a high oblique angle, roofs as pattern: a temple gate, a shop front behind cloth curtains."
+"domestic interior" = "A room with sliding paper walls opened onto a garden or a street: tatami and a brazier. The world is always visible through an opening."
+"mechanical" = "The few machines of Edo, wood and rope worked by hand: a water wheel, a mechanical doll at a festival."
+"industrial and infrastructural" = "The works of the great roads and rivers, crowded with the people using them: a long bridge, a timber raft on a river."
+"agricultural and cultivated" = "The season's field work: rice paddies flooded for planting, farmers under straw raincoats."
+"aquatic" = "Water as pattern and force, the most drawn thing in this world: waves rising into claws, rain on a river crowded with boats."
+"atmospheric" = "Sky and air as bands of colour, where bokashi belongs: a red dawn, mist hiding a valley."
+"glacial and frozen" = "Snow drawn as soft white masses and falling dots: snow on travellers' hats, icicles at a temple's eaves."
+"fire and ember" = "Fire as festival and as disaster: fireworks over the river, a burning ward with fire brigades on the roofs."
+"textile and fiber" = "Cloth as the print's richest pattern: kimono, umbrellas in rain."
+"ritual object" = "Ritual woven into daily life: a torii at a road's turn, a festival float pulled through a street."
+"paper and inscription" = "Paper lanterns and poem slips tied to branches. Writing appears as calligraphic marks, never as a readable sentence."
+"instrument and measure" = "Measure in the floating world: an abacus at a shop counter, the distance markers of the post roads."

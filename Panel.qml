@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import qs.Commons
 import qs.Ui
 import "Model.js" as Model
+import "sections"
 
 // Settings + status popup for Astro-Arc. Structurally mirrors the built-in
 // weather panel (Panel base class, KeyboardPanel, FileView-backed state,
@@ -52,6 +53,8 @@ Panel {
     reviewsIndexFile.reload()
     costsFile.reload()
     loadModelCatalogIfStale()
+    loadStyleCatalog()
+    defaultAgentProc.running = true
   }
 
   function openFromHotkey() {
@@ -61,6 +64,9 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     if (root.editingLocation) root.cancelEditingLocation()
+    // Reopening starts on the main view (or Settings, which stays put as
+    // it always has); a half-done drill-in doesn't wait behind the icon.
+    root.closeDrillIns("settings")
     root.controller.hide()
   }
 
@@ -130,12 +136,12 @@ Panel {
     draftBirthTime = root.configState.birthTimeUnknown ? "" : root.configState.birthTime
     birthError = ""
     // Fields are plain (unbound) ClipboardSafeFields — see the note on
-    // birthDateField/birthTimeField below — so the displayed text needs an
+    // birthDateField/birthTimeField in sections/BirthLocationSection.qml — so the displayed text needs an
     // imperative push here too, deferred until after the fields exist on
     // first load.
     Qt.callLater(function() {
-      birthDateField.text = root.draftBirthDate
-      birthTimeField.text = root.draftBirthTime
+      birthLocationSection.birthDateField.text = root.draftBirthDate
+      birthLocationSection.birthTimeField.text = root.draftBirthTime
     })
   }
 
@@ -175,9 +181,9 @@ Panel {
     locationSuggestions = []
     suggestionIndex = 0
     Qt.callLater(function() {
-      locationField.text = root.configState.locationName
-      locationField.selectAll()
-      locationField.forceActiveFocus()
+      birthLocationSection.locationField.text = root.configState.locationName
+      birthLocationSection.locationField.selectAll()
+      birthLocationSection.locationField.forceActiveFocus()
     })
   }
 
@@ -189,7 +195,7 @@ Panel {
   }
 
   function commitLocation() {
-    var location = Model.locationCommit(locationField.text, locationSuggestions, suggestionIndex)
+    var location = Model.locationCommit(birthLocationSection.locationField.text, locationSuggestions, suggestionIndex)
     if (location.name === "") {
       clearLocation()
       return
@@ -231,7 +237,7 @@ Panel {
   }
 
   function requestGeocode() {
-    var query = locationField.text.trim()
+    var query = birthLocationSection.locationField.text.trim()
     if (query.length < 2) {
       locationSuggestions = []
       return
@@ -265,6 +271,10 @@ Panel {
     onTriggered: root.requestGeocode()
   }
 
+  function restartGeocodeDebounce() {
+    geocodeDebounce.restart()
+  }
+
   // ---- Frequency ------------------------------------------------------
   function commitFrequency(value) {
     frequencyWriteProc.command = [root.configBin, "--set-frequency", value]
@@ -278,11 +288,25 @@ Panel {
     }
   }
 
+  function commitIntervalHours(value) {
+    intervalHoursWriteProc.command = [root.configBin, "--set-interval-hours", value]
+    intervalHoursWriteProc.running = true
+  }
+
+  Process {
+    id: intervalHoursWriteProc
+    onExited: function(exitCode) {
+      if (exitCode === 0) root.configFile.reload()
+    }
+  }
+
   Connections {
     target: root
     function onConfigStateChanged() {
-      if (frequencyDropdown.value !== root.configState.frequency)
-        frequencyDropdown.value = root.configState.frequency
+      if (scheduleSection.frequencyDropdown.value !== root.configState.frequency)
+        scheduleSection.frequencyDropdown.value = root.configState.frequency
+      if (scheduleSection.intervalHoursDropdown.value !== String(root.configState.intervalHours))
+        scheduleSection.intervalHoursDropdown.value = String(root.configState.intervalHours)
     }
   }
 
@@ -343,12 +367,12 @@ Panel {
     // that.
     if (root.configState.frequency === "manual") return
 
-    var currentKey = Model.currentPeriodKey(root.configState.frequency)
+    var currentKey = Model.currentPeriodKey(root.configState.frequency, undefined, root.configState.intervalHours)
     // Model.runCoversPeriod, not a comparison against lastRun.periodKey: that
     // key was filed under whatever frequency was set when the run happened, so
     // comparing it across a frequency CHANGE made switching Daily -> Monthly
     // generate on the spot. See its comment in Model.js.
-    if (Model.runCoversPeriod(root.lastRun, root.configState.frequency)) return
+    if (Model.runCoversPeriod(root.lastRun, root.configState.frequency, undefined, root.configState.intervalHours)) return
     // Already tried this exact period this session (regardless of whether
     // it succeeded) — avoid hammering a misconfigured setup (e.g. no API
     // key) every autoGenerateCheckInterval; the next real period, or a
@@ -379,14 +403,243 @@ Panel {
     }
   }
 
+  // The schedule in a word or two, for the hero: "Daily", "Every 3 hours",
+  // "Manual".
+  readonly property string scheduleSummary: {
+    var f = root.configState.frequency
+    if (f === "manual") return "Manual"
+    if (f === "hourly") {
+      var s = Model.scheduleLabel(f, root.configState.intervalHours)
+      return s.charAt(0).toUpperCase() + s.slice(1)
+    }
+    var choice = Model.FREQUENCY_CHOICES.filter(function(c) { return c.key === f })[0]
+    return choice ? choice.label : f
+  }
+
   // heroStatus: compact one-line summary shown under the title, matching
-  // the built-in bluetooth/network panels' icon+title+status hero row.
-  // Deliberately says nothing about the schedule — the Frequency dropdown is
-  // the one place that reports it, and having the status line repeat it only
-  // made a cadence look like something this line was reporting *on*.
+  // the built-in bluetooth/network panels' icon+title+status hero row:
+  // state · schedule · last run. The schedule lives here now that the main
+  // view has no footer; the last run's time is the time alone on a run from
+  // today, with the date otherwise.
   readonly property string heroStatus: root.generating
-    ? "Generating…"
-    : (root.lastRun ? "Up to date" : "Not generated yet")
+    ? "Generating… · " + root.scheduleSummary
+    : (root.lastRun
+      ? "Up to date · " + root.scheduleSummary + " · " + Model.formatGeneratedAt(root.lastRun.generatedAt, function(d) {
+          var today = new Date()
+          return Qt.formatDateTime(d, d.toDateString() === today.toDateString() ? "h:mm AP" : "MMM d, h:mm AP")
+        })
+      : "Not generated yet · " + root.scheduleSummary)
+
+  // ---- Views. One KeyboardPanel, one fixed height: the main view, or one
+  // drill-in at a time — Settings, Tweak, Create, History (Browse all) and
+  // Fix (a style that failed validation) — each with a back button. Each has
+  // its own flag, so the logic that opens and closes them stays where it
+  // was; `view` only says which one is showing. -----------------------------
+  property bool browseOpen: false
+  property bool fixOpen: false
+  readonly property string view: showSettings ? "settings"
+    : tweakOpen ? "tweak"
+    : styleCreateMode !== "" ? "create"
+    : browseOpen ? "browse"
+    : fixOpen ? "fix"
+    : "main"
+
+  // Close every drill-in but `keep`, so opening one never leaves another
+  // underneath it.
+  function closeDrillIns(keep) {
+    if (keep !== "settings" && showSettings) toggleSettings()
+    if (keep !== "tweak") tweakOpen = false
+    if (keep !== "create" && styleCreateMode !== "") { styleCreateMode = ""; styleImportResult = null }
+    if (keep !== "browse") browseOpen = false
+    if (keep !== "fix") fixOpen = false
+  }
+
+  function openView(name) {
+    navReturnItem = navCurrentItem()
+    closeDrillIns(name)
+    styleActionStatus = ""
+    if (name === "settings" && !showSettings) toggleSettings()
+    else if (name === "tweak") { tweakOpen = true; tweakBackupFile.reload() }
+    else if (name === "create") { styleNoAgent = false; styleCreateMode = "create" }
+    else if (name === "browse") browseOpen = true
+    else if (name === "fix") fixOpen = true
+    Qt.callLater(navReset)
+  }
+
+  // Back to the main view, focus returned to whatever opened the drill-in.
+  function goBack() {
+    closeDrillIns("")
+    var back = navReturnItem
+    navReturnItem = null
+    Qt.callLater(function() {
+      if (back && back.visible) back.forceActiveFocus()
+      else navReset()
+    })
+  }
+
+  // ---- Main view: browsing generations with ‹ › and the thumbnail strip.
+  readonly property int selectedIndex: {
+    for (var i = 0; i < reviewsIndex.length; i++)
+      if (reviewsIndex[i].id === selectedReviewId) return i
+    return -1
+  }
+
+  function showOlder() {
+    if (selectedIndex >= 0 && selectedIndex < reviewsIndex.length - 1)
+      selectedReviewId = reviewsIndex[selectedIndex + 1].id
+  }
+
+  function showNewer() {
+    if (selectedIndex > 0) selectedReviewId = reviewsIndex[selectedIndex - 1].id
+  }
+
+  // The reading saved with the selected generation; for the newest, an
+  // entry from before generations.json carried readings falls back to
+  // last-run.json, which is the same run.
+  readonly property string selectedReading: selectedReview && selectedReview.distillation !== ""
+    ? selectedReview.distillation
+    : ((selectedIsNewest || reviewsIndex.length === 0) && lastRun ? lastRun.distillation : "")
+  readonly property string selectedPosition: selectedReview && selectedReview.distillation !== ""
+    ? selectedReview.narrativePosition
+    : ((selectedIsNewest || reviewsIndex.length === 0) && lastRun ? lastRun.narrativePosition : "")
+
+  // "Oct 17 · 8:40 PM" and "Dragon Ball Z" for a generation's caption.
+  function reviewWhen(review) {
+    if (!review || review.createdAt === "") return review ? review.label : ""
+    var d = new Date(review.createdAt)
+    return isNaN(d.getTime()) ? review.label : Qt.formatDateTime(d, "MMM d · h:mm AP")
+  }
+
+  function reviewStyleLabel(review) {
+    if (!review) return ""
+    if (review.artStyleLabel !== "") return review.artStyleLabel
+    var style = Model.findStyle(styleCatalog, Model.reviewStyleKey(review, styleCatalog))
+    return style ? style.label : ""
+  }
+
+  // ---- Keyboard navigation. Every control in the showing view takes focus
+  // (Tab, or the arrows by position); Enter/Space activate it, Escape goes
+  // back a view or closes. A focused control keeps the keys it uses itself
+  // (text fields their typing and caret keys, the image its ‹ ›), and only
+  // what it ignores reaches PanelKeyCatcher. -------------------------------
+  property var navReturnItem: null
+  // The showing view's root, and its Flickable (so a control moved to is
+  // scrolled into sight; the history grid scrolls itself).
+  readonly property Item navRoot: view === "settings" ? settingsColumn
+    : view === "tweak" ? tweakView
+    : view === "create" ? createView
+    : view === "fix" ? fixView
+    : view === "browse" ? browseView
+    : mainColumn
+  readonly property Item navFlick: view === "settings" ? settingsFlick
+    : view === "tweak" ? tweakFlick
+    : view === "create" ? createFlick
+    : view === "fix" ? fixFlick
+    : view === "browse" ? null
+    : mainFlick
+  // What popups and pickers must stay inside: the area under the hero.
+  readonly property Item contentArea: viewArea
+  // The main view's height, latched while it shows (see mainColumn), and
+  // the gap between the hero and the views.
+  property real mainViewHeight: 0
+  readonly property int viewGap: Style.space(14)
+
+  // A fixed style leaves its Fix view with nothing to show.
+  onFailedStyleChanged: if (fixOpen && failedStyle === null) goBack()
+
+  // A control loses focus when its view hides; whatever changed the view,
+  // the keys must still reach the catcher afterwards.
+  onViewChanged: Qt.callLater(function() {
+    if (root.opened && !root.navCurrentItem()) keyCatcher.forceActiveFocus()
+  })
+
+  function navCandidates() {
+    var out = []
+    function walk(item) {
+      if (!item || !item.visible) return
+      if (item.activeFocusOnTab && item.enabled !== false && item.width > 0 && item.height > 0) out.push(item)
+      var kids = item.children
+      for (var i = 0; i < kids.length; i++) walk(kids[i])
+    }
+    walk(heroSection)
+    walk(navRoot)
+    return out
+  }
+
+  function navCurrentItem() {
+    var c = navCandidates()
+    for (var i = 0; i < c.length; i++) if (c[i].activeFocus) return c[i]
+    return null
+  }
+
+  function navFocus(item) {
+    if (!item) return
+    item.forceActiveFocus()
+    // Scroll a control in a scrolling view into sight.
+    if (navFlick && navFlick.contentItem && item !== navFlick) {
+      var p = item.mapToItem(navFlick.contentItem, 0, 0)
+      if (p.y < navFlick.contentY) navFlick.contentY = Math.max(0, p.y - Style.space(8))
+      else if (p.y + item.height > navFlick.contentY + navFlick.height)
+        navFlick.contentY = Math.min(Math.max(0, navFlick.contentHeight - navFlick.height),
+                                     p.y + item.height - navFlick.height + Style.space(8))
+    }
+  }
+
+  // A view just appeared: nothing in it is focused, keys go to the catcher.
+  function navReset() {
+    if (navFlick) navFlick.contentY = 0
+    keyCatcher.forceActiveFocus()
+  }
+
+  function navTab(direction) {
+    var c = navCandidates()
+    if (c.length === 0) return
+    var i = c.indexOf(navCurrentItem())
+    if (i < 0) navFocus(direction > 0 ? c[0] : c[c.length - 1])
+    else navFocus(c[(i + direction + c.length) % c.length])
+  }
+
+  // Spatial: the nearest control in the arrow's direction, preferring ones in
+  // line with the current one (same row for ←→, same column for ↑↓).
+  function navMove(dx, dy) {
+    var c = navCandidates()
+    var cur = navCurrentItem()
+    if (!cur) {
+      // Nothing focused yet: ←→ browse the generations on the main view,
+      // ↑↓ start at the top or the bottom.
+      if (dx !== 0 && view === "main") { if (dx < 0) showOlder(); else showNewer(); return }
+      if (c.length > 0) navFocus(dy < 0 ? c[c.length - 1] : c[0])
+      return
+    }
+    var base = keyCatcher
+    var a = cur.mapToItem(base, 0, 0)
+    var best = null, bestScore = Infinity
+    for (var i = 0; i < c.length; i++) {
+      if (c[i] === cur) continue
+      var b = c[i].mapToItem(base, 0, 0)
+      var along, across
+      if (dx !== 0) {
+        // Horizontal neighbours must overlap the current row.
+        if (b.y + c[i].height <= a.y + 2 || b.y >= a.y + cur.height - 2) continue
+        along = dx > 0 ? b.x - (a.x + cur.width) : a.x - (b.x + c[i].width)
+        across = Math.abs((b.y + c[i].height / 2) - (a.y + cur.height / 2))
+      } else {
+        along = dy > 0 ? b.y - (a.y + cur.height) : a.y - (b.y + c[i].height)
+        var overlap = Math.min(a.x + cur.width, b.x + c[i].width) - Math.max(a.x, b.x)
+        across = overlap > 0 ? 0 : -overlap
+      }
+      if (along < -2) continue
+      var score = Math.max(0, along) + across * 2
+      if (score < bestScore) { bestScore = score; best = c[i] }
+    }
+    if (best) navFocus(best)
+  }
+
+  // Escape: a drill-in goes back; the main view closes the panel.
+  function navEscape() {
+    if (view !== "main") goBack()
+    else close()
+  }
 
   // ---- Settings sub-view (image backend/model, Stage 1/2 models, API
   // keys) -------------------------------------------------------------------
@@ -674,11 +927,22 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
-  // ---- The popout. The panel itself stays rudimentary — provider, one key,
-  // one quality preset — and everything that makes this configurable rather
-  // than merely usable lives here: every model the key can reach, the two chat
-  // stages split apart, a separate key per slot, and the cost ceiling.
+  // ---- The popout. The panel's settings view holds only what a reading
+  // needs (birth, place, schedule); everything else lives here: provider and
+  // key, the quality preset, background size, theme, usage, every model the
+  // key can reach, the two chat stages split apart, a separate key per slot,
+  // and the cost ceiling.
   property bool advancedOpen: false
+
+  // The key rows live in the popout, so their status is fetched when it
+  // opens, and a half-finished Replace is dropped when it closes.
+  onAdvancedOpenChanged: {
+    var slots = ["stage1", "stage2", "image"]
+    for (var i = 0; i < slots.length; i++) {
+      if (advancedOpen) refreshApiKeyStatus(slots[i])
+      else setApiKeyField(slots[i], "replacing", false)
+    }
+  }
 
   // ---- Quality preset: one control that sets all four model settings, in
   // the spirit of a game's graphics presets. The individual pickers below stay
@@ -880,7 +1144,7 @@ Panel {
       onStreamFinished: {
         var size = String(text || "").trim()
         if (Model.isValidBackgroundSize(size)) {
-          backgroundSizeField.text = size
+          advancedWindow.backgroundSizeField.text = size
           root.commitBackgroundSize(size)
         } else {
           root.backgroundSizeError = "Couldn't detect the current resolution"
@@ -889,11 +1153,412 @@ Panel {
     }
   }
 
-  // ---- Art style: which pipeline/styles.toml preset Stage 2's prompt is
-  // suffixed with. -----------------------------------------------------
+  // ---- Art style: which theme the run is built for. The dropdown is built
+  // from the theme files themselves (backend/bin/style_catalog.py): shipped
+  // ones in backend/pipeline/styles/, the user's own in
+  // ~/.config/astro-arc/styles/. A theme that fails validation stays listed
+  // but is never written to the config; picking it shows what is wrong. ------
+  readonly property string styleCatalogBin: binDir + "/style_catalog.py"
+  property var styleCatalog: []
+  property bool styleCatalogLoaded: false
+  // The loader's own warnings (stderr), e.g. a user file ignored because it
+  // has a shipped theme's key.
+  property string styleCatalogNotice: ""
+  // A failed theme picked from the list to see its errors. The config keeps
+  // the theme it had.
+  property string inspectedStyleKey: ""
+  property string styleActionStatus: ""
+  property bool styleActionStatusIsError: false
+  // Bumped after a preview is rewritten, so the Image reloads the same path.
+  property int stylePreviewVersion: 0
+
+  // A configured key with no theme (a deleted user theme, say). A run falls
+  // back to the default and says so on stderr (resolve_style_key); the panel
+  // selects the default and says the same thing where it can be seen.
+  readonly property bool configuredStyleMissing: root.styleCatalogLoaded
+    && !Model.findStyle(root.styleCatalog, root.configState.artStyle)
+  readonly property string shownStyleKey: root.configuredStyleMissing
+    ? Model.DEFAULT_ART_STYLE : root.configState.artStyle
+  readonly property var shownStyle: Model.findStyle(root.styleCatalog, root.shownStyleKey)
+  // The failed theme whose errors are on show: the one picked from the list,
+  // or the configured one if its file has broken since it was chosen.
+  readonly property var failedStyle: {
+    var picked = Model.findStyle(root.styleCatalog, root.inspectedStyleKey)
+    if (picked && !picked.valid) return picked
+    return root.shownStyle && !root.shownStyle.valid ? root.shownStyle : null
+  }
+
+  onShownStyleKeyChanged: {
+    styleSection.styleDropdown.value = root.shownStyleKey
+    // An open Tweak card (and its note) was about the previous theme.
+    root.tweakOpen = false
+  }
+
+  function loadStyleCatalog() {
+    if (styleCatalogProc.running) return
+    root.styleCatalogNotice = ""
+    styleCatalogProc.running = true
+  }
+
+  function pickArtStyle(value) {
+    root.styleActionStatus = ""
+    if (value === Model.STYLE_CREATE || value === Model.STYLE_IMPORT) {
+      root.openView("create")
+      if (value === Model.STYLE_IMPORT) root.styleCreateMode = "import"
+      root.styleImportResult = null
+      styleSection.styleDropdown.value = root.shownStyleKey
+      return
+    }
+    root.styleCreateMode = ""
+    var row = Model.findStyle(root.styleCatalog, value)
+    if (row && !row.valid) {
+      root.inspectedStyleKey = value
+      styleSection.styleDropdown.value = root.shownStyleKey
+      // Its errors and fixes are a drill-in now.
+      root.openView("fix")
+      return
+    }
+    root.inspectedStyleKey = ""
+    root.commitArtStyle(value)
+  }
+
   function commitArtStyle(value) {
     artStyleWriteProc.command = [root.configBin, "--set-art-style", value]
     artStyleWriteProc.running = true
+  }
+
+  // ---- Create your own style (decision 9). The plugin never asks a model
+  // to write a theme: "Create" briefs the user's Omarchy default agent with
+  // the astro-arc-style skill, "Copy prompt" builds one self-contained prompt
+  // for a web chat, and "Import theme" brings the chat's TOML back in. All of
+  // it is backend/bin/astro-arc-style. ------------------------------------
+  readonly property string styleBin: binDir + "/astro-arc-style"
+  // "", "create" or "import": which of the two forms is open.
+  property string styleCreateMode: ""
+  property string styleIdeaDraft: ""
+  // omarchy-default-agent's answer; "" when none is set.
+  property string defaultAgent: ""
+  // An agent launch found no default agent: the form shows the copy path.
+  property bool styleNoAgent: false
+  // astro-arc-style import's JSON: {key, path, label, errors, needsPreview, fixBlock, ...}.
+  property var styleImportResult: null
+  // render --estimate's JSON for the theme being given a preview.
+  property var styleRenderEstimate: null
+  property string styleRenderKey: ""
+
+  function setStyleStatus(text, isError) {
+    root.styleActionStatus = text
+    root.styleActionStatusIsError = isError === true
+  }
+
+  function runStyle(proc, args) {
+    if (proc.running) return
+    root.styleActionStatus = ""
+    proc.command = [root.python, root.styleBin].concat(args)
+    proc.running = true
+  }
+
+  function createStyleWithAgent() {
+    var idea = root.styleIdeaDraft.trim()
+    if (idea === "") { setStyleStatus("Describe the style in one line first.", true); return }
+    root.runStyle(styleAgentProc, ["agent", "create", idea])
+  }
+
+  function copyCreatePrompt() {
+    var idea = root.styleIdeaDraft.trim()
+    if (idea === "") { setStyleStatus("Describe the style in one line first.", true); return }
+    styleCopyProc.doneText = "Copied. Paste it into any chat model, then bring its reply back with Import theme."
+    root.runStyle(styleCopyProc, ["create-prompt", idea, "--copy"])
+  }
+
+  // Replaces Prompt 4's stubs: "Fix with AI" briefs the default agent with
+  // the file and its errors, "Copy fix prompt" does the same for a web chat.
+  function fixStyleWithAgent(row) {
+    if (!row) return
+    root.runStyle(styleAgentProc, ["agent", "fix", row.path])
+  }
+
+  function copyStyleFixPrompt(row) {
+    if (!row) return
+    styleCopyProc.doneText = "Copied. Paste it into your chat model, then Import theme with the corrected file."
+    root.runStyle(styleCopyProc, ["fix-prompt", row.path, "--copy"])
+  }
+
+  // ---- Tweak: change a working user theme by saying what's off about it.
+  // The agent (or a web chat, via Copy prompt) edits the theme in place;
+  // astro-arc-style backs its files up first, and "Undo last tweak" puts
+  // them back. ---------------------------------------------------------------
+  property bool tweakOpen: false
+  property string tweakNoteDraft: ""
+  property bool tweakIncludeExample: true
+  // The theme the tweak card acts on: the shown style, when it is the user's.
+  readonly property var tweakTheme: shownStyle && shownStyle.source === "user" ? shownStyle : null
+  // "Today's image": the newest generation's background, when it kept one.
+  readonly property string tweakExampleImage: reviewsIndex.length > 0 ? reviewsIndex[0].imagePath : ""
+  // The backup's manifest, when there is one: {key, files, savedAt}.
+  property var tweakBackup: null
+
+  property FileView tweakBackupFile: FileView {
+    path: root.tweakTheme
+      ? root.home + "/.local/state/omarchy/astro-arc/tweak-backups/" + root.tweakTheme.key + "/manifest.json" : ""
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.tweakBackup = root.parseStyleJson(text())
+    onLoadFailed: root.tweakBackup = null
+    onPathChanged: root.tweakBackup = null
+  }
+
+  // A drill-in view now (openView reloads the backup state on the way in).
+  function toggleTweak() {
+    if (root.tweakOpen) root.goBack()
+    else root.openView("tweak")
+  }
+
+  function tweakArgs() {
+    var args = [root.tweakTheme.path, "--note", root.tweakNoteDraft.trim()]
+    if (root.tweakIncludeExample && root.tweakExampleImage !== "") args = args.concat(["--example", root.tweakExampleImage])
+    return args
+  }
+
+  function tweakStyleWithAgent() {
+    if (!root.tweakTheme) return
+    if (root.tweakNoteDraft.trim() === "") { setStyleStatus("Say what's off about it first.", true); return }
+    root.runStyle(styleAgentProc, ["agent", "tweak"].concat(root.tweakArgs()))
+  }
+
+  function copyTweakPrompt() {
+    if (!root.tweakTheme) return
+    if (root.tweakNoteDraft.trim() === "") { setStyleStatus("Say what's off about it first.", true); return }
+    styleCopyProc.doneText = "Copied, and the current version is saved. Paste it into any chat model"
+      + (root.tweakIncludeExample && root.tweakExampleImage !== "" ? ", attach " + root.tweakExampleImage : "")
+      + ", then bring its reply back with Import theme."
+    root.runStyle(styleCopyProc, ["tweak-prompt"].concat(root.tweakArgs()).concat(["--copy"]))
+  }
+
+  function undoLastTweak() {
+    if (!root.tweakTheme || !root.tweakBackup) return
+    root.runStyle(styleUndoProc, ["tweak-undo", root.tweakTheme.path])
+  }
+
+  Process {
+    id: styleUndoProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) {
+          root.setStyleStatus("Restored “" + (root.tweakTheme ? root.tweakTheme.label : r.key)
+            + "” to how it was before the last tweak.", false)
+          root.stylePreviewVersion++
+          root.loadStyleCatalog()
+        } else {
+          root.setStyleStatus((r && r.error) || "Couldn't undo the tweak.", true)
+        }
+        root.tweakBackupFile.reload()
+      }
+    }
+  }
+
+  function copyImportErrors() {
+    if (!root.styleImportResult) return
+    Quickshell.execDetached(["wl-copy", root.styleImportResult.fixBlock])
+    setStyleStatus("Copied. Paste it back into your chat.", false)
+  }
+
+  function importStyle(fromClipboard) {
+    root.styleImportResult = null
+    root.runStyle(styleImportProc, ["import", fromClipboard ? "--clipboard" : "--choose-file"])
+  }
+
+  // A preview by render: the cost first (--estimate), then a click to spend it.
+  function estimateStyleRender(row) {
+    if (!row) return
+    root.styleRenderKey = row.key
+    root.styleRenderEstimate = null
+    root.runStyle(styleEstimateProc, ["render", row.path, "--estimate", "--json"])
+  }
+
+  function renderStylePreview() {
+    var row = Model.findStyle(root.styleCatalog, root.styleRenderKey)
+    var path = row ? row.path : (root.styleImportResult ? root.styleImportResult.path : "")
+    if (path === "") return
+    root.runStyle(styleRenderProc, ["render", path, "--yes", "--json"])
+  }
+
+  function styleRenderButtonText() {
+    if (styleRenderProc.running) return "Rendering…"
+    var e = root.styleRenderEstimate
+    if (!e) return "Render a preview"
+    return "Render a preview (" + (typeof e.cost === "number" ? "about " + Model.formatUsd(e.cost) : "cost unknown") + ")"
+  }
+
+  function parseStyleJson(text) {
+    try { return JSON.parse(String(text || "")) } catch (e) { return null }
+  }
+
+  // Install/update: link the skill where Omarchy's agents read skills. Run on
+  // every load, so an update (which needs a shell restart) re-links it.
+  Component.onCompleted: Quickshell.execDetached([root.python, root.styleBin, "install-skill"])
+
+  Process {
+    id: defaultAgentProc
+    command: ["omarchy-default-agent"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.defaultAgent = String(text || "").trim()
+    }
+  }
+
+  Process {
+    id: styleAgentProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) {
+          root.setStyleStatus(Model.agentLabelStart(r.agent) + " is opening in a terminal with the astro-arc-style skill. "
+            + "It asks before anything that costs money.", false)
+          root.tweakBackupFile.reload()
+        } else if (r && r.noAgent) {
+          root.defaultAgent = ""
+          root.styleNoAgent = true
+          root.setStyleStatus("No default agent is set in Omarchy, so use Copy prompt with any chat model instead "
+            + "(or set one with: omarchy default agent).", true)
+        } else {
+          root.setStyleStatus((r && r.error) || "Couldn't open the agent.", true)
+        }
+      }
+    }
+  }
+
+  Process {
+    id: styleCopyProc
+    property string doneText: ""
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) {
+          root.setStyleStatus(styleCopyProc.doneText, false)
+          root.tweakBackupFile.reload()
+        }
+        else root.setStyleStatus((r && r.error) || "Couldn't build the prompt.", true)
+      }
+    }
+  }
+
+  Process {
+    id: styleImportProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok && r.cancelled) return
+        if (!r || !r.ok) { root.setStyleStatus((r && r.error) || "Couldn't import the theme.", true); return }
+        root.styleImportResult = r
+        root.styleRenderKey = r.key
+        root.styleRenderEstimate = null
+        root.loadStyleCatalog()
+        if (r.errors.length === 0 && r.needsPreview) root.runStyle(styleEstimateProc, ["render", r.path, "--estimate", "--json"])
+        if (r.errors.length === 0 && !r.needsPreview)
+          root.setStyleStatus("“" + r.label + "” is ready: pick it from the Style list.", false)
+      }
+    }
+  }
+
+  Process {
+    id: styleEstimateProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.styleRenderEstimate = root.parseStyleJson(text)
+    }
+  }
+
+  Process {
+    id: styleRenderProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) {
+          root.setStyleStatus("Preview rendered (spent " + Model.formatUsd(r.spent) + "). The theme is ready: pick it from the Style list.", false)
+          root.styleRenderEstimate = null
+          root.styleImportResult = null
+          root.stylePreviewVersion++
+          root.loadStyleCatalog()
+        } else {
+          root.setStyleStatus((r && r.error) || "The render failed.", true)
+        }
+      }
+    }
+  }
+
+  // Both write <key>.jpg into a user theme's folder; shipped previews are
+  // read-only and style_catalog.py refuses them.
+  function setStylePreview(key, imagePath) {
+    if (stylePreviewProc.running) return
+    root.styleActionStatus = ""
+    stylePreviewProc.command = [root.python, root.styleCatalogBin, "--set-preview", key, imagePath]
+    stylePreviewProc.running = true
+  }
+
+  function changeStylePreview(key) {
+    if (stylePreviewProc.running) return
+    root.styleActionStatus = ""
+    stylePreviewProc.command = [root.python, root.styleCatalogBin, "--change-preview", key]
+    stylePreviewProc.running = true
+  }
+
+  Process {
+    id: styleCatalogProc
+    command: [root.python, root.styleCatalogBin]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          var rows = JSON.parse(String(text || ""))
+          if (Array.isArray(rows)) {
+            root.styleCatalog = Model.sortStyleCatalog(rows)
+            root.styleCatalogLoaded = true
+            return
+          }
+        } catch (e) {}
+        root.styleCatalogNotice = "Couldn't read the theme list"
+      }
+    }
+    // Only the loader's warnings, never a parse failure reported above.
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var lines = String(text || "").trim().split("\n").filter(function(l) { return l !== "" })
+        if (lines.length > 0) root.styleCatalogNotice = lines
+          .map(function(l) { return l.replace(/^astro-arc: warning: /, "") }).join("\n")
+      }
+    }
+  }
+
+  Process {
+    id: stylePreviewProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var result = null
+        try { result = JSON.parse(String(text || "")) } catch (e) {}
+        if (result && result.ok && result.cancelled) return
+        if (result && result.ok) {
+          root.styleImportResult = null
+          root.styleRenderEstimate = null
+          root.styleActionStatus = "Preview updated."
+          root.styleActionStatusIsError = false
+          root.stylePreviewVersion++
+          root.loadStyleCatalog()
+        } else {
+          root.styleActionStatus = (result && result.error) ? result.error : "Could not set the preview."
+          root.styleActionStatusIsError = true
+        }
+      }
+    }
   }
 
   Process {
@@ -973,6 +1638,47 @@ Panel {
     onLoadFailed: root.costsSummary = { total: 0, unknownCount: 0, generationCount: 0 }
   }
 
+  // ---- Reset usage: starts "Spent" over at zero (astro-arc-reset-usage).
+  // The old costs.json is kept beside it as costs-reset-<time>.json, so this
+  // is recoverable, but it still arms on the first click and reverts after 4s
+  // like Clear History: a total that quietly went to zero is easy to miss. ---
+  readonly property string resetUsageBin: binDir + "/astro-arc-reset-usage"
+  property bool resetUsageArmed: false
+  property string resetUsageError: ""
+
+  function resetUsageClicked() {
+    if (resetUsageProc.running) return
+    if (root.resetUsageArmed) {
+      root.resetUsageArmed = false
+      resetUsageArmTimer.stop()
+      root.resetUsageError = ""
+      resetUsageProc.running = true
+    } else {
+      root.resetUsageArmed = true
+      resetUsageArmTimer.restart()
+    }
+  }
+
+  Timer {
+    id: resetUsageArmTimer
+    interval: 4000
+    onTriggered: root.resetUsageArmed = false
+  }
+
+  Process {
+    id: resetUsageProc
+    command: [root.resetUsageBin]
+    stderr: StdioCollector { waitForEnd: true; onStreamFinished: root.resetUsageError = String(text || "").trim() }
+    onExited: function(exitCode) {
+      if (exitCode === 0) {
+        root.resetUsageError = ""
+        root.costsFile.reload()
+      } else if (root.resetUsageError === "") {
+        root.resetUsageError = "Reset failed."
+      }
+    }
+  }
+
   // ---- Themes Generated: every real generation, browsable and — since
   // astro-arc-generate now snapshots the live theme dir into each entry —
   // exportable as a standalone theme (astro-arc-save-theme) before the
@@ -1030,6 +1736,40 @@ Panel {
 
   function openLatestReview() {
     if (reviewsIndex.length > 0) openReview(reviewsIndex[0].path)
+  }
+
+  // The generation the main view shows: its image, its actions, and — when
+  // it is the newest — the reading last-run.json carries for it.
+  readonly property var selectedReview: reviewForId(selectedReviewId)
+  readonly property bool selectedIsNewest: selectedReviewId !== ""
+    && reviewsIndex.length > 0 && reviewsIndex[0].id === selectedReviewId
+  // The selected generation's user theme, when it has one and an image to
+  // offer it as a preview — the condition for "Use as style preview".
+  readonly property var selectedPreviewTheme: {
+    var review = selectedReview
+    if (!review || review.imagePath === "") return null
+    var theme = Model.findStyle(styleCatalog, Model.reviewStyleKey(review, styleCatalog))
+    return theme && theme.source === "user" ? theme : null
+  }
+
+  // The full-size background when the entry kept its theme snapshot, the
+  // entry's page otherwise (older entries have no image of their own).
+  function openSelectedImage() {
+    var review = selectedReview
+    if (!review) return
+    if (review.imagePath !== "") Quickshell.execDetached(["xdg-open", review.imagePath])
+    else openReview(review.path)
+  }
+
+  function useSelectedAsStylePreview() {
+    if (selectedPreviewTheme) setStylePreview(selectedPreviewTheme.key, selectedReview.imagePath)
+  }
+
+  // The "Create a new style" expander. Open means a create or import flow is
+  // showing; closing it drops a half-finished import result.
+  function toggleStyleCreate() {
+    if (styleCreateMode !== "") goBack()
+    else openView("create")
   }
 
   // ---- Save Selected Theme: exports the selected entry's theme snapshot
@@ -1261,250 +2001,24 @@ Panel {
     }
   }
 
+  // ---- Read by the section files, which can't see this file's ids. --------
+  readonly property bool styleAgentRunning: styleAgentProc.running
+  readonly property bool styleCopyRunning: styleCopyProc.running
+  readonly property bool styleUndoRunning: styleUndoProc.running
+  readonly property bool styleImportRunning: styleImportProc.running
+  readonly property bool styleEstimateRunning: styleEstimateProc.running
+  readonly property bool styleRenderRunning: styleRenderProc.running
+  readonly property bool stylePreviewRunning: stylePreviewProc.running
+  readonly property bool setThemeRunning: setThemeProc.running
+  readonly property bool exportThemeRunning: exportThemeProc.running
+  readonly property bool shareRecordRunning: shareRecordProc.running
+
   // Shared label-column width so every label-left/control-right row lines
   // up, the same way a settings form's labels would.
   // Wide enough for "Schedule", the longest of the row labels — a narrower
   // column let that label's text run past its own box and butt straight
   // into the control beside it.
   readonly property int labelColW: Style.space(64)
-
-  // Every text input in this panel is a ClipboardSafeField. Qt reads the
-  // whole clipboard into an *editable* text field by itself: on every
-  // clipboard change (to update canPaste) and whenever readOnly flips, with
-  // no paste, no size limit and no deadline, so a streaming clipboard owner
-  // can stall or exhaust the shared shell. Each of those reads, and the
-  // middle-click selection paste, is skipped while readOnly is true
-  // (qquicktextinput.cpp q_canPasteChanged/canPaste/setReadOnly/
-  // mousePressEvent). So this field is readOnly for its whole life and never
-  // flips: it does its own typing in Keys.onPressed, and reads the clipboard
-  // only on an explicit Ctrl+V / Shift+Insert, through wl-paste in a separate
-  // process with a 2 s deadline and a byte cap, so even a hostile owner can't
-  // block the shell. Navigation, selection, Ctrl+A, copy, Return
-  // (accepted/editingFinished) and focus-out editingFinished are stock
-  // TextInput behavior and work unchanged on a readOnly field.
-  component ClipboardSafeField: TextField {
-    id: safeField
-    readOnly: true
-    // readOnly hides the cursor; show it (solid — Qt only blinks editable
-    // fields) whenever the field has focus.
-    cursorVisible: activeFocus
-    // Bytes taken from the clipboard per paste: room for maximumLength
-    // characters of 4-byte UTF-8, at most 64 KiB.
-    readonly property int pasteByteLimit: Math.min(maximumLength * 4, 65536)
-
-    function replaceSelection(insert) {
-      var start = selectionStart
-      var end = selectionEnd
-      var room = maximumLength - (text.length - (end - start))
-      if (insert.length > room) insert = insert.slice(0, Math.max(0, room))
-      var next = text.slice(0, start) + insert + text.slice(end)
-      text = next
-      // A field's onTextChanged may reformat (the birth fields re-insert
-      // separators); the caret then goes to the end, as stock Qt did.
-      cursorPosition = text === next ? start + insert.length : text.length
-    }
-
-    function deleteBack(wordwise) {
-      if (selectionStart !== selectionEnd) { replaceSelection(""); return }
-      var pos = cursorPosition
-      if (pos === 0) return
-      var from = pos - 1
-      if (wordwise) {
-        while (from > 0 && /\s/.test(text.charAt(from))) from--
-        while (from > 0 && !/\s/.test(text.charAt(from - 1))) from--
-      }
-      select(from, pos)
-      replaceSelection("")
-    }
-
-    function deleteForward(wordwise) {
-      if (selectionStart !== selectionEnd) { replaceSelection(""); return }
-      var pos = cursorPosition
-      if (pos === text.length) return
-      var to = pos + 1
-      if (wordwise) {
-        while (to < text.length && /\s/.test(text.charAt(to))) to++
-        while (to < text.length && !/\s/.test(text.charAt(to))) to++
-      }
-      select(pos, to)
-      replaceSelection("")
-    }
-
-    function pasteFromClipboard() {
-      if (pasteProc.running) return
-      pasteProc.command = ["sh", "-c",
-        "timeout 2 wl-paste --no-newline --type text 2>/dev/null | head -c \"$1\"",
-        "sh", String(safeField.pasteByteLimit)]
-      pasteProc.running = true
-    }
-
-    Keys.onPressed: function(event) {
-      var ctrl = (event.modifiers & Qt.ControlModifier) !== 0
-      var shift = (event.modifiers & Qt.ShiftModifier) !== 0
-      if ((ctrl && event.key === Qt.Key_V) || (shift && event.key === Qt.Key_Insert)) {
-        pasteFromClipboard(); event.accepted = true
-      } else if (ctrl && event.key === Qt.Key_X) {
-        if (echoMode === TextInput.Normal) copy()
-        replaceSelection(""); event.accepted = true
-      } else if (event.key === Qt.Key_Backspace) {
-        deleteBack(ctrl); event.accepted = true
-      } else if (event.key === Qt.Key_Delete) {
-        deleteForward(ctrl); event.accepted = true
-      } else if (!ctrl && (event.modifiers & (Qt.AltModifier | Qt.MetaModifier)) === 0
-                 && event.text.length > 0 && !/[\x00-\x1f\x7f]/.test(event.text)) {
-        replaceSelection(event.text); event.accepted = true
-      }
-    }
-
-    Process {
-      id: pasteProc
-      stdout: StdioCollector {
-        waitForEnd: true
-        // Single-line field: line breaks and tabs become spaces, other
-        // control characters are dropped.
-        onStreamFinished: if (safeField.activeFocus && text.length > 0)
-          safeField.replaceSelection(text.replace(/[\r\n\t]+/g, " ").replace(/[\x00-\x1f\x7f]/g, ""))
-      }
-    }
-  }
-
-  // Reusable key-management block for one API slot (stage1/stage2/image):
-  // masked-reference display, replace/remove, password input, and
-  // validation status. Used identically for all three settings sections
-  // below instead of tripling ~90 lines of near-identical QML — that
-  // duplication is exactly how the earlier null-guard bug (one copy fixed,
-  // a second one wouldn't have been) would have happened again with three
-  // copies instead of one. Inline `component` declarations resolve `root`
-  // by id the same way the built-in agents panel's LimitRow/DayRow do
-  // (confirmed by reading its source), so this can call straight back into
-  // root's slot-parameterized functions without threading callbacks.
-  component ApiKeySection: Column {
-    id: section
-    required property string slot
-    // When true this row represents the ONE key the simple view shows, and
-    // saving writes it to every slot. `slot` still names which slot's status is
-    // displayed, since in that mode all three hold the same key anyway.
-    property bool storeAll: false
-    readonly property var keyState: root.apiKeyState[slot]
-
-    width: parent.width
-    spacing: Style.space(6)
-
-    // ---- Key present, not replacing: masked reference only. The full
-    // key is never displayed. ------------------------------------------
-    Item {
-      width: parent.width
-      visible: section.keyState.present && !section.keyState.replacing
-      height: Math.max(statusText.implicitHeight, replaceBtn.implicitHeight)
-
-      Text {
-        id: statusText
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        text: section.keyState.masked
-        font.family: root.bar.fontFamily
-        font.pixelSize: Style.font.bodySmall
-        color: root.bar.foreground
-      }
-
-      Row {
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: Style.space(6)
-
-        Button {
-          id: replaceBtn
-          text: "Replace"
-          bordered: true
-          fontSize: Style.font.caption
-          foreground: root.bar.foreground
-          onClicked: {
-            root.setApiKeyField(section.slot, "replacing", true)
-            root.setApiKeyField(section.slot, "validation", null)
-          }
-        }
-        Button {
-          text: "Remove"
-          bordered: true
-          fontSize: Style.font.caption
-          foreground: root.bar.foreground
-          onClicked: root.clearApiKey(section.slot)
-        }
-      }
-    }
-
-    // ---- No key yet, or actively replacing it: masked/password input.
-    // Field text is never bound to the draft the normal way, for the same
-    // reason birthDateField isn't (see its comment) — onTextChanged
-    // pushes one way, and the field is cleared imperatively once saved.
-    Column {
-      width: parent.width
-      spacing: Style.space(6)
-      visible: !section.keyState.present || section.keyState.replacing
-
-      Row {
-        width: parent.width
-        spacing: Style.space(8)
-
-        ClipboardSafeField {
-          id: keyField
-          width: parent.width - saveKeyBtn.width - Style.space(8)
-          password: true
-          enabled: !section.keyState.saving
-          placeholderText: "sk-…"
-          foreground: root.bar.foreground
-          font.family: root.bar.fontFamily
-          onTextChanged: {
-            if (section.slot === "stage1") root.stage1Draft = text
-            else if (section.slot === "stage2") root.stage2Draft = text
-            else root.imageDraft = text
-          }
-          Keys.onReturnPressed: section.storeAll ? root.saveApiKeyEverywhere() : root.saveApiKey(section.slot)
-        }
-
-        Button {
-          id: saveKeyBtn
-          text: section.keyState.saving ? "Saving…" : "Save"
-          bordered: true
-          fontSize: Style.font.caption
-          foreground: root.bar.foreground
-          enabled: !section.keyState.saving && root.draftFor(section.slot).length > 0
-          onClicked: section.storeAll ? root.saveApiKeyEverywhere() : root.saveApiKey(section.slot)
-        }
-      }
-
-      Button {
-        visible: section.keyState.replacing
-        text: "Cancel"
-        bordered: true
-        fontSize: Style.font.caption
-        foreground: root.bar.foreground
-        onClicked: {
-          root.setApiKeyField(section.slot, "replacing", false)
-          keyField.text = ""
-          root.clearDraft(section.slot)
-        }
-      }
-    }
-
-    // ---- Validation status — never shows the key itself, only whether
-    // the last save authenticated. ---------------------------------------
-    Text {
-      visible: section.keyState.validating || section.keyState.validation !== null
-      width: parent.width
-      wrapMode: Text.WordWrap
-      text: section.keyState.validating
-        ? "Validating…"
-        : section.keyState.validation
-          ? (section.keyState.validation.ok ? "✓ " : "✗ ") + section.keyState.validation.message
-          : ""
-      color: section.keyState.validating
-        ? Qt.darker(root.bar.foreground, 1.5)
-        : (section.keyState.validation && section.keyState.validation.ok ? "#a6e3a1" : (root.bar.urgent || "#f38ba8"))
-      font.family: root.bar.fontFamily
-      font.pixelSize: Style.font.caption
-    }
-  }
 
   KeyboardPanel {
     id: panel
@@ -1522,1200 +2036,139 @@ Panel {
     // Same 380px as the agents/bluetooth/network/audio panels, so Astro-Arc
     // reads as one of the family instead of a narrower one-off.
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight)
+    // One height for every view: the main view's, capped by
+    // fittedContentHeight at the screen height minus the bar (and the gap
+    // and margin around the card). The main view is built from fixed-height
+    // blocks, so browsing doesn't change it either; anything taller than
+    // this scrolls inside its view.
+    contentHeight: panel.fittedContentHeight(heroSection.implicitHeight + root.viewGap + root.mainViewHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
       blocked: root.editingLocation
-      onCloseRequested: root.close()
-      onTabRequested: function(direction) { root.switchPanel(direction) }
+      onCloseRequested: root.navEscape()
+      // Tab stays inside the panel now, cycling its controls (it used to
+      // switch to the neighbouring bar panel).
+      onTabRequested: function(direction) { root.navTab(direction) }
+      onMoveRequested: function(dx, dy) { root.navMove(dx, dy) }
 
-      Flickable {
-        id: scroll
-        anchors.fill: parent
-        contentWidth: width
-        contentHeight: column.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        interactive: contentHeight > height
+      // ---- Hero: ✦ · Astro-Arc · status, or back · the view's title ------
+      HeroSection {
+        id: heroSection
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        panel: root
+      }
 
-        Column {
-          id: column
-          // No manual padding here: KeyboardPanel's card already reserves
-          // its own padding (Style.spacing.popupPadding) around
-          // contentHolder. Rows below use label-left/control-right (an
-          // Item with the label anchored left, the control anchored
-          // right) instead of stacking a header above its control —
-          // there's horizontal room in a 320px panel that stacking wasted.
-          width: scroll.width
-          spacing: Style.space(8)
+      // ---- The views, each filling the same area below the hero ----------
+      Item {
+        id: viewArea
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: heroSection.bottom
+        anchors.topMargin: root.viewGap
+        anchors.bottom: parent.bottom
 
-          // ---- Hero: icon · title · status — the shared PanelHero, same
-          // as every other built-in popup uses ------------------------------
-          PanelHero {
-            width: parent.width
-            title: root.showSettings ? "Settings" : "Astro-Arc"
-            meta: root.showSettings ? "" : root.heroStatus
-            foreground: root.bar.foreground
-            fontFamily: root.bar.fontFamily
-            iconComponent: Component {
-              Text {
-                text: root.showSettings ? "‹" : (root.generating ? "✵" : "✦")
-                color: root.bar.foreground
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.display
+        // ================== MAIN VIEW ==================
+        Flickable {
+          id: mainFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "main"
+          contentHeight: mainColumn.implicitHeight
 
-                // Was purely decorative — a "‹" that looks exactly like a
-                // back button but did nothing when clicked. Same action as
-                // the trailing ✕ below; only live while it's actually
-                // showing the back chevron, not over the ✦/✵ status icon.
-                MouseArea {
-                  anchors.fill: parent
-                  enabled: root.showSettings
-                  cursorShape: root.showSettings ? Qt.PointingHandCursor : Qt.ArrowCursor
-                  onClicked: root.toggleSettings()
-                }
-              }
-            }
-            trailingControl: Component {
-              PanelActionButton {
-                iconText: root.showSettings ? "✕" : "⚙"
-                fontSize: Style.font.body
-                foreground: root.bar.foreground
-                tooltipText: root.showSettings ? "Close settings" : "Settings"
-                onClicked: root.toggleSettings()
-              }
-            }
-          }
-
-          PanelSeparator { foreground: root.bar.foreground }
-
-          // ================== SETTINGS VIEW ==================
           Column {
+            id: mainColumn
             width: parent.width
-            spacing: Style.space(10)
-            visible: root.showSettings
+            spacing: Style.space(14)
 
-            // First, because it decides what a generation does to the desktop
-            // at all — more consequential than any model choice below.
-            Toggle {
-              width: parent.width
-              label: root.configState.backgroundOnly ? "Background only (on)" : "Background only (off)"
-              description: root.configState.backgroundOnly
-                ? "Do not update theme colors"
-                : "Theme colors will update from the background's palette"
-              checked: root.configState.backgroundOnly
-              foreground: root.bar.foreground
-              fontFamily: root.bar.fontFamily
-              onClicked: root.commitBackgroundOnly(!root.configState.backgroundOnly)
-            }
+            // A hidden Column measures 0, so the height every view uses is
+            // taken while this one is showing.
+            function latch() { if (visible && implicitHeight > 0) root.mainViewHeight = implicitHeight }
+            onImplicitHeightChanged: latch()
+            onVisibleChanged: latch()
+            Component.onCompleted: latch()
 
-            // ---- Provider: the global setting everything else is scoped
-            // to. The key you paste, which models are offered, what they cost
-            // — all of it follows from this. Only OpenAI today; the control
-            // exists so a second provider is a data change, not a redesign.
-            // (This replaced a "Backend" picker that lived under IMAGE
-            // GENERATION and offered local Stable Diffusion. Local is no longer
-            // offered here, but a config that still says "local" is honored —
-            // see astro-arc-generate.)
-            Item {
-              width: parent.width
-              height: Math.max(providerLabel.implicitHeight, providerDropdown.implicitHeight, advancedBtn.implicitHeight)
-
-              Text {
-                id: providerLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Provider"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Dropdown {
-                id: providerDropdown
-                anchors.left: providerLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: advancedBtn.left
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: root.configState.provider
-                options: Model.PROVIDER_CHOICES.map(function(c) {
-                  return { value: c.key, label: c.label }
-                })
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitProvider(value) }
-              }
-
-              Button {
-                id: advancedBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Advanced"
-                foreground: root.bar.foreground
-                onClicked: root.advancedOpen = true
-              }
-            }
-
-            // One key, written to all three slots. The per-stage split lives in
-            // the popout; showing three key rows here made the common case —
-            // one account, one key — look like a three-step setup.
-            //
-            // Titled, because a stored key renders as a masked reference
-            // ("sk-...CxYA") and an unlabelled row of characters gives no clue
-            // what it is or why it is there.
-            Text {
-              width: parent.width
-              text: "API key"
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-
-            ApiKeySection { slot: "image"; storeAll: true }
-
+            TodaySection { panel: root }
             PanelSeparator { foreground: root.bar.foreground }
-
-            // ---- Quality: one control for every model choice. ---------
-            PanelSectionHeader { text: "QUALITY"; foreground: root.bar.foreground }
-
-            Item {
-              width: parent.width
-              height: Math.max(qualityPresetLabel.implicitHeight, presetDropdown.implicitHeight)
-
-              Text {
-                id: qualityPresetLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Preset"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Dropdown {
-                id: presetDropdown
-                anchors.left: qualityPresetLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: Model.resolvePresetKey(root.configState, root.modelCatalog.presets)
-                options: {
-                  var opts = (root.modelCatalog.presets || []).map(function(p) {
-                    return { value: p.key, label: Model.presetLabel(p) }
-                  })
-                  // "Custom" is a readout, not a choice — you reach it by
-                  // changing something in the popout. Listed so the dropdown can
-                  // display the state it is actually in.
-                  opts.push({ value: "custom", label: "Custom (set in Popout)" })
-                  return opts
-                }
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitPreset(value) }
-              }
-            }
-
-            // What the preset actually resolved to. Read-only on purpose: this
-            // is the answer to "what is it using?", and changing it is what the
-            // popout is for.
-            Column {
-              width: parent.width
-              spacing: Style.space(2)
-
-              Text {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: "Chat models: " + (root.configState.stage1Model === root.configState.stage2Model
-                  ? root.configState.stage1Model
-                  : root.configState.stage1Model + " (interpretation) · " + root.configState.stage2Model + " (image prompt)")
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-
-              Text {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                text: "Image model: " + root.configState.openaiModel + " · " + root.configState.openaiQuality
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-
-              Text {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                // Projected from a FRESH period, not from the cost log. The log
-                // averages real runs, and same-day regenerations in it are
-                // mostly cache hits, so it reported a daily cost far below the
-                // truth — the run that prompted this charged $0.07 because only
-                // Stage 2 and the render actually ran, while a new day of the
-                // same settings costs $0.18.
-                text: {
-                  var e = Model.projectedMonthlyCost(root.modelCatalog.nextRun, root.configState.frequency)
-                  if (!e) return "Est. monthly: cost unknown for the current models"
-                  var per = Model.formatUsd(e.perRun) + " per full run ("
-                    + (e.source === "actual" ? "actual" : "est") + ")"
-                  // With nothing scheduled there is no monthly figure to give —
-                  // only what a run costs when you ask for one.
-                  if (!e.scheduled) return "No recurring cost — generates only when you click. " + per
-                  return "Est. " + Model.formatUsd(e.perMonth) + "/month at " + root.configState.frequency
-                    + " · " + per
-                }
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-            }
-
-            PanelSeparator { foreground: root.bar.foreground }
-
-            // ---- Background size: which resolution the render is fitted to.
-            // Kept here rather than in the popout because it is about your
-            // monitor, not about models.
-            PanelSectionHeader { text: "BACKGROUND"; foreground: root.bar.foreground }
-            // ---- Background size: applies to whichever backend renders
-            // the image — image_fit.py crops/scales either backend's
-            // native output to this exact size afterward. -----------------
-            Item {
-              width: parent.width
-              height: Math.max(backgroundSizeLabel.implicitHeight, backgroundSizeField.implicitHeight)
-
-              Text {
-                id: backgroundSizeLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Background"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              ClipboardSafeField {
-                id: backgroundSizeField
-                anchors.left: backgroundSizeLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: detectSizeBtn.left
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "auto"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onEditingFinished: root.commitBackgroundSize(text)
-                Component.onCompleted: text = root.configState.backgroundSize
-                Connections {
-                  target: root
-                  function onConfigStateChanged() {
-                    if (!backgroundSizeField.activeFocus) backgroundSizeField.text = root.configState.backgroundSize
-                  }
-                }
-              }
-
-              Button {
-                id: detectSizeBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Auto-detect"
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                onClicked: root.detectBackgroundSize()
-              }
-            }
-
-            Text {
-              visible: root.backgroundSizeError !== ""
-              width: parent.width
-              text: root.backgroundSizeError
-              color: root.bar.urgent || "#f38ba8"
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            PanelSeparator { foreground: root.bar.foreground }
-            PanelSectionHeader { text: "THEME"; foreground: root.bar.foreground }
-
-            // ---- Theme generator: which tool turns the rendered image
-            // into colors.toml/icons.theme/etc. "Built-in" is
-            // palette_extract.py (default, no external dependency);
-            // "Aether" shells out to Omarchy's own richer generator and
-            // silently falls back to built-in if it's missing or fails —
-            // see astro-arc-generate's theming block. --------------------
-            Item {
-              width: parent.width
-              height: Math.max(themeGeneratorLabel.implicitHeight, themeGeneratorDropdown.implicitHeight)
-
-              Text {
-                id: themeGeneratorLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Generator"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Dropdown {
-                id: themeGeneratorDropdown
-                anchors.left: themeGeneratorLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: root.configState.themeGenerator
-                options: Model.THEME_GENERATOR_CHOICES.map(function(c) {
-                  return { value: c.key, label: c.label }
-                })
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.commitThemeGenerator(value) }
-              }
-            }
-
-
-            // ---- History retention: days of "Themes Generated" entries
-            // to keep (astro-arc-prune-history runs automatically every
-            // generation with this value). Estimate is real-data-based —
-            // the average size of entries that actually have a recorded
-            // sizeBytes, times how many the window is projected to hold at
-            // the current frequency — never a guessed number before
-            // there's any size history to average (see
-            // Model.estimateHistorySpace). --------------------------------
-            Item {
-              width: parent.width
-              height: Math.max(historyRetentionLabel.implicitHeight, historyRetentionField.implicitHeight)
-
-              Text {
-                id: historyRetentionLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "History"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              ClipboardSafeField {
-                id: historyRetentionField
-                anchors.left: historyRetentionLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: historyRetentionDaysLabel.left
-                anchors.rightMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-                placeholderText: "30"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onEditingFinished: root.commitHistoryRetentionDays(text)
-                Component.onCompleted: text = String(root.configState.historyRetentionDays)
-                Connections {
-                  target: root
-                  function onConfigStateChanged() {
-                    if (!historyRetentionField.activeFocus) historyRetentionField.text = String(root.configState.historyRetentionDays)
-                  }
-                }
-              }
-
-              Text {
-                id: historyRetentionDaysLabel
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: "days"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-            }
-
-            Text {
-              visible: root.historyRetentionError !== ""
-              width: parent.width
-              text: root.historyRetentionError
-              color: root.bar.urgent || "#f38ba8"
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              readonly property var estimate: Model.estimateHistorySpace(root.reviewsIndex, root.configState.historyRetentionDays, root.configState.frequency)
-              text: {
-                var e = estimate
-                var basis = " (based on " + e.knownCount + " saved generation" + (e.knownCount === 1 ? "" : "s") + ")"
-                if (e.estimatedBytes !== null)
-                  return "Est. space for " + root.configState.historyRetentionDays + " days: ~"
-                    + Model.formatBytes(e.estimatedBytes) + basis
-                // No cadence: how much this ends up using depends on how often
-                // you click, so give the per-generation figure — which IS known
-                // — rather than the "not enough history" line, which would be
-                // untrue whenever there is history but nothing scheduled.
-                if (e.noCadence)
-                  return "Est. space: ~" + Model.formatBytes(e.avgBytes) + " per generation"
-                    + " — no total, since nothing is scheduled" + basis
-                return "Est. space: not enough history yet to estimate"
-              }
-              color: Qt.darker(root.bar.foreground, 1.5)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            PanelSeparator { foreground: root.bar.foreground }
-            PanelSectionHeader { text: "API USAGE"; foreground: root.bar.foreground }
-
-            // ---- Running total, computed locally from costs.json — real
-            // token-based cost for every generation's 3 API calls (see
-            // cost_estimate.py). Always available, no API call needed. -----
-            Item {
-              width: parent.width
-              height: spentText.implicitHeight
-
-              Text {
-                id: spentLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Spent"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Text {
-                id: spentText
-                anchors.left: spentLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                elide: Text.ElideRight
-                text: "$" + root.costsSummary.total.toFixed(4)
-                  + " across " + root.costsSummary.generationCount + " generation" + (root.costsSummary.generationCount === 1 ? "" : "s")
-                  + (root.costsSummary.unknownCount > 0 ? " (+" + root.costsSummary.unknownCount + " w/ unrecognized-model cost)" : "")
-                color: root.bar.foreground
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-            }
-
-            PanelSeparator { foreground: root.bar.foreground }
-            PanelSectionHeader { text: "VERSION"; foreground: root.bar.foreground }
-
-            Item {
-              width: parent.width
-              height: versionRowLabel.implicitHeight
-
-              Text {
-                id: versionRowLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Version"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              // The release this checkout is on, linked to its GitHub page.
-              // "v1.0.1 (a3f9c21)" on a release; "v1.0.1 +3 (a3f9c21)" on a
-              // development copy that is 3 commits past it. The link is the
-              // whole update story now: it lands on the release page, which
-              // says to run `omarchy plugin update`.
-              Text {
-                id: versionText
-                anchors.left: versionRowLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: parent.right
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                elide: Text.ElideRight
-                text: root.versionLabel === ""
-                  ? ""
-                  : root.versionLabel
-                    + (root.versionAhead > 0 ? " +" + root.versionAhead : "")
-                    + (root.versionCommit !== "" ? " (" + root.versionCommit + ")" : "")
-                color: root.bar.foreground
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                font.underline: root.versionUrl !== "" && versionMouse.containsMouse
-
-                MouseArea {
-                  id: versionMouse
-                  anchors.fill: parent
-                  enabled: root.versionUrl !== ""
-                  hoverEnabled: true
-                  cursorShape: root.versionUrl !== "" ? Qt.PointingHandCursor : Qt.ArrowCursor
-                  onClicked: Quickshell.execDetached(["xdg-open", root.versionUrl])
-                }
-              }
-
-            }
-
-            // Updating is a terminal command on purpose — see the Updates note
-            // above the version properties for why the panel does not do it.
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: "Update with: omarchy plugin update"
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
+            StyleSection { id: styleSection; panel: root }
           }
+        }
 
-          // ================== MAIN VIEW ==================
-          // ---- Birth + location: the only inputs a reading needs,
-          // one section instead of two ------------------------------------
+        // ================== SETTINGS ==================
+        // Only what a reading needs. Everything else is in the Advanced
+        // popout (sections/AdvancedSettingsWindow.qml).
+        Flickable {
+          id: settingsFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "settings"
+          contentHeight: settingsColumn.implicitHeight
+
           Column {
+            id: settingsColumn
             width: parent.width
-            spacing: Style.space(6)
-            visible: !root.showSettings
+            spacing: Style.space(16)
 
-            PanelSectionHeader { text: "BIRTH & LOCATION"; foreground: root.bar.foreground }
-
-            // Born: label left, date + time fields right. Blank time =
-            // unknown (no separate toggle); both auto-save on blur/Enter.
-            Item {
-              width: parent.width
-              height: Math.max(bornLabel.implicitHeight, birthDateField.implicitHeight)
-
-              // Pure anchors (no Row) so birthTimeField's width falls
-              // straight out of anchors.left/right instead of a
-              // cross-reference to a sibling Row's own anchor-derived
-              // width, which is harder to reason about for no benefit here.
-              Text {
-                id: bornLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Born"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              // text is intentionally not bound to root.draftBirthDate: a
-              // persistent binding would be severed the moment the user
-              // types (Qt Quick sets `text` imperatively as you edit,
-              // which drops any declarative binding on it for good).
-              // syncDraftsFromConfig pushes text in on load/reopen
-              // instead; onTextChanged is the only path the other way.
-              //
-              // onTextChanged also re-formats as-you-type: only digits are
-              // meaningful input, and Model.formatDateDigits re-inserts the
-              // "-" separators, so typing "19900615" displays as
-              // "1990-06-15" without the user typing the dashes. Reassigning
-              // `text` re-enters onTextChanged; the `formatted !== text`
-              // guard makes that second pass a no-op instead of a loop.
-              ClipboardSafeField {
-                id: birthDateField
-                anchors.left: bornLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                width: Style.space(118)
-                maximumLength: 10
-                placeholderText: "YYYY-MM-DD"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onTextChanged: {
-                  var formatted = Model.formatDateDigits(text)
-                  if (formatted !== text) { text = formatted; return }
-                  root.draftBirthDate = text
-                }
-                onEditingFinished: root.commitBirth()
-              }
-
-              ClipboardSafeField {
-                id: birthTimeField
-                anchors.left: birthDateField.right
-                anchors.leftMargin: Style.space(6)
-                anchors.verticalCenter: parent.verticalCenter
-                width: Style.space(64)
-                maximumLength: 5
-                placeholderText: "HH:MM"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                onTextChanged: {
-                  var formatted = Model.formatTimeDigits(text)
-                  if (formatted !== text) { text = formatted; return }
-                  root.draftBirthTime = text
-                }
-                onEditingFinished: root.commitBirth()
-              }
-            }
-
-            Text {
-              visible: root.birthError !== ""
-              width: parent.width
-              text: root.birthError
-              color: root.bar.urgent || "#f38ba8"
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            // Where: label left, current location + Change on the right;
-            // swaps to a search field in place while editing.
-            Item {
-              width: parent.width
-              visible: !root.editingLocation
-              height: Math.max(whereLabel.implicitHeight, changeBtn.implicitHeight)
-
-              Text {
-                id: whereLabel
-                anchors.left: parent.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: root.labelColW
-                text: "Where"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              Button {
-                id: changeBtn
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Change"
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                onClicked: root.startEditingLocation()
-              }
-
-              Text {
-                anchors.left: whereLabel.right
-                anchors.leftMargin: Style.space(8)
-                anchors.right: changeBtn.left
-                anchors.rightMargin: Style.space(8)
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.configState.locationName || "Not set"
-                elide: Text.ElideRight
-                color: root.bar.foreground
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-            }
-
-            Column {
-              width: parent.width
-              spacing: Style.space(4)
-              visible: root.editingLocation
-
-              Row {
-                width: parent.width
-                spacing: Style.space(8)
-
-                ClipboardSafeField {
-                  id: locationField
-                  width: parent.width - cancelBtn.width - Style.space(8)
-                  enabled: !root.savingLocation
-                  placeholderText: "Search city, state, country"
-                  foreground: root.bar.foreground
-                  font.family: root.bar.fontFamily
-                  onTextChanged: if (root.editingLocation && !root.savingLocation) geocodeDebounce.restart()
-                  Keys.onPressed: function(event) {
-                    if (event.key === Qt.Key_Escape) {
-                      root.cancelEditingLocation(); event.accepted = true
-                    } else if (event.key === Qt.Key_Down) {
-                      if (root.suggestionIndex < root.locationSuggestions.length - 1) root.suggestionIndex++
-                      event.accepted = true
-                    } else if (event.key === Qt.Key_Up) {
-                      if (root.suggestionIndex > 0) root.suggestionIndex--
-                      event.accepted = true
-                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                      root.commitLocation(); event.accepted = true
-                    }
-                  }
-                }
-
-                Button {
-                  id: cancelBtn
-                  text: root.savingLocation ? "…" : "✕"
-                  bordered: true
-                  foreground: root.bar.foreground
-                  fontSize: Style.font.bodySmall
-                  enabled: !root.savingLocation
-                  onClicked: root.cancelEditingLocation()
-                }
-              }
-
-              Repeater {
-                model: root.locationSuggestions
-
-                Rectangle {
-                  required property var modelData
-                  required property int index
-                  width: parent.width
-                  height: suggestionRow.implicitHeight + Style.space(8)
-                  radius: Style.cornerRadius
-                  color: index === root.suggestionIndex ? Style.hoverFillFor(root.bar.foreground, Color.accent) : "transparent"
-
-                  Row {
-                    id: suggestionRow
-                    anchors.left: parent.left
-                    anchors.leftMargin: Style.space(8)
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Style.space(8)
-
-                    Text {
-                      text: modelData.name
-                      color: root.bar.foreground
-                      font.family: root.bar.fontFamily
-                      font.pixelSize: Style.font.bodySmall
-                    }
-                    Text {
-                      visible: text !== ""
-                      text: modelData.description
-                      color: Qt.darker(root.bar.foreground, 1.5)
-                      font.family: root.bar.fontFamily
-                      font.pixelSize: Style.font.caption
-                    }
-                  }
-
-                  MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onPositionChanged: root.suggestionIndex = index
-                    onClicked: root.pickSuggestion(modelData)
-                  }
-                }
-              }
-
-              Text {
-                visible: root.configState.latitude !== null
-                text: root.configState.latitude !== null
-                  ? ("Coordinates: " + root.configState.latitude.toFixed(4) + ", " + root.configState.longitude.toFixed(4))
-                  : ""
-                color: Qt.darker(root.bar.foreground, 1.5)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-            }
-          }
-
-          // ================== MAIN VIEW, continued ==================
-          Column {
-            width: parent.width
-            spacing: Style.space(8)
-            visible: !root.showSettings
-
-          // ---- Schedule: label left, compact dropdown right — the
-          // Dropdown's own default width (240px) is most of the panel,
-          // so it's overridden down to fit a label beside it -------------
-          Item {
-            width: parent.width
-            height: Math.max(scheduleLabel.implicitHeight, frequencyDropdown.implicitHeight)
-
-            Text {
-              id: scheduleLabel
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-              width: root.labelColW
-              text: "Schedule"
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-
-            Dropdown {
-              id: frequencyDropdown
-              anchors.left: scheduleLabel.right
-              anchors.leftMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              width: Style.space(100)
-              showLabel: false
-              value: root.configState.frequency
-              options: Model.FREQUENCY_CHOICES.map(function(c) {
-                return { value: c.key, label: c.label }
-              })
-              foreground: root.bar.foreground
-              onChanged: function(value) { root.commitFrequency(value) }
-            }
-          }
-
-          // ---- What a schedule actually promises. The scheduler is the
-          // panel's own poll, so it needs the shell running: it does not
-          // outlive the login session. Locking the screen does not stop it (a
-          // lock is not a logout), and a boundary crossed while the machine
-          // was off or asleep is caught by the first poll after it comes back,
-          // within five minutes, rather than skipped. Worth stating plainly:
-          // "every hour" reads as a promise the machine cannot keep while it
-          // is switched off. ----------------------------------------------
-          Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: root.configState.frequency === "manual"
-              ? "Nothing generates on its own — Regenerate is the only trigger."
-              : "Runs only while the computer is on and you are logged in; a locked "
-                + "screen still counts. Anything due while it was off, asleep or "
-                + "logged out runs shortly after you are back."
-            color: Qt.darker(root.bar.foreground, 1.5)
-            font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          // ---- Style: label left, dropdown right — no longer locked;
-          // options come from pipeline/styles.toml (mirrored in Model.js
-          // as ART_STYLE_CHOICES). -----------------------------------------
-          Item {
-            width: parent.width
-            height: Math.max(styleLabel.implicitHeight, styleDropdown.implicitHeight)
-
-            Text {
-              id: styleLabel
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-              width: root.labelColW
-              text: "Style"
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-
-            Dropdown {
-              id: styleDropdown
-              anchors.left: styleLabel.right
-              anchors.leftMargin: Style.space(8)
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              showLabel: false
-              value: root.configState.artStyle
-              options: Model.ART_STYLE_CHOICES.map(function(s) {
-                return { value: s.key, label: s.label }
-              })
-              foreground: root.bar.foreground
-              onChanged: function(value) { root.commitArtStyle(value) }
-            }
-          }
-
-          PanelSeparator { foreground: root.bar.foreground }
-
-          // ---- Regenerate, beside the last-generated status -------------
-          Item {
-            width: parent.width
-            height: Math.max(statusText.implicitHeight, regenerateBtn.implicitHeight)
-
-            Text {
-              id: statusText
-              anchors.left: parent.left
-              anchors.right: regenerateBtn.left
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              elide: Text.ElideRight
-              text: root.lastRun
-                ? "Last run: " + Model.formatGeneratedAt(root.lastRun.generatedAt, function(d) {
-                    return Qt.formatDateTime(d, "MMM d, h:mm AP")
-                  })
-                : "Not generated yet"
-              color: Qt.darker(root.bar.foreground, 1.5)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            Button {
-              id: regenerateBtn
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              // Shows what THIS click will charge, which depends on what is
-              // already cached for the current period — not the same as a
-              // fresh day's cost.
-              text: root.generating ? "Generating…" : Model.nextRunLabel(root.modelCatalog.nextRun)
-              bordered: true
-              foreground: root.bar.foreground
-              fontSize: Style.font.caption
-              enabled: !root.generating
-              onClicked: root.regenerateNow()
-
-              // The button used to resize the moment it was clicked: the label
-              // shortens ("Regenerate · $0.069" -> "Generating…") AND a spinner
-              // icon appeared, so the width moved twice in one frame. Latching
-              // the widest width it has ever wanted fixes the shrink, and since
-              // the idle label is the longer of the two and no icon is added
-              // any more, that maximum is reached on the first paint and never
-              // changes again — so there is no initial jump either.
-              property real reservedWidth: 0
-              onImplicitWidthChanged: if (implicitWidth > reservedWidth) reservedWidth = implicitWidth
-              width: Math.max(implicitWidth, reservedWidth)
-            }
-          }
-
-          Text {
-            visible: root.generateError !== ""
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: "Last run error: " + root.generateError
-            color: root.bar.urgent || "#f38ba8"
-            font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          // ---- Distillation: the one-line psychological core of the last
-          // reading, with its narrative-position badge above it — same two
-          // fields the review-history HTML shows as a badge over an
-          // italicized quote (build_review.py's .badge/.distillation). -----
-          Column {
-            width: parent.width
-            spacing: Style.space(2)
-            visible: !!root.lastRun && root.lastRun.distillation !== ""
-
-            Text {
-              visible: root.lastRun ? root.lastRun.narrativePosition !== "" : false
-              text: root.lastRun ? root.lastRun.narrativePosition : ""
-              color: Color.accent
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-              font.capitalization: Font.AllUppercase
-            }
-
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: root.lastRun ? "“" + root.lastRun.distillation + "”" : ""
-              font.family: root.bar.fontFamily
-              font.italic: true
-              font.pixelSize: Style.font.bodySmall
-              color: root.bar.foreground
-            }
-          }
-
-          // ---- Themes Generated: browse every real generation (was
-          // "Reviews" — renamed since every entry is a real iteration now,
-          // not just the Phase 3 style-comparison batches this started as).
-          // Each carries its own on-disk size; Save Selected Theme exports
-          // one as a permanent Omarchy theme (astro-arc-save-theme); Clear
-          // History deletes all of them right now regardless of age
-          // (astro-arc-prune-history --all) — the automatic age-based
-          // pruning runs on its own every generation, see the THEME
-          // settings section's History retention field. -------------------
-          Column {
-            width: parent.width
-            spacing: Style.space(6)
-            visible: root.reviewsIndex.length > 0
-
+            BirthLocationSection { id: birthLocationSection; panel: root }
             PanelSeparator { foreground: root.bar.foreground }
-            PanelSectionHeader { text: "THEMES GENERATED"; foreground: root.bar.foreground }
-
-            // The picker gets the whole row. It used to share it with a
-            // "History" label and the Open button, which left an entry like
-            // "Sep 19, 2:10 PM · Cyberpunk · 2.39 MB" elided in the middle —
-            // and the part that gets cut is the style, which is the part you
-            // are choosing by. The section header already says what this is,
-            // so the label column was pure cost; Open moved to the row below,
-            // where it sits with the other two things you can do to the
-            // entry you picked.
-            Item {
-              width: parent.width
-              height: reviewsDropdown.implicitHeight
-
-              Dropdown {
-                id: reviewsDropdown
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                showLabel: false
-                value: root.selectedReviewId
-                options: root.reviewsIndex.map(function(r) {
-                  // cardCount was meaningful when a review could bundle
-                  // several style variants for one reading (the Phase 3
-                  // exploration batches); every review since is one real
-                  // generation, so it's redundant noise now. Size is null
-                  // (omitted) on an entry built before that field existed.
-                  var sizeSuffix = r.sizeBytes !== null ? " · " + Model.formatBytes(r.sizeBytes) : ""
-                  return { value: r.id, label: r.label + sizeSuffix }
-                })
-                foreground: root.bar.foreground
-                onChanged: function(value) { root.selectedReviewId = value }
-              }
-            }
-
-            // ---- One action bar for the selected generation. -------------
-            //
-            // Was two rows with different rules: Open/Browse/Set in a left-
-            // packed Row, then Save/Share/Export anchored left/centre/right in
-            // an Item. Two layout idioms, two orders, and the pair that
-            // actually changes something (Set) sat next to the pair that only
-            // looks (Open/Browse).
-            //
-            // Now one Grid in a single stated order, equal column widths, and
-            // it wraps to two rows only when one will not fit. `columns` is
-            // the whole layout rule: all of them across if the row can hold
-            // them at a sane width, otherwise half each row. Widths are set
-            // from the column count rather than from each label, so the row
-            // stays put when a label shortens to "Setting…" — which is what
-            // the per-button reservedWidth latches used to do one at a time.
-            Grid {
-              id: reviewActions
-              width: parent.width
-              visible: !root.themeNamePromptOpen
-              spacing: Style.space(8)
-
-              readonly property int count: 6
-              // The narrowest a button may get before wrapping is better than
-              // cramming. Below this the labels start eliding, which is worse
-              // than a second row.
-              readonly property int minButtonWidth: 84
-              readonly property bool fitsOneRow:
-                (width - spacing * (count - 1)) / count >= minButtonWidth
-              columns: fitsOneRow ? count : Math.ceil(count / 2)
-              readonly property real cellWidth:
-                (width - spacing * (columns - 1)) / columns
-
-              // The whole history as one browsable page — the URL worth
-              // bookmarking. Plain files; opens in the default browser. First
-              // because it is the way in to everything, not just this entry.
-              Button {
-                id: archiveBtn
-                text: "Browse All"
-                width: reviewActions.cellWidth
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                onClicked: root.openArchive()
-              }
-
-              Button {
-                id: openReviewBtn
-                text: "Open"
-                width: reviewActions.cellWidth
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: root.selectedReviewId !== ""
-                onClicked: root.openSelectedReview()
-              }
-
-              // The only one here that changes what you are looking at, and
-              // the next generation undoes it — the permanent copies are Save
-              // and Export.
-              Button {
-                id: setThemeBtn
-                text: setThemeProc.running ? "Setting…" : "Set"
-                width: reviewActions.cellWidth
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: root.selectedReviewId !== "" && !setThemeProc.running
-                onClicked: root.setSelectedTheme()
-              }
-
-              // Save installs the theme here; Export packages it for someone
-              // else.
-              Button {
-                id: saveThemeBtn
-                text: "Save"
-                width: reviewActions.cellWidth
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: root.selectedReviewId !== ""
-                onClicked: root.openSaveThemePrompt()
-              }
-
-              Button {
-                id: exportThemeBtn
-                text: exportThemeProc.running ? "Exporting…" : "Export"
-                width: reviewActions.cellWidth
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: root.selectedReviewId !== "" && !exportThemeProc.running
-                onClicked: root.exportSelectedTheme()
-              }
-
-              // The odd one out between its neighbours: they copy the THEME,
-              // this copies the RECORD — one .html with the image in it, made
-              // to be read rather than installed. Last because it is the only
-              // one that is not about the desktop, and NOT dropped: it was
-              // absent from the requested order, but removing a working
-              // feature is a different decision from reordering the bar.
-              Button {
-                id: shareRecordBtn
-                text: shareRecordProc.running ? "Sharing…" : "Share"
-                width: reviewActions.cellWidth
-                bordered: true
-                fontSize: Style.font.caption
-                foreground: root.bar.foreground
-                enabled: root.selectedReviewId !== "" && !shareRecordProc.running
-                onClicked: root.shareSelectedRecord()
-              }
-            }
-
-            // ---- Name prompt: shown in place of the row above once Save
-            // Selected Theme is clicked. Pre-filled with
-            // Model.suggestThemeName's guess from that generation's own
-            // concept tags — editable before it's actually saved. ----------
-            Column {
-              width: parent.width
-              spacing: Style.space(6)
-              visible: root.themeNamePromptOpen
-
-              Text {
-                text: "Theme name"
-                color: Qt.darker(root.bar.foreground, 1.3)
-                font.family: root.bar.fontFamily
-                font.pixelSize: Style.font.bodySmall
-              }
-
-              ClipboardSafeField {
-                id: themeNameField
-                width: parent.width
-                placeholderText: "e.g. Geological Rootedness"
-                foreground: root.bar.foreground
-                font.family: root.bar.fontFamily
-                text: root.themeNameDraft
-                onTextChanged: root.themeNameDraft = text
-                Keys.onReturnPressed: root.confirmSaveTheme()
-                Keys.onEnterPressed: root.confirmSaveTheme()
-                Component.onCompleted: forceActiveFocus()
-              }
-
-              Item {
-                width: parent.width
-                height: Math.max(confirmSaveThemeBtn.implicitHeight, cancelSaveThemeBtn.implicitHeight)
-
-                Button {
-                  id: cancelSaveThemeBtn
-                  anchors.left: parent.left
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "Cancel"
-                  bordered: true
-                  fontSize: Style.font.caption
-                  foreground: root.bar.foreground
-                  onClicked: root.cancelSaveThemePrompt()
-                }
-
-                Button {
-                  id: confirmSaveThemeBtn
-                  anchors.right: parent.right
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: "Save"
-                  bordered: true
-                  fontSize: Style.font.caption
-                  foreground: root.bar.foreground
-                  onClicked: root.confirmSaveTheme()
-                }
-              }
-            }
-
-            Text {
-              visible: root.themeActionStatus !== ""
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: root.themeActionStatus
-              color: root.themeActionStatusIsError ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
+            ScheduleSection { id: scheduleSection; panel: root }
+            PanelSeparator { foreground: root.bar.foreground }
+            AdvancedLinkSection { panel: root }
           }
-          }
+        }
+
+        // ================== DRILL-INS ==================
+        Flickable {
+          id: tweakFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "tweak"
+          contentHeight: tweakView.implicitHeight
+          TweakView { id: tweakView; panel: root }
+        }
+
+        Flickable {
+          id: createFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "create"
+          contentHeight: createView.implicitHeight
+          CreateView { id: createView; panel: root }
+        }
+
+        Flickable {
+          id: fixFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "fix"
+          contentHeight: fixView.implicitHeight
+          FixView { id: fixView; panel: root }
+        }
+
+        // Scrolls its own grid, so it takes the area as it is.
+        BrowseView {
+          id: browseView
+          visible: root.view === "browse"
+          panel: root
+          availableHeight: viewArea.height
         }
       }
     }
@@ -2731,341 +2184,7 @@ Panel {
     function toggle(): void { root.toggle() }
   }
 
-  // ---- Advanced settings popout -------------------------------------
-  // A real overlay window rather than an expanded panel, following the
-  // image-picker plugin's pattern (PanelWindow + WlrLayershell overlay): the
-  // bar panel is narrow, and this view has to hold every model the key can
-  // reach plus three key rows without either being cramped.
-  //
-  // Deliberately a sibling of the panel, not a separate QML file: ApiKeySection
-  // is an inline component of this file and inline components are not visible
-  // from another one, so extracting this would mean duplicating the key rows —
-  // the one part of this widget where duplication is genuinely dangerous.
-  PanelWindow {
-    id: advancedWindow
-
-    visible: root.advancedOpen
-    anchors { top: true; bottom: true; left: true; right: true }
-    color: "transparent"
-    WlrLayershell.namespace: "astro-arc-advanced-settings"
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.advancedOpen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
-
-    // Click-outside-to-close, with the card itself swallowing clicks so a
-    // mis-aimed click inside doesn't dismiss a form being filled in.
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.advancedOpen = false
-    }
-
-    Rectangle {
-      anchors.fill: parent
-      color: "#cc000000"
-      z: -1
-    }
-
-    Rectangle {
-      id: advancedCard
-      anchors.centerIn: parent
-      width: Math.min(parent.width - Style.space(16) * 2, 720)
-      height: Math.min(parent.height - Style.space(16) * 2, 860)
-      radius: 14
-      color: root.bar ? root.bar.background : "#11111b"
-      border.color: Qt.darker(root.bar ? root.bar.foreground : "#cdd6f4", 2.4)
-      border.width: 1
-
-      // Escape-to-close lives here, not on the PanelWindow. PanelWindow has no
-      // `focus` property at all — assigning one aborts creation of the window
-      // AND of its parent, which is what stopped the whole widget from opening.
-      // Keys is an attached property of Item, so it needs an Item to attach to;
-      // the card is one, and the window's Exclusive keyboardFocus is what routes
-      // Wayland key events here in the first place.
-      focus: root.advancedOpen
-      Keys.onEscapePressed: root.advancedOpen = false
-
-      MouseArea { anchors.fill: parent }
-
-      Column {
-        id: advancedHeader
-        anchors { top: parent.top; left: parent.left; right: parent.right; margins: Style.space(14) }
-        spacing: Style.space(4)
-
-        Item {
-          width: parent.width
-          height: Math.max(advancedTitle.implicitHeight, advancedCloseBtn.implicitHeight)
-
-          Text {
-            id: advancedTitle
-            anchors.left: parent.left
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Advanced settings"
-            color: root.bar ? root.bar.foreground : "#cdd6f4"
-            font.family: root.bar ? root.bar.fontFamily : "sans"
-            font.pixelSize: Style.font.body
-            font.bold: true
-          }
-
-          Button {
-            id: advancedCloseBtn
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Close"
-            foreground: root.bar ? root.bar.foreground : "#cdd6f4"
-            onClicked: root.advancedOpen = false
-          }
-        }
-
-        Text {
-          width: parent.width
-          wrapMode: Text.WordWrap
-          text: "Anything set here overrides the quality preset, which will then read \"Custom\". Costs marked (est) are published rates applied to token counts measured from real runs; (actual) means this exact combination has been measured on this machine."
-          color: Qt.darker(root.bar ? root.bar.foreground : "#cdd6f4", 1.3)
-          font.family: root.bar ? root.bar.fontFamily : "sans"
-          font.pixelSize: Style.font.caption
-        }
-      }
-
-      Flickable {
-        anchors { top: advancedHeader.bottom; left: parent.left; right: parent.right; bottom: parent.bottom; margins: Style.space(14) }
-        contentHeight: advancedContent.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-
-        Column {
-          id: advancedContent
-          width: parent.width
-          spacing: Style.space(10)
-
-          PanelSectionHeader { text: "MODEL LIST"; foreground: root.bar.foreground }
-
-          Item {
-            width: parent.width
-            height: Math.max(advModelStatus.implicitHeight, advRefreshBtn.implicitHeight, advShowAllBtn.implicitHeight)
-
-            Text {
-              id: advModelStatus
-              anchors.left: parent.left
-              anchors.right: advShowAllBtn.left
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              wrapMode: Text.WordWrap
-              text: {
-                if (root.modelCatalogLoading) return "Refreshing…"
-                if (root.modelCatalogError !== "") return root.modelCatalogError
-                if (!root.modelCatalog.everFetched) return "Model list not fetched yet"
-                var n = (root.modelCatalog.image || []).length + (root.modelCatalog.chat || []).length
-                return n + " reachable" + (root.modelCatalog.stale ? " · over a day old" : "")
-              }
-              color: root.modelCatalogError !== "" ? (root.bar.urgent || "#f38ba8") : Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            Button {
-              id: advShowAllBtn
-              anchors.right: advRefreshBtn.left
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              text: root.showAllModels ? "Shortlist" : "All models"
-              foreground: root.bar.foreground
-              onClicked: root.showAllModels = !root.showAllModels
-            }
-
-            Button {
-              id: advRefreshBtn
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              text: "Refresh"
-              enabled: !root.modelCatalogLoading
-              foreground: root.bar.foreground
-              onClicked: root.loadModelCatalog(true)
-            }
-          }
-
-          PanelSeparator { foreground: root.bar.foreground }
-          PanelSectionHeader { text: "STAGE 1 · INTERPRETATION"; foreground: root.bar.foreground }
-
-          AdvancedChatPicker { stage: "stage1" }
-          ApiKeySection { slot: "stage1" }
-
-          PanelSeparator { foreground: root.bar.foreground }
-          PanelSectionHeader { text: "STAGE 2 · IMAGE PROMPT"; foreground: root.bar.foreground }
-
-          AdvancedChatPicker { stage: "stage2" }
-          ApiKeySection { slot: "stage2" }
-
-          PanelSeparator { foreground: root.bar.foreground }
-          PanelSectionHeader { text: "IMAGE GENERATION"; foreground: root.bar.foreground }
-
-          Item {
-            width: parent.width
-            height: Math.max(advImageLabel.implicitHeight, advImageDropdown.implicitHeight)
-
-            Text {
-              id: advImageLabel
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-              width: root.labelColW
-              text: "Model"
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-
-            Dropdown {
-              id: advImageDropdown
-              anchors.left: advImageLabel.right
-              anchors.leftMargin: Style.space(8)
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              showLabel: false
-              value: Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
-              options: {
-                var rows = Model.imageRowsWithinCeiling(
-                  Model.visibleRows(root.modelCatalog.image || [], root.showAllModels),
-                  root.configState.maxCostPerImage)
-                var opts = rows.map(function(r) {
-                  return { value: Model.openaiModelDropdownValue(r.model, r.quality), label: Model.imageModelLabel(r) }
-                })
-                var current = Model.openaiModelDropdownValue(root.configState.openaiModel, root.configState.openaiQuality)
-                if (current && !opts.some(function(o) { return o.value === current }))
-                  opts.unshift({ value: current, label: root.configState.openaiModel + " — " + root.configState.openaiQuality + "  · over ceiling" })
-                return opts
-              }
-              foreground: root.bar.foreground
-              onChanged: function(value) { root.commitOpenaiModel(value) }
-            }
-          }
-
-          Item {
-            width: parent.width
-            height: Math.max(advCeilingLabel.implicitHeight, advCeilingField.implicitHeight)
-
-            Text {
-              id: advCeilingLabel
-              anchors.left: parent.left
-              anchors.verticalCenter: parent.verticalCenter
-              width: root.labelColW
-              text: "Max $/image"
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.bodySmall
-            }
-
-            ClipboardSafeField {
-              id: advCeilingField
-              anchors.left: advCeilingLabel.right
-              anchors.leftMargin: Style.space(8)
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              placeholderText: "0.00 (no ceiling)"
-              foreground: root.bar.foreground
-              font.family: root.bar.fontFamily
-              onEditingFinished: root.commitMaxCostPerImage(text)
-              Component.onCompleted: text = String(root.configState.maxCostPerImage)
-              Connections {
-                target: root
-                function onConfigStateChanged() {
-                  if (!advCeilingField.activeFocus) advCeilingField.text = String(root.configState.maxCostPerImage)
-                }
-              }
-            }
-          }
-
-          Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            visible: root.maxCostPerImageError !== ""
-            text: root.maxCostPerImageError
-            color: root.bar.urgent || "#f38ba8"
-            font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          ApiKeySection { slot: "image" }
-
-          PanelSeparator { foreground: root.bar.foreground }
-          PanelSectionHeader { text: "DESTRUCTIVE"; foreground: root.bar.foreground }
-
-          // Moved out of the main panel: it sat next to "Save Selected Theme",
-          // one row apart from the thing it destroys, and a mis-click there
-          // deletes every generation. Two clicks are still required (the button
-          // arms, then confirms) — this just puts it somewhere you have to mean
-          // to go.
-          Column {
-            width: parent.width
-            spacing: Style.space(4)
-
-            Text {
-              width: parent.width
-              wrapMode: Text.WordWrap
-              text: "Deletes every entry in Themes Generated immediately, ignoring the retention window. Saved themes are not affected."
-              color: Qt.darker(root.bar.foreground, 1.3)
-              font.family: root.bar.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            Button {
-              id: advClearHistoryBtn
-              text: root.clearHistoryArmed ? "Confirm Clear?" : "Clear History"
-              bordered: true
-              fontSize: Style.font.caption
-              foreground: root.clearHistoryArmed ? (root.bar.urgent || "#f38ba8") : root.bar.foreground
-              onClicked: root.clearHistoryClicked()
-            }
-          }
-
-        }
-      }
-    }
-  }
-
-  // One chat-model picker, used for both stages in the popout. The two stages
-  // are separate controls here precisely because splitting them is the point of
-  // this window; the panel shows them merged as "Chat models".
-  component AdvancedChatPicker: Item {
-    id: picker
-    required property string stage
-    readonly property string currentModel: stage === "stage1" ? root.configState.stage1Model : root.configState.stage2Model
-
-    width: parent.width
-    height: Math.max(pickerLabel.implicitHeight, pickerDropdown.implicitHeight)
-
-    Text {
-      id: pickerLabel
-      anchors.left: parent.left
-      anchors.verticalCenter: parent.verticalCenter
-      width: root.labelColW
-      text: "Model"
-      color: Qt.darker(root.bar.foreground, 1.3)
-      font.family: root.bar.fontFamily
-      font.pixelSize: Style.font.bodySmall
-    }
-
-    Dropdown {
-      id: pickerDropdown
-      anchors.left: pickerLabel.right
-      anchors.leftMargin: Style.space(8)
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      showLabel: false
-      value: picker.currentModel
-      options: {
-        var opts = Model.visibleRows(root.modelCatalog.chat || [], root.showAllModels).map(function(r) {
-          return { value: r.model, label: Model.chatModelLabel(r) }
-        })
-        var cur = picker.currentModel
-        if (cur && !opts.some(function(o) { return o.value === cur }))
-          opts.unshift({ value: cur, label: cur + "  · not in catalog" })
-        return opts
-      }
-      foreground: root.bar.foreground
-      onChanged: function(value) {
-        if (picker.stage === "stage1") root.commitStage1Model(value)
-        else root.commitStage2Model(value)
-      }
-    }
-  }
+  // ---- Advanced settings popout (sections/AdvancedSettingsWindow.qml) ----
+  AdvancedSettingsWindow { id: advancedWindow; panel: root }
 
 }

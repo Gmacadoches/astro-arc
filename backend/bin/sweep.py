@@ -140,6 +140,48 @@ def texture_for_cell(cell):
             "multiplicity": int(mult), "exposureBand": eband}
 
 
+def dial_for_day(state_dir, key, cell):
+    """A replayed day's dial and where its base came from: (dial, source).
+
+    The base is dial_from_texture on that day's own texture -- the copy
+    stored in its pipeline-meta, else its reading-<key>.json -- so the cell
+    is the one that day really had. A day from before the texture existed
+    (or with a broken one) has none, and its base is built from `cell`
+    instead (source "cell"). Whatever dial the pipeline-meta stored then goes
+    on top, as before. Production never does this: a reading without its
+    texture is an error there. Shared by replay_days.py and replay_amplify.py.
+    """
+    import llm_pipeline as lp  # the harness may be pointed at another build
+
+    def read(path):
+        try:
+            return json.loads(path.read_text()) if path.exists() else {}
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    meta = read(state_dir / f"pipeline-meta-{key}.json")
+    dial, source = None, "cell"
+    for texture in (meta.get("texture"),
+                    (read(state_dir / f"reading-{key}.json").get("arc") or {}).get("texture")):
+        try:
+            dial, source = lp.dial_from_texture(texture), "texture"
+            break
+        except lp.PipelineError:
+            continue
+    if dial is None:
+        dial = lp.dial_from_texture(texture_for_cell(cell))
+    dial.update({k: v for k, v in (meta.get("dial") or {}).items() if v is not None})
+    return dial, source
+
+
+def report_filled(sources, cell):
+    """One note for the days that had no usable texture of their own."""
+    from_cell = [k for k, src in sources if src == "cell"]
+    if from_cell:
+        print(f"note: {len(from_cell)} of {len(sources)} day(s) have no usable texture "
+              f"({', '.join(from_cell)}); their base dial is --cell {cell}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True, help="folder name under verification/")
@@ -178,6 +220,8 @@ def main():
     if args.stage2_model:
         config["stage2Model"] = args.stage2_model
     style_key = args.style or config.get("artStyle") or "symbolist"
+    if hasattr(lp, "require_charter"):
+        lp.require_charter(style_key)
     image_model = args.image_model or config.get("openaiModel") or "gpt-image-1-mini"
     size = args.size or config.get("backgroundSize") or "1600x900"
     width, height = (int(x) for x in size.split("x"))
@@ -293,7 +337,7 @@ def main():
         jobs = [(r, None) for r in registers]
 
     cliches = lp.load_cliches()
-    style_label, style_guidance = lp.load_style_info(style_key)
+    style_world = lp.load_style_world(style_key)
 
     results = []
     total_cost = 0.0
@@ -334,23 +378,24 @@ def main():
             kwargs["amplification"] = sample_amp
         if dial is not None:
             kwargs["dial"] = dial
-        if hasattr(lp, "load_register_guidance"):
-            # Production passes this (see llm_pipeline.build); without it a sweep
-            # of a register that HAS guidance measures a prompt production never
-            # sends. Guarded by hasattr so the harness still runs against a
-            # pre-guidance build of the pipeline, same as the kwargs above.
-            if hasattr(lp, "load_register_line"):
-                guidance = lp.load_register_line(style_key, primary)
-                sec_guidance = lp.load_register_line(style_key, secondary)
-                if sec_guidance:
-                    kwargs["secondary_register_guidance"] = sec_guidance
-            else:
-                guidance = lp.load_register_guidance(primary)
-            if guidance:
-                kwargs["register_guidance"] = guidance
+        # Production passes these (see llm_pipeline.build); without them a
+        # sweep measures a prompt production never sends. Guarded by hasattr
+        # so the harness still runs against an older build of the pipeline,
+        # same as the kwargs above.
+        if hasattr(lp, "load_register_line"):
+            guidance = lp.load_register_line(style_key, primary)
+            sec_guidance = lp.load_register_line(style_key, secondary)
+            if sec_guidance:
+                kwargs["secondary_register_guidance"] = sec_guidance
+        elif hasattr(lp, "load_register_guidance"):
+            guidance = lp.load_register_guidance(primary)
+        else:
+            guidance = ""
+        if guidance:
+            kwargs["register_guidance"] = guidance
         if hasattr(lp, "load_style_brief"):
-            # Production passes the style's own brief rules (see build()); a
-            # sweep that omitted them would test every style on the fallback.
+            # Production passes the style's own brief rules (see build());
+            # stage2_image_prompt refuses to run without them.
             kwargs["style_brief"] = lp.load_style_brief(style_key)
         if hasattr(lp, "load_style_highlight"):
             kwargs["highlight"] = lp.load_style_highlight(style_key)
@@ -358,18 +403,18 @@ def main():
         try:
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
                 stage1, primary, [], cliches, stage2_model,
-                style_label, style_guidance, **kwargs
+                style_world, **kwargs
             )
         except TypeError:
             # Older pipeline signature (pre-Task 3/4) — fall back so the
             # harness can still produce a baseline on unmodified code.
             prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
                 stage1, primary, [], cliches, stage2_model,
-                style_label, style_guidance,
+                style_world,
             )
 
-        suffix = lp.load_style_suffix(style_key, has_people)
-        final_prompt = f"{prompt}, {suffix}" if suffix else prompt
+        # Production's own join, so a sweep renders what a real run would.
+        final_prompt = lp.final_image_prompt(prompt, style_key, has_people)
 
         # One tier for every sample, the same one production uses. This used to
         # bump figures to "high" and default everything else to "medium", on the

@@ -8,8 +8,9 @@ reading, turns that into a single image, renders it, and derives a matching
 colour palette from the rendered image — so the wallpaper and the theme always
 agree, because the theme is made *from* the wallpaper.
 
-It runs on a cadence you pick, and every generation is browsable, exportable and
-shareable.
+It runs on a cadence you pick, paints in one of seven built-in worlds **or one
+you make yourself** (your Omarchy agent writes it with you from a one-line
+idea), and every generation is browsable, exportable and shareable.
 
 ![A night procession of umbrella yōkai and paper-limbed spirits carries a dismantled grain hoist across a bridge in slanting rain, while a road-worn warrior drinks tea on a post-station veranda beside a festival puppet wagon](docs/images/hero.jpg)
 
@@ -31,7 +32,49 @@ same day's reading, rendered in each:
 | ![A pilgrim leads a mule past a pelican larger than a horse, opening its breast over its young, with a snail-knight from the border in the reeds](docs/images/styles/illuminated.jpg) | | |
 
 **[What each world is, and how it was built →](docs/styles.md)** ·
-**[Make your own →](docs/charter-schema.md)**
+**[Make your own ↓](#make-your-own-world)**
+
+---
+
+## Make your own world
+
+A style is one file, and you don't have to write it. Your Omarchy default agent
+writes it with you:
+
+1. Open the style picker in the panel and choose **+ Create a new style…** at
+   the bottom of the list.
+2. Describe it in one line: *1920s art deco travel posters*, *Dutch Golden Age
+   still life*, *1980s arcade cabinet art*.
+3. Click **Create with** *your agent* (Claude Code, Codex, OpenCode, whichever
+   you set with `omarchy default agent`). It opens in a terminal, already briefed
+   with the plugin's [`astro-arc-style`](skills/astro-arc-style/SKILL.md) skill.
+
+The agent then does the whole job with you: it writes the world (its era,
+materials, inhabitants, myths, light and technique), validates it, test-writes
+real prompts from your own recent days, has a blind judge check that hard days
+still read as hard and soft days as soft, and renders the preview image. Every
+step that spends API credit prints its cost first and waits for your yes. When
+it is done, the style is in the dropdown as **"Your Style (custom)"**, and it
+generates like any built-in one.
+
+**No agent set up?** **Copy prompt** puts everything a chat model needs on the
+clipboard. Paste it into any chat on the web, then bring the file it writes
+back with **Import theme…**, which saves and validates it.
+
+**Not quite right?** With one of your own styles selected, click **Tweak**
+beside the picker and say what's off (*fewer landscapes, more character
+close-ups*), optionally with today's image as an example. Your agent edits the
+style in place, or **Copy prompt** does the same through a web chat. The
+current version is saved first, so **Undo last tweak** puts it back.
+
+**Something wrong with it?** A style that fails validation stays in the
+dropdown as **(Failed Validation)** and won't generate. **Fix with AI** hands it
+back to your agent together with the exact errors, and **Copy fix prompt** does
+the same for a web chat.
+
+Your styles live in `~/.config/astro-arc/styles/` as `<key>.toml` plus a
+`<key>.jpg` preview. That folder belongs to you, so `omarchy plugin update`
+never touches it. To give a style to a friend, send them the two files.
 
 ---
 
@@ -77,6 +120,8 @@ they put in frame.
 - **Omarchy.** This is a bar-widget plugin; it does not run standalone.
 - **An OpenAI API key.** Every stage is an API call, so a key is required
   regardless of which models you pick.
+- **Optional, to make your own styles:** an Omarchy default agent
+  (`omarchy default agent`), or any chat model on the web.
 
 That is all. There is no install step: nothing is compiled, nothing is
 downloaded, no service is registered. The backend runs on the Python and
@@ -98,7 +143,9 @@ and place.
 Nothing generates on its own until you say so: **Schedule** starts at **None**,
 so the first theme is the one you ask for with **Regenerate**. Set it to Hourly,
 Daily, Weekly or Monthly once you know what a run costs you — the panel prices
-the month for whichever you pick.
+the month for whichever you pick. Hourly gets a second picker for every 1, 2,
+3, 4, 6, 8 or 12 hours, and the slots line up with the clock (every 3 hours
+runs in the 00:00, 03:00, 06:00 ... slots).
 
 A schedule only advances while you are logged in, because the widget itself is
 the scheduler. A locked screen still counts; being switched off, asleep or
@@ -157,7 +204,7 @@ will charge, and whether that figure is measured or projected.
 You can set a hard ceiling per image, and every model your key can reach is
 selectable in the Advanced popout if you want to tune it yourself.
 
-## Sharing a theme
+## Exporting a generation as an Omarchy theme
 
 Any generation can be exported as a standalone Omarchy theme repository —
 palette, wallpaper, preview thumbnail and README. Push it to a git host and
@@ -192,7 +239,8 @@ says which step each one changes:
 
 | File | What it controls |
 | --- | --- |
-| `backend/pipeline/styles.toml` | the seven styles: each one's technique and its world (see [`docs/charter-schema.md`](docs/charter-schema.md)) |
+| `~/.config/astro-arc/styles/` | **your own styles**, one `<key>.toml` + `<key>.jpg` each, made [with your agent](#make-your-own-world) and kept across updates |
+| `backend/pipeline/styles/` | the seven shipped styles, same format: each one's technique and its world (see [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md)) |
 | `backend/pipeline/registers.toml` | the 20 material registers a scene is built from |
 | `backend/pipeline/actors.toml` | the kinds of actor a scene can have, from a lone person to a swarm |
 | `backend/pipeline/model-rates.toml` | model prices, quality presets, shortlists |
@@ -210,9 +258,14 @@ says which step each one changes:
   `master` only ever holds releases, and how updates find them.
 - [`docs/styles.md`](docs/styles.md) — the seven worlds, each rendered from
   the same reading and register, with what defines each one.
-- [`docs/charter-schema.md`](docs/charter-schema.md) — every field of a style's
-  world, what it controls, and how to write one well: the reference for making
-  your own style.
+- [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md) — every
+  field of a style, what it controls, and how to write one well: the agent
+  skill behind "Create your own style", readable by people too. The plugin
+  links it into your agents' skill folders (`~/.claude/skills/`,
+  `~/.codex/skills/` and so on) when the panel loads, so you can also just ask
+  your agent for an Astro-Arc style in any session.
+- [`docs/decisions/`](docs/decisions/) — why things are the way they are, with
+  the measurements behind each call.
 
 Each script carries its own header comment explaining what it does and why it
 does it that way; that is the reference for anything PIPELINE.md does not cover.

@@ -37,7 +37,9 @@ still needs to know how many tokens a tier burns.
 """
 
 import json
+import os
 import re
+import subprocess
 import sys
 import tomllib
 from datetime import datetime, timedelta, timezone
@@ -78,7 +80,7 @@ _NOT_CHAT_RE = re.compile(
 def load_rates():
     """pipeline/model-rates.toml, read fresh every call so a hand edit takes
     effect on the next generation with no restart — same contract as
-    registers.toml and styles.toml."""
+    registers.toml and the theme files."""
     path = PIPELINE_DIR / "model-rates.toml"
     if not path.exists():
         return {"chat": {}, "image": {}, "image_qualities": {}, "hierarchy": {}}
@@ -149,6 +151,17 @@ def load_learned_usage():
         return {}
 
 
+def _write_learned(learned):
+    """Write the file whole, by rename. Written in place, a second process
+    reading it mid-write got a partial file, load_learned_usage() read that
+    as {}, and its next write replaced every measurement with one entry: two
+    parallel astro-arc-style runs did exactly that on 2026-10-17."""
+    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = LEARNED_USAGE_FILE.with_name(f".{LEARNED_USAGE_FILE.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(learned, indent=2))
+    tmp.replace(LEARNED_USAGE_FILE)
+
+
 def usage_key(model, quality, size):
     """Token consumption depends on all three, so a measurement is only valid
     for the exact combination it was measured on."""
@@ -184,8 +197,7 @@ def record_usage(model, quality, size, usage):
         "history": history,
         "measuredAt": datetime.now(timezone.utc).isoformat(),
     }
-    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    _write_learned(learned)
     return learned[usage_key(model, quality, size)]
 
 
@@ -230,8 +242,7 @@ def record_stage_usage(stage, model, usage):
         "reasoningTokens": reasoning,
         "measuredAt": datetime.now(timezone.utc).isoformat(),
     }
-    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    _write_learned(learned)
     return stages[stage][model]
 
 
@@ -387,8 +398,7 @@ def get_capability(model, name, learned=None):
 def set_capability(model, name, value):
     learned = load_learned_usage()
     learned.setdefault("capabilities", {}).setdefault(model, {})[name] = value
-    LEARNED_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    LEARNED_USAGE_FILE.write_text(json.dumps(learned, indent=2))
+    _write_learned(learned)
     return value
 
 
@@ -672,6 +682,31 @@ def catalog(width=1024, height=1024):
     }
 
 
+def parse_size(value, default_width, default_height):
+    """--size as the panel passes it: the raw backgroundSize setting, which
+    is "WIDTHxHEIGHT" or "auto" (the default). "auto" resolves the same way
+    astro-arc-generate resolves it, so the prices shown match what a run
+    would render. int() on "auto" used to raise after --refresh had already
+    fetched the list, so the panel got no JSON and the model list never
+    loaded. Anything unreadable keeps the defaults: the size only moves cost
+    estimates, never which models are listed."""
+    if value == "auto":
+        try:
+            value = subprocess.run(
+                [str(Path(__file__).parent / "astro-arc-detect-resolution")],
+                capture_output=True, text=True, timeout=5,
+            ).stdout.strip() or "1920x1080"
+        except (OSError, subprocess.SubprocessError):
+            value = "1920x1080"
+    try:
+        width, height = (int(x) for x in value.split("x"))
+    except ValueError:
+        return default_width, default_height
+    if width <= 0 or height <= 0:
+        return default_width, default_height
+    return width, height
+
+
 def main():
     args = sys.argv[1:]
     # astro-arc-generate asks for this before deciding whether it can afford a
@@ -686,7 +721,7 @@ def main():
     width = height = 1024
     for i, a in enumerate(args):
         if a == "--size" and i + 1 < len(args):
-            width, height = (int(x) for x in args[i + 1].split("x"))
+            width, height = parse_size(args[i + 1], width, height)
     result = catalog(width, height)
     result["ok"] = True
     print(json.dumps(result, indent=2))

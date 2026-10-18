@@ -3,6 +3,13 @@
 // Kept side-effect free and module.exports-able so it can be unit tested
 // the same way weather/Model.js is.
 
+// The Style dropdown is built from the theme files themselves
+// (backend/bin/style_catalog.py): shipped themes in backend/pipeline/styles/,
+// the user's own in ~/.config/astro-arc/styles/. Only the default key is
+// known here; it is what a config with no style, or with a key whose theme is
+// gone, falls back to (llm_pipeline.DEFAULT_STYLE says the same).
+var DEFAULT_ART_STYLE = "symbolist"
+
 var DEFAULT_CONFIG = {
   birthDate: "",
   birthTime: "",
@@ -16,6 +23,9 @@ var DEFAULT_CONFIG = {
   // costs nothing is the only safe thing to pick on someone's behalf;
   // an explicit "daily" in an existing config.json still wins over this.
   frequency: "manual",
+  // Hours between runs when frequency is "hourly"; ignored otherwise. See
+  // INTERVAL_HOURS_CHOICES.
+  intervalHours: 1,
   // "openai" — the legacy key `provider` superseded. It defaulted to "local"
   // (Stable Diffusion) long after that path stopped being offered in the UI,
   // which meant the default named a backend a new install could not reach.
@@ -27,7 +37,7 @@ var DEFAULT_CONFIG = {
   stage1Model: "gpt-4o-mini",
   stage2Model: "gpt-4o-mini",
   backgroundSize: "auto",
-  artStyle: "symbolist",
+  artStyle: DEFAULT_ART_STYLE,
   themeGenerator: "built-in",
   // true — change only the wallpaper and leave the user's theme colors alone.
   // Most people already run a theme they chose, often several theme plugins;
@@ -55,6 +65,24 @@ var FREQUENCY_CHOICES = [
   { key: "manual", label: "None" }
 ]
 
+// "Every N hours" under Hourly. Divisors of 24 only, mirroring
+// period_key.py's INTERVAL_HOURS: the slots then line up with the clock
+// (every 3 hours is 00, 03, 06 ...) and the last one of the day is as long as
+// the rest. 1 is plain hourly, with the same keys it always had.
+var INTERVAL_HOURS_CHOICES = [1, 2, 3, 4, 6, 8, 12]
+
+function intervalHours(value) {
+  var n = parseInt(value, 10)
+  return INTERVAL_HOURS_CHOICES.indexOf(n) >= 0 ? n : 1
+}
+
+// The cadence in words, for text like "/month at every 3 hours".
+function scheduleLabel(frequency, hours) {
+  if (frequency !== "hourly") return String(frequency)
+  var n = intervalHours(hours)
+  return n === 1 ? "hourly" : "every " + n + " hours"
+}
+
 // "aether" shells out to Omarchy's own theme generator for a richer theme
 // (it's what fixes the file-manager icon color, among other things — see
 // palette_extract.py's icons.theme comment) and silently falls back to
@@ -78,21 +106,74 @@ var THEME_GENERATOR_CHOICES = [
   { key: "aether", label: "Aether (Omarchy)" }
 ]
 
-// Kept in sync by hand with pipeline/styles.toml — same reasoning as
-// OPENAI_MODEL_CHOICES below: QML can't read TOML directly, and this list
-// changes rarely enough that hand-sync is simpler than a live bridge.
-// Curated down to 5 then back up to 7 on 2026-09-07 — see styles.toml's
-// own header comment and CHANGELOG.md for what changed and why. Add more
-// here (and in styles.toml) freely.
-var ART_STYLE_CHOICES = [
-  { key: "symbolist", label: "Symbolist / Visionary" },
-  { key: "engraving", label: "Antique Engraving" },
-  { key: "cosmic", label: "Cosmic / Nebula" },
-  { key: "ghibli", label: "Studio Ghibli" },
-  { key: "cyberpunk", label: "Cyberpunk" },
-  { key: "ukiyoe", label: "Ukiyo-e" },
-  { key: "illuminated", label: "Illuminated Manuscript" }
-]
+// One catalog row's dropdown label. A user theme says so; a theme that fails
+// validation stays listed, so a broken file is visible rather than missing.
+function styleOptionLabel(row) {
+  if (!row) return ""
+  var label = row.label || row.key
+  if (row.source === "user") label += " (custom)"
+  if (!row.valid) label += " (Failed Validation)"
+  return label
+}
+
+// Shipped themes first, then the user's, each alphabetical by label.
+function sortStyleCatalog(rows) {
+  return (rows || []).slice().sort(function(a, b) {
+    var sa = a.source === "user" ? 1 : 0
+    var sb = b.source === "user" ? 1 : 0
+    if (sa !== sb) return sa - sb
+    return String(a.label).localeCompare(String(b.label))
+  })
+}
+
+function findStyle(rows, key) {
+  for (var i = 0; i < (rows || []).length; i++)
+    if (rows[i].key === key) return rows[i]
+  return null
+}
+
+// The warning a run prints for the same case (llm_pipeline.missing_style_warning).
+function missingStyleWarning(key) {
+  return "art style '" + key + "' is not an installed theme; using '" + DEFAULT_ART_STYLE + "'"
+}
+
+// The Style dropdown's two actions, listed after the themes. Their values can
+// never be a theme key (keys are lowercase letters, digits and hyphens).
+var STYLE_CREATE = "__create__"
+var STYLE_IMPORT = "__import__"
+
+function styleDropdownOptions(rows) {
+  return (rows || []).map(function(s) { return { value: s.key, label: styleOptionLabel(s) } })
+    .concat([{ value: STYLE_CREATE, label: "Create your own style…" },
+             { value: STYLE_IMPORT, label: "Import theme…" }])
+}
+
+// A failed theme whose only error is the missing preview: it needs an image,
+// not a fix.
+function styleOnlyNeedsPreview(row) {
+  var errors = (row && row.errors) || []
+  return errors.length > 0 && errors.every(function(e) { return e.indexOf(": preview: ") !== -1 })
+}
+
+// omarchy-default-agent's names, as Omarchy's own menu shows them.
+var AGENT_NAMES = {
+  pi: "Pi", omp: "Oh My Pi", opencode: "OpenCode", claude: "Claude Code", codex: "Codex",
+  crush: "Crush", grok: "Grok", gemini: "Gemini", openclaw: "OpenClaw", hermes: "Hermes",
+  copilot: "GitHub Copilot", muse: "Muse Code", "cursor-agent": "Cursor CLI"
+}
+
+// What every label calls the agent: its display name, the raw name for one
+// this table doesn't know, and "your agent" until one is detected — so a label
+// never names an agent the user doesn't have.
+function agentLabel(agent) {
+  return AGENT_NAMES[agent] || agent || "your agent"
+}
+
+// The same at the start of a sentence: "Your agent opens…".
+function agentLabelStart(agent) {
+  var label = agentLabel(agent)
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
 
 // ---- Model catalog labels -------------------------------------------------
 // Rows come from backend/bin/model_catalog.py. Cost is deliberately allowed to
@@ -133,18 +214,19 @@ function nextRunLabel(nextRun) {
 // The log averages real runs, and same-day regenerations in it are mostly
 // cache hits, so averaging them reported a daily cost far below the truth —
 // $0.89/mo against an actual $5.60/mo in the case that prompted this.
-function projectedMonthlyCost(nextRun, frequency) {
+function projectedMonthlyCost(nextRun, frequency, hours) {
   if (!nextRun || typeof nextRun.full !== "number") return null
   // Note `in` rather than a falsy check: manual is 0 runs a month, and `||`
   // would have quietly turned that into the daily default — the one frequency
   // where the answer is "nothing" would have reported the largest number.
   var runs = (frequency in RUNS_PER_MONTH) ? RUNS_PER_MONTH[frequency] : RUNS_PER_MONTH.daily
+  if (frequency === "hourly") runs = runs / intervalHours(hours)
 
   // Hourly is the one cadence that runs more than once inside a single period
   // of the READING. astro_engine keys its arc by local date whatever the
   // schedule says, and Stage 1 and Stage 1.5's meaning both cache
   // against that key — so the first run of each day pays for a fresh reading
-  // and the other 23 only re-roll the material, Stage 2's imagery and the render. Charging
+  // and the rest (23 of them at every hour) only re-roll the material, Stage 2's imagery and the render. Charging
   // all 730 runs at the full rate overstated the month by about 40% at the
   // rates measured here ($19.57 against a real $13.77), which is exactly the
   // kind of invented number this project's cost rule exists to prevent.
@@ -263,13 +345,14 @@ function parseConfig(raw) {
       longitude: hasCoords ? lon : null,
       timezone: typeof data.timezone === "string" ? data.timezone : "",
       frequency: ["hourly", "daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
+      intervalHours: intervalHours(data.intervalHours),
       imageBackend: data.imageBackend === "local" ? "local" : "openai",
       openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
       openaiQuality: typeof data.openaiQuality === "string" ? data.openaiQuality : "",
       stage1Model: typeof data.stage1Model === "string" && data.stage1Model !== "" ? data.stage1Model : "gpt-4o-mini",
       stage2Model: typeof data.stage2Model === "string" && data.stage2Model !== "" ? data.stage2Model : "gpt-4o-mini",
       backgroundSize: data.backgroundSize === "auto" || (typeof data.backgroundSize === "string" && SIZE_PATTERN.test(data.backgroundSize)) ? data.backgroundSize : "auto",
-      artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : "symbolist",
+      artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : DEFAULT_ART_STYLE,
       themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
       // Only an explicit false turns it off, matching astro-arc-generate.
       backgroundOnly: data.backgroundOnly !== false,
@@ -318,14 +401,29 @@ function normalizeReviewLabel(label) {
   return out === "" ? String(label) : out
 }
 
+// The theme a generation was made in, as a catalog key, or "".
+function reviewStyleKey(review, rows) {
+  if (!review) return ""
+  if (review.artStyle) return review.artStyle
+  var matches = (rows || []).filter(function(r) { return r.label === review.artStyleLabel })
+  return matches.length === 1 ? matches[0].key : ""
+}
+
 function parseReviewsIndex(raw) {
   try {
     var data = JSON.parse(String(raw || "[]"))
     if (!Array.isArray(data)) return []
     return data.filter(function(r) { return r && r.id && r.path }).map(function(r) {
       var size = Number.isInteger(r.sizeBytes) ? r.sizeBytes : parseInt(r.sizeBytes, 10)
+      // thumb is a bare filename beside the entry's index.html (build_review.py
+      // writes "thumb.jpg"). Anything with a slash in it is ignored rather than
+      // resolved, so the panel never reads outside the entry's own directory.
+      // "" on an entry built before thumbnails existed.
+      var thumb = typeof r.thumb === "string" && r.thumb !== "" && r.thumb.indexOf("/") === -1 ? r.thumb : ""
+      var entryDir = String(r.path).replace(/\/[^\/]*$/, "")
       return {
         id: String(r.id),
+        thumbPath: thumb ? entryDir + "/" + thumb : "",
         label: normalizeReviewLabel(r.label || "Untitled"),
         createdAt: String(r.createdAt || ""),
         path: String(r.path),
@@ -333,7 +431,17 @@ function parseReviewsIndex(raw) {
         periodKey: typeof r.periodKey === "string" ? r.periodKey : null,
         hasThemeSnapshot: !!r.hasThemeSnapshot,
         sizeBytes: isNaN(size) ? null : size,
-        conceptTags: Array.isArray(r.conceptTags) ? r.conceptTags.filter(function(t) { return typeof t === "string" }) : []
+        conceptTags: Array.isArray(r.conceptTags) ? r.conceptTags.filter(function(t) { return typeof t === "string" }) : [],
+        // artStyle (the key) is only in entries built after 2026-10-17; older
+        // ones have the label alone, which reviewStyleKey matches instead.
+        artStyle: typeof r.artStyle === "string" ? r.artStyle : "",
+        artStyleLabel: typeof r.artStyleLabel === "string" ? r.artStyleLabel : "",
+        // The reading saved with this generation, so browsing back shows the
+        // reading that went with each image. "" on entries built before
+        // generations.json carried it.
+        distillation: typeof r.distillation === "string" ? r.distillation : "",
+        narrativePosition: typeof r.narrativePosition === "string" ? r.narrativePosition : "",
+        imagePath: r.hasThemeSnapshot ? entryDir + "/theme/backgrounds/background.png" : ""
       }
     })
   } catch (e) {
@@ -412,12 +520,13 @@ function formatBytes(bytes) {
 // this project's cost-estimate convention: null/"unknown" beats a
 // fabricated figure. Returns { estimatedBytes, knownCount } — knownCount
 // lets the caller show "estimate" vs. "no data yet" language.
-function estimateHistorySpace(reviewsIndex, retentionDays, frequency) {
+function estimateHistorySpace(reviewsIndex, retentionDays, frequency, hours) {
   var known = (reviewsIndex || []).filter(function(r) { return typeof r.sizeBytes === "number" })
   if (known.length === 0) return { estimatedBytes: null, knownCount: 0 }
 
   var avgBytes = known.reduce(function(sum, r) { return sum + r.sizeBytes }, 0) / known.length
   var intervalDays = FREQUENCY_INTERVAL_DAYS[frequency]
+  if (frequency === "hourly") intervalDays = intervalDays * intervalHours(hours)
   // No cadence means nothing to project from: on "manual" the number of entries
   // depends entirely on how often you click, so report the average size and say
   // the total is unknown rather than answering as if it were daily — which is
@@ -565,12 +674,18 @@ function isoWeekKey(date) {
 // this against lastRun.periodKey is a plain string check with no elapsed-
 // time math at all, so 11pm on one date and 1am the next both resolve to
 // their own date's key regardless of how few hours separate them.
-function currentPeriodKey(frequency, now) {
+//
+// `hours` is the Hourly interval: the key names the hour its slot starts on,
+// so at every 3 hours 14:05 falls in "T12". Ignored by the other frequencies.
+function currentPeriodKey(frequency, now, hours) {
   var d = now || new Date()
   if (frequency === "weekly") return isoWeekKey(d)
   if (frequency === "monthly") return d.getFullYear() + "-" + pad2(d.getMonth() + 1)
   var day = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
-  if (frequency === "hourly") return day + "T" + pad2(d.getHours())
+  if (frequency === "hourly") {
+    var n = intervalHours(hours)
+    return day + "T" + pad2(Math.floor(d.getHours() / n) * n)
+  }
   return day
 }
 
@@ -586,12 +701,12 @@ function currentPeriodKey(frequency, now) {
 //
 // Falls back to the stored key for a run old enough to predate generatedAt, or
 // one carrying a timestamp that won't parse.
-function runCoversPeriod(lastRun, frequency, now) {
+function runCoversPeriod(lastRun, frequency, now, hours) {
   if (!lastRun) return false
-  var currentKey = currentPeriodKey(frequency, now)
+  var currentKey = currentPeriodKey(frequency, now, hours)
   var generated = lastRun.generatedAt ? new Date(lastRun.generatedAt) : null
   if (generated && !isNaN(generated.getTime()))
-    return currentPeriodKey(frequency, generated) === currentKey
+    return currentPeriodKey(frequency, generated, hours) === currentKey
   return lastRun.periodKey === currentKey
 }
 
@@ -610,10 +725,24 @@ if (typeof module !== "undefined") {
   module.exports = {
     DEFAULT_CONFIG: DEFAULT_CONFIG,
     OPENAI_MODEL_CHOICES: OPENAI_MODEL_CHOICES,
-    ART_STYLE_CHOICES: ART_STYLE_CHOICES,
+    DEFAULT_ART_STYLE: DEFAULT_ART_STYLE,
+    styleOptionLabel: styleOptionLabel,
+    sortStyleCatalog: sortStyleCatalog,
+    findStyle: findStyle,
+    reviewStyleKey: reviewStyleKey,
+    missingStyleWarning: missingStyleWarning,
+    STYLE_CREATE: STYLE_CREATE,
+    STYLE_IMPORT: STYLE_IMPORT,
+    styleDropdownOptions: styleDropdownOptions,
+    styleOnlyNeedsPreview: styleOnlyNeedsPreview,
+    agentLabel: agentLabel,
+    agentLabelStart: agentLabelStart,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,
+    INTERVAL_HOURS_CHOICES: INTERVAL_HOURS_CHOICES,
+    intervalHours: intervalHours,
+    scheduleLabel: scheduleLabel,
     chatModelLabel: chatModelLabel,
     imageModelLabel: imageModelLabel,
     formatUsd: formatUsd,

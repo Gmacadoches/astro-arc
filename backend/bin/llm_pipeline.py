@@ -2,7 +2,7 @@
 """Astro-Arc's three-stage LLM prompt pipeline — replaces the old
 symbol_map.py lookup-table approach. Nothing in here builds imagery from a
 fixed vocabulary anymore; the tables that remain (registers.toml,
-cliches.toml, styles.toml) are tuning constraints on an LLM, not content
+cliches.toml, styles/<key>.toml) are tuning constraints on an LLM, not content
 sources.
 
   Stage 1 (interpret): chart data -> psychological reading (Jungian/
@@ -51,8 +51,10 @@ metadata_out.json, for last-run.json and the review log to pick up.
 
 import hashlib
 import json
+import os
 import random
 import re
+import string
 import time
 import sys
 import tomllib
@@ -375,31 +377,6 @@ def actor_excluded_for(register):
     return set((_load_actors().get("exclude") or {}).get(register, []))
 
 
-def load_register_guidance(register):
-    """Optional per-register steer from registers.toml's [guidance] table —
-    "" for the registers that have none, which is most of them by design.
-
-    Mirrors load_style_info()'s guidance for art styles, and exists for the
-    same narrow reason: a register whose obvious reading is much smaller than
-    its real territory has to be told so. `man-beast` is the case that
-    prompted it — the word lands on minotaurs and satyrs and stops, when the
-    register is meant to span every part-human figure in world myth.
-
-    Deliberately NOT a vocabulary list per register. See registers.toml's
-    [guidance] header for why that trade goes the way it does.
-    """
-    if not register:
-        return ""
-    path = PIPELINE_DIR / "registers.toml"
-    if not path.exists():
-        return ""
-    try:
-        with open(path, "rb") as f:
-            return tomllib.load(f).get("guidance", {}).get(register, "")
-    except (tomllib.TOMLDecodeError, OSError):
-        return ""
-
-
 def load_cliches():
     path = PIPELINE_DIR / "cliches.toml"
     if not path.exists():
@@ -408,18 +385,146 @@ def load_cliches():
         return tomllib.load(f).get("terms", [])
 
 
+# One file per theme (decision 4): styles/<key>.toml plus a required
+# styles/<key>.jpg preview. The key is the file name. Shipped themes sit beside
+# the code; a user's own go in user_styles_dir().
+SHIPPED_STYLES_DIR = PIPELINE_DIR / "styles"
+
+
+def user_styles_dir():
+    """~/.config/astro-arc/styles, or under $XDG_CONFIG_HOME when it is set."""
+    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "astro-arc" / "styles"
+
+
+class Theme(dict):
+    """One theme: its file's TOML table, plus where it came from.
+
+    A dict, so every loader below reads it exactly as it read a styles.toml
+    table and the charter hash sees the same values. `valid`, `errors` and
+    `warnings` are validate_charter's verdict, worked out on first use because
+    the verb check reads every other theme too."""
+
+    def __init__(self, key, table, source, path, parse_error=None):
+        super().__init__(table)
+        self.key = key
+        self.source = source
+        self.path = path
+        self.preview = path.with_suffix(".jpg")
+        self.parse_error = parse_error
+        self._verdict = None
+
+    @property
+    def label(self):
+        label = self.get("label")
+        return label.strip() if isinstance(label, str) and label.strip() else self.key
+
+    def _validated(self):
+        if self._verdict is None:
+            self._verdict = validate_charter(self.key)
+        return self._verdict
+
+    @property
+    def errors(self):
+        return self._validated()[0]
+
+    @property
+    def warnings(self):
+        return self._validated()[1]
+
+    @property
+    def valid(self):
+        return not self.errors
+
+
+_STYLE_NOTICES = set()
+
+
+def _style_notice(line):
+    """A loader warning, printed once per process: load_styles() runs dozens
+    of times in one build()."""
+    if line not in _STYLE_NOTICES:
+        _STYLE_NOTICES.add(line)
+        print(f"astro-arc: warning: {line}", file=sys.stderr)
+
+
+def _read_theme(path, source):
+    try:
+        with open(path, "rb") as f:
+            return Theme(path.stem, tomllib.load(f), source, path)
+    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as e:
+        return Theme(path.stem, {}, source, path, parse_error=str(e))
+
+
 def load_styles():
-    path = PIPELINE_DIR / "styles.toml"
-    if not path.exists():
-        return {}
-    with open(path, "rb") as f:
-        return tomllib.load(f)
+    """Every theme by key: the shipped ones, then the user's. Read fresh every
+    call, so an edit takes effect on the next run with no restart.
+
+    A user file whose key is a shipped theme's is ignored with a warning: a
+    shipped key always means the shipped theme. A file that does not parse
+    still loads, empty, so it can be listed as failing validation."""
+    themes = {path.stem: _read_theme(path, "shipped")
+              for path in sorted(SHIPPED_STYLES_DIR.glob("*.toml"))}
+    user_dir = user_styles_dir()
+    try:
+        user_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
+    for path in sorted(user_dir.glob("*.toml")):
+        if path.stem in themes:
+            _style_notice(f"user theme {path} has the key of a shipped theme "
+                          f"('{path.stem}') and is ignored; rename the file to use it")
+            continue
+        themes[path.stem] = _read_theme(path, "user")
+    for path in _DRAFT_THEME_FILES:
+        source = "user" if path.parent == user_dir.resolve() else "draft"
+        themes[path.stem] = _read_theme(path, source)
+    return themes
+
+
+# Theme files outside both folders that load_styles() reads too, for the rest
+# of this process: astro-arc-style's draft, which may be written anywhere.
+_DRAFT_THEME_FILES = []
+
+
+def add_draft_theme(path):
+    """Load one more theme file, by its file name, from wherever it is. It
+    takes the place of a user theme with the same key; a shipped key raises
+    ValueError, because a shipped key always means the shipped theme."""
+    path = Path(path).resolve()
+    if path.parent == SHIPPED_STYLES_DIR.resolve():
+        return path.stem  # a shipped theme, already loaded as itself
+    if (SHIPPED_STYLES_DIR / f"{path.stem}.toml").exists():
+        raise ValueError(f"'{path.stem}' is the key of a shipped theme; rename {path.name}")
+    if path not in _DRAFT_THEME_FILES:
+        _DRAFT_THEME_FILES.append(path)
+    return path.stem
+
+
+DEFAULT_STYLE = "symbolist"
+
+
+def resolve_style_key(key):
+    """The configured `artStyle`, resolved once when a run reads the config.
+    A key with no theme file (stale, deleted, or a typo) falls back to
+    DEFAULT_STYLE with a warning rather than failing the day's image; this is
+    the only place an unknown key is forgiven, and every loader below takes a
+    resolved key."""
+    if key and key in load_styles():
+        return key
+    if key:
+        print(f"astro-arc: warning: {missing_style_warning(key)}", file=sys.stderr)
+    return DEFAULT_STYLE
+
+
+def missing_style_warning(key):
+    """What a run and the panel both say about a configured key with no theme."""
+    return f"art style '{key}' is not an installed theme; using '{DEFAULT_STYLE}'"
 
 
 def load_style_suffix(style_key, has_people=False):
-    """Falls back to 'symbolist' (the one Phase 3 settled on) if the
-    configured key doesn't match anything in styles.toml — a stale/typo'd
-    key should degrade to the known-good default, not an empty suffix.
+    """The style's technique, appended to every image prompt. `style_key` is
+    already resolved (resolve_style_key).
 
     Two coexisting schemas (added 2026-09-08 for ghibli's split — see
     CHANGELOG.md): a preset either defines a bare `suffix` (applied to
@@ -449,11 +554,7 @@ def load_style_suffix(style_key, has_people=False):
     been updated to pass it still gets suffix_base alone, never a
     surprise figure-rendering clause.
     """
-    styles = load_styles()
-    preset = styles.get(style_key) or styles.get("symbolist")
-    if not preset:
-        return ""
-
+    preset = load_styles()[style_key]
     if "suffix_base" in preset:
         suffix = preset.get("suffix_base", "")
         if has_people and preset.get("suffix_figures"):
@@ -461,6 +562,14 @@ def load_style_suffix(style_key, has_people=False):
         return suffix
 
     return preset.get("suffix", "")
+
+
+def final_image_prompt(image_prompt, style_key, has_people):
+    """Stage 2's prompt joined with the style suffix: exactly what the image
+    model is sent. build() and the sweep/replay harnesses all call this, so a
+    sweep renders the prompt production would."""
+    style_suffix = load_style_suffix(style_key, has_people)
+    return f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
 
 
 # The order the charter's fields are read out to Stage 2. Fixed here rather
@@ -486,128 +595,21 @@ _CHARTER_FIELDS = (
 
 
 
-# ===========================================================================
-# FALLBACKS FOR AN UNCHARTERED STYLE
-#
-# As of 2026-10-10 (STYLE-OVERHAUL Prompt 4) every shipped style has a
-# charter with its own highlight, brief rules, signature and verbs, so nothing
-# below reaches a shipped style. It is kept, in one place, for a new or
-# user-created style that has no charter yet, which then behaves the way every
-# style did before it was chartered. NOT here: the global light lines
-# (_LIGHT_BY_EXPOSURE), which five of the seven styles still use because only
-# cosmic and cyberpunk have a [light] table.
-# ===========================================================================
-
-# THE HIGHLIGHT, 2026-10-09. The one thing in a scene the eye goes to first.
-# Until today this was "the anomaly", defined once for every style in Stage
-# 1.5's and Stage 2's prompts -- wrong in exactly one way, far LARGER or far
-# OLDER, never glowing, nothing explains it. That is ghibli's logic of the
-# unremarked strange thing, and every other world inherited it (Garrett: the
-# cyberpunk anomalies "aren't working"). Now each charter says what a highlight
-# is in its world (`highlight`), and a register line may say what form it takes
-# in that material. This text is the fallback for styles with no charter yet,
-# so their behaviour does not change until they are chartered. The data key
-# stays `anomaly` so archived records and sweeps keep reading.
-#
-# Rewritten 2026-10-10 (STYLE-OVERHAUL Prompt 1): it named "the size of a barn
-# or a hillside" and "far older and more worn", and barn reached 21 of 33 days
-# and ancient/older 37 of 52 highlights. No size comparison is named now, wear
-# is the dial's condition, and "far older" gave way to a wrong place, so an
-# unchartered style's highlight is not always an antique. A style's own
-# highlight_modes, when it has them, say today's kind of wrongness.
-DEFAULT_HIGHLIGHT = (
-    "One thing, native to this world and made of its own materials, that is wrong in exactly "
-    "one way: far too large for its kind, or somewhere its kind could never be. It is solid and "
-    "lit like everything else; it does not glow, float, shimmer or look magical. Nothing in the "
-    "scene explains why it is there. If it is large, choose a scale comparison native to this "
-    "scene, never the same one twice, and put part of it in shot, close (one edge, the shadow it "
-    "throws) rather than shrinking it or pushing it to the back of the frame."
-)
-
-# The brief rules every style ran on until 2026-09-26, verbatim, with the dial
-# values as {placeholders}. They were written for ghibli and now live in
-# [ghibli.brief]; this copy is only the fallback for styles that have not been
-# chartered yet (symbolist, engraving, cosmic, ukiyoe, illuminated), so their
-# output does not change until someone decides what theirs should be -- the
-# same migration strategy as `guidance` standing in for a missing charter.
-DEFAULT_STAGE2_BRIEF = (
-    "THE IMPOSSIBLE — applies to every image: at least one thing in frame could not exist, "
-    "and nothing in the scene treats it as remarkable; it may be the highlight. Not a decorated version of an ordinary "
-    "thing: a machine that is clearly alive or awake, a creature far too large for its kind, a "
-    "structure that walks or floats or grew where it stands, a being that is plainly not a "
-    "person. Build it from this world's own materials, give it real weight, light it "
-    "like everything else, and let the actor treat it the way they would a wall. An image "
-    "in which everything could exist is a failed response.\n"
-    "    What temper it is in: {wonderTone}\n"
-    "    SCALE MUST READ. Put something of known human size next to it — a figure, a doorway, a "
-    "cart, a gate — close enough in frame to measure it against. A huge thing photographed alone "
-    "is just a texture; it only becomes huge beside something that is not.",
-    "OPENNESS — applies to every image, whatever the numbers above say: at least half the frame must be open. Sky, horizon, landscape, sea, or depth that keeps going. Open means depth, not daylight: a night sky, a drop into dark or lit depths, or fog that keeps going all count, and how bright the open part is comes from the light line below, not from this rule. Pull the viewpoint back far enough that this is true. If the scene is indoors, the room must open onto that distance through a large window, a doorway, a missing wall or a broken roof, and what is seen through it must occupy a substantial part of the frame rather than being a bright rectangle in a corner. A fully enclosed interior is a failed response, and so is a close-up that crops the world out. Name what is out there rather than that it is far: not \"beyond\", \"in the distance\" or \"far off\".",
-)
-
-# STYLE-OVERHAUL Prompt 2: one thing in frame that could only exist in this
-# world. A charter writes its own as `signature` in [<style>.brief]; ghibli's
-# THE IMPOSSIBLE (`impossible`) already does this job. Everyone else gets this.
-SIGNATURE_KEYS = ("signature", "impossible")
-DEFAULT_SIGNATURE = ("SIGNATURE — at least one thing in frame could only exist in {styleLabel}'s "
-                     "world, named explicitly. It may be the highlight or the actor. An image that "
-                     "could be relabelled as another style is a failed response.")
-
-# Verbs decide which relations get depicted, so this is shape, not flavor. The old
-# list was six pressure verbs plus two neutral ones, applied unconditionally.
-# Since 2026-10-10 these are a FALLBACK for a style with no [verbs] table, and
-# are drawn from three at a time like a charter's (draw_style_choices), so
-# each list was lengthened to keep any one verb out of most prompts.
-_VERBS_HARD = ("feeding, binding, eroding, crushing, spilling into, bearing down on, toppling, "
-               "splitting, flooding, smothering, scorching, cracking open")
-_VERBS_SOFT = ("holding, drying, ripening, settling, leaning against, warming, being mended, "
-               "being carried, drifting, rising, cooling, swaying")
-
-# Grouped by activity since 2026-10-10, like a charter's actor tables; the
-# rest/play/ritual/travel groups are new.
-_ACTOR_VERBS_HARD = {
-    "work": "hauling, prising, bracing against, digging out, striking, shouldering, forcing",
-    "rest": "sheltering under, waiting out, being pinned by",
-    "ritual": "keeping vigil over, burning something at",
-    "travel": "climbing, pushing through, being carried off by",
-}
-_ACTOR_VERBS_SOFT = {
-    # "feeding" left this list 2026-10-10: it is also in _VERBS_HARD, so a
-    # style on the fallback drew it twice as often as anything else (33%).
-    "work": "tending, mending, sorting, washing, harvesting, carrying",
-    "rest": "sleeping beside, eating, sitting with",
-    "play": "playing, watching something at work, listening to",
-    "travel": "walking past, riding, arriving at",
-}
-
-# ===========================================================================
-# END OF FALLBACKS
-# ===========================================================================
 
 HIGHLIGHT_MODES_LEN = (4, 6)
 
 
 def load_style_highlight(style_key):
-    """What a highlight is in this style's world: the charter's `highlight`
-    field, or DEFAULT_HIGHLIGHT for a style with none."""
-    world = (load_styles().get(style_key) or {}).get("world") or {}
-    text = str(world.get("highlight") or "").strip() if isinstance(world, dict) else ""
-    return text or DEFAULT_HIGHLIGHT
+    """What a highlight is in this style's world: the charter's `highlight`.
+    The data key stays `anomaly`, so archived records and sweeps keep
+    reading."""
+    return load_styles()[style_key]["world"]["highlight"].strip()
 
 
 def load_highlight_modes(style_key):
-    """`highlight_modes` under `[<style>.world]`: 4-6 kinds of wrongness, one
-    drawn per run, or None for a style without them."""
-    world = (load_styles().get(style_key) or {}).get("world") or {}
-    values = world.get("highlight_modes") if isinstance(world, dict) else None
-    if values is None:
-        return None
-    lo, hi = HIGHLIGHT_MODES_LEN
-    values = [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
-    if not lo <= len(values) <= hi:
-        raise PipelineError(f"styles.toml [{style_key}.world] highlight_modes has {len(values)} "
-                            f"entries; it needs {lo} to {hi}")
-    return values
+    """`highlight_modes` under `[<style>.world]`: the kinds of wrongness, one
+    drawn per run."""
+    return [str(v).strip() for v in load_styles()[style_key]["world"]["highlight_modes"]]
 
 
 def highlight_with_mode(highlight, dial):
@@ -619,7 +621,7 @@ def highlight_with_mode(highlight, dial):
 class _BriefValues(dict):
     """format_map source for brief rules: the dial's values by key, with an
     unknown or missing key left visible as "{key}" rather than raising, so a
-    typo in styles.toml shows up in the prompt instead of crashing a run."""
+    typo in a theme file shows up in the prompt instead of crashing a run."""
     def __init__(self, dial):
         super().__init__({k: v for k, v in (dial or {}).items() if isinstance(v, str)})
 
@@ -630,75 +632,21 @@ class _BriefValues(dict):
 
 
 def load_style_brief(style_key):
-    """The rules Stage 2's brief carries for this style, in file order. A
-    style with no `[<style>.brief]` table gets DEFAULT_STAGE2_BRIEF; every
-    style without a rule keyed in SIGNATURE_KEYS also gets DEFAULT_SIGNATURE.
-    (stage2_image_prompt still reads a None from an older caller as "use
-    DEFAULT_STAGE2_BRIEF".)
-
-    Rule text may use the dial's string values as {placeholders}
-    ({wonderTone}, {light}, ...)."""
-    brief = (load_styles().get(style_key) or {}).get("brief")
-    if not isinstance(brief, dict):
-        # Unchartered: ghibli's fallback rules, plus the default signature.
-        return list(DEFAULT_STAGE2_BRIEF) + [_default_signature(style_key)]
-    # A style with a [space] array gets today's drawn space line and the
-    # WALLPAPER rule instead of its own fixed depth rule (see
-    # draw_style_choices); keeping both would hand Stage 2 the old fixed
-    # distance on top of the new one.
-    skip = SPACE_REPLACES_BRIEF if load_style_space(style_key) else ()
-    rules = [str(v).strip() for k, v in brief.items() if k not in skip and str(v).strip()]
-    if not any(k in brief for k in SIGNATURE_KEYS):
-        rules.append(_default_signature(style_key))
-    return rules
-
-
-def _default_signature(style_key):
-    label = (load_styles().get(style_key) or {}).get("label") or style_key
-    return DEFAULT_SIGNATURE.replace("{styleLabel}", label)
+    """The rules Stage 2's brief carries for this style: `[<style>.brief]`,
+    in file order. Rule text may use the dial's string values as
+    {placeholders} ({wonderTone}, {light}, ...)."""
+    return [str(v).strip() for v in load_styles()[style_key]["brief"].values()]
 
 
 def load_style_world(style_key):
-    """The `[<style>.world]` charter as a block of prose, or "" if this style
-    has not been chartered yet.
-
-    Charters replace the old free-text `guidance` field, which had to carry a
-    world, a set of prohibitions and a plea not to default to a cottage kitchen
-    all in one paragraph — and only ghibli ever got a good one. The fields are
-    fixed so that every style answers the same questions.
-
-    Returns "" rather than raising for an unchartered style, which is what
-    makes the migration incremental: load_style_info() falls back to that
-    style's `guidance` until its charter is approved.
-    """
-    styles = load_styles()
-    world = (styles.get(style_key) or {}).get("world") or {}
-    if not isinstance(world, dict):
-        return ""
+    """The `[<style>.world]` charter as a block of prose, in _CHARTER_FIELDS
+    order. The fields are fixed so that every style answers the same
+    questions; validate_charter says which are required."""
+    world = load_styles()[style_key]["world"]
     parts = [f"{label}: {str(world[key]).strip()}"
              for key, label in _CHARTER_FIELDS
              if world.get(key) and str(world[key]).strip()]
     return "\n".join(parts)
-
-
-def load_style_info(style_key):
-    """(label, world) for the configured style — what Stage 2 is told about
-    the world it is painting in, so it does not invent imagery the style has
-    no vocabulary for and can take content from the style rather than only
-    rendering.
-
-    The charter wins where one exists; otherwise the old free-text `guidance`
-    stands in. That fallback is the whole migration strategy: charters are
-    authored and approved one style at a time, and an unchartered style keeps
-    working exactly as it did. Same fallback-to-symbolist behaviour as
-    load_style_suffix() for an unknown key.
-    """
-    styles = load_styles()
-    preset = styles.get(style_key) or styles.get("symbolist")
-    if not preset:
-        return "", ""
-    key = style_key if style_key in styles else "symbolist"
-    return preset.get("label", ""), load_style_world(key) or preset.get("guidance", "")
 
 
 # ---------------------------------------------------------------------------
@@ -1245,20 +1193,11 @@ _WONDER_BY_POLARITY = {
     "soft": "It is at peace, which is not the same as friendly. It is occupied with its own business and indifferent to being watched.",
 }
 
-_LIGHT_BY_EXPOSURE = {
-    # Rewritten 2026-09-26 as a count and a failure condition. The old line was
-    # a mood ("most of the frame is unlit or obscured") and mood words are not
-    # obeyed: across the cyberpunk (a) sweeps and ghibli's darkest cell, lo
-    # cells came back overcast day, sunset, or full sun.
-    "lo": "It is night, or the scene is somewhere daylight does not reach. At least two thirds of the frame is dark, and what is happening is only partly visible — lost in shadow, fog or depth rather than described. The only light is what the scene itself provides. A frame in which most of the image is well lit is a failed response.",
-    # "Raking, partial light" until 2026-10-10: "raking" was copied into 32% of
-    # 56 cross-style prompts. Same meaning, no adjective to copy.
-    "mid": "The light comes from one clear direction, and lit and unlit areas are both substantial. A frame lit evenly from everywhere is a failed response.",
-    # Rewritten 2026-09-26 to match "lo": a count and a failure condition. Once
-    # lo was fixed, cyberpunk's rain-and-neon pulled hi cells to dusk and sunset
-    # (cp-a4-*), because a mood line gives nothing to push back with.
-    "hi": "It is full day — flat overcast, open daylight or hard noon sun — and the light is even across the frame. Everything is visible: nothing is hidden and nothing is dramatised by shadow. A frame that is mostly dark, lit by a low or setting sun, or lit mainly by the scene's own lamps and signs is a failed response.",
-}
+# The exposure bands astro_engine sorts a day into. The light line for each
+# band lives in the style's own `[<style>.light]` table since 2026-10-16
+# (decisions 4 and 2): the global lines assumed an Earth sky, and every style
+# now carries its own, so the pipeline keeps only the band names.
+EXPOSURE_BANDS = ("lo", "mid", "hi")
 
 # The anomaly is present EVERY day; what varies is how the world treats it. A
 # switch would leave roughly half the year with no puncture at all, and those are
@@ -1288,7 +1227,7 @@ _LIGHT_BY_EXPOSURE = {
 #
 # Until 2026-10-09 every cell also said "nothing explains why it is here". That
 # is a property of ghibli's highlight, not of how an actor treats one, so it
-# moved into ghibli's charter `highlight` and DEFAULT_HIGHLIGHT.
+# moved into the charters' `highlight`.
 #
 # STANCE ONLY since 2026-10-10 (STYLE-OVERHAUL Prompt 1), in all three actor
 # tables. Each cell used to name actions ("prising at it, digging it out...",
@@ -1338,7 +1277,7 @@ _ACTOR_SITE_RELATION = {
 # entirely agentless: eroding, spilling, settling and ripening are processes, and
 # only "being mended" and "being carried" imply a hand, both passively and
 # off-stage. The one genuinely conscious verb in the whole codebase was
-# "watching", reachable only from the deprecated NO_TEXTURE_DIAL.
+# "watching", reachable only from the pre-dial constants (deleted 2026-10-16).
 #
 # Two constraints from the melodrama audit are baked in here rather than left to
 # the prompt: "fleeing" is out of the hard list, because it is the most
@@ -1346,58 +1285,36 @@ _ACTOR_SITE_RELATION = {
 # job is to react; and "watching"/"listening to" are kept only in the sense of
 # attending to a thing at work, never to a face.
 
-# What a reading with NO texture block degrades to — an old reading-*.json from
-# before the texture existed, or a hand-pinned input. These are the pre-dial
-# constants, and until 2026-09-13 they were also a user-facing choice
-# (`pipelineMode: "legacy"`), which is why they used to be called LEGACY_DIAL.
-#
-# That choice was removed. Selecting it disabled the one mechanism this whole
-# project is built on — the chart deciding what the image looks like — so
-# "legacy" was an option to make Astro-Arc stop being Astro-Arc, and it was the
-# DEFAULT, meaning every fresh install got the behaviour the project had already
-# decided was wrong. The constants stay because the missing-texture path is
-# real and still needs an answer.
-NO_TEXTURE_DIAL = {
-    "mode": "no-texture",
-    "sites": 3,
-    "objectRange": (4, 7),
-    "thingRange": (6, 10),
-    "wordRange": (90, 130),
-    "verbs": "feeding, binding, eroding, sheltering, crushing, spilling into, growing through, watching",
-    # The actor layers have no pre-dial equivalent to degrade to, so the
-    # fallback gets the most neutral cell of each rather than nothing: a
-    # missing texture must not also mean a missing actor, or the degraded path
-    # quietly reverts to the object-strewn output this work exists to fix.
-    "actorVerbs": _ACTOR_VERBS_SOFT["work"],
-    "registerCohesion": "collide",
-    "spatial": None,
-    "light": None,
-    "prominence": _PROMINENCE_BY_INTENSITY["mid"],
-    "wonderTone": _WONDER_BY_POLARITY["soft"],
-    "anomalyRelation": _ACTOR_ANOMALY_RELATION[("soft", "mid")],
-    "objectRelation": _ACTOR_OBJECT_RELATION[("soft", "mid")],
-    "siteRelation": _ACTOR_SITE_RELATION[("soft", "mid")],
-    "tonalDirection": None,
-}
+# A reading with no texture is a broken reading, not a cell (2026-10-16).
+# astro_engine.compute_texture always returns polarity, both bands and
+# multiplicity, and astro-arc-generate always runs astro_engine, so a missing
+# texture or band means something upstream failed. It used to degrade to
+# NO_TEXTURE_DIAL, a fixed pre-dial cell that sent Stage 2 no light line at
+# all; it is now an error. Harnesses that replay old days name a cell instead
+# (replay_days.py and replay_amplify.py --cell).
+TEXTURE_KEYS = ("polarity", "intensityBand", "exposureBand", "multiplicity")
 
 
 def dial_from_texture(texture):
     """The day's imperatives. `texture` is arc["texture"] from astro_engine.
-
-    Falls back to NO_TEXTURE_DIAL only when there is no texture to read at all.
-    """
+    A missing texture, or one missing any of TEXTURE_KEYS, is an error."""
     if not texture:
-        return dict(NO_TEXTURE_DIAL)
+        raise PipelineError("The reading has no texture; astro_engine always computes one, "
+                            "so the reading is broken. Regenerate it.")
+    missing = [k for k in TEXTURE_KEYS if texture.get(k) is None]
+    if missing:
+        raise PipelineError(f"The reading's texture is missing {', '.join(missing)}; "
+                            "astro_engine always supplies them, so the reading is broken.")
 
-    polarity = texture.get("polarity") or "soft"
-    # A day with no aspect in orb (1 in 365) is a defined cell, not an exception:
-    # soft at minimum intensity. An exception branch is how a neutral day ends up
-    # looking like a crash.
+    polarity = texture["polarity"]
+    # A day with no aspect in orb (1 in 365) is a defined cell, not a fallback:
+    # astro_engine says "none", and it reads as soft at minimum intensity. An
+    # exception branch is how a neutral day ends up looking like a crash.
     if polarity == "none":
         polarity = "soft"
-    intensity_band = texture.get("intensityBand") or "lo"
-    exposure_band = texture.get("exposureBand") or "mid"
-    multiplicity = texture.get("multiplicity") or 0
+    intensity_band = texture["intensityBand"]
+    exposure_band = texture["exposureBand"]
+    multiplicity = texture["multiplicity"]
 
     for max_hits, sites, objects, things, words in _DENSITY_BY_MULTIPLICITY:
         if multiplicity <= max_hits:
@@ -1409,20 +1326,18 @@ def dial_from_texture(texture):
         # each array to draw from without re-reading the texture.
         "polarity": polarity,
         "intensityBand": intensity_band,
-        # For a style's own [light] lines (draw_style_choices).
+        # Picks the line from the style's [light] table (draw_style_choices).
         "exposureBand": exposure_band,
         "sites": sites,
         "objectRange": objects,
         "thingRange": things,
         "wordRange": words,
-        "verbs": _VERBS_HARD if polarity == "hard" else _VERBS_SOFT,
-        # Replaced by draw_style_choices with one drawn activity's verbs.
-        "actorVerbs": (_ACTOR_VERBS_HARD if polarity == "hard" else _ACTOR_VERBS_SOFT)["work"],
+        # verbs, actorVerbs, light and the rest come from the style's own
+        # charter, in draw_style_choices.
         "registerCohesion": "collide" if polarity == "hard" else "cohere",
         "spatial": _SPATIAL_BY_INTENSITY[intensity_band],
         "prominence": _PROMINENCE_BY_INTENSITY[intensity_band],
         "wonderTone": _WONDER_BY_POLARITY["hard" if polarity == "hard" else "soft"],
-        "light": _LIGHT_BY_EXPOSURE[exposure_band],
         "anomalyRelation": _ACTOR_ANOMALY_RELATION[(polarity, intensity_band)],
         "objectRelation": _ACTOR_OBJECT_RELATION[(polarity, intensity_band)],
         "siteRelation": _ACTOR_SITE_RELATION[(polarity, intensity_band)],
@@ -1466,63 +1381,28 @@ def _style_table(style_key, name):
 
 
 def load_style_verbs(style_key):
-    """`[<style>.verbs]` as {array: [verb, ...]}, or None for a style without
-    one -- which keeps the global _VERBS_* / _ACTOR_VERBS_* strings, so an
-    unchartered style behaves as before. A table that is present must carry
-    all four arrays at 20-30 entries each; anything else raises, because a
-    half-written list would quietly hand Stage 2 three verbs from a dozen."""
-    table = _style_table(style_key, "verbs")
-    if table is None:
-        return None
-    if not isinstance(table, dict):
-        raise PipelineError(f"styles.toml [{style_key}.verbs] must be a table")
-    lo, hi = VERB_ARRAY_LEN
+    """`[<style>.verbs]` as {array: [verb, ...]}, the actor arrays as
+    {activity: [verb, ...]} in ACTIVITIES order. validate_charter has already
+    checked the counts and activities: a half-written list would quietly hand
+    Stage 2 three verbs from a dozen."""
+    table = load_styles()[style_key]["verbs"]
     out = {}
     for name in VERB_ARRAYS:
-        raw = table.get(name) or []
+        raw = table[name]
         if name.startswith("actor_"):
-            if not isinstance(raw, dict):
-                raise PipelineError(f"styles.toml [{style_key}.verbs] {name} must be a table "
-                                    f"keyed by activity ({', '.join(ACTIVITIES)})")
-            groups = {k: [str(v).strip() for v in raw.get(k) or [] if str(v).strip()]
-                      for k in ACTIVITIES}
-            groups = {k: v for k, v in groups.items() if v}
-            missing = [k for k in ("work", "rest", "travel") if k not in groups]
-            if missing or not ({"play", "ritual"} & groups.keys()):
-                raise PipelineError(f"styles.toml [{style_key}.verbs] {name} needs work, rest, "
-                                    f"travel, and play or ritual")
-            values = [v for k in groups for v in groups[k]]
+            out[name] = {k: [str(v).strip() for v in raw[k]] for k in ACTIVITIES if raw.get(k)}
         else:
-            groups = None
-            values = [str(v).strip() for v in raw if str(v).strip()]
-        if not lo <= len(values) <= hi:
-            raise PipelineError(f"styles.toml [{style_key}.verbs] {name} has {len(values)} "
-                                f"entries; it needs {lo} to {hi}")
-        if len(set(values)) != len(values):
-            raise PipelineError(f"styles.toml [{style_key}.verbs] {name} repeats an entry")
-        out[name] = groups or values
+            out[name] = [str(v).strip() for v in raw]
     return out
-
-
-def _global_verbs():
-    """The fallback for a style with no [verbs] table, in the same shape:
-    the global lists, drawn from like any style's rather than sent whole
-    (sent whole, 'drying' was in 67% of cosmic's prompts)."""
-    split = lambda text: [v.strip() for v in text.split(",") if v.strip()]  # noqa: E731
-    return {
-        "process_hard": split(_VERBS_HARD),
-        "process_soft": split(_VERBS_SOFT),
-        "actor_hard": {k: split(v) for k, v in _ACTOR_VERBS_HARD.items()},
-        "actor_soft": {k: split(v) for k, v in _ACTOR_VERBS_SOFT.items()},
-    }
 
 
 # How worn things are, drawn per run for every style (STYLE-OVERHAUL Prompt 1,
 # Step 5). Wear used to be a constant -- the highlight, THE IMPOSSIBLE, the
 # soft/lo actor relation and both charters all required it -- so every image
 # came back weathered. Hard days lean to the far end, soft days to the near
-# one; nothing is ruled out on either. A style may replace the list with a
-# `conditions` array (a pristine world, a ruined one), drawn evenly.
+# one; nothing is ruled out on either. The scale is the pipeline's, the same
+# for every style (the per-style `conditions` override went 2026-10-16,
+# unused).
 CONDITIONS = ("newly made", "kept and cared for", "worn with long use", "failing", "ruined")
 _CONDITION_WEIGHTS = {
     "hard": {"newly made": 1, "kept and cared for": 1, "worn with long use": 3, "failing": 3, "ruined": 3},
@@ -1537,17 +1417,6 @@ CONDITION_HOW = ("Show it through the shape and state of things already named �
                  "weathered, cracked, mossy or patched, and not with extra words of its own.")
 
 
-def load_style_conditions(style_key):
-    values = _style_table(style_key, "conditions")
-    if not isinstance(values, list):
-        return None
-    values = [str(v).strip() for v in values if str(v).strip()]
-    return values or None
-
-
-# The brief rules a [space] array replaces, by their key in [<style>.brief].
-SPACE_REPLACES_BRIEF = ("openness", "depth")
-
 # Invariant, the same for every style with a [space] array: it keeps what
 # OPENNESS and DEPTH were for (a wallpaper must not be claustrophobic) without
 # fixing where the depth is.
@@ -1558,16 +1427,8 @@ WALLPAPER_RULE = ("WALLPAPER — The frame always has somewhere for the eye to g
 
 
 def load_style_space(style_key):
-    """`[<style>.space]`: 6-8 one-sentence depth recipes, or None for a style
-    without one, which keeps its OPENNESS or DEPTH brief rule."""
-    values = _style_table(style_key, "space")
-    if values is None:
-        return None
-    lo, hi = SPACE_ARRAY_LEN
-    values = [str(v).strip() for v in values if str(v).strip()] if isinstance(values, list) else []
-    if not lo <= len(values) <= hi:
-        raise PipelineError(f"styles.toml [{style_key}.space] has {len(values)} recipes; it needs {lo} to {hi}")
-    return values
+    """`space` under `[<style>]`: the depth recipes, one drawn per run."""
+    return [str(v).strip() for v in load_styles()[style_key]["space"]]
 
 
 def _style_history(history, style_key):
@@ -1608,9 +1469,9 @@ def draw_style_choices(style_key, dial, history, period_key):
     dial = dict(dial)
     draws = {}
     rng = _style_rng(period_key, style_key, history)
-    hard = (dial.get("polarity") or "soft") == "hard"
+    hard = dial["polarity"] == "hard"
 
-    verbs = load_style_verbs(style_key) or _global_verbs()
+    verbs = load_style_verbs(style_key)
     process = verbs["process_hard" if hard else "process_soft"]
     actor = verbs["actor_hard" if hard else "actor_soft"]
     draws["processVerbs"] = _draw(rng, process, _recent_draws(history, style_key, "processVerbs"), VERB_DRAW)
@@ -1631,16 +1492,12 @@ def draw_style_choices(style_key, dial, history, period_key):
         draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
         dial["space"] = draws["space"]
 
-    # A style's own light lines, where the global ones assume an Earth sky
-    # (STYLE-OVERHAUL Prompt 2). Not a draw: the exposure band decides.
-    light = _style_table(style_key, "light")
-    band = dial.get("exposureBand")
-    if isinstance(light, dict) and band and str(light.get(band) or "").strip():
-        dial["light"] = str(light[band]).strip()
+    # The style's light line for today's exposure band. Not a draw: the band
+    # decides.
+    dial["light"] = str(_style_table(style_key, "light")[dial["exposureBand"]]).strip()
 
-    conditions = load_style_conditions(style_key) or list(CONDITIONS)
     used = _recent_draws(history, style_key, "condition")
-    pool = [c for c in conditions if c not in used] or conditions
+    pool = [c for c in CONDITIONS if c not in used] or list(CONDITIONS)
     weights = _CONDITION_WEIGHTS["hard" if hard else "soft"]
     draws["condition"] = rng.choices(pool, weights=[weights.get(c, 1) for c in pool])[0]
     dial["condition"] = draws["condition"]
@@ -1651,6 +1508,232 @@ def draw_style_choices(style_key, dial, history, period_key):
         dial["highlightMode"] = draws["highlightMode"]
 
     return dial, draws
+
+
+# ---- The charter validator (charter-required, 2026-10-16) ------------------
+#
+# The one place that says what a complete charter is (decision 2 in
+# docs/decisions/2026-10-styles.md). There are no neutral fallbacks any more:
+# the loaders above read a charter as if it were complete, and build() refuses
+# a style this finds errors in before anything is billed. Each error names the
+# style, the field and the rule, so whoever wrote the charter can fix it from
+# the message alone. Warnings are choices the schema allows but advises
+# against (decision 8); they are printed and never block a run.
+
+# The [world] fields a charter must have: everything Stage 2 reads out except
+# `forbids` (optional; no shipped style uses it), plus the highlight.
+CHARTER_WORLD_FIELDS = tuple(k for k, _ in _CHARTER_FIELDS if k != "forbids") + (
+    "highlight", "highlight_modes")
+
+
+def _text(value):
+    return str(value).strip() if isinstance(value, str) else ""
+
+
+def _flat_verbs(value):
+    """A verb array as one list, the actor tables' activities concatenated."""
+    if isinstance(value, dict):
+        return [v for group in value.values() if isinstance(group, list) for v in group]
+    return list(value) if isinstance(value, list) else []
+
+
+def _brief_keys(style_key):
+    """The dial keys a brief rule may use as {placeholders}: the string values
+    of a real dial after this style's draws, which is exactly what
+    _BriefValues hands format_map."""
+    texture = {"polarity": "soft", "intensityBand": "mid", "exposureBand": "mid", "multiplicity": 0}
+    dial = dial_from_texture(texture)
+    try:
+        dial, _ = draw_style_choices(style_key, dial, [], "validate")
+    except Exception:  # an incomplete charter; its errors are reported elsewhere
+        pass
+    return {k for k, v in dial.items() if isinstance(v, str)}
+
+
+# Studio and franchise names a theme's model-facing text must not use (the
+# skill's rule; decision 10 is the open question for the shipped ghibli
+# suffix). Historical artists and periods are fine and not listed. A living
+# artist cannot be listed at all, so the skill carries that rule alone.
+PROTECTED_NAMES = ("ghibli", "miyazaki", "pixar", "disney", "dreamworks", "marvel",
+                   "star wars", "pokemon", "pokémon", "nintendo", "warhammer",
+                   "studio trigger", "makoto shinkai")
+
+
+def _theme_strings(value, path=""):
+    """Every string in a theme table, with its field path."""
+    if isinstance(value, str):
+        yield path, value
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            yield from _theme_strings(v, f"{path}.{k}" if path else str(k))
+    elif isinstance(value, list):
+        for v in value:
+            yield from _theme_strings(v, path)
+
+
+def validate_charter(style_key):
+    """(errors, warnings) for one theme. An empty error list means the charter
+    is complete, the preview exists, and the theme can be used for a run."""
+    styles = load_styles()
+    errors, warnings = [], []
+
+    def error(field, rule):
+        errors.append(f"{style_key}: {field}: {rule}")
+
+    def warn(field, note):
+        warnings.append(f"{style_key}: {field}: {note}")
+
+    style = styles.get(style_key)
+    if not isinstance(style, dict):
+        return [f"{style_key}: no such theme"], []
+    if getattr(style, "parse_error", None):
+        return [f"{style_key}: {style.path.name} is not valid TOML: {style.parse_error}"], []
+    preview = getattr(style, "preview", None)
+    if preview is not None and not preview.is_file():
+        error("preview", f"{preview.name} is required beside {style.path.name}")
+
+    if not _text(style.get("label")):
+        error("label", "required")
+    if not (_text(style.get("suffix")) or _text(style.get("suffix_base"))):
+        error("suffix", "a `suffix` or a `suffix_base` is required")
+
+    def table(name):
+        value = style.get(name)
+        if not isinstance(value, dict):
+            error(f"[{name}]", "table required")
+            return {}
+        return value
+
+    world = table("world")
+    for key in CHARTER_WORLD_FIELDS:
+        if key == "highlight_modes":
+            continue
+        if not _text(world.get(key)):
+            error(f"[world] {key}", "required")
+    if world:
+        modes = world.get("highlight_modes")
+        lo, hi = HIGHLIGHT_MODES_LEN
+        if not isinstance(modes, list):
+            error("[world] highlight_modes", f"required, an array of {lo} to {hi} kinds of wrongness")
+        else:
+            modes = [_text(m) for m in modes]
+            if not all(modes):
+                error("[world] highlight_modes", "every entry must be non-empty text")
+            elif not lo <= len(modes) <= hi:
+                error("[world] highlight_modes", f"has {len(modes)} entries; it needs {lo} to {hi}")
+
+    brief = table("brief")
+    if brief:
+        for key in ("signature", "temper"):
+            if not _text(brief.get(key)):
+                error(f"[brief] {key}", "required")
+        allowed = _brief_keys(style_key)
+        moods = _CAPTION_EMOTION | _CAPTION_MOTIVE | _CAPTION_SIDES
+        for key, rule in brief.items():
+            rule = _text(rule)
+            if not rule:
+                error(f"[brief] {key}", "must be non-empty text")
+                continue
+            fields = {f for _, f, _, _ in string.Formatter().parse(rule) if f}
+            for name in sorted(fields - allowed):
+                error(f"[brief] {key}", f"{{{name}}} is not a value the dial supplies "
+                                        f"({', '.join(sorted(allowed))})")
+            # TEMPER carries the dial's temper ({wonderTone}); it is not a
+            # rule with a failure condition and is never written as one.
+            if key != "temper" and "failed response" not in rule.lower():
+                warn(f"[brief] {key}", 'has no "failed response" condition')
+            words = set(re.findall(r"[a-z]+", re.sub(r"\{[^}]*\}", " ", rule.lower())))
+            if words & moods:
+                warn(f"[brief] {key}", "requires a mood or relationship "
+                                       f"({', '.join(sorted(words & moods))}); allowed, "
+                                       "but it is the creator's choice, not the chart's")
+
+    verbs = table("verbs")
+    if verbs:
+        lo, hi = VERB_ARRAY_LEN
+        for name in VERB_ARRAYS:
+            raw = verbs.get(name)
+            field = f"[verbs] {name}"
+            if name.startswith("actor_"):
+                if not isinstance(raw, dict):
+                    error(field, f"required, a table keyed by activity ({', '.join(ACTIVITIES)})")
+                    continue
+                unknown = sorted(set(raw) - set(ACTIVITIES))
+                if unknown:
+                    error(field, f"unknown activity {', '.join(unknown)}; use {', '.join(ACTIVITIES)}")
+                present = {k for k in ACTIVITIES if isinstance(raw.get(k), list) and raw.get(k)}
+                missing = [k for k in ("work", "rest", "travel") if k not in present]
+                if missing or not ({"play", "ritual"} & present):
+                    error(field, "needs work, rest and travel, plus play or ritual"
+                                 + (f" (missing {', '.join(missing)})" if missing else ""))
+            elif not isinstance(raw, list):
+                error(field, f"required, an array of {lo} to {hi} verbs")
+                continue
+            values = [_text(v) for v in _flat_verbs(raw)]
+            if not all(values):
+                error(field, "every entry must be non-empty text")
+            if not lo <= len(values) <= hi:
+                error(field, f"has {len(values)} entries; it needs {lo} to {hi}")
+            repeats = sorted({v for v in values if v and values.count(v) > 1})
+            if repeats:
+                error(field, f"repeats {', '.join(repeats)}")
+            for other, other_style in styles.items():
+                if other == style_key or not isinstance(other_style, dict):
+                    continue
+                theirs = other_style.get("verbs")
+                if not isinstance(theirs, dict):
+                    continue
+                shared = sorted(set(values) & {_text(v) for v in _flat_verbs(theirs.get(name))} - {""})
+                if shared:
+                    warn(field, f"shares {', '.join(shared)} with {other}'s {name}")
+
+    registers = style.get("registers")
+    if not isinstance(registers, dict):
+        error("[registers]", "table required")
+    else:
+        for register in load_registers():
+            if not _text(registers.get(register)):
+                error(f"[registers] {register}", "required (one line per register in registers.toml)")
+
+    space = style.get("space")
+    lo, hi = SPACE_ARRAY_LEN
+    if not isinstance(space, list):
+        error("space", f"required, an array of {lo} to {hi} depth recipes")
+    elif not all(_text(v) for v in space):
+        error("space", "every recipe must be non-empty text")
+    elif not lo <= len(space) <= hi:
+        error("space", f"has {len(space)} recipes; it needs {lo} to {hi}")
+
+    light = table("light")
+    if light:
+        if set(light) != set(EXPOSURE_BANDS):
+            error("[light]", f"needs exactly {', '.join(EXPOSURE_BANDS)} "
+                                         f"(has {', '.join(sorted(light)) or 'nothing'})")
+        for band in EXPOSURE_BANDS:
+            if band in light and not _text(light[band]):
+                error(f"[light] {band}", "must be non-empty text")
+
+    named = {}
+    for field, text in _theme_strings({k: v for k, v in style.items() if k != "label"}):
+        low = text.lower()
+        for name in PROTECTED_NAMES:
+            if re.search(rf"\b{re.escape(name)}\b", low):
+                named.setdefault(field.split(".")[0], set()).add(name)
+    for field, names in sorted(named.items()):
+        warn(field, f"names a protected studio or franchise ({', '.join(sorted(names))}); "
+                    "describe what the frame looks like instead")
+
+    return errors, warnings
+
+
+def require_charter(style_key):
+    """validate_charter for a run: print the warnings, refuse on any error."""
+    errors, warnings = validate_charter(style_key)
+    for line in warnings:
+        print(f"astro-arc: style warning: {line}", file=sys.stderr)
+    if errors:
+        raise PipelineError(f"Style '{style_key}' has an incomplete charter and cannot be used "
+                            "for a run:\n  " + "\n  ".join(errors))
 
 
 # The anomaly (2026-09-12, was "intrusion"): it used to be an object from "a
@@ -1836,7 +1919,7 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     Returns (result_dict, cost) — cost is None on a cache hit.
     """
     if dial is None:
-        dial = dict(NO_TEXTURE_DIAL)
+        raise PipelineError("Stage 1.5 needs the day's dial (dial_from_texture)")
     natal_hash = _natal_hash(config)
     # The charter is an input as well as the style key: editing it must
     # re-draw that day's meaning, not serve one written for the old wording.
@@ -1961,24 +2044,19 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
 
 
 def load_register_line(style_key, register):
-    """What this register means in this style's world: the style's own
-    `[<style>.registers]` line when it has one, else registers.toml's generic
-    [guidance] entry, else "". The style line REPLACES the generic one rather
-    than adding to it, because it is the more specific answer to the same
-    question."""
+    """What this register means in this style's world: the style's
+    `[<style>.registers]` line. validate_charter requires one for every
+    register, so there is no generic fallback."""
     if not register:
         return ""
-    lines = (load_styles().get(style_key) or {}).get("registers")
-    if isinstance(lines, dict) and str(lines.get(register) or "").strip():
-        return str(lines[register]).strip()
-    return load_register_guidance(register)
+    return str(load_styles()[style_key]["registers"][register]).strip()
 
 
 def stage15_material(stage1_result, meaning, model, config, dial=None, style_key=None,
                      style_world="", register=None, secondary_register=None,
                      avoid_material=None):
     """The MATERIAL half of Stage 1.5: objects and the highlight (key
-    `anomaly`, see DEFAULT_HIGHLIGHT), built
+    `anomaly`, see load_style_highlight), built
     from the day's register. Never cached -- every generation, regenerates
     included, gets fresh material, which is the point of the split: the same
     meaning, a new register, new objects.
@@ -1996,7 +2074,7 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
 
     Returns (result_dict, cost)."""
     if dial is None:
-        dial = dict(NO_TEXTURE_DIAL)
+        raise PipelineError("Stage 1.5 needs the day's dial (dial_from_texture)")
     object_lo, object_hi = dial["objectRange"]
     system_prompt = (
         STAGE15_MATERIAL_SYSTEM
@@ -2317,7 +2395,7 @@ def stage2_system():
 
 
 def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_model,
-                         style_label=None, style_guidance=None, secondary_register=None,
+                         style_world=None, secondary_register=None,
                          amplification=None, dial=None, register_guidance=None,
                          style_brief=None, secondary_register_guidance=None,
                          highlight=None):
@@ -2345,8 +2423,11 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         ]
 
 
-    if style_label and style_guidance:
-        user_lines.append(f"Rendering style for this image: {style_label} — {style_guidance}")
+    # The world charter only. The style's `label` is display-only and never
+    # reaches a model: a prompts-only comparison (decision 3,
+    # docs/decisions/2026-10-styles.md) found no loss without it.
+    if style_world:
+        user_lines.append(f"Rendering style for this image: {style_world}")
     if register:
         user_lines.append(f"Primary material register (the scene's protagonist material): {register}")
     if register_guidance:
@@ -2365,8 +2446,9 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
     # why every image carried the same implicit meaning however the chart moved.
     # Kept as counts and imperatives rather than mood words — "one site, three
     # named things, 60-80 words" is obeyed; "today is a calm day" is not.
-    if dial is None:
-        dial = dict(NO_TEXTURE_DIAL)
+    if dial is None or style_brief is None or not highlight:
+        raise PipelineError("stage2_image_prompt needs the dial, the style's brief and its "
+                            "highlight; build() passes all three")
     # Who is in the scene, from Stage 1.5. An amplification written before the
     # actor existed has neither field, and rather than defaulting to "none" —
     # which is the behaviour this change exists to stop being the default — an
@@ -2409,13 +2491,13 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         # 2026-09-26, so the extra thing was usually a duplicate, and its
         # examples ("aquatic" -> "real water") were among the repeats.
         f"  REGISTER: the objects you were given already carry the primary register ({register}). Name one further thing made of it only if no object in the scene is plainly made of it.",
-        f"  What a highlight is in this world: {highlight_with_mode(highlight or DEFAULT_HIGHLIGHT, dial)}",
-        f"  How prominent the highlight is in this image: {dial.get('prominence') or _PROMINENCE_BY_INTENSITY['mid']}",
+        f"  What a highlight is in this world: {highlight_with_mode(highlight, dial)}",
+        f"  How prominent the highlight is in this image: {dial['prominence']}",
         f"  The highlight, and how the actor treats it: {dial['anomalyRelation']}",
     ]
     # The "THE ANOMALY IS ENORMOUS, put PART of it in shot" rule that sat here
-    # (fired only for scale anomalies) moved into DEFAULT_HIGHLIGHT and ghibli's
-    # charter `highlight` on 2026-10-09, with the scale/time typing it keyed on.
+    # (fired only for scale anomalies) moved into the charters' `highlight` on
+    # 2026-10-09, with the scale/time typing it keyed on.
     # The actor goes in the brief rather than STAGE2_SYSTEM for the reason the
     # register-contribution and openness rules did: the brief is demonstrably
     # the part that gets obeyed. Three relations, not one — the anomaly line
@@ -2441,30 +2523,14 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
             "  THE ACTOR: none. This is one of the few constellations with nobody in it — "
             "the materials and the place carry the image alone. Do not add a figure."
         )
-    # Unconditional, appended to EVERY brief whatever the dial says, and placed
-    # here rather than in STAGE2_SYSTEM because the brief is demonstrably the
-    # part that gets obeyed (see the register-contribution requirement above,
-    # moved here for the same reason). These are wallpapers: they sit behind a
-    # desktop all day, and an enclosed room reads as claustrophobic at that size
-    # however good its content is. Phrased as a countable share of frame and a
-    # failure condition, matching the word-count rule, because "make it feel
-    # open" is a mood word and mood words are not obeyed.
-    # Unconditional, like OPENNESS below, and placed here for the same reason:
-    # the brief is demonstrably the part that gets obeyed. Until now wonder was
-    # only DESCRIBED, in the style charter, and nothing anywhere required it —
-    # so a world of walking machines reliably produced a plausible flour mill.
-    # A charter says what MAY exist; only the brief makes something appear.
-    #
-    # Phrased as a count and a failure condition, matching the openness and
-    # word-count rules, because "make it wondrous" is a mood word and mood
-    # words are not obeyed.
-    # Style-specific rules, each phrased as a count and a failure condition
-    # because mood words are not obeyed. Until 2026-09-26 THE IMPOSSIBLE and
-    # OPENNESS were hardcoded here for every style; both were written for
-    # ghibli's world, and cyberpunk is defined by different things (depth
-    # rather than sky, neon, the tended). They now come from the style's
-    # `[<style>.brief]` table -- see load_style_brief().
-    for rule in (DEFAULT_STAGE2_BRIEF if style_brief is None else style_brief):
+    # The style's own rules, from `[<style>.brief]` (load_style_brief), each
+    # phrased as a count and a failure condition because mood words are not
+    # obeyed. They sit in the brief rather than STAGE2_SYSTEM because the brief
+    # is demonstrably the part that gets obeyed. Until 2026-09-26 THE
+    # IMPOSSIBLE and OPENNESS were hardcoded here for every style; both were
+    # written for ghibli's world. Every style has had its own since
+    # 2026-10-10, and since 2026-10-16 a charter without them cannot run.
+    for rule in style_brief:
         brief.append("  " + rule.format_map(_BriefValues(dial)))
     if space:
         brief += [f"  SPACE — today's depth: {space.rstrip('.')}.", f"  {WALLPAPER_RULE}"]
@@ -2497,7 +2563,8 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
 def build(reading, config):
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     stage2_model = config.get("stage2Model") or "gpt-4o-mini"
-    style_key = config.get("artStyle") or "symbolist"
+    style_key = resolve_style_key(config.get("artStyle"))
+    require_charter(style_key)
     period_key = reading["arc"]["periodKey"]
 
     # The dial has to exist BEFORE Stage 1.5, because it sets how many objects to
@@ -2521,14 +2588,14 @@ def build(reading, config):
     # because the dial they change is one of its inputs.
     dial, draws = draw_style_choices(style_key, dial, history, period_key)
     register, secondary_register = pick_registers(history, registers, dial["registerCohesion"])
+    style_world = load_style_world(style_key)
     amplification, stage15_cost = stage15_amplify(
         stage1, stage1_model, period_key, config, dial=dial,
-        style_key=style_key, style_world=load_style_world(style_key),
+        style_key=style_key, style_world=style_world,
         register=register, secondary_register=secondary_register,
         avoid_material=recent_material(history),
     )
     avoid = avoid_concepts(history)
-    style_label, style_guidance = load_style_info(style_key)
 
     # The melodrama rule, enforced before the image call as B4 specified. It was
     # built and calibrated on 2026-09-20 (21/21 against Garrett's labels) but
@@ -2544,7 +2611,7 @@ def build(reading, config):
     for _attempt in range(1 + CAPTION_RESAMPLES):
         image_prompt, concept_tags, has_people, attempt_cost = stage2_image_prompt(
             stage1, register, avoid, cliches, stage2_model,
-            style_label, style_guidance,
+            style_world,
             secondary_register=secondary_register,
             amplification=amplification,
             dial=dial,
@@ -2564,8 +2631,7 @@ def build(reading, config):
     # value through so a suffix_base/suffix_figures preset (see
     # load_style_suffix) only pays for figure-rendering instructions on a
     # generation that actually has a figure in it.
-    style_suffix = load_style_suffix(style_key, has_people)
-    final_prompt = f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
+    final_prompt = final_image_prompt(image_prompt, style_key, has_people)
 
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -2629,11 +2695,11 @@ def build(reading, config):
         "draws": draws,
         "avoidedConcepts": avoid,
         "artStyle": style_key,
-        # The display name for that key (styles.toml's own `label`), so
+        # The display name for that key (the theme file's own `label`), so
         # anything captioning a run — the "Themes Generated" entry's
         # title, the exported theme's README — can name the style the
         # way the Style dropdown does without re-reading the TOML.
-        "artStyleLabel": style_label,
+        "artStyleLabel": load_styles()[style_key]["label"],
         "imagePrompt": image_prompt,
         "finalPrompt": final_prompt,
         # Cost of the chat calls this run actually made — None means

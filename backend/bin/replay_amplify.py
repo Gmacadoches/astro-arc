@@ -43,6 +43,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
+from sweep import dial_for_day, report_filled  # noqa: E402
 from paths import STATE_DIR  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402  — one definition, shared
 
@@ -57,14 +58,16 @@ def load_config():
     return json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
 
 
-def load_days():
+def load_days(cell):
     """(key, stage1_result, dial) per cached daily reading, oldest first.
+    The base dial comes from the day's own stored texture; `cell` (sweep.py's
+    format) stands in for a day that has none (see sweep.dial_for_day).
 
     The dial comes from that day's pipeline-meta rather than being recomputed:
     recomputing it from today's Moon would pair a day's reading with a tonal
     direction it never had, which is the same confound sweep.py pins against.
     """
-    days = []
+    days, filled_days = [], []
     for path in sorted(READINGS_DIR.glob("*.json")):
         key = path.stem
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", key):
@@ -75,15 +78,10 @@ def load_days():
             continue
         if not all(reading.get(k) for k in ("reading", "distillation", "narrativePosition")):
             continue
-        dial = dict(lp.NO_TEXTURE_DIAL)
-        meta_path = STATE_DIR / f"pipeline-meta-{key}.json"
-        if meta_path.exists():
-            try:
-                stored = (json.loads(meta_path.read_text()).get("dial") or {})
-                dial.update({k: v for k, v in stored.items() if v is not None})
-            except (json.JSONDecodeError, OSError):
-                pass
+        dial, source = dial_for_day(STATE_DIR, key, cell)
+        filled_days.append((key, source))
         days.append((key, reading, dial))
+    report_filled(filled_days, cell)
     return days
 
 
@@ -192,6 +190,8 @@ def main():
                     help="comma-separated. archetype: control,rule,full. "
                          "actor-kind: A-chart,B-dial,C-hybrid,D-constrained")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--cell", default="soft/mid/1/mid",
+                    help="dial cell for a day with no usable stored texture: polarity/intensityBand/multiplicity/exposureBand, as sweep.py --cell")
     ap.add_argument("--seed", type=int, default=0, help="for arm B's tie-breaking")
     ap.add_argument("--veto-window", type=int, default=None,
                     help="override ACTOR_VETO_WINDOW: how many recent kinds are blocked")
@@ -203,7 +203,7 @@ def main():
     model = args.model or config.get("stage1Model") or "gpt-4o-mini"
     if args.veto_window is not None:
         lp.ACTOR_VETO_WINDOW = args.veto_window
-    days = load_days()
+    days = load_days(args.cell)
     default_arms = "A-chart,B-dial,C-hybrid,D-constrained" if args.axis == "actor-kind" else "rule,full"
     arms = [a.strip() for a in (args.arms or default_arms).split(",") if a.strip()]
     out_name = args.out or ("b6-actor-kind" if args.axis == "actor-kind" else "b0-archetype-range")
