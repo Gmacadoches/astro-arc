@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "garrett.astro-arc",
   "name": "Astro-Arc",
-  "version": "1.2.3",
+  "version": "1.3.0",
   "license": "AGPL-3.0-or-later",
   "author": "Garrett McDaniel",
   "description": "Your birth chart and today's sky, painted as a new desktop every day. Pick one of seven worlds, from Studio Ghibli to Edo woodblock to 1970s space art, or make your own: describe it in one line and your Omarchy default agent builds the style with you. Each image can set your theme from its own palette, and is archived with the reading behind it, shareable as one file or exportable as an Omarchy theme. Runs from the bar on your schedule, using your OpenAI API key, from about a cent a run.",
