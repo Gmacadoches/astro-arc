@@ -56,6 +56,7 @@ import re
 import shutil
 import subprocess
 import sys
+import textwrap
 import tomllib
 from datetime import datetime
 from pathlib import Path
@@ -157,12 +158,16 @@ def confirm(args, cost_line):
     if not shutil.which("zenity"):
         print("Nothing spent: asking you needs zenity, which is not installed.", file=out)
         return False
-    text = (f"Astro-Arc wants to use your OpenAI key{f' for {theme}' if theme else ''}:\n\n"
-            f"{cost_line}\n\nNothing is spent unless you click Spend.")
+    # Compact: the lines are broken here, short, and the window fits them
+    # (--no-wrap). Letting zenity wrap makes GTK size the dialog far taller
+    # than its text. Don't spend has the focus, so a stray Enter spends nothing.
+    lines = [f"Use your OpenAI key{f' for {theme}' if theme else ''}?", ""]
+    lines += textwrap.wrap(cost_line, 46)
     try:
         answer = subprocess.run(
-            ["zenity", "--question", "--title=Astro-Arc: spend on your API key?", "--no-wrap", "--no-markup",
-             f"--text={text}", "--ok-label=Spend", "--cancel-label=Don't spend", "--timeout=600"],
+            ["zenity", "--question", "--title=Astro-Arc", "--no-wrap", "--no-markup", "--default-cancel",
+             f"--text={chr(10).join(lines)}", "--ok-label=Spend", "--cancel-label=Don't spend",
+             "--timeout=600"],
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError:
         answer = None
