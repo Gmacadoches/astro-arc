@@ -169,6 +169,15 @@ function agentLabel(agent) {
   return AGENT_NAMES[agent] || agent || "your agent"
 }
 
+// The agents Astro-Arc will start: those with a mode that asks the user before
+// each action, which is how it starts them. Mirrors ASKING_MODE in
+// backend/bin/astro-arc-style; any other default agent gets Copy prompt.
+var AGENTS_THAT_ASK = ["claude", "codex", "gemini", "grok"]
+
+function agentAsks(agent) {
+  return AGENTS_THAT_ASK.indexOf(agent) >= 0
+}
+
 // The same at the start of a sentence: "Your agent opens…".
 function agentLabelStart(agent) {
   var label = agentLabel(agent)
@@ -737,6 +746,8 @@ if (typeof module !== "undefined") {
     styleOnlyNeedsPreview: styleOnlyNeedsPreview,
     agentLabel: agentLabel,
     agentLabelStart: agentLabelStart,
+    AGENTS_THAT_ASK: AGENTS_THAT_ASK,
+    agentAsks: agentAsks,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,

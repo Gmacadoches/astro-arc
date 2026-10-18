@@ -31,7 +31,7 @@ go. A theme never restates these.
 - `<key>.jpg` beside it, the preview, is required. Workflow step 5 makes it.
 - Every field below is required unless it says optional. Strings are TOML
   basic strings in double quotes; escape inner double quotes as `\"`.
-- A valid theme shows in the panel's Style dropdown as "<label> (custom)"; an
+- A valid theme shows in the panel's style list as "<label>", tagged custom; an
   invalid one as "(Failed Validation)", and it cannot generate.
 
 ## The rules
@@ -257,10 +257,21 @@ actor_soft.travel = ["promenading along", "riding out to", "rowing across", "arr
 
 `astro-arc-style` is the plugin's command:
 `~/.config/omarchy/plugins/astro-arc/backend/bin/astro-arc-style` (the brief
-that launched you may give its exact path). `preview`, `meaning` and `render`
-spend the user's API credit: each prints its cost and spends nothing without
-`--yes`. Show the user that cost and get their yes before passing `--yes`; one
-yes may cover several runs of the same command if the user says so.
+that launched you may give its exact path).
+
+**The user is in the loop for every step.** Before each step, tell the user
+what it will do and wait for them to agree; never chain steps on your own.
+`preview`, `meaning` and `render` spend the user's API credit. Before running
+one, run it with `--estimate` (free: it prints the cost and stops), tell the
+user that cost, and ask; run it only once they say yes. If they say no, stop
+and ask what they would like instead.
+
+**Show every file.** Whenever a step writes or changes a file, give the user
+its full path, one per line, so they can open it: the theme file you wrote or
+edited, every rendered image (`rendered:` lines) and its prompt text (`its
+prompt:`), the preview it set (`preview:`), and any saved record (`saved to`).
+After a render, list every image path and say which one, if any, became the
+preview. Never summarise files as "in the renders folder".
 
 1. **Decide the world.** From the user's idea, settle in a few lines: the
    technique (what a finished frame looks like), the world's era and
@@ -273,26 +284,27 @@ yes may cover several runs of the same command if the user says so.
 3. **Validate.** `astro-arc-style validate <file>`. Fix every error and every
    warning that is not deliberate, and repeat. Done when the only error left
    is the missing preview.
-4. **Preview the prompts.** `astro-arc-style preview <file> --yes` writes six
+4. **Preview the prompts.** `astro-arc-style preview <file>` writes six
    scene prompts, three for a real hard day and three for a soft one. Read
    them all. Done when: every prompt is recognisably this world; no noun
    from your own fields turns up in most prompts (a menu leak, rule 1); the
    hard ones read as strain and the soft ones do not. Otherwise fix the
    fields that caused it and repeat from step 3.
-5. **Check the meaning.** `astro-arc-style meaning <file> --yes` replays the
+5. **Check the meaning.** `astro-arc-style meaning <file>` replays the
    last 8 real days and has a blind judge score them. Done when it prints
    `MEANING: PASS` (at least 6/8 hard/soft read right, at most 1
    near-duplicate pair, at most 2/8 in the theme's favourite scene). On FAIL
    it lists the failing prompts with reasons; fix by the table below and
    repeat from step 3.
-6. **Make the preview.** `astro-arc-style render <file>` shows the render
-   cost at the user's own image settings; with their yes,
-   `astro-arc-style render <file> --yes`. One render becomes `<key>.jpg`.
-   With `--n 3`, show the user the files and set their pick with
-   `astro-arc-style choose <file> <image>`. The user may instead give an
-   image they have: `choose` it.
+6. **Make the preview.** `astro-arc-style render <file> --estimate` gives the
+   render cost at the user's own image settings; tell them, and with their
+   yes run `astro-arc-style render <file>`. One render becomes `<key>.jpg`.
+   With `--n 3`, show the user every rendered file by its full path and set
+   their pick with `astro-arc-style choose <file> <image>`. The user may
+   instead give an image they have: `choose` it. Renders are kept in
+   `~/.local/state/omarchy/astro-arc/renders/<key>/`.
 7. **Finish.** `astro-arc-style validate <file>` shows 0 errors. Tell the
-   user the theme is in the Style dropdown as "<label> (custom)", what it
+   user the theme is in the style list as "<label>", tagged custom, what it
    cost, and any warning you left on purpose.
 
 ### When `meaning` fails

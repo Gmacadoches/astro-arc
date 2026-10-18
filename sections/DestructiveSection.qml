@@ -23,7 +23,7 @@ Column {
     Text {
       width: parent.width
       wrapMode: Text.WordWrap
-      text: "Deletes every entry in Themes Generated immediately, ignoring the retention window. Saved themes are not affected."
+      text: "Deletes every generation in History immediately, ignoring the retention window. Saved themes are not affected."
       color: Qt.darker(panel.bar.foreground, 1.3)
       font.family: panel.bar.fontFamily
       font.pixelSize: Style.font.caption

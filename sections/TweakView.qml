@@ -134,7 +134,7 @@ Column {
   // The primary action, filled with the accent like Set wallpaper.
   PanelButton {
     width: parent.width
-    visible: !panel.styleNoAgent
+    visible: panel.agentCanLaunch
     text: panel.styleAgentRunning ? "Opening…" : "Tweak with " + Model.agentLabel(panel.defaultAgent)
     fontSize: Style.font.caption
     foreground: panel.bar.background
@@ -192,10 +192,11 @@ Column {
     width: parent.width
     foreground: panel.bar.foreground
     fontFamily: panel.bar.fontFamily
-    text: panel.styleNoAgent
-      ? "No default agent is set in Omarchy. Copy prompt puts the theme and your note on the clipboard "
-        + "for any chat model; the current version is saved first."
-      : Model.agentLabelStart(panel.defaultAgent) + " edits this style's files in a terminal and asks "
-        + "before using your API key. The current version is saved first."
+    text: !panel.agentCanLaunch
+      ? panel.agentWontLaunch + " Copy prompt puts the theme and your note on the clipboard for any chat "
+        + "model; importing the reply saves the current version first."
+      : Model.agentLabelStart(panel.defaultAgent) + " edits this style in a terminal, one step at a time: it "
+        + "asks you before each change and before anything that uses your API key, telling you the cost first. "
+        + "It sees your recent readings and the example image. The current version is saved first."
   }
 }

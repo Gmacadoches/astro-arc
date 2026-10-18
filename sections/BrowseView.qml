@@ -69,15 +69,77 @@ Item {
           color: on ? (hot || activeFocus ? Qt.lighter(Color.accent, 1.12) : Color.accent)
             : (hot || activeFocus ? Style.hoverFillFor(panel.bar.foreground, Color.accent) : "transparent")
           onClicked: view.filter = modelData
-          // Keep a chip reached by keyboard in view.
+          // Keep a chip reached by keyboard in view, clear of the ‹ › that
+          // cover the row's ends while there is more to scroll.
           onActiveFocusChanged: if (activeFocus) {
-            if (x < chips.contentX) chips.contentX = x
-            else if (x + width > chips.contentX + chips.width) chips.contentX = x + width - chips.width
+            var edge = chipNav.width + Style.space(4)
+            if (x < chips.contentX + edge) chips.scrollTo(x - edge)
+            else if (x + width > chips.contentX + chips.width - edge) chips.scrollTo(x + width - chips.width + edge)
           }
         }
       }
     }
+
+    readonly property real maxX: Math.max(0, contentWidth - width)
+    readonly property bool moreLeft: contentX > 1
+    readonly property bool moreRight: contentX < maxX - 1
+
+    function scrollTo(x) {
+      chipScroll.stop()
+      chipScroll.to = Math.max(0, Math.min(maxX, x))
+      chipScroll.start()
+    }
+
+    NumberAnimation on contentX { id: chipScroll; running: false; duration: 180; easing.type: Easing.OutCubic }
   }
+
+  // ‹ and › over the row's ends, each shown only while chips are hidden on
+  // that side, for whoever isn't using the keyboard (where ←→ already reach
+  // every chip). A solid patch in the card's colour, fading into the row,
+  // keeps half-hidden chips from showing through. Not in the focus order:
+  // they only scroll, and the chips themselves are reachable.
+  component ChipNav: Item {
+    id: nav
+    required property bool forward
+    readonly property bool shown: forward ? chips.moreRight : chips.moreLeft
+    width: navButton.width + Style.space(14)
+    height: chips.height
+    anchors.top: chips.top
+    visible: opacity > 0
+    opacity: shown ? 1 : 0
+    Behavior on opacity { NumberAnimation { duration: 120 } }
+
+    Rectangle {
+      anchors.fill: parent
+      gradient: Gradient {
+        orientation: Gradient.Horizontal
+        GradientStop { position: 0.0; color: nav.forward ? "transparent" : Color.popups.background }
+        GradientStop { position: 0.4; color: Color.popups.background }
+        GradientStop { position: 0.6; color: Color.popups.background }
+        GradientStop { position: 1.0; color: nav.forward ? Color.popups.background : "transparent" }
+      }
+    }
+
+    // Swallow clicks on the fade so they don't land on a half-hidden chip.
+    MouseArea { anchors.fill: parent; enabled: nav.shown }
+
+    PanelActionButton {
+      id: navButton
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.left: nav.forward ? undefined : parent.left
+      anchors.right: nav.forward ? parent.right : undefined
+      size: chips.height
+      iconText: nav.forward ? "󰅂" : "󰅁"
+      bordered: true
+      fontSize: Style.font.body
+      foreground: view.panel.bar.foreground
+      tooltipText: nav.forward ? "More styles" : "Back"
+      onClicked: chips.scrollTo(chips.contentX + (nav.forward ? 1 : -1) * chips.width * 0.75)
+    }
+  }
+
+  ChipNav { id: chipNav; forward: false; anchors.left: chips.left }
+  ChipNav { forward: true; anchors.right: chips.right }
 
   // ---- The grid ----------------------------------------------------------
   GridView {

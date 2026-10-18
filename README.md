@@ -45,17 +45,25 @@ writes it with you:
    the bottom of the list.
 2. Describe it in one line: *1920s art deco travel posters*, *Dutch Golden Age
    still life*, *1980s arcade cabinet art*.
-3. Click **Create with** *your agent* (Claude Code, Codex, OpenCode, whichever
-   you set with `omarchy default agent`). It opens in a terminal, already briefed
-   with the plugin's [`astro-arc-style`](skills/astro-arc-style/SKILL.md) skill.
+3. Click **Create with** *your agent* (whichever you set with
+   `omarchy default agent`). It opens in a terminal, briefed with the plugin's
+   [`astro-arc-style`](skills/astro-arc-style/SKILL.md) skill.
 
-The agent then does the whole job with you: it writes the world (its era,
-materials, inhabitants, myths, light and technique), validates it, test-writes
-real prompts from your own recent days, has a blind judge check that hard days
-still read as hard and soft days as soft, and renders the preview image. Every
-step that spends API credit prints its cost first and waits for your yes. When
-it is done, the style is in the dropdown as **"Your Style (custom)"**, and it
-generates like any built-in one.
+**You stay in charge of every step.** The agent works with you one step at a
+time: it writes the world (its era, materials, inhabitants, myths, light and
+technique), validates it, test-writes real prompts from your own recent days,
+has a blind judge check that hard days still read as hard and soft days as
+soft, and renders the preview image. Astro-Arc starts the agent in its mode
+that asks you before every command and change — never in an auto-approve,
+"yolo" or allow-all mode — and before any step that spends API credit it tells
+you the cost and waits for your yes. Every file it writes, renders included,
+it shows you by its full path. When it is done, the style is in the list as
+**"Your Style · custom"**, and it generates like any built-in one.
+
+Astro-Arc starts **Claude Code, Codex, Gemini and Grok** this way (Codex in its
+read-only sandbox, so anything it changes needs your approval). An agent that
+can't be started in a mode that asks first isn't started at all; the panel says
+so and offers Copy prompt instead.
 
 **No agent set up?** **Copy prompt** puts everything a chat model needs on the
 clipboard. Paste it into any chat on the web, then bring the file it writes
@@ -155,30 +163,46 @@ minutes of your being back rather than being skipped.
 **Update:** `omarchy plugin update garrett.astro-arc`. The plugin never
 updates itself — the panel shows which release you are on and leaves the
 updating to Omarchy.
-**Remove:** `omarchy plugin remove garrett.astro-arc`. Your archive stays —
-see below.
+**Remove:** `omarchy plugin remove garrett.astro-arc`. Everything it made for
+you stays, so nothing you care about disappears with it. Delete what you don't
+want:
+
+| What | Where |
+|---|---|
+| Your archive (every generation and its theme) | `~/.local/share/astro-arc/` |
+| Your own styles | `~/.config/astro-arc/styles/` |
+| Settings | `~/.local/state/omarchy/settings/astro-arc.json` |
+| Caches, tweak backups, preview renders | `~/.local/state/omarchy/astro-arc/` |
+| API keys | the system keyring: **Remove** beside each key in Advanced settings, or `secret-tool clear service astro-arc` |
+| Skill links, only if you made them | run `backend/bin/astro-arc-style uninstall-skill` before removing |
 
 ## Your archive
 
 Every generation is kept as a page of its own — the image, the reading, the
 prompt and what it cost — together with its complete theme, in
-`~/.local/share/astro-arc/`. Under **Themes Generated** in the panel, pick a
-generation and then **Open** its page, **Browse** the whole gallery
-(`~/.local/share/astro-arc/index.html`: every generation, newest first — bookmark
-it), or **Set Theme** to put that generation's colours and wallpaper back on the
-desktop. Set Theme is temporary by design: the next generation replaces it, and
-**Save Theme** is how one becomes a permanent Omarchy theme.
+`~/.local/share/astro-arc/`. The image at the top of the panel pages through
+them: **‹ ›** (or ← → from the keyboard), the thumbnail strip under it, or
+**All** for a grid of everything, filterable by style. Each one comes back with
+the reading it was made from.
 
-To send one to someone, **Share Record** writes that generation as a single
-`.html` file — the image, the reading, the prompt and the costs, all inside the
-one file, so it opens anywhere with no folder around it. It asks where to save.
-(**Export** is the other direction: it packages the *theme* as a git repo
-someone can install with `omarchy theme install`, and leaves the reading out.)
+For the generation showing, **Set wallpaper** puts its colours and wallpaper
+back on the desktop. That is temporary by design: the next generation replaces
+it. Under **⋯**:
 
-Uninstalling the plugin leaves your archive untouched, because it was always
-just files in your home directory. Delete the folder when you no longer want
-it. *History* in Settings sets how long generations are kept; the newest is
-never pruned.
+- **Open image** — the full-size wallpaper.
+- **Save a copy…** — keep it as a permanent Omarchy theme.
+- **Export…** — package the *theme* as a git repo someone can install with
+  `omarchy theme install` (the reading is left out).
+- **Share…** — the image, the reading, the prompt and the costs as one `.html`
+  file that opens anywhere. It asks where to save.
+- **Use as style preview** — for one of your own styles.
+
+The whole archive is also one page in your browser
+(`~/.local/share/astro-arc/index.html`, newest first — **Open in browser** in
+the History grid). Uninstalling the plugin leaves it untouched; delete the
+folder when you no longer want it. *History* retention in Advanced settings
+sets how long generations are kept (**Clean up…** in the grid goes there); the
+newest is never pruned.
 
 ## What it costs
 
@@ -230,6 +254,12 @@ image prompt, never the reading that produced them.
   is the entire mechanism — if that is not acceptable to you, this is not the
   tool for you. The birth place is looked up with Open-Meteo's geocoder, which
   also supplies its timezone.
+- **Your agent, only when you start it.** Creating, fixing or tweaking a style
+  with your agent sends what it works on to that agent's model provider: the
+  style file, your note, the example image if you tick it, and — while it tests
+  a style — prompts built from your recent readings (`preview` and `meaning`
+  print them). Nothing goes to an agent unless you click its button; Copy
+  prompt keeps it to whichever chat you paste into.
 
 ## Tuning it
 
@@ -260,10 +290,12 @@ says which step each one changes:
   the same reading and register, with what defines each one.
 - [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md) — every
   field of a style, what it controls, and how to write one well: the agent
-  skill behind "Create your own style", readable by people too. The plugin
-  links it into your agents' skill folders (`~/.claude/skills/`,
-  `~/.codex/skills/` and so on) when the panel loads, so you can also just ask
-  your agent for an Astro-Arc style in any session.
+  skill behind "Create a new style", readable by people too. The agent's brief
+  points it at this file, so nothing is installed anywhere. If you'd like any
+  agent session to know it, run `backend/bin/astro-arc-style install-skill`
+  yourself: it links the skill into each installed agent's skills folder
+  (`~/.claude/skills/`, `~/.codex/skills/` and so on), never replacing
+  anything already there, and `uninstall-skill` removes exactly those links.
 - [`docs/decisions/`](docs/decisions/) — why things are the way they are, with
   the measurements behind each call.
 

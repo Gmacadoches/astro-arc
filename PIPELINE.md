@@ -357,16 +357,23 @@ field exists outside a style's file, and there are no neutral fallbacks.
 | `backend/pipeline/styles/` | the 7 shipped styles |
 | `~/.config/astro-arc/styles/` (`$XDG_CONFIG_HOME` respected) | the user's own, untouched by `omarchy plugin update`. A file with a shipped key is ignored with a warning |
 
-Every file goes through `validate_charter()` on load. The Style dropdown is
-built from the result: shipped styles by label, the user's as "<label>
-(custom)", and an invalid one as "(Failed Validation)", which cannot generate.
+Every file goes through `validate_charter()` on load. The style list is built
+from the result: shipped styles by label, the user's tagged "custom", and an
+invalid one as "(Failed Validation)", which cannot generate.
 
-**Making one is a conversation with your own agent, not a form.** The panel's
-**Create your own style…** takes a one-line idea and runs
-`astro-arc-style agent create`, which opens the user's Omarchy default agent
-(`omarchy-agent-prompt`) in a terminal, briefed with the
-`astro-arc-style` skill (`skills/astro-arc-style/SKILL.md`). The skill is
-the schema, the writing rules and the workflow; the agent follows it:
+**Making one is a conversation with your own agent, not a form — and the user
+approves every step of it.** **+ Create a new style…** at the end of the style
+list takes a one-line idea and runs `astro-arc-style agent create`, which opens
+the user's Omarchy default agent in a terminal (`omarchy-launch-tui`), briefed
+with the `astro-arc-style` skill (`skills/astro-arc-style/SKILL.md`). It does
+not go through `omarchy-agent`, which starts agents unattended: Astro-Arc
+starts the agent in its mode that asks before each action (`ASKING_MODE` in
+`astro-arc-style`: Claude Code, Codex in its read-only sandbox, Gemini, Grok)
+and starts no other, so the user approves every command it runs. The skill
+has it run each paid command below with `--estimate` first (free: prints the
+cost) and ask before spending, and show every file it writes by its full path.
+The skill is the schema, the writing rules and the workflow; the agent
+follows it:
 
 ```sh
 astro-arc-style validate <file>  # free; names each bad field
@@ -377,17 +384,19 @@ astro-arc-style render   <file>  # the preview image, your settings
 
 `meaning` scores whether hard days still read hard and soft days soft, how
 many prompts are near-duplicates, and how often the style falls back on one
-favourite scene. Each command that calls a model prints its projected cost and spends nothing
-without the user's yes. With no default agent set, **Copy prompt** builds one
+favourite scene. With no default agent set, or one that can't be started in an
+asking mode, **Copy prompt** builds one
 self-contained prompt (the skill plus the idea) for any web chat, and
 **Import theme…** brings the TOML back, saves it in the user folder and
 validates it. **Fix with AI** / **Copy fix prompt** do the same for a style
 that failed validation, with its errors attached. The plugin itself never asks
 a model to write a style, and has no API fallback for it.
 
-The panel also links the skill into each agent's skills folder (`~/.claude`,
-`~/.codex`, `~/.agents`, `~/.pi/agent`, `~/.hermes`, where they exist) on load,
-so any agent session can make or fix a style without the panel.
+Nothing is installed into the agents' own folders: the brief names the skill
+file. `astro-arc-style install-skill`, run by the user, links it into each
+agent's skills folder (`~/.claude`, `~/.codex`, `~/.agents`, `~/.pi/agent`,
+`~/.hermes`, where they exist) so any session can use it; it never replaces
+anything already there, and `uninstall-skill` removes exactly those links.
 
 ---
 

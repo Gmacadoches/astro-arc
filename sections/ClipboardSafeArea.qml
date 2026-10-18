@@ -26,6 +26,11 @@ TextArea {
   readOnly: true
   // readOnly hides the cursor; show it whenever the area has focus.
   cursorVisible: activeFocus
+  // A read-only TextEdit also drops its caret keys (arrows, Home/End, Shift
+  // to select) unless this is set. It only adds TextSelectableByKeyboard;
+  // every clipboard read in QQuickTextControl stays gated on TextEditable,
+  // which a readOnly field never has (checked with the #10992 harness).
+  selectByKeyboard: true
   wrapMode: TextEdit.Wrap
   font.family: Style.font.family
   font.pixelSize: Style.font.bodySmall
