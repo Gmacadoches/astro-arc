@@ -964,7 +964,11 @@ Panel {
     return root.shownStyle && !root.shownStyle.valid ? root.shownStyle : null
   }
 
-  onShownStyleKeyChanged: styleSection.styleDropdown.value = root.shownStyleKey
+  onShownStyleKeyChanged: {
+    styleSection.styleDropdown.value = root.shownStyleKey
+    // An open Tweak card (and its note) was about the previous theme.
+    root.tweakOpen = false
+  }
 
   function loadStyleCatalog() {
     if (styleCatalogProc.running) return
@@ -1054,6 +1058,87 @@ Panel {
     root.runStyle(styleCopyProc, ["fix-prompt", row.path, "--copy"])
   }
 
+  // ---- Tweak: change a working user theme by saying what's off about it.
+  // The agent (or a web chat, via Copy prompt) edits the theme in place;
+  // astro-arc-style backs its files up first, and "Undo last tweak" puts
+  // them back. ---------------------------------------------------------------
+  property bool tweakOpen: false
+  property string tweakNoteDraft: ""
+  property bool tweakIncludeExample: true
+  // The theme the tweak card acts on: the shown style, when it is the user's.
+  readonly property var tweakTheme: shownStyle && shownStyle.source === "user" ? shownStyle : null
+  // "Today's image": the newest generation's background, when it kept one.
+  readonly property string tweakExampleImage: reviewsIndex.length > 0 ? reviewsIndex[0].imagePath : ""
+  // The backup's manifest, when there is one: {key, files, savedAt}.
+  property var tweakBackup: null
+
+  property FileView tweakBackupFile: FileView {
+    path: root.tweakTheme
+      ? root.home + "/.local/state/omarchy/astro-arc/tweak-backups/" + root.tweakTheme.key + "/manifest.json" : ""
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.tweakBackup = root.parseStyleJson(text())
+    onLoadFailed: root.tweakBackup = null
+    onPathChanged: root.tweakBackup = null
+  }
+
+  function toggleTweak() {
+    root.styleActionStatus = ""
+    root.tweakOpen = !root.tweakOpen
+    // One expander at a time under the picker.
+    if (root.tweakOpen) {
+      root.styleCreateMode = ""
+      root.styleImportResult = null
+      root.tweakBackupFile.reload()
+    }
+  }
+
+  function tweakArgs() {
+    var args = [root.tweakTheme.path, "--note", root.tweakNoteDraft.trim()]
+    if (root.tweakIncludeExample && root.tweakExampleImage !== "") args = args.concat(["--example", root.tweakExampleImage])
+    return args
+  }
+
+  function tweakStyleWithAgent() {
+    if (!root.tweakTheme) return
+    if (root.tweakNoteDraft.trim() === "") { setStyleStatus("Say what's off about it first.", true); return }
+    root.runStyle(styleAgentProc, ["agent", "tweak"].concat(root.tweakArgs()))
+  }
+
+  function copyTweakPrompt() {
+    if (!root.tweakTheme) return
+    if (root.tweakNoteDraft.trim() === "") { setStyleStatus("Say what's off about it first.", true); return }
+    styleCopyProc.doneText = "Copied, and the current version is saved. Paste it into any chat model"
+      + (root.tweakIncludeExample && root.tweakExampleImage !== "" ? ", attach " + root.tweakExampleImage : "")
+      + ", then bring its reply back with Import theme."
+    root.runStyle(styleCopyProc, ["tweak-prompt"].concat(root.tweakArgs()).concat(["--copy"]))
+  }
+
+  function undoLastTweak() {
+    if (!root.tweakTheme || !root.tweakBackup) return
+    root.runStyle(styleUndoProc, ["tweak-undo", root.tweakTheme.path])
+  }
+
+  Process {
+    id: styleUndoProc
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var r = root.parseStyleJson(text)
+        if (r && r.ok) {
+          root.setStyleStatus("Restored “" + (root.tweakTheme ? root.tweakTheme.label : r.key)
+            + "” to how it was before the last tweak.", false)
+          root.stylePreviewVersion++
+          root.loadStyleCatalog()
+        } else {
+          root.setStyleStatus((r && r.error) || "Couldn't undo the tweak.", true)
+        }
+        root.tweakBackupFile.reload()
+      }
+    }
+  }
+
   function copyImportErrors() {
     if (!root.styleImportResult) return
     Quickshell.execDetached(["wl-copy", root.styleImportResult.fixBlock])
@@ -1111,8 +1196,9 @@ Panel {
       onStreamFinished: {
         var r = root.parseStyleJson(text)
         if (r && r.ok) {
-          root.setStyleStatus(Model.agentLabel(r.agent) + " is opening in a terminal with the astro-arc-style skill. "
+          root.setStyleStatus(Model.agentLabelStart(r.agent) + " is opening in a terminal with the astro-arc-style skill. "
             + "It asks before anything that costs money.", false)
+          root.tweakBackupFile.reload()
         } else if (r && r.noAgent) {
           root.defaultAgent = ""
           root.styleNoAgent = true
@@ -1132,7 +1218,10 @@ Panel {
       waitForEnd: true
       onStreamFinished: {
         var r = root.parseStyleJson(text)
-        if (r && r.ok) root.setStyleStatus(styleCopyProc.doneText, false)
+        if (r && r.ok) {
+          root.setStyleStatus(styleCopyProc.doneText, false)
+          root.tweakBackupFile.reload()
+        }
         else root.setStyleStatus((r && r.error) || "Couldn't build the prompt.", true)
       }
     }
@@ -1465,6 +1554,7 @@ Panel {
     } else {
       styleNoAgent = false
       styleCreateMode = "create"
+      tweakOpen = false
     }
   }
 
@@ -1700,6 +1790,7 @@ Panel {
   // ---- Read by the section files, which can't see this file's ids. --------
   readonly property bool styleAgentRunning: styleAgentProc.running
   readonly property bool styleCopyRunning: styleCopyProc.running
+  readonly property bool styleUndoRunning: styleUndoProc.running
   readonly property bool styleImportRunning: styleImportProc.running
   readonly property bool styleEstimateRunning: styleEstimateProc.running
   readonly property bool styleRenderRunning: styleRenderProc.running

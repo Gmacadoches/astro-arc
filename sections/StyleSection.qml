@@ -72,7 +72,8 @@ Column {
       id: styleDropdown
       anchors.left: stylePreviewFrame.right
       anchors.leftMargin: Style.space(8)
-      anchors.right: parent.right
+      anchors.right: tweakBtn.visible ? tweakBtn.left : parent.right
+      anchors.rightMargin: tweakBtn.visible ? Style.space(8) : 0
       anchors.verticalCenter: parent.verticalCenter
       showLabel: false
       value: panel.shownStyleKey
@@ -82,6 +83,172 @@ Column {
       })
       foreground: panel.bar.foreground
       onChanged: function(value) { panel.pickArtStyle(value) }
+    }
+
+    // Your own themes only: a shipped theme's files are the plugin's.
+    Button {
+      id: tweakBtn
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      height: styleDropdown.implicitHeight
+      visible: panel.tweakTheme !== null
+      iconText: "󰏫"
+      iconSize: Style.font.caption
+      text: "Tweak"
+      bordered: true
+      selected: panel.tweakOpen
+      fontSize: Style.font.caption
+      foreground: panel.bar.foreground
+      onClicked: panel.toggleTweak()
+    }
+  }
+
+  // ---- Tweak: what's off about this theme, for the agent or a chat. ------
+  Rectangle {
+    width: parent.width
+    visible: panel.tweakOpen && panel.tweakTheme !== null
+    height: tweakCard.implicitHeight + Style.space(12) * 2
+    radius: Style.cornerRadius
+    color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.04)
+    border.width: 1
+    border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.15)
+
+    Column {
+      id: tweakCard
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.margins: Style.space(12)
+      spacing: Style.space(10)
+
+      Text {
+        width: parent.width
+        wrapMode: Text.WordWrap
+        text: "What's off about " + (panel.tweakTheme ? panel.tweakTheme.label : "this style") + "?"
+        color: dim
+        font.family: panel.bar.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+
+      // Not bound to the draft for the reason birthDateField isn't (see
+      // BirthLocationSection): typing would sever it. One-way out instead.
+      ClipboardSafeArea {
+        id: tweakNoteArea
+        width: parent.width
+        height: Math.max(implicitHeight, Style.space(76))
+        placeholderText: "e.g. fewer landscapes, more character close-ups; keep the cel shading"
+        foreground: panel.bar.foreground
+        font.family: panel.bar.fontFamily
+        onTextChanged: panel.tweakNoteDraft = text
+        onVisibleChanged: if (visible) { text = panel.tweakNoteDraft; forceActiveFocus() }
+      }
+
+      // The newest generation's image, when it kept one. Shown even when
+      // that image was made in another style: it can be the example of what
+      // to change towards as easily as what to change away from.
+      Item {
+        width: parent.width
+        height: Math.max(exampleBox.height, exampleLabel.implicitHeight)
+        visible: panel.tweakExampleImage !== ""
+
+        Rectangle {
+          id: exampleBox
+          anchors.left: parent.left
+          anchors.verticalCenter: parent.verticalCenter
+          width: Style.space(16)
+          height: width
+          radius: Style.space(3)
+          color: panel.tweakIncludeExample ? Color.accent : "transparent"
+          border.width: 1
+          border.color: panel.tweakIncludeExample ? Color.accent : Qt.darker(panel.bar.foreground, 1.5)
+
+          Text {
+            anchors.centerIn: parent
+            visible: panel.tweakIncludeExample
+            text: "󰄬"
+            color: panel.bar.background
+            font.family: panel.bar.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+        }
+
+        Text {
+          id: exampleLabel
+          anchors.left: exampleBox.right
+          anchors.leftMargin: Style.space(8)
+          anchors.right: parent.right
+          anchors.verticalCenter: parent.verticalCenter
+          wrapMode: Text.WordWrap
+          text: "Include today's image as an example"
+          color: panel.bar.foreground
+          font.family: panel.bar.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: Qt.PointingHandCursor
+          onClicked: panel.tweakIncludeExample = !panel.tweakIncludeExample
+        }
+      }
+
+      // The primary action, filled with the accent like Set wallpaper.
+      Button {
+        width: parent.width
+        visible: !panel.styleNoAgent
+        text: panel.styleAgentRunning ? "Opening…" : "Tweak with " + Model.agentLabel(panel.defaultAgent)
+        fontSize: Style.font.caption
+        foreground: panel.bar.background
+        color: hot ? Qt.lighter(Color.accent, 1.12) : Color.accent
+        opacity: enabled ? 1 : 0.45
+        enabled: !panel.styleAgentRunning && panel.tweakNoteDraft.trim() !== ""
+        onClicked: panel.tweakStyleWithAgent()
+      }
+
+      Item {
+        width: parent.width
+        height: Math.max(tweakCopyBtn.implicitHeight, undoTweakBtn.implicitHeight)
+
+        Button {
+          id: tweakCopyBtn
+          anchors.left: parent.left
+          width: (parent.width - Style.space(8)) / 2
+          text: "Copy prompt"
+          bordered: true
+          fontSize: Style.font.caption
+          foreground: panel.bar.foreground
+          enabled: !panel.styleCopyRunning && panel.tweakNoteDraft.trim() !== ""
+          opacity: enabled ? 1 : 0.45
+          onClicked: panel.copyTweakPrompt()
+        }
+
+        Button {
+          id: undoTweakBtn
+          anchors.right: parent.right
+          width: tweakCopyBtn.width
+          text: panel.styleUndoRunning ? "Undoing…" : "Undo last tweak"
+          bordered: true
+          fontSize: Style.font.caption
+          foreground: panel.bar.foreground
+          enabled: panel.tweakBackup !== null && !panel.styleUndoRunning
+          opacity: enabled ? 1 : 0.45
+          tooltipText: panel.tweakBackup && panel.tweakBackup.savedAt
+            ? "Restore the version saved " + Qt.formatDateTime(new Date(panel.tweakBackup.savedAt), "MMM d, h:mm AP")
+            : "Nothing to undo yet"
+          onClicked: panel.undoLastTweak()
+        }
+      }
+
+      InfoNote {
+        width: parent.width
+        foreground: panel.bar.foreground
+        fontFamily: panel.bar.fontFamily
+        text: panel.styleNoAgent
+          ? "No default agent is set in Omarchy. Copy prompt puts the theme and your note on the clipboard "
+            + "for any chat model; the current version is saved first."
+          : Model.agentLabelStart(panel.defaultAgent) + " edits this style's files in a terminal and asks "
+            + "before using your API key. The current version is saved first."
+      }
     }
   }
 
@@ -227,7 +394,9 @@ Column {
         spacing: Style.space(10)
         visible: panel.styleCreateMode === "create"
 
-        readonly property bool hasAgent: panel.defaultAgent !== "" && !panel.styleNoAgent
+        // Until a launch finds none, the agent is assumed and named by its
+        // display name ("your agent" before detection answers).
+        readonly property bool hasAgent: !panel.styleNoAgent
 
         Text {
           width: parent.width
@@ -297,7 +466,7 @@ Column {
           foreground: panel.bar.foreground
           fontFamily: panel.bar.fontFamily
           text: parent.hasAgent
-            ? Model.agentLabel(panel.defaultAgent) + " writes the theme with you in a terminal, and asks before "
+            ? Model.agentLabelStart(panel.defaultAgent) + " writes the theme with you in a terminal, and asks before "
               + "checking it or rendering its preview with your API key. Copy prompt is for a web chat model."
             : "No default agent is set in Omarchy. Copy prompt puts everything a chat model needs on the "
               + "clipboard; paste it into any chat, then bring the file it writes back with Import theme."

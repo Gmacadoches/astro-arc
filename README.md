@@ -41,7 +41,7 @@ same day's reading, rendered in each:
 A style is one file, and you don't have to write it. Your Omarchy default agent
 writes it with you:
 
-1. Open the **Style** dropdown in the panel and pick **Create your own style…**
+1. Under **Style** in the panel, open **Create a new style**.
 2. Describe it in one line: *1920s art deco travel posters*, *Dutch Golden Age
    still life*, *1980s arcade cabinet art*.
 3. Click **Create with** *your agent* (Claude Code, Codex, OpenCode, whichever
@@ -59,6 +59,12 @@ generates like any built-in one.
 **No agent set up?** **Copy prompt** puts everything a chat model needs on the
 clipboard. Paste it into any chat on the web, then bring the file it writes
 back with **Import theme…**, which saves and validates it.
+
+**Not quite right?** With one of your own styles selected, click **Tweak**
+beside the picker and say what's off (*fewer landscapes, more character
+close-ups*), optionally with today's image as an example. Your agent edits the
+style in place, or **Copy prompt** does the same through a web chat. The
+current version is saved first, so **Undo last tweak** puts it back.
 
 **Something wrong with it?** A style that fails validation stays in the
 dropdown as **(Failed Validation)** and won't generate. **Fix with AI** hands it

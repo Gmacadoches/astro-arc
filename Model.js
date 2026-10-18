@@ -162,8 +162,17 @@ var AGENT_NAMES = {
   copilot: "GitHub Copilot", muse: "Muse Code", "cursor-agent": "Cursor CLI"
 }
 
+// What every label calls the agent: its display name, the raw name for one
+// this table doesn't know, and "your agent" until one is detected — so a label
+// never names an agent the user doesn't have.
 function agentLabel(agent) {
-  return AGENT_NAMES[agent] || agent || ""
+  return AGENT_NAMES[agent] || agent || "your agent"
+}
+
+// The same at the start of a sentence: "Your agent opens…".
+function agentLabelStart(agent) {
+  var label = agentLabel(agent)
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 // ---- Model catalog labels -------------------------------------------------
@@ -722,6 +731,7 @@ if (typeof module !== "undefined") {
     styleDropdownOptions: styleDropdownOptions,
     styleOnlyNeedsPreview: styleOnlyNeedsPreview,
     agentLabel: agentLabel,
+    agentLabelStart: agentLabelStart,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,
