@@ -3,8 +3,8 @@ import qs.Commons
 import qs.Ui
 import "../Model.js" as Model
 
-// Settings view, top: Background only, Provider (with the Advanced popout
-// button) and the one API key the simple view writes to every slot.
+// Advanced popout, top: Background only, Provider, and the one API key
+// that is written to every slot (the per-stage rows further down override it).
 Column {
   id: section
   required property var panel
@@ -36,7 +36,7 @@ Column {
   // see astro-arc-generate.)
   Item {
     width: parent.width
-    height: Math.max(providerLabel.implicitHeight, providerDropdown.implicitHeight, advancedBtn.implicitHeight)
+    height: Math.max(providerLabel.implicitHeight, providerDropdown.implicitHeight)
 
     Text {
       id: providerLabel
@@ -53,8 +53,7 @@ Column {
       id: providerDropdown
       anchors.left: providerLabel.right
       anchors.leftMargin: Style.space(8)
-      anchors.right: advancedBtn.left
-      anchors.rightMargin: Style.space(8)
+      anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       showLabel: false
       value: panel.configState.provider
@@ -65,14 +64,6 @@ Column {
       onChanged: function(value) { panel.commitProvider(value) }
     }
 
-    Button {
-      id: advancedBtn
-      anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
-      text: "Advanced"
-      foreground: panel.bar.foreground
-      onClicked: panel.advancedOpen = true
-    }
   }
 
   // One key, written to all three slots. The per-stage split lives in

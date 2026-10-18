@@ -41,9 +41,9 @@ Column {
           return { value: p.key, label: Model.presetLabel(p) }
         })
         // "Custom" is a readout, not a choice — you reach it by
-        // changing something in the popout. Listed so the dropdown can
+        // changing a model further down. Listed so the dropdown can
         // display the state it is actually in.
-        opts.push({ value: "custom", label: "Custom (set in Popout)" })
+        opts.push({ value: "custom", label: "Custom (set below)" })
         return opts
       }
       foreground: panel.bar.foreground
@@ -53,7 +53,7 @@ Column {
 
   // What the preset actually resolved to. Read-only on purpose: this
   // is the answer to "what is it using?", and changing it is what the
-  // popout is for.
+  // per-stage pickers further down are for.
   Column {
     width: parent.width
     spacing: Style.space(2)

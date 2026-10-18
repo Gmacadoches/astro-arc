@@ -2,8 +2,10 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 
-// Hero: icon · title · status — the shared PanelHero, same as every other
-// built-in popup uses. The ‹ / ⚙ / ✕ controls toggle the settings view.
+// Hero: the shared PanelHero, same as every other built-in popup uses.
+// Main view: ✦ (✵ while generating) · Astro-Arc · status, and a gear that
+// opens the settings view. Settings view: a back button and "Settings" —
+// nothing trailing, since back is the one way out.
 PanelHero {
   required property var panel
 
@@ -13,30 +15,39 @@ PanelHero {
   foreground: panel.bar.foreground
   fontFamily: panel.bar.fontFamily
   iconComponent: Component {
-    Text {
-      text: panel.showSettings ? "‹" : (panel.generating ? "✵" : "✦")
-      color: panel.bar.foreground
-      font.family: panel.bar.fontFamily
-      font.pixelSize: Style.font.display
+    Item {
+      implicitWidth: panel.showSettings ? backBtn.implicitWidth : starText.implicitWidth
+      implicitHeight: panel.showSettings ? backBtn.implicitHeight : starText.implicitHeight
 
-      // Was purely decorative — a "‹" that looks exactly like a
-      // back button but did nothing when clicked. Same action as
-      // the trailing ✕ below; only live while it's actually
-      // showing the back chevron, not over the ✦/✵ status icon.
-      MouseArea {
-        anchors.fill: parent
-        enabled: panel.showSettings
-        cursorShape: panel.showSettings ? Qt.PointingHandCursor : Qt.ArrowCursor
+      Text {
+        id: starText
+        visible: !panel.showSettings
+        text: panel.generating ? "✵" : "✦"
+        color: Color.accent
+        font.family: panel.bar.fontFamily
+        font.pixelSize: Style.font.display
+      }
+
+      PanelActionButton {
+        id: backBtn
+        visible: panel.showSettings
+        iconText: "󰅁"
+        bordered: true
+        fontSize: Style.font.body
+        foreground: panel.bar.foreground
+        tooltipText: "Back"
         onClicked: panel.toggleSettings()
       }
     }
   }
   trailingControl: Component {
     PanelActionButton {
-      iconText: panel.showSettings ? "✕" : "⚙"
+      visible: !panel.showSettings
+      iconText: "󰒓"
+      bordered: true
       fontSize: Style.font.body
       foreground: panel.bar.foreground
-      tooltipText: panel.showSettings ? "Close settings" : "Settings"
+      tooltipText: "Settings"
       onClicked: panel.toggleSettings()
     }
   }

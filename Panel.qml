@@ -405,9 +405,17 @@ Panel {
   // Deliberately says nothing about the schedule — the Frequency dropdown is
   // the one place that reports it, and having the status line repeat it only
   // made a cadence look like something this line was reporting *on*.
+  //
+  // Carries the last run's time, which used to sit on its own line beside
+  // Regenerate: the time alone on a run from today, with the date otherwise.
   readonly property string heroStatus: root.generating
     ? "Generating…"
-    : (root.lastRun ? "Up to date" : "Not generated yet")
+    : (root.lastRun
+      ? "Up to date · Last run " + Model.formatGeneratedAt(root.lastRun.generatedAt, function(d) {
+          var today = new Date()
+          return Qt.formatDateTime(d, d.toDateString() === today.toDateString() ? "h:mm AP" : "MMM d, h:mm AP")
+        })
+      : "Not generated yet")
 
   // ---- Settings sub-view (image backend/model, Stage 1/2 models, API
   // keys) -------------------------------------------------------------------
@@ -695,11 +703,22 @@ Panel {
     onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
   }
 
-  // ---- The popout. The panel itself stays rudimentary — provider, one key,
-  // one quality preset — and everything that makes this configurable rather
-  // than merely usable lives here: every model the key can reach, the two chat
-  // stages split apart, a separate key per slot, and the cost ceiling.
+  // ---- The popout. The panel's settings view holds only what a reading
+  // needs (birth, place, schedule); everything else lives here: provider and
+  // key, the quality preset, background size, theme, usage, every model the
+  // key can reach, the two chat stages split apart, a separate key per slot,
+  // and the cost ceiling.
   property bool advancedOpen: false
+
+  // The key rows live in the popout, so their status is fetched when it
+  // opens, and a half-finished Replace is dropped when it closes.
+  onAdvancedOpenChanged: {
+    var slots = ["stage1", "stage2", "image"]
+    for (var i = 0; i < slots.length; i++) {
+      if (advancedOpen) refreshApiKeyStatus(slots[i])
+      else setApiKeyField(slots[i], "replacing", false)
+    }
+  }
 
   // ---- Quality preset: one control that sets all four model settings, in
   // the spirit of a game's graphics presets. The individual pickers below stay
@@ -901,7 +920,7 @@ Panel {
       onStreamFinished: {
         var size = String(text || "").trim()
         if (Model.isValidBackgroundSize(size)) {
-          backgroundSection.backgroundSizeField.text = size
+          advancedWindow.backgroundSizeField.text = size
           root.commitBackgroundSize(size)
         } else {
           root.backgroundSizeError = "Couldn't detect the current resolution"
@@ -1409,6 +1428,46 @@ Panel {
     if (reviewsIndex.length > 0) openReview(reviewsIndex[0].path)
   }
 
+  // The generation the main view shows: its image, its actions, and — when
+  // it is the newest — the reading last-run.json carries for it.
+  readonly property var selectedReview: reviewForId(selectedReviewId)
+  readonly property bool selectedIsNewest: selectedReviewId !== ""
+    && reviewsIndex.length > 0 && reviewsIndex[0].id === selectedReviewId
+  // The selected generation's user theme, when it has one and an image to
+  // offer it as a preview — the condition for "Use as style preview".
+  readonly property var selectedPreviewTheme: {
+    var review = selectedReview
+    if (!review || review.imagePath === "") return null
+    var theme = Model.findStyle(styleCatalog, Model.reviewStyleKey(review, styleCatalog))
+    return theme && theme.source === "user" ? theme : null
+  }
+
+  // The full-size background when the entry kept its theme snapshot, the
+  // entry's page otherwise (older entries have no image of their own).
+  function openSelectedImage() {
+    var review = selectedReview
+    if (!review) return
+    if (review.imagePath !== "") Quickshell.execDetached(["xdg-open", review.imagePath])
+    else openReview(review.path)
+  }
+
+  function useSelectedAsStylePreview() {
+    if (selectedPreviewTheme) setStylePreview(selectedPreviewTheme.key, selectedReview.imagePath)
+  }
+
+  // The "Create a new style" expander. Open means a create or import flow is
+  // showing; closing it drops a half-finished import result.
+  function toggleStyleCreate() {
+    styleActionStatus = ""
+    styleImportResult = null
+    if (styleCreateMode !== "") {
+      styleCreateMode = ""
+    } else {
+      styleNoAgent = false
+      styleCreateMode = "create"
+    }
+  }
+
   // ---- Save Selected Theme: exports the selected entry's theme snapshot
   // to a new, permanent Omarchy theme (astro-arc-save-theme) — outside
   // both the live astro-arc theme (overwritten every generation) and the
@@ -1701,50 +1760,47 @@ Panel {
           width: scroll.width
           spacing: Style.space(8)
 
-          // ---- Hero: icon · title · status --------------------------------
+          // ---- Hero: icon · title · status, or back · Settings ------------
           HeroSection { panel: root }
 
-          PanelSeparator { foreground: root.bar.foreground }
-
-          // ================== SETTINGS VIEW ==================
-          Column {
-            width: parent.width
-            spacing: Style.space(10)
-            visible: root.showSettings
-
-            GeneralSettingsSection { panel: root }
-            PanelSeparator { foreground: root.bar.foreground }
-            QualitySection { panel: root }
-            PanelSeparator { foreground: root.bar.foreground }
-            BackgroundSection { id: backgroundSection; panel: root }
-            PanelSeparator { foreground: root.bar.foreground }
-            ThemeSettingsSection { panel: root }
-            PanelSeparator { foreground: root.bar.foreground }
-            UsageSection { panel: root }
-            PanelSeparator { foreground: root.bar.foreground }
-            VersionSection { panel: root }
-          }
-
           // ================== MAIN VIEW ==================
-          BirthLocationSection {
-            id: birthLocationSection
-            panel: root
-            visible: !root.showSettings
-          }
-
+          // Today's image and reading first, then what you pick (style),
+          // then what you browse (history), then where the settings are.
           Column {
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(16)
             visible: !root.showSettings
 
-            ScheduleSection { panel: root }
-            StyleSection { id: styleSection; panel: root }
+            TodaySection { panel: root }
             PanelSeparator { foreground: root.bar.foreground }
-            GenerateSection { panel: root }
-            ThemesGeneratedSection {
+            StyleSection { id: styleSection; panel: root }
+
+            PanelSeparator {
+              visible: root.reviewsIndex.length > 0
+              foreground: root.bar.foreground
+            }
+            HistorySection {
               panel: root
               visible: root.reviewsIndex.length > 0
             }
+
+            PanelSeparator { foreground: root.bar.foreground }
+            FooterSection { panel: root }
+          }
+
+          // ================== SETTINGS VIEW ==================
+          // Only what a reading needs. Everything else is in the Advanced
+          // popout (sections/AdvancedSettingsWindow.qml).
+          Column {
+            width: parent.width
+            spacing: Style.space(16)
+            visible: root.showSettings
+
+            BirthLocationSection { id: birthLocationSection; panel: root }
+            PanelSeparator { foreground: root.bar.foreground }
+            ScheduleSection { panel: root }
+            PanelSeparator { foreground: root.bar.foreground }
+            AdvancedLinkSection { panel: root }
           }
         }
       }
@@ -1762,6 +1818,6 @@ Panel {
   }
 
   // ---- Advanced settings popout (sections/AdvancedSettingsWindow.qml) ----
-  AdvancedSettingsWindow { panel: root }
+  AdvancedSettingsWindow { id: advancedWindow; panel: root }
 
 }

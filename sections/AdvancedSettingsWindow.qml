@@ -12,6 +12,8 @@ import qs.Ui
 PanelWindow {
   id: advancedWindow
   required property var panel
+  // Panel.qml's detectBackgroundSize writes the detected size in here.
+  property alias backgroundSizeField: backgroundSection.backgroundSizeField
 
   visible: panel.advancedOpen
   anchors { top: true; bottom: true; left: true; right: true }
@@ -88,7 +90,7 @@ PanelWindow {
       Text {
         width: parent.width
         wrapMode: Text.WordWrap
-        text: "Anything set here overrides the quality preset, which will then read \"Custom\". Costs marked (est) are published rates applied to token counts measured from real runs; (actual) means this exact combination has been measured on this machine."
+        text: "Everything the panel itself doesn't need. A model picked under a stage overrides the quality preset, which will then read \"Custom\".Costs marked (est) are published rates applied to token counts measured from real runs; (actual) means this exact combination has been measured on this machine."
         color: Qt.darker(panel.bar ? panel.bar.foreground : "#cdd6f4", 1.3)
         font.family: panel.bar ? panel.bar.fontFamily : "sans"
         font.pixelSize: Style.font.caption
@@ -106,6 +108,19 @@ PanelWindow {
         width: parent.width
         spacing: Style.space(10)
 
+        GeneralSettingsSection { panel: advancedWindow.panel }
+        PanelSeparator { foreground: panel.bar.foreground }
+        QualitySection { panel: advancedWindow.panel }
+        PanelSeparator { foreground: panel.bar.foreground }
+        BackgroundSection { id: backgroundSection; panel: advancedWindow.panel }
+        PanelSeparator { foreground: panel.bar.foreground }
+        ThemeSettingsSection { panel: advancedWindow.panel }
+        PanelSeparator { foreground: panel.bar.foreground }
+        UsageSection { panel: advancedWindow.panel }
+        PanelSeparator { foreground: panel.bar.foreground }
+        VersionSection { panel: advancedWindow.panel }
+
+        PanelSeparator { foreground: panel.bar.foreground }
         ModelListSection { panel: advancedWindow.panel }
 
         PanelSeparator { foreground: panel.bar.foreground }
