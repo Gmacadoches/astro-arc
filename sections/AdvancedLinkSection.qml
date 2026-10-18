@@ -4,7 +4,7 @@ import qs.Ui
 
 // Settings view, last: the way into the Advanced popout, where everything a
 // reading doesn't need lives — provider, keys, models, quality, theme, usage.
-Button {
+PanelButton {
   required property var panel
 
   width: parent.width

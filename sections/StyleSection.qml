@@ -3,30 +3,28 @@ import qs.Commons
 import qs.Ui
 import "../Model.js" as Model
 
-// Main view: STYLE — the picker with the selected theme's preview beside it,
-// a failed theme's errors and fixes, and "Create a new style", which opens
-// the create and import flows in place.
+// Main view, bottom: the style row — the selected theme's preview, the
+// picker (which ends in "+ Create a new style…" and opens upward), and Tweak
+// for your own themes — then one fixed status slot. Everything that used to
+// grow the panel under the picker (an action's result, a broken or missing
+// style) is a line in that slot now, and the long forms are drill-in views.
 Column {
+  id: section
   required property var panel
   // Panel.qml resets this to the shown style after a non-selectable pick.
   property alias styleDropdown: styleDropdown
 
   readonly property color dim: Qt.darker(panel.bar.foreground, 1.3)
-  readonly property color faint: Qt.darker(panel.bar.foreground, 1.5)
   readonly property color urgent: panel.bar.urgent || "#f38ba8"
 
   width: parent.width
   spacing: Style.space(10)
 
-  PanelSectionHeader { text: "STYLE"; foreground: panel.bar.foreground }
-
-  // ---- Picker: preview swatch, then the dropdown. Options come from the
-  // theme files (style_catalog.py); see loadStyleCatalog. A user theme's
-  // swatch is also how you change its preview. ------------------------------
   Item {
     width: parent.width
     height: Math.max(stylePreviewFrame.height, styleDropdown.implicitHeight)
 
+    // A user theme's swatch is also how you change its preview.
     Rectangle {
       id: stylePreviewFrame
       anchors.left: parent.left
@@ -35,15 +33,20 @@ Column {
       height: width
       radius: Style.cornerRadius
       color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.08)
-      border.width: 1
-      border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.25)
+      border.width: activeFocus ? 2 : 1
+      border.color: activeFocus ? panel.bar.foreground
+        : Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.25)
 
-      readonly property bool userTheme: panel.shownStyle !== null && panel.shownStyle.source === "user"
+      readonly property bool changeable: panel.shownStyle !== null && panel.shownStyle.source === "user"
+        && !panel.stylePreviewRunning
+      activeFocusOnTab: changeable
+      Keys.onReturnPressed: panel.changeStylePreview(panel.shownStyleKey)
+      Keys.onEnterPressed: panel.changeStylePreview(panel.shownStyleKey)
+      Keys.onSpacePressed: panel.changeStylePreview(panel.shownStyleKey)
 
       Image {
-        id: stylePreviewImage
         anchors.fill: parent
-        anchors.margins: parent.border.width
+        anchors.margins: 2
         visible: status === Image.Ready
         source: panel.shownStyle && panel.shownStyle.preview
           ? "file://" + panel.shownStyle.preview + "?v=" + panel.stylePreviewVersion : ""
@@ -56,37 +59,46 @@ Column {
       MouseArea {
         id: previewMouse
         anchors.fill: parent
-        enabled: stylePreviewFrame.userTheme && !panel.stylePreviewRunning
+        enabled: stylePreviewFrame.changeable
         hoverEnabled: true
         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: panel.changeStylePreview(panel.shownStyleKey)
       }
 
       PanelToolTip {
-        visible: previewMouse.enabled && previewMouse.containsMouse
+        visible: stylePreviewFrame.changeable && (previewMouse.containsMouse || stylePreviewFrame.activeFocus)
         text: "Change preview"
       }
     }
 
-    Dropdown {
+    // Options come from the theme files (style_catalog.py); see
+    // loadStyleCatalog. Create sits at the end of the list itself.
+    PanelPicker {
       id: styleDropdown
       anchors.left: stylePreviewFrame.right
       anchors.leftMargin: Style.space(8)
       anchors.right: tweakBtn.visible ? tweakBtn.left : parent.right
       anchors.rightMargin: tweakBtn.visible ? Style.space(8) : 0
       anchors.verticalCenter: parent.verticalCenter
-      showLabel: false
+      bounds: panel.contentArea
+      preferUp: true
       value: panel.shownStyleKey
-      // Create and Import have their own control below now.
-      options: Model.styleDropdownOptions(panel.styleCatalog).filter(function(o) {
-        return o.value !== Model.STYLE_CREATE && o.value !== Model.STYLE_IMPORT
+      options: panel.styleCatalog.map(function(s) {
+        return {
+          value: s.key,
+          label: s.label + (s.valid ? "" : " (Failed Validation)"),
+          tag: s.source === "user" ? "custom" : ""
+        }
       })
+      footerText: "+ Create a new style…"
       foreground: panel.bar.foreground
+      fontFamily: panel.bar.fontFamily
       onChanged: function(value) { panel.pickArtStyle(value) }
+      onFooterActivated: panel.pickArtStyle(Model.STYLE_CREATE)
     }
 
     // Your own themes only: a shipped theme's files are the plugin's.
-    Button {
+    PanelButton {
       id: tweakBtn
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
@@ -96,551 +108,77 @@ Column {
       iconSize: Style.font.caption
       text: "Tweak"
       bordered: true
-      selected: panel.tweakOpen
       fontSize: Style.font.caption
       foreground: panel.bar.foreground
-      onClicked: panel.toggleTweak()
+      onClicked: panel.openView("tweak")
     }
   }
 
-  // ---- Tweak: what's off about this theme, for the agent or a chat. ------
-  Rectangle {
+  // ---- Status slot: two lines, always there. The newest thing worth saying,
+  // in this order: what the last action did, what is wrong with the style,
+  // the last generation's error. ----------------------------------------------
+  Item {
+    id: statusSlot
     width: parent.width
-    visible: panel.tweakOpen && panel.tweakTheme !== null
-    height: tweakCard.implicitHeight + Style.space(12) * 2
-    radius: Style.cornerRadius
-    color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.04)
-    border.width: 1
-    border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.15)
+    height: statusMetrics.lineSpacing * 2
 
-    Column {
-      id: tweakCard
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.margins: Style.space(12)
-      spacing: Style.space(10)
+    FontMetrics { id: statusMetrics; font: statusText.font }
 
-      Text {
-        width: parent.width
-        wrapMode: Text.WordWrap
-        text: "What's off about " + (panel.tweakTheme ? panel.tweakTheme.label : "this style") + "?"
-        color: dim
-        font.family: panel.bar.fontFamily
-        font.pixelSize: Style.font.caption
-      }
-
-      // Not bound to the draft for the reason birthDateField isn't (see
-      // BirthLocationSection): typing would sever it. One-way out instead.
-      ClipboardSafeArea {
-        id: tweakNoteArea
-        width: parent.width
-        height: Math.max(implicitHeight, Style.space(76))
-        placeholderText: "e.g. fewer landscapes, more character close-ups; keep the cel shading"
-        foreground: panel.bar.foreground
-        font.family: panel.bar.fontFamily
-        onTextChanged: panel.tweakNoteDraft = text
-        onVisibleChanged: if (visible) { text = panel.tweakNoteDraft; forceActiveFocus() }
-      }
-
-      // The newest generation's image, when it kept one. Shown even when
-      // that image was made in another style: it can be the example of what
-      // to change towards as easily as what to change away from.
-      Item {
-        width: parent.width
-        height: Math.max(exampleBox.height, exampleLabel.implicitHeight)
-        visible: panel.tweakExampleImage !== ""
-
-        Rectangle {
-          id: exampleBox
-          anchors.left: parent.left
-          anchors.verticalCenter: parent.verticalCenter
-          width: Style.space(16)
-          height: width
-          radius: Style.space(3)
-          color: panel.tweakIncludeExample ? Color.accent : "transparent"
-          border.width: 1
-          border.color: panel.tweakIncludeExample ? Color.accent : Qt.darker(panel.bar.foreground, 1.5)
-
-          Text {
-            anchors.centerIn: parent
-            visible: panel.tweakIncludeExample
-            text: "󰄬"
-            color: panel.bar.background
-            font.family: panel.bar.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-        }
-
-        Text {
-          id: exampleLabel
-          anchors.left: exampleBox.right
-          anchors.leftMargin: Style.space(8)
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          wrapMode: Text.WordWrap
-          text: "Include today's image as an example"
-          color: panel.bar.foreground
-          font.family: panel.bar.fontFamily
-          font.pixelSize: Style.font.caption
-        }
-
-        MouseArea {
-          anchors.fill: parent
-          cursorShape: Qt.PointingHandCursor
-          onClicked: panel.tweakIncludeExample = !panel.tweakIncludeExample
-        }
-      }
-
-      // The primary action, filled with the accent like Set wallpaper.
-      Button {
-        width: parent.width
-        visible: !panel.styleNoAgent
-        text: panel.styleAgentRunning ? "Opening…" : "Tweak with " + Model.agentLabel(panel.defaultAgent)
-        fontSize: Style.font.caption
-        foreground: panel.bar.background
-        color: hot ? Qt.lighter(Color.accent, 1.12) : Color.accent
-        opacity: enabled ? 1 : 0.45
-        enabled: !panel.styleAgentRunning && panel.tweakNoteDraft.trim() !== ""
-        onClicked: panel.tweakStyleWithAgent()
-      }
-
-      Item {
-        width: parent.width
-        height: Math.max(tweakCopyBtn.implicitHeight, undoTweakBtn.implicitHeight)
-
-        Button {
-          id: tweakCopyBtn
-          anchors.left: parent.left
-          width: (parent.width - Style.space(8)) / 2
-          text: "Copy prompt"
-          bordered: true
-          fontSize: Style.font.caption
-          foreground: panel.bar.foreground
-          enabled: !panel.styleCopyRunning && panel.tweakNoteDraft.trim() !== ""
-          opacity: enabled ? 1 : 0.45
-          onClicked: panel.copyTweakPrompt()
-        }
-
-        Button {
-          id: undoTweakBtn
-          anchors.right: parent.right
-          width: tweakCopyBtn.width
-          text: panel.styleUndoRunning ? "Undoing…" : "Undo last tweak"
-          bordered: true
-          fontSize: Style.font.caption
-          foreground: panel.bar.foreground
-          enabled: panel.tweakBackup !== null && !panel.styleUndoRunning
-          opacity: enabled ? 1 : 0.45
-          tooltipText: panel.tweakBackup && panel.tweakBackup.savedAt
-            ? "Restore the version saved " + Qt.formatDateTime(new Date(panel.tweakBackup.savedAt), "MMM d, h:mm AP")
-            : "Nothing to undo yet"
-          onClicked: panel.undoLastTweak()
-        }
-      }
-
-      InfoNote {
-        width: parent.width
-        foreground: panel.bar.foreground
-        fontFamily: panel.bar.fontFamily
-        text: panel.styleNoAgent
-          ? "No default agent is set in Omarchy. Copy prompt puts the theme and your note on the clipboard "
-            + "for any chat model; the current version is saved first."
-          : Model.agentLabelStart(panel.defaultAgent) + " edits this style's files in a terminal and asks "
-            + "before using your API key. The current version is saved first."
-      }
+    readonly property var message: {
+      if (panel.styleActionStatus !== "")
+        return { text: panel.styleActionStatus, error: panel.styleActionStatusIsError, fix: false }
+      if (panel.themeActionStatus !== "")
+        return { text: panel.themeActionStatus, error: panel.themeActionStatusIsError, fix: false }
+      if (panel.failedStyle !== null)
+        return { text: "“" + panel.failedStyle.label + "” failed validation"
+          + (panel.failedStyle.key === panel.shownStyleKey ? ", so runs will fail until it is fixed." : "."),
+          error: true, fix: true }
+      if (panel.configuredStyleMissing)
+        return { text: "Warning: " + Model.missingStyleWarning(panel.configState.artStyle) + ".", error: true, fix: false }
+      if (panel.styleCatalogNotice !== "")
+        return { text: panel.styleCatalogNotice, error: true, fix: false }
+      if (panel.generateError !== "")
+        return { text: "Last run error: " + panel.generateError, error: true, fix: false }
+      return null
     }
-  }
-
-  Text {
-    visible: panel.configuredStyleMissing
-    width: parent.width
-    wrapMode: Text.WordWrap
-    text: "Warning: " + Model.missingStyleWarning(panel.configState.artStyle) + "."
-    color: urgent
-    font.family: panel.bar.fontFamily
-    font.pixelSize: Style.font.caption
-  }
-
-  Text {
-    visible: panel.styleCatalogNotice !== ""
-    width: parent.width
-    wrapMode: Text.WordWrap
-    text: panel.styleCatalogNotice
-    color: urgent
-    font.family: panel.bar.fontFamily
-    font.pixelSize: Style.font.caption
-  }
-
-  // ---- A theme that failed validation: what is wrong, and the ways to get
-  // it fixed. ----------------------------------------------------------------
-  Column {
-    width: parent.width
-    spacing: Style.space(6)
-    visible: panel.failedStyle !== null
 
     Text {
-      width: parent.width
+      id: statusText
+      anchors.left: parent.left
+      anchors.right: detailsBtn.visible ? detailsBtn.left : parent.right
+      anchors.rightMargin: detailsBtn.visible ? Style.space(8) : 0
+      anchors.top: parent.top
       wrapMode: Text.WordWrap
-      text: panel.failedStyle
-        ? "“" + panel.failedStyle.label + "” failed validation and can't be used for a generation"
-          + (panel.failedStyle.key === panel.shownStyleKey ? " (it is the configured style, so runs will fail until it is fixed)" : "")
-          + ":\n" + panel.failedStyle.errors.map(function(e) { return "• " + e }).join("\n")
-        : ""
-      color: urgent
+      maximumLineCount: 2
+      elide: Text.ElideRight
+      text: statusSlot.message ? statusSlot.message.text : ""
+      color: statusSlot.message && statusSlot.message.error ? section.urgent : section.dim
       font.family: panel.bar.fontFamily
       font.pixelSize: Style.font.caption
-    }
 
-    Flow {
-      width: parent.width
-      spacing: Style.space(8)
-
-      Button {
-        visible: !Model.styleOnlyNeedsPreview(panel.failedStyle) && panel.defaultAgent !== ""
-        text: panel.styleAgentRunning ? "Opening…" : "Fix with AI"
-        bordered: true
-        fontSize: Style.font.caption
-        foreground: panel.bar.foreground
-        enabled: !panel.styleAgentRunning
-        onClicked: panel.fixStyleWithAgent(panel.failedStyle)
+      MouseArea {
+        id: statusMouse
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.NoButton
       }
 
-      Button {
-        visible: !Model.styleOnlyNeedsPreview(panel.failedStyle)
-        text: "Copy fix prompt"
-        bordered: true
-        fontSize: Style.font.caption
-        foreground: panel.bar.foreground
-        enabled: !panel.styleCopyRunning
-        onClicked: panel.copyStyleFixPrompt(panel.failedStyle)
-      }
-
-      // Missing only its preview: render one, cost shown first.
-      Button {
-        visible: panel.failedStyle !== null && panel.failedStyle.source === "user"
-          && Model.styleOnlyNeedsPreview(panel.failedStyle)
-        text: panel.styleRenderKey === (panel.failedStyle ? panel.failedStyle.key : "") && panel.styleRenderEstimate
-          ? panel.styleRenderButtonText() : "Render a preview…"
-        bordered: true
-        fontSize: Style.font.caption
-        foreground: panel.bar.foreground
-        enabled: !panel.styleRenderRunning && !panel.styleEstimateRunning
-        onClicked: {
-          if (panel.styleRenderKey === panel.failedStyle.key && panel.styleRenderEstimate) panel.renderStylePreview()
-          else panel.estimateStyleRender(panel.failedStyle)
-        }
-      }
-
-      // A missing preview is itself a validation error, so a failed user
-      // theme needs this here too.
-      Button {
-        visible: panel.failedStyle !== null && panel.failedStyle.source === "user"
-        text: panel.stylePreviewRunning ? "Choosing…" : "Change preview"
-        bordered: true
-        fontSize: Style.font.caption
-        foreground: panel.bar.foreground
-        enabled: !panel.stylePreviewRunning
-        onClicked: panel.changeStylePreview(panel.failedStyle.key)
+      // The whole message, when two lines cut it short.
+      PanelToolTip {
+        visible: statusMouse.containsMouse && statusText.truncated
+        text: statusText.text
       }
     }
-  }
 
-  // ---- Create a new style: the expander. --------------------------------
-  Button {
-    id: createToggle
-    width: parent.width
-    leftAlign: true
-    iconText: "󰐕"
-    iconSize: Style.font.caption
-    text: "Create a new style"
-    fontSize: Style.font.bodySmall
-    foreground: panel.bar.foreground
-    onClicked: panel.toggleStyleCreate()
-
-    Text {
-      anchors.right: parent.right
-      anchors.rightMargin: Style.spacing.controlPaddingX
-      anchors.verticalCenter: parent.verticalCenter
-      text: panel.styleCreateMode !== "" ? "󰅃" : "󰅀"
-      color: faint
-      font.family: panel.bar.fontFamily
-      font.pixelSize: Style.font.body
-    }
-  }
-
-  // The open expander: one card holding whichever flow is showing.
-  Rectangle {
-    width: parent.width
-    visible: panel.styleCreateMode !== ""
-    height: createCard.implicitHeight + Style.space(12) * 2
-    radius: Style.cornerRadius
-    color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.04)
-    border.width: 1
-    border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.15)
-
-    Column {
-      id: createCard
-      anchors.left: parent.left
+    PanelButton {
+      id: detailsBtn
       anchors.right: parent.right
       anchors.top: parent.top
-      anchors.margins: Style.space(12)
-      spacing: Style.space(10)
-
-      // ---- Create: one line, then the default agent or a prompt for any
-      // chat model. ---------------------------------------------------------
-      Column {
-        width: parent.width
-        spacing: Style.space(10)
-        visible: panel.styleCreateMode === "create"
-
-        // Until a launch finds none, the agent is assumed and named by its
-        // display name ("your agent" before detection answers).
-        readonly property bool hasAgent: !panel.styleNoAgent
-
-        Text {
-          width: parent.width
-          wrapMode: Text.WordWrap
-          text: "Describe the style in one line"
-          color: dim
-          font.family: panel.bar.fontFamily
-          font.pixelSize: Style.font.caption
-        }
-
-        ClipboardSafeField {
-          id: styleIdeaField
-          width: parent.width
-          maximumLength: 200
-          placeholderText: "e.g. 1920s art deco travel posters"
-          foreground: panel.bar.foreground
-          font.family: panel.bar.fontFamily
-          text: panel.styleIdeaDraft
-          onTextChanged: panel.styleIdeaDraft = text
-          Keys.onReturnPressed: panel.defaultAgent !== "" ? panel.createStyleWithAgent() : panel.copyCreatePrompt()
-          Keys.onEnterPressed: panel.defaultAgent !== "" ? panel.createStyleWithAgent() : panel.copyCreatePrompt()
-        }
-
-        // The primary action, filled with the accent like Set wallpaper.
-        Button {
-          width: parent.width
-          visible: parent.hasAgent
-          text: panel.styleAgentRunning ? "Opening…" : "Create with " + Model.agentLabel(panel.defaultAgent)
-          fontSize: Style.font.caption
-          foreground: panel.bar.background
-          color: hot ? Qt.lighter(Color.accent, 1.12) : Color.accent
-          opacity: enabled ? 1 : 0.45
-          enabled: !panel.styleAgentRunning
-          onClicked: panel.createStyleWithAgent()
-        }
-
-        Item {
-          width: parent.width
-          height: Math.max(copyPromptBtn.implicitHeight, importThemeBtn.implicitHeight)
-
-          Button {
-            id: copyPromptBtn
-            anchors.left: parent.left
-            width: (parent.width - Style.space(8)) / 2
-            text: "Copy prompt"
-            bordered: true
-            fontSize: Style.font.caption
-            foreground: panel.bar.foreground
-            enabled: !panel.styleCopyRunning
-            onClicked: panel.copyCreatePrompt()
-          }
-
-          Button {
-            id: importThemeBtn
-            anchors.right: parent.right
-            width: copyPromptBtn.width
-            text: "Import theme"
-            bordered: true
-            fontSize: Style.font.caption
-            foreground: panel.bar.foreground
-            onClicked: { panel.styleCreateMode = "import"; panel.styleImportResult = null }
-          }
-        }
-
-        InfoNote {
-          width: parent.width
-          foreground: panel.bar.foreground
-          fontFamily: panel.bar.fontFamily
-          text: parent.hasAgent
-            ? Model.agentLabelStart(panel.defaultAgent) + " writes the theme with you in a terminal, and asks before "
-              + "checking it or rendering its preview with your API key. Copy prompt is for a web chat model."
-            : "No default agent is set in Omarchy. Copy prompt puts everything a chat model needs on the "
-              + "clipboard; paste it into any chat, then bring the file it writes back with Import theme."
-        }
-      }
-
-      // ---- Import theme: the TOML a chat model wrote, from the clipboard
-      // or a file, saved to ~/.config/astro-arc/styles and validated. --------
-      Column {
-        width: parent.width
-        spacing: Style.space(10)
-        visible: panel.styleCreateMode === "import"
-
-        Text {
-          width: parent.width
-          wrapMode: Text.WordWrap
-          text: "Copy the theme your chat model wrote (the whole TOML file, code fences are fine), "
-            + "or choose a .toml file. It is saved to your styles folder and checked."
-          color: dim
-          font.family: panel.bar.fontFamily
-          font.pixelSize: Style.font.caption
-        }
-
-        Item {
-          width: parent.width
-          height: Math.max(importClipboardBtn.implicitHeight, importFileBtn.implicitHeight)
-
-          Button {
-            id: importClipboardBtn
-            anchors.left: parent.left
-            width: (parent.width - Style.space(8)) / 2
-            text: panel.styleImportRunning ? "Importing…" : "From clipboard"
-            bordered: true
-            fontSize: Style.font.caption
-            foreground: panel.bar.foreground
-            enabled: !panel.styleImportRunning
-            onClicked: panel.importStyle(true)
-          }
-
-          Button {
-            id: importFileBtn
-            anchors.right: parent.right
-            width: importClipboardBtn.width
-            text: "Choose file…"
-            bordered: true
-            fontSize: Style.font.caption
-            foreground: panel.bar.foreground
-            enabled: !panel.styleImportRunning
-            onClicked: panel.importStyle(false)
-          }
-        }
-
-        Button {
-          text: "‹ Back to create"
-          fontSize: Style.font.caption
-          foreground: dim
-          onClicked: { panel.styleCreateMode = "create"; panel.styleImportResult = null }
-        }
-
-        // Failed: the errors as one block to paste back into the chat.
-        Column {
-          width: parent.width
-          spacing: Style.space(6)
-          visible: panel.styleImportResult !== null && panel.styleImportResult.errors.length > 0
-
-          Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: panel.styleImportResult
-              ? "“" + panel.styleImportResult.label + "” was saved but failed validation. Paste this back into your chat:"
-              : ""
-            color: urgent
-            font.family: panel.bar.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          Rectangle {
-            width: parent.width
-            height: importErrorsText.implicitHeight + Style.space(12)
-            color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.06)
-            border.width: 1
-            border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.2)
-
-            Text {
-              id: importErrorsText
-              anchors.fill: parent
-              anchors.margins: Style.space(6)
-              wrapMode: Text.WordWrap
-              text: panel.styleImportResult ? panel.styleImportResult.fixBlock : ""
-              color: panel.bar.foreground
-              font.family: "monospace"
-              font.pixelSize: Style.font.caption
-            }
-          }
-
-          Row {
-            spacing: Style.space(8)
-
-            Button {
-              text: "Copy errors"
-              bordered: true
-              fontSize: Style.font.caption
-              foreground: panel.bar.foreground
-              onClicked: panel.copyImportErrors()
-            }
-
-            Button {
-              visible: panel.defaultAgent !== ""
-              text: panel.styleAgentRunning ? "Opening…" : "Fix with AI"
-              bordered: true
-              fontSize: Style.font.caption
-              foreground: panel.bar.foreground
-              enabled: !panel.styleAgentRunning
-              onClicked: panel.fixStyleWithAgent(panel.styleImportResult)
-            }
-          }
-        }
-
-        // Valid but for its preview: render one (cost first) or pick an image.
-        Column {
-          width: parent.width
-          spacing: Style.space(6)
-          visible: panel.styleImportResult !== null && panel.styleImportResult.errors.length === 0
-            && panel.styleImportResult.needsPreview
-
-          Text {
-            width: parent.width
-            wrapMode: Text.WordWrap
-            text: panel.styleImportResult
-              ? "“" + panel.styleImportResult.label + "” is valid. It needs a preview image: render one "
-                + "with your image model and settings"
-                + (panel.styleRenderEstimate && panel.styleRenderEstimate.line ? " (" + panel.styleRenderEstimate.model
-                   + ", " + panel.styleRenderEstimate.quality + ")" : "")
-                + ", or choose an image you have."
-              : ""
-            color: dim
-            font.family: panel.bar.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          Flow {
-            width: parent.width
-            spacing: Style.space(8)
-
-            Button {
-              text: panel.styleRenderButtonText()
-              bordered: true
-              fontSize: Style.font.caption
-              foreground: panel.bar.foreground
-              enabled: panel.styleRenderEstimate !== null && !panel.styleRenderRunning
-              onClicked: panel.renderStylePreview()
-            }
-
-            Button {
-              text: panel.stylePreviewRunning ? "Choosing…" : "Choose an image…"
-              bordered: true
-              fontSize: Style.font.caption
-              foreground: panel.bar.foreground
-              enabled: !panel.stylePreviewRunning && !panel.styleRenderRunning
-              onClicked: panel.changeStylePreview(panel.styleImportResult.key)
-            }
-          }
-        }
-      }
+      visible: statusSlot.message !== null && statusSlot.message.fix
+      text: "Details 󰅂"
+      fontSize: Style.font.caption
+      foreground: panel.bar.foreground
+      onClicked: panel.openView("fix")
     }
-  }
-
-  Text {
-    visible: panel.styleActionStatus !== ""
-    width: parent.width
-    wrapMode: Text.WordWrap
-    text: panel.styleActionStatus
-    color: panel.styleActionStatusIsError ? urgent : dim
-    font.family: panel.bar.fontFamily
-    font.pixelSize: Style.font.caption
   }
 }

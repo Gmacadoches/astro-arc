@@ -436,6 +436,11 @@ function parseReviewsIndex(raw) {
         // ones have the label alone, which reviewStyleKey matches instead.
         artStyle: typeof r.artStyle === "string" ? r.artStyle : "",
         artStyleLabel: typeof r.artStyleLabel === "string" ? r.artStyleLabel : "",
+        // The reading saved with this generation, so browsing back shows the
+        // reading that went with each image. "" on entries built before
+        // generations.json carried it.
+        distillation: typeof r.distillation === "string" ? r.distillation : "",
+        narrativePosition: typeof r.narrativePosition === "string" ? r.narrativePosition : "",
         imagePath: r.hasThemeSnapshot ? entryDir + "/theme/backgrounds/background.png" : ""
       }
     })

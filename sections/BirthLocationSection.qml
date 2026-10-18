@@ -144,7 +144,7 @@ Column {
         }
       }
 
-      Button {
+      PanelButton {
         id: changeBtn
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -188,7 +188,7 @@ Column {
           }
         }
 
-        Button {
+        PanelButton {
           id: cancelBtn
           text: panel.savingLocation ? "…" : "✕"
           bordered: true

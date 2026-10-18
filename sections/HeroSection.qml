@@ -1,27 +1,51 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "../Model.js" as Model
 
-// Hero: the shared PanelHero, same as every other built-in popup uses.
-// Main view: ✦ (✵ while generating) · Astro-Arc · status, and a gear that
-// opens the settings view. Settings view: a back button and "Settings" —
-// nothing trailing, since back is the one way out.
+// Hero: the shared PanelHero, same as every other built-in popup uses, and
+// the one row every view keeps. Main view: ✦ (✵ while generating) ·
+// Astro-Arc · state · schedule · last run, and a gear into Settings. Any
+// other view: a back button, the view's title and a line about it — nothing
+// trailing, since back is the way out (Escape works too).
 PanelHero {
+  id: hero
   required property var panel
 
+  readonly property bool drilledIn: panel.view !== "main"
+  readonly property string agentName: Model.agentLabel(panel.defaultAgent)
+
   width: parent.width
-  title: panel.showSettings ? "Settings" : "Astro-Arc"
-  meta: panel.showSettings ? "" : panel.heroStatus
+  title: {
+    switch (panel.view) {
+    case "settings": return "Settings"
+    case "tweak": return "Tweak " + (panel.tweakTheme ? panel.tweakTheme.label : "style")
+    case "create": return panel.styleCreateMode === "import" ? "Import a theme" : "Create a new style"
+    case "browse": return "History"
+    case "fix": return "Fix " + (panel.failedStyle ? panel.failedStyle.label : "style")
+    default: return "Astro-Arc"
+    }
+  }
+  meta: {
+    switch (panel.view) {
+    case "settings": return ""
+    case "tweak": return "Custom style · with " + agentName
+    case "create": return panel.styleCreateMode === "import" ? "From a chat model's reply" : "With " + agentName + " or any chat model"
+    case "browse": return panel.reviewsIndex.length + " image" + (panel.reviewsIndex.length === 1 ? "" : "s")
+    case "fix": return "Failed validation"
+    default: return panel.heroStatus
+    }
+  }
   foreground: panel.bar.foreground
   fontFamily: panel.bar.fontFamily
   iconComponent: Component {
     Item {
-      implicitWidth: panel.showSettings ? backBtn.implicitWidth : starText.implicitWidth
-      implicitHeight: panel.showSettings ? backBtn.implicitHeight : starText.implicitHeight
+      implicitWidth: hero.drilledIn ? backBtn.implicitWidth : starText.implicitWidth
+      implicitHeight: hero.drilledIn ? backBtn.implicitHeight : starText.implicitHeight
 
       Text {
         id: starText
-        visible: !panel.showSettings
+        visible: !hero.drilledIn
         text: panel.generating ? "✵" : "✦"
         color: Color.accent
         font.family: panel.bar.fontFamily
@@ -30,25 +54,27 @@ PanelHero {
 
       PanelActionButton {
         id: backBtn
-        visible: panel.showSettings
+        visible: hero.drilledIn
         iconText: "󰅁"
         bordered: true
+        focusable: true
         fontSize: Style.font.body
         foreground: panel.bar.foreground
         tooltipText: "Back"
-        onClicked: panel.toggleSettings()
+        onClicked: panel.goBack()
       }
     }
   }
   trailingControl: Component {
     PanelActionButton {
-      visible: !panel.showSettings
+      visible: !hero.drilledIn
       iconText: "󰒓"
       bordered: true
+      focusable: true
       fontSize: Style.font.body
       foreground: panel.bar.foreground
       tooltipText: "Settings"
-      onClicked: panel.toggleSettings()
+      onClicked: panel.openView("settings")
     }
   }
 }

@@ -25,18 +25,19 @@ Column {
     width: parent.width
     height: frequencyDropdown.implicitHeight
 
-    Dropdown {
+    PanelPicker {
       id: frequencyDropdown
       anchors.left: parent.left
       anchors.right: hourly ? intervalEveryLabel.left : parent.right
       anchors.rightMargin: hourly ? Style.space(8) : 0
       anchors.verticalCenter: parent.verticalCenter
-      showLabel: false
+      bounds: panel.contentArea
+      foreground: panel.bar.foreground
+      fontFamily: panel.bar.fontFamily
       value: panel.configState.frequency
       options: Model.FREQUENCY_CHOICES.map(function(c) {
         return { value: c.key, label: c.label }
       })
-      foreground: panel.bar.foreground
       onChanged: function(value) { panel.commitFrequency(value) }
     }
 
@@ -52,18 +53,19 @@ Column {
       font.pixelSize: Style.font.bodySmall
     }
 
-    Dropdown {
+    PanelPicker {
       id: intervalHoursDropdown
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       width: Style.space(64)
       visible: hourly
-      showLabel: false
+      bounds: panel.contentArea
+      foreground: panel.bar.foreground
+      fontFamily: panel.bar.fontFamily
       value: String(panel.configState.intervalHours)
       options: Model.INTERVAL_HOURS_CHOICES.map(function(n) {
         return { value: String(n), label: n + "h" }
       })
-      foreground: panel.bar.foreground
       onChanged: function(value) { panel.commitIntervalHours(value) }
     }
   }

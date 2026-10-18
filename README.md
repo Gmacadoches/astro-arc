@@ -41,7 +41,8 @@ same day's reading, rendered in each:
 A style is one file, and you don't have to write it. Your Omarchy default agent
 writes it with you:
 
-1. Under **Style** in the panel, open **Create a new style**.
+1. Open the style picker in the panel and choose **+ Create a new style…** at
+   the bottom of the list.
 2. Describe it in one line: *1920s art deco travel posters*, *Dutch Golden Age
    still life*, *1980s arcade cabinet art*.
 3. Click **Create with** *your agent* (Claude Code, Codex, OpenCode, whichever

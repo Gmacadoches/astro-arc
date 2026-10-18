@@ -64,6 +64,9 @@ Panel {
   function close() {
     setCenterHoverRevealSuppressed(false)
     if (root.editingLocation) root.cancelEditingLocation()
+    // Reopening starts on the main view (or Settings, which stays put as
+    // it always has); a half-done drill-in doesn't wait behind the icon.
+    root.closeDrillIns("settings")
     root.controller.hide()
   }
 
@@ -400,22 +403,243 @@ Panel {
     }
   }
 
+  // The schedule in a word or two, for the hero: "Daily", "Every 3 hours",
+  // "Manual".
+  readonly property string scheduleSummary: {
+    var f = root.configState.frequency
+    if (f === "manual") return "Manual"
+    if (f === "hourly") {
+      var s = Model.scheduleLabel(f, root.configState.intervalHours)
+      return s.charAt(0).toUpperCase() + s.slice(1)
+    }
+    var choice = Model.FREQUENCY_CHOICES.filter(function(c) { return c.key === f })[0]
+    return choice ? choice.label : f
+  }
+
   // heroStatus: compact one-line summary shown under the title, matching
-  // the built-in bluetooth/network panels' icon+title+status hero row.
-  // Deliberately says nothing about the schedule — the Frequency dropdown is
-  // the one place that reports it, and having the status line repeat it only
-  // made a cadence look like something this line was reporting *on*.
-  //
-  // Carries the last run's time, which used to sit on its own line beside
-  // Regenerate: the time alone on a run from today, with the date otherwise.
+  // the built-in bluetooth/network panels' icon+title+status hero row:
+  // state · schedule · last run. The schedule lives here now that the main
+  // view has no footer; the last run's time is the time alone on a run from
+  // today, with the date otherwise.
   readonly property string heroStatus: root.generating
-    ? "Generating…"
+    ? "Generating… · " + root.scheduleSummary
     : (root.lastRun
-      ? "Up to date · Last run " + Model.formatGeneratedAt(root.lastRun.generatedAt, function(d) {
+      ? "Up to date · " + root.scheduleSummary + " · " + Model.formatGeneratedAt(root.lastRun.generatedAt, function(d) {
           var today = new Date()
           return Qt.formatDateTime(d, d.toDateString() === today.toDateString() ? "h:mm AP" : "MMM d, h:mm AP")
         })
-      : "Not generated yet")
+      : "Not generated yet · " + root.scheduleSummary)
+
+  // ---- Views. One KeyboardPanel, one fixed height: the main view, or one
+  // drill-in at a time — Settings, Tweak, Create, History (Browse all) and
+  // Fix (a style that failed validation) — each with a back button. Each has
+  // its own flag, so the logic that opens and closes them stays where it
+  // was; `view` only says which one is showing. -----------------------------
+  property bool browseOpen: false
+  property bool fixOpen: false
+  readonly property string view: showSettings ? "settings"
+    : tweakOpen ? "tweak"
+    : styleCreateMode !== "" ? "create"
+    : browseOpen ? "browse"
+    : fixOpen ? "fix"
+    : "main"
+
+  // Close every drill-in but `keep`, so opening one never leaves another
+  // underneath it.
+  function closeDrillIns(keep) {
+    if (keep !== "settings" && showSettings) toggleSettings()
+    if (keep !== "tweak") tweakOpen = false
+    if (keep !== "create" && styleCreateMode !== "") { styleCreateMode = ""; styleImportResult = null }
+    if (keep !== "browse") browseOpen = false
+    if (keep !== "fix") fixOpen = false
+  }
+
+  function openView(name) {
+    navReturnItem = navCurrentItem()
+    closeDrillIns(name)
+    styleActionStatus = ""
+    if (name === "settings" && !showSettings) toggleSettings()
+    else if (name === "tweak") { tweakOpen = true; tweakBackupFile.reload() }
+    else if (name === "create") { styleNoAgent = false; styleCreateMode = "create" }
+    else if (name === "browse") browseOpen = true
+    else if (name === "fix") fixOpen = true
+    Qt.callLater(navReset)
+  }
+
+  // Back to the main view, focus returned to whatever opened the drill-in.
+  function goBack() {
+    closeDrillIns("")
+    var back = navReturnItem
+    navReturnItem = null
+    Qt.callLater(function() {
+      if (back && back.visible) back.forceActiveFocus()
+      else navReset()
+    })
+  }
+
+  // ---- Main view: browsing generations with ‹ › and the thumbnail strip.
+  readonly property int selectedIndex: {
+    for (var i = 0; i < reviewsIndex.length; i++)
+      if (reviewsIndex[i].id === selectedReviewId) return i
+    return -1
+  }
+
+  function showOlder() {
+    if (selectedIndex >= 0 && selectedIndex < reviewsIndex.length - 1)
+      selectedReviewId = reviewsIndex[selectedIndex + 1].id
+  }
+
+  function showNewer() {
+    if (selectedIndex > 0) selectedReviewId = reviewsIndex[selectedIndex - 1].id
+  }
+
+  // The reading saved with the selected generation; for the newest, an
+  // entry from before generations.json carried readings falls back to
+  // last-run.json, which is the same run.
+  readonly property string selectedReading: selectedReview && selectedReview.distillation !== ""
+    ? selectedReview.distillation
+    : ((selectedIsNewest || reviewsIndex.length === 0) && lastRun ? lastRun.distillation : "")
+  readonly property string selectedPosition: selectedReview && selectedReview.distillation !== ""
+    ? selectedReview.narrativePosition
+    : ((selectedIsNewest || reviewsIndex.length === 0) && lastRun ? lastRun.narrativePosition : "")
+
+  // "Oct 17 · 8:40 PM" and "Dragon Ball Z" for a generation's caption.
+  function reviewWhen(review) {
+    if (!review || review.createdAt === "") return review ? review.label : ""
+    var d = new Date(review.createdAt)
+    return isNaN(d.getTime()) ? review.label : Qt.formatDateTime(d, "MMM d · h:mm AP")
+  }
+
+  function reviewStyleLabel(review) {
+    if (!review) return ""
+    if (review.artStyleLabel !== "") return review.artStyleLabel
+    var style = Model.findStyle(styleCatalog, Model.reviewStyleKey(review, styleCatalog))
+    return style ? style.label : ""
+  }
+
+  // ---- Keyboard navigation. Every control in the showing view takes focus
+  // (Tab, or the arrows by position); Enter/Space activate it, Escape goes
+  // back a view or closes. A focused control keeps the keys it uses itself
+  // (text fields their typing and caret keys, the image its ‹ ›), and only
+  // what it ignores reaches PanelKeyCatcher. -------------------------------
+  property var navReturnItem: null
+  // The showing view's root, and its Flickable (so a control moved to is
+  // scrolled into sight; the history grid scrolls itself).
+  readonly property Item navRoot: view === "settings" ? settingsColumn
+    : view === "tweak" ? tweakView
+    : view === "create" ? createView
+    : view === "fix" ? fixView
+    : view === "browse" ? browseView
+    : mainColumn
+  readonly property Item navFlick: view === "settings" ? settingsFlick
+    : view === "tweak" ? tweakFlick
+    : view === "create" ? createFlick
+    : view === "fix" ? fixFlick
+    : view === "browse" ? null
+    : mainFlick
+  // What popups and pickers must stay inside: the area under the hero.
+  readonly property Item contentArea: viewArea
+  // The main view's height, latched while it shows (see mainColumn), and
+  // the gap between the hero and the views.
+  property real mainViewHeight: 0
+  readonly property int viewGap: Style.space(14)
+
+  // A fixed style leaves its Fix view with nothing to show.
+  onFailedStyleChanged: if (fixOpen && failedStyle === null) goBack()
+
+  // A control loses focus when its view hides; whatever changed the view,
+  // the keys must still reach the catcher afterwards.
+  onViewChanged: Qt.callLater(function() {
+    if (root.opened && !root.navCurrentItem()) keyCatcher.forceActiveFocus()
+  })
+
+  function navCandidates() {
+    var out = []
+    function walk(item) {
+      if (!item || !item.visible) return
+      if (item.activeFocusOnTab && item.enabled !== false && item.width > 0 && item.height > 0) out.push(item)
+      var kids = item.children
+      for (var i = 0; i < kids.length; i++) walk(kids[i])
+    }
+    walk(heroSection)
+    walk(navRoot)
+    return out
+  }
+
+  function navCurrentItem() {
+    var c = navCandidates()
+    for (var i = 0; i < c.length; i++) if (c[i].activeFocus) return c[i]
+    return null
+  }
+
+  function navFocus(item) {
+    if (!item) return
+    item.forceActiveFocus()
+    // Scroll a control in a scrolling view into sight.
+    if (navFlick && navFlick.contentItem && item !== navFlick) {
+      var p = item.mapToItem(navFlick.contentItem, 0, 0)
+      if (p.y < navFlick.contentY) navFlick.contentY = Math.max(0, p.y - Style.space(8))
+      else if (p.y + item.height > navFlick.contentY + navFlick.height)
+        navFlick.contentY = Math.min(Math.max(0, navFlick.contentHeight - navFlick.height),
+                                     p.y + item.height - navFlick.height + Style.space(8))
+    }
+  }
+
+  // A view just appeared: nothing in it is focused, keys go to the catcher.
+  function navReset() {
+    if (navFlick) navFlick.contentY = 0
+    keyCatcher.forceActiveFocus()
+  }
+
+  function navTab(direction) {
+    var c = navCandidates()
+    if (c.length === 0) return
+    var i = c.indexOf(navCurrentItem())
+    if (i < 0) navFocus(direction > 0 ? c[0] : c[c.length - 1])
+    else navFocus(c[(i + direction + c.length) % c.length])
+  }
+
+  // Spatial: the nearest control in the arrow's direction, preferring ones in
+  // line with the current one (same row for ←→, same column for ↑↓).
+  function navMove(dx, dy) {
+    var c = navCandidates()
+    var cur = navCurrentItem()
+    if (!cur) {
+      // Nothing focused yet: ←→ browse the generations on the main view,
+      // ↑↓ start at the top or the bottom.
+      if (dx !== 0 && view === "main") { if (dx < 0) showOlder(); else showNewer(); return }
+      if (c.length > 0) navFocus(dy < 0 ? c[c.length - 1] : c[0])
+      return
+    }
+    var base = keyCatcher
+    var a = cur.mapToItem(base, 0, 0)
+    var best = null, bestScore = Infinity
+    for (var i = 0; i < c.length; i++) {
+      if (c[i] === cur) continue
+      var b = c[i].mapToItem(base, 0, 0)
+      var along, across
+      if (dx !== 0) {
+        // Horizontal neighbours must overlap the current row.
+        if (b.y + c[i].height <= a.y + 2 || b.y >= a.y + cur.height - 2) continue
+        along = dx > 0 ? b.x - (a.x + cur.width) : a.x - (b.x + c[i].width)
+        across = Math.abs((b.y + c[i].height / 2) - (a.y + cur.height / 2))
+      } else {
+        along = dy > 0 ? b.y - (a.y + cur.height) : a.y - (b.y + c[i].height)
+        var overlap = Math.min(a.x + cur.width, b.x + c[i].width) - Math.max(a.x, b.x)
+        across = overlap > 0 ? 0 : -overlap
+      }
+      if (along < -2) continue
+      var score = Math.max(0, along) + across * 2
+      if (score < bestScore) { bestScore = score; best = c[i] }
+    }
+    if (best) navFocus(best)
+  }
+
+  // Escape: a drill-in goes back; the main view closes the panel.
+  function navEscape() {
+    if (view !== "main") goBack()
+    else close()
+  }
 
   // ---- Settings sub-view (image backend/model, Stage 1/2 models, API
   // keys) -------------------------------------------------------------------
@@ -979,9 +1203,9 @@ Panel {
   function pickArtStyle(value) {
     root.styleActionStatus = ""
     if (value === Model.STYLE_CREATE || value === Model.STYLE_IMPORT) {
-      root.styleCreateMode = value === Model.STYLE_CREATE ? "create" : "import"
+      root.openView("create")
+      if (value === Model.STYLE_IMPORT) root.styleCreateMode = "import"
       root.styleImportResult = null
-      root.styleNoAgent = false
       styleSection.styleDropdown.value = root.shownStyleKey
       return
     }
@@ -990,6 +1214,8 @@ Panel {
     if (row && !row.valid) {
       root.inspectedStyleKey = value
       styleSection.styleDropdown.value = root.shownStyleKey
+      // Its errors and fixes are a drill-in now.
+      root.openView("fix")
       return
     }
     root.inspectedStyleKey = ""
@@ -1083,15 +1309,10 @@ Panel {
     onPathChanged: root.tweakBackup = null
   }
 
+  // A drill-in view now (openView reloads the backup state on the way in).
   function toggleTweak() {
-    root.styleActionStatus = ""
-    root.tweakOpen = !root.tweakOpen
-    // One expander at a time under the picker.
-    if (root.tweakOpen) {
-      root.styleCreateMode = ""
-      root.styleImportResult = null
-      root.tweakBackupFile.reload()
-    }
+    if (root.tweakOpen) root.goBack()
+    else root.openView("tweak")
   }
 
   function tweakArgs() {
@@ -1547,15 +1768,8 @@ Panel {
   // The "Create a new style" expander. Open means a create or import flow is
   // showing; closing it drops a half-finished import result.
   function toggleStyleCreate() {
-    styleActionStatus = ""
-    styleImportResult = null
-    if (styleCreateMode !== "") {
-      styleCreateMode = ""
-    } else {
-      styleNoAgent = false
-      styleCreateMode = "create"
-      tweakOpen = false
-    }
+    if (styleCreateMode !== "") goBack()
+    else openView("create")
   }
 
   // ---- Save Selected Theme: exports the selected entry's theme snapshot
@@ -1822,70 +2036,87 @@ Panel {
     // Same 380px as the agents/bluetooth/network/audio panels, so Astro-Arc
     // reads as one of the family instead of a narrower one-off.
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight)
+    // One height for every view: the main view's, capped by
+    // fittedContentHeight at the screen height minus the bar (and the gap
+    // and margin around the card). The main view is built from fixed-height
+    // blocks, so browsing doesn't change it either; anything taller than
+    // this scrolls inside its view.
+    contentHeight: panel.fittedContentHeight(heroSection.implicitHeight + root.viewGap + root.mainViewHeight)
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
       blocked: root.editingLocation
-      onCloseRequested: root.close()
-      onTabRequested: function(direction) { root.switchPanel(direction) }
+      onCloseRequested: root.navEscape()
+      // Tab stays inside the panel now, cycling its controls (it used to
+      // switch to the neighbouring bar panel).
+      onTabRequested: function(direction) { root.navTab(direction) }
+      onMoveRequested: function(dx, dy) { root.navMove(dx, dy) }
 
-      Flickable {
-        id: scroll
-        anchors.fill: parent
-        contentWidth: width
-        contentHeight: column.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
-        interactive: contentHeight > height
+      // ---- Hero: ✦ · Astro-Arc · status, or back · the view's title ------
+      HeroSection {
+        id: heroSection
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        panel: root
+      }
 
-        Column {
-          id: column
-          // No manual padding here: KeyboardPanel's card already reserves
-          // its own padding (Style.spacing.popupPadding) around
-          // contentHolder. Rows below use label-left/control-right (an
-          // Item with the label anchored left, the control anchored
-          // right) instead of stacking a header above its control —
-          // there's horizontal room in a 320px panel that stacking wasted.
-          width: scroll.width
-          spacing: Style.space(8)
+      // ---- The views, each filling the same area below the hero ----------
+      Item {
+        id: viewArea
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: heroSection.bottom
+        anchors.topMargin: root.viewGap
+        anchors.bottom: parent.bottom
 
-          // ---- Hero: icon · title · status, or back · Settings ------------
-          HeroSection { panel: root }
+        // ================== MAIN VIEW ==================
+        Flickable {
+          id: mainFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "main"
+          contentHeight: mainColumn.implicitHeight
 
-          // ================== MAIN VIEW ==================
-          // Today's image and reading first, then what you pick (style),
-          // then what you browse (history), then where the settings are.
           Column {
+            id: mainColumn
             width: parent.width
-            spacing: Style.space(16)
-            visible: !root.showSettings
+            spacing: Style.space(14)
+
+            // A hidden Column measures 0, so the height every view uses is
+            // taken while this one is showing.
+            function latch() { if (visible && implicitHeight > 0) root.mainViewHeight = implicitHeight }
+            onImplicitHeightChanged: latch()
+            onVisibleChanged: latch()
+            Component.onCompleted: latch()
 
             TodaySection { panel: root }
             PanelSeparator { foreground: root.bar.foreground }
             StyleSection { id: styleSection; panel: root }
-
-            PanelSeparator {
-              visible: root.reviewsIndex.length > 0
-              foreground: root.bar.foreground
-            }
-            HistorySection {
-              panel: root
-              visible: root.reviewsIndex.length > 0
-            }
-
-            PanelSeparator { foreground: root.bar.foreground }
-            FooterSection { panel: root }
           }
+        }
 
-          // ================== SETTINGS VIEW ==================
-          // Only what a reading needs. Everything else is in the Advanced
-          // popout (sections/AdvancedSettingsWindow.qml).
+        // ================== SETTINGS ==================
+        // Only what a reading needs. Everything else is in the Advanced
+        // popout (sections/AdvancedSettingsWindow.qml).
+        Flickable {
+          id: settingsFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "settings"
+          contentHeight: settingsColumn.implicitHeight
+
           Column {
+            id: settingsColumn
             width: parent.width
             spacing: Style.space(16)
-            visible: root.showSettings
 
             BirthLocationSection { id: birthLocationSection; panel: root }
             PanelSeparator { foreground: root.bar.foreground }
@@ -1893,6 +2124,51 @@ Panel {
             PanelSeparator { foreground: root.bar.foreground }
             AdvancedLinkSection { panel: root }
           }
+        }
+
+        // ================== DRILL-INS ==================
+        Flickable {
+          id: tweakFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "tweak"
+          contentHeight: tweakView.implicitHeight
+          TweakView { id: tweakView; panel: root }
+        }
+
+        Flickable {
+          id: createFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "create"
+          contentHeight: createView.implicitHeight
+          CreateView { id: createView; panel: root }
+        }
+
+        Flickable {
+          id: fixFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "fix"
+          contentHeight: fixView.implicitHeight
+          FixView { id: fixView; panel: root }
+        }
+
+        // Scrolls its own grid, so it takes the area as it is.
+        BrowseView {
+          id: browseView
+          visible: root.view === "browse"
+          panel: root
+          availableHeight: viewArea.height
         }
       }
     }
