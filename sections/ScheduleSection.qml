@@ -7,6 +7,9 @@ import "../Model.js" as Model
 // Hourly, and what a schedule actually promises.
 Column {
   required property var panel
+  // Panel.qml re-syncs these when the config file changes underneath them.
+  property alias frequencyDropdown: frequencyDropdown
+  property alias intervalHoursDropdown: intervalHoursDropdown
 
   readonly property bool hourly: panel.configState.frequency === "hourly"
 

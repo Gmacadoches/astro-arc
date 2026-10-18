@@ -300,10 +300,10 @@ Panel {
   Connections {
     target: root
     function onConfigStateChanged() {
-      if (frequencyDropdown.value !== root.configState.frequency)
-        frequencyDropdown.value = root.configState.frequency
-      if (intervalHoursDropdown.value !== String(root.configState.intervalHours))
-        intervalHoursDropdown.value = String(root.configState.intervalHours)
+      if (scheduleSection.frequencyDropdown.value !== root.configState.frequency)
+        scheduleSection.frequencyDropdown.value = root.configState.frequency
+      if (scheduleSection.intervalHoursDropdown.value !== String(root.configState.intervalHours))
+        scheduleSection.intervalHoursDropdown.value = String(root.configState.intervalHours)
     }
   }
 
@@ -1798,7 +1798,7 @@ Panel {
 
             BirthLocationSection { id: birthLocationSection; panel: root }
             PanelSeparator { foreground: root.bar.foreground }
-            ScheduleSection { panel: root }
+            ScheduleSection { id: scheduleSection; panel: root }
             PanelSeparator { foreground: root.bar.foreground }
             AdvancedLinkSection { panel: root }
           }
