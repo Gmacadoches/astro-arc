@@ -35,4 +35,4 @@ CHANGELOG.md
 STYLE-OVERHAUL.md
 
 # /brag launch-video output (video, stills, share copy): local, not plugin code.
-brag-output/
+brag-output*/
