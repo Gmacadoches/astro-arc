@@ -194,9 +194,9 @@ Column {
     fontFamily: panel.bar.fontFamily
     text: !panel.agentCanLaunch
       ? panel.agentWontLaunch + " Copy prompt puts the theme and your note on the clipboard for any chat "
-        + "model; the current version is saved first."
+        + "model; importing the reply saves the current version first."
       : Model.agentLabelStart(panel.defaultAgent) + " edits this style in a terminal, one step at a time: it "
-        + "asks you before each change, and anything that uses your API key waits for you to approve its cost "
-        + "in a dialog. It sees your recent readings and the example image. The current version is saved first."
+        + "asks you before each change and before anything that uses your API key, telling you the cost first. "
+        + "It sees your recent readings and the example image. The current version is saved first."
   }
 }

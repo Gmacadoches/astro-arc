@@ -96,8 +96,8 @@ Column {
       fontFamily: panel.bar.fontFamily
       text: parent.hasAgent
         ? Model.agentLabelStart(panel.defaultAgent) + " writes the theme with you in a terminal, one step at "
-          + "a time: it asks you before each change, and anything that uses your API key waits for you to "
-          + "approve its cost in a dialog. It sees your recent readings while it tests the theme. "
+          + "a time: it asks you before each change and before anything that uses your API key, telling you "
+          + "the cost first. It sees your recent readings while it tests the theme. "
           + "Copy prompt is for a web chat model."
         : panel.agentWontLaunch + " Copy prompt puts everything a chat model needs on the clipboard; paste it "
           + "into any chat, then bring the file it writes back with Import theme."

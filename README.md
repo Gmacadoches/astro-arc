@@ -54,11 +54,11 @@ time: it writes the world (its era, materials, inhabitants, myths, light and
 technique), validates it, test-writes real prompts from your own recent days,
 has a blind judge check that hard days still read as hard and soft days as
 soft, and renders the preview image. Astro-Arc starts the agent in its mode
-that asks you before each change it makes — never in an auto-approve, "yolo"
-or allow-all mode — and every step that spends API credit opens a dialog on
-your screen with its cost: nothing is spent unless you click **Spend** there
-yourself, which the agent cannot do for you. When it is done, the style is in
-the list as **"Your Style · custom"**, and it generates like any built-in one.
+that asks you before every command and change — never in an auto-approve,
+"yolo" or allow-all mode — and before any step that spends API credit it tells
+you the cost and waits for your yes. Every file it writes, renders included,
+it shows you by its full path. When it is done, the style is in the list as
+**"Your Style · custom"**, and it generates like any built-in one.
 
 Astro-Arc starts **Claude Code, Codex, Gemini and Grok** this way (Codex in its
 read-only sandbox, so anything it changes needs your approval). An agent that

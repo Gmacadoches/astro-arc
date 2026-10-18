@@ -26,7 +26,8 @@
         idea or the broken file and its errors.
     astro-arc-style tweak-prompt <file> --note TEXT [--example IMAGE] [--copy]
         The same for changing a working user theme: the file, what is off
-        about it, and the guide. Backs the theme up first, like agent tweak.
+        about it, and the guide. Nothing is backed up yet: importing the
+        chat's reply over the theme backs it up first, like agent tweak.
     astro-arc-style agent create <idea> | agent fix <file>
                     | agent tweak <file> --note TEXT [--example IMAGE]
         Brief the user's Omarchy default agent in a new terminal, started in
@@ -41,11 +42,12 @@
         On request only: link the skill into each installed agent's skills
         folder so any session can use it, or remove those links again.
 
-Human in the loop, always. Everything that calls a model shows its projected
-cost in a dialog and spends nothing unless the user clicks Spend there — not a
-flag, not a terminal answer, so neither an agent nor a script can say yes for
-them. The plugin itself never asks a model to write a theme; the user's own
-agent or chat does that, one approved step at a time.
+Human in the loop, always. Astro-Arc starts an agent only in its asking mode,
+where the user approves every command it runs; the skill has the agent state a
+paid step's cost first (each such command takes --estimate) and ask. Every
+command prints the full path of each file it writes. The plugin itself never
+asks a model to write a theme; the user's own agent or chat does that, one
+approved step at a time.
 """
 
 import argparse
@@ -56,7 +58,6 @@ import re
 import shutil
 import subprocess
 import sys
-import textwrap
 import tomllib
 from datetime import datetime
 from pathlib import Path
@@ -146,36 +147,16 @@ def is_preview_error(line):
     return ": preview: " in line
 
 
-def confirm(args, cost_line):
-    """Ask the user — the person at the screen, not whoever ran this — before
-    spending. A dialog, because a flag or a terminal answer can be supplied by
-    an agent or a script; a click on Spend can only come from the user. With
-    no way to show the dialog, nothing is spent."""
+def estimate_or_announce(args, cost_line):
+    """With --estimate: print the cost and stop (True means stop). Otherwise
+    print it and go on. The user's approval is not asked here: an agent
+    started by Astro-Arc runs in its asking mode, where the user approves each
+    command — after the skill has had it state this cost with --estimate —
+    and in the panel the cost is on the button that is clicked."""
     # stderr under --json, so stdout stays one JSON document.
-    out = sys.stderr if getattr(args, "json", False) else sys.stdout
+    out = sys.stderr if getattr(args, "json", False) and not args.estimate else sys.stdout
     print(cost_line, file=out)
-    theme = Path(getattr(args, "file", "")).name
-    if not shutil.which("zenity"):
-        print("Nothing spent: asking you needs zenity, which is not installed.", file=out)
-        return False
-    # Compact: the lines are broken here, short, and the window fits them
-    # (--no-wrap). Letting zenity wrap makes GTK size the dialog far taller
-    # than its text. Don't spend has the focus, so a stray Enter spends nothing.
-    lines = [f"Use your OpenAI key{f' for {theme}' if theme else ''}?", ""]
-    lines += textwrap.wrap(cost_line, 46)
-    try:
-        answer = subprocess.run(
-            ["zenity", "--question", "--title=Astro-Arc", "--no-wrap", "--no-markup", "--default-cancel",
-             f"--text={chr(10).join(lines)}", "--ok-label=Spend", "--cancel-label=Don't spend",
-             "--timeout=600"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    except OSError:
-        answer = None
-    if answer is not None and answer.returncode == 0:
-        print("You approved it.", file=out)
-        return True
-    print("Nothing spent: you declined (or the dialog closed). Ask the user what they'd like instead.", file=out)
-    return False
+    return bool(args.estimate)
 
 
 def usd(cost):
@@ -319,8 +300,8 @@ def cmd_preview(args):
     model = config.get("stage2Model") or "gpt-4o-mini"
     n = 3 * len(picked)
     cost = chat_cost(model, len(picked) + n, n)
-    if not confirm(args, f"preview: {n} prompts, no images, on {model}: {usd(cost)}"):
-        return 2
+    if estimate_or_announce(args, f"preview: {n} prompts, no images, on {model}: {usd(cost)}"):
+        return 0
     pairs = register_spread(n, key)
     history, records, spent = [], [], 0.0
     for i, day in enumerate(picked):
@@ -410,9 +391,9 @@ def cmd_meaning(args):
     s2 = chat_cost(model2, 0, MEANING_DAYS)
     jc = judge_cost(model2)
     total = None if None in (replay_cost, s2, jc) else replay_cost + s2 + jc
-    if not confirm(args, f"meaning: {MEANING_DAYS} real days prompts-only ({model1} / {model2}) "
-                         f"and one judge call on {model2}: {usd(total)}"):
-        return 2
+    if estimate_or_announce(args, f"meaning: {MEANING_DAYS} real days prompts-only ({model1} / {model2}) "
+                                  f"and one judge call on {model2}: {usd(total)}"):
+        return 0
     log = (lambda *_: None) if args.json else print
     rows, spent = replay(key, days, config, redraw=True, log=log)
     ids, result, jcost = judge(rows, config)
@@ -425,6 +406,7 @@ def cmd_meaning(args):
         print(json.dumps(verdict, indent=2))
     else:
         print_verdict(verdict)
+        print(f"\nsaved to {verdict['record']}")
     return 0 if verdict["pass"] else 1
 
 
@@ -516,14 +498,9 @@ def cmd_render(args):
                           "line": line}) if args.json else line)
         return 0
     require_usable(key)
-    # The panel shows the estimate on its button first, and this dialog is
-    # still the yes: the same gate for a click in the panel, an agent and a
-    # terminal.
-    if not confirm(args, line):
-        if args.json:
-            print(json.dumps({"ok": False, "declined": True, "error": "Nothing spent: you didn't approve it.",
-                              "line": line}))
-        return 2
+    # The panel shows the estimate on its button, and the click is the yes;
+    # an agent's run was approved by the user as a command.
+    estimate_or_announce(args, line)
     days = real_days(1)
     if not days:
         raise StyleError("no cached daily readings yet; generate a wallpaper first")
@@ -550,8 +527,10 @@ def cmd_render(args):
     if args.json:
         print(json.dumps({"ok": True, "images": images, "preview": preview, "spent": round(spent, 4)}))
         return 0
+    # Every file written, by full path, so the user can open each one.
     for p in images:
         print(f"rendered: {p}")
+        print(f"  its prompt: {Path(p).with_suffix('.txt')}")
     if preview:
         print(f"preview: {preview}")
     else:
@@ -642,13 +621,16 @@ def cmd_import(args):
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{key}.toml"
     replaced = target.exists()
+    backup = ""
     if replaced:
-        shutil.copy2(target, target.with_name(f"{key}.toml.prev"))
+        # A chat's reply replacing a theme (Tweak's Copy prompt comes back
+        # this way): back it up now, so Undo last tweak puts it back.
+        backup = str(backup_files(key, target))
     target.write_text(text)
     errors, warnings = lp.validate_charter(theme_key(target))
     blocking = [e for e in errors if not is_preview_error(e)]
     print(json.dumps({
-        "ok": True, "key": key, "path": str(target), "replaced": replaced,
+        "ok": True, "key": key, "path": str(target), "replaced": replaced, "backup": backup,
         "label": lp.load_styles()[key].label, "errors": blocking, "warnings": warnings,
         "needsPreview": any(is_preview_error(e) for e in errors),
         "fixBlock": fix_block(blocking) if blocking else "",
@@ -720,6 +702,14 @@ def backup_theme(file):
     """Save the theme's files as they are now, replacing the previous backup:
     "Undo last tweak" goes back one tweak, not all the way."""
     key, path = user_theme(file)
+    return backup_files(key, path)
+
+
+def backup_files(key, path):
+    """Taken right before something changes the theme — an agent's tweak
+    starting, or an import replacing it — never ahead of time: an early
+    backup that is never followed by a change would overwrite the real undo
+    point with the unchanged files."""
     folder = TWEAK_BACKUP_ROOT / key
     tmp = TWEAK_BACKUP_ROOT / f".{key}.tmp"
     shutil.rmtree(tmp, ignore_errors=True)
@@ -790,9 +780,10 @@ def cmd_fix_prompt(args):
 
 
 def cmd_tweak_prompt(args):
+    # No backup here: nothing changes until the chat's reply is imported,
+    # and import backs the theme up right before it replaces it.
     user_theme(args.file)
     text = tweak_prompt(args.file, args.note, args.example)
-    backup_theme(args.file)
     if args.copy:
         copy(text)
         print(json.dumps({"ok": True, "chars": len(text)}))
@@ -813,7 +804,8 @@ def agent_brief(kind, target, note="", example=""):
                 + "\n".join(f"  {line}" for line in note.strip().splitlines())
                 + tweak_example_line(example)
                 + "\n\nChange only what the note is about and keep everything else. The current "
-                "version is backed up, so edit the file in place; validate it when you're done.")
+                f"version is backed up in {TWEAK_BACKUP_ROOT / key}/ (Undo last tweak in the panel "
+                "restores it), so edit the file in place; validate it when you're done.")
     else:
         key = theme_key(target)
         errors, _ = lp.validate_charter(key)
@@ -831,7 +823,7 @@ Read the astro-arc-style skill first and follow its workflow step by step; it ha
 
   {SKILL_FILE}
 
-Its command is {THIS}. Work one step at a time and tell me what each step will do before you do it. Every step that costs money opens a dialog where I approve or decline it myself; wait for my answer, and if I decline, stop and ask me what I'd like instead. Never try to get around that dialog."""
+Its command is {THIS}. Work one step at a time and tell me what each step will do before you do it. Before any step that costs money, run it with --estimate and tell me the cost, then ask me before running it; if I say no, stop and ask what I'd like instead. Whenever a step writes or changes a file, give me its full path."""
 
 
 def default_agent():
@@ -926,6 +918,7 @@ def main():
     for name in ("preview", "meaning"):
         p = sub.add_parser(name)
         p.add_argument("file")
+        p.add_argument("--estimate", action="store_true", help="print the projected cost and stop")
         p.add_argument("--json", action="store_true")
     p = sub.add_parser("render")
     p.add_argument("file")

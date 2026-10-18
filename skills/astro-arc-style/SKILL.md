@@ -261,11 +261,17 @@ that launched you may give its exact path).
 
 **The user is in the loop for every step.** Before each step, tell the user
 what it will do and wait for them to agree; never chain steps on your own.
-`preview`, `meaning` and `render` spend the user's API credit: each one opens a
-dialog on the user's screen showing the cost, and spends nothing unless the
-user clicks Spend there. Run the command and wait for it; there is no flag or
-answer that approves it for them, and you must not try to get around the
-dialog. If the user declines, stop and ask what they would like instead.
+`preview`, `meaning` and `render` spend the user's API credit. Before running
+one, run it with `--estimate` (free: it prints the cost and stops), tell the
+user that cost, and ask; run it only once they say yes. If they say no, stop
+and ask what they would like instead.
+
+**Show every file.** Whenever a step writes or changes a file, give the user
+its full path, one per line, so they can open it: the theme file you wrote or
+edited, every rendered image (`rendered:` lines) and its prompt text (`its
+prompt:`), the preview it set (`preview:`), and any saved record (`saved to`).
+After a render, list every image path and say which one, if any, became the
+preview. Never summarise files as "in the renders folder".
 
 1. **Decide the world.** From the user's idea, settle in a few lines: the
    technique (what a finished frame looks like), the world's era and
@@ -290,12 +296,13 @@ dialog. If the user declines, stop and ask what they would like instead.
    near-duplicate pair, at most 2/8 in the theme's favourite scene). On FAIL
    it lists the failing prompts with reasons; fix by the table below and
    repeat from step 3.
-6. **Make the preview.** `astro-arc-style render <file>` asks the user to
-   approve the render cost at their own image settings, in its dialog. One
-   render becomes `<key>.jpg`.
-   With `--n 3`, show the user the files and set their pick with
-   `astro-arc-style choose <file> <image>`. The user may instead give an
-   image they have: `choose` it.
+6. **Make the preview.** `astro-arc-style render <file> --estimate` gives the
+   render cost at the user's own image settings; tell them, and with their
+   yes run `astro-arc-style render <file>`. One render becomes `<key>.jpg`.
+   With `--n 3`, show the user every rendered file by its full path and set
+   their pick with `astro-arc-style choose <file> <image>`. The user may
+   instead give an image they have: `choose` it. Renders are kept in
+   `~/.local/state/omarchy/astro-arc/renders/<key>/`.
 7. **Finish.** `astro-arc-style validate <file>` shows 0 errors. Tell the
    user the theme is in the style list as "<label>", tagged custom, what it
    cost, and any warning you left on purpose.

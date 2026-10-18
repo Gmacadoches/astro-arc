@@ -1342,9 +1342,10 @@ Panel {
   function copyTweakPrompt() {
     if (!root.tweakTheme) return
     if (root.tweakNoteDraft.trim() === "") { setStyleStatus("Say what's off about it first.", true); return }
-    styleCopyProc.doneText = "Copied, and the current version is saved. Paste it into any chat model"
+    styleCopyProc.doneText = "Copied. Paste it into any chat model"
       + (root.tweakIncludeExample && root.tweakExampleImage !== "" ? ", attach " + root.tweakExampleImage : "")
-      + ", then bring its reply back with Import theme."
+      + ", then bring its reply back with Import theme; the current version is saved first, so Undo last "
+      + "tweak can put it back."
     root.runStyle(styleCopyProc, ["tweak-prompt"].concat(root.tweakArgs()).concat(["--copy"]))
   }
 
@@ -1395,8 +1396,7 @@ Panel {
     var row = Model.findStyle(root.styleCatalog, root.styleRenderKey)
     var path = row ? row.path : (root.styleImportResult ? root.styleImportResult.path : "")
     if (path === "") return
-    // No approval flag: astro-arc-style asks the user in its own dialog,
-    // the same one an agent's run gets.
+    // The cost was on the button that was just clicked: that is the yes.
     root.runStyle(styleRenderProc, ["render", path, "--json"])
   }
 
@@ -1432,7 +1432,7 @@ Panel {
         var r = root.parseStyleJson(text)
         if (r && r.ok) {
           root.setStyleStatus(Model.agentLabelStart(r.agent) + " is opening in a terminal. It asks you before each "
-            + "change, and anything that costs money waits for you to approve it in a dialog.", false)
+            + "change and before anything that costs money, telling you the cost first.", false)
           root.tweakBackupFile.reload()
         } else if (r && r.unsupportedAgent) {
           root.setStyleStatus(r.error, true)
@@ -1503,8 +1503,6 @@ Panel {
           root.styleImportResult = null
           root.stylePreviewVersion++
           root.loadStyleCatalog()
-        } else if (r && r.declined) {
-          root.setStyleStatus("Nothing spent: you didn't approve the render.", false)
         } else {
           root.setStyleStatus((r && r.error) || "The render failed.", true)
         }

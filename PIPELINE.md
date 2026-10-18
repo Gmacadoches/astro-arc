@@ -369,10 +369,11 @@ with the `astro-arc-style` skill (`skills/astro-arc-style/SKILL.md`). It does
 not go through `omarchy-agent`, which starts agents unattended: Astro-Arc
 starts the agent in its mode that asks before each action (`ASKING_MODE` in
 `astro-arc-style`: Claude Code, Codex in its read-only sandbox, Gemini, Grok)
-and starts no other. The paid commands below each open a dialog showing their
-cost and spend nothing unless the user clicks Spend — there is no flag that
-approves it, so the agent cannot. The skill is the schema, the writing rules
-and the workflow; the agent follows it:
+and starts no other, so the user approves every command it runs. The skill
+has it run each paid command below with `--estimate` first (free: prints the
+cost) and ask before spending, and show every file it writes by its full path.
+The skill is the schema, the writing rules and the workflow; the agent
+follows it:
 
 ```sh
 astro-arc-style validate <file>  # free; names each bad field
