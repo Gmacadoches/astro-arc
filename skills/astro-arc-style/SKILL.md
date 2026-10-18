@@ -31,7 +31,7 @@ go. A theme never restates these.
 - `<key>.jpg` beside it, the preview, is required. Workflow step 5 makes it.
 - Every field below is required unless it says optional. Strings are TOML
   basic strings in double quotes; escape inner double quotes as `\"`.
-- A valid theme shows in the panel's Style dropdown as "<label> (custom)"; an
+- A valid theme shows in the panel's style list as "<label>", tagged custom; an
   invalid one as "(Failed Validation)", and it cannot generate.
 
 ## The rules
@@ -257,10 +257,15 @@ actor_soft.travel = ["promenading along", "riding out to", "rowing across", "arr
 
 `astro-arc-style` is the plugin's command:
 `~/.config/omarchy/plugins/astro-arc/backend/bin/astro-arc-style` (the brief
-that launched you may give its exact path). `preview`, `meaning` and `render`
-spend the user's API credit: each prints its cost and spends nothing without
-`--yes`. Show the user that cost and get their yes before passing `--yes`; one
-yes may cover several runs of the same command if the user says so.
+that launched you may give its exact path).
+
+**The user is in the loop for every step.** Before each step, tell the user
+what it will do and wait for them to agree; never chain steps on your own.
+`preview`, `meaning` and `render` spend the user's API credit: each one opens a
+dialog on the user's screen showing the cost, and spends nothing unless the
+user clicks Spend there. Run the command and wait for it; there is no flag or
+answer that approves it for them, and you must not try to get around the
+dialog. If the user declines, stop and ask what they would like instead.
 
 1. **Decide the world.** From the user's idea, settle in a few lines: the
    technique (what a finished frame looks like), the world's era and
@@ -273,26 +278,26 @@ yes may cover several runs of the same command if the user says so.
 3. **Validate.** `astro-arc-style validate <file>`. Fix every error and every
    warning that is not deliberate, and repeat. Done when the only error left
    is the missing preview.
-4. **Preview the prompts.** `astro-arc-style preview <file> --yes` writes six
+4. **Preview the prompts.** `astro-arc-style preview <file>` writes six
    scene prompts, three for a real hard day and three for a soft one. Read
    them all. Done when: every prompt is recognisably this world; no noun
    from your own fields turns up in most prompts (a menu leak, rule 1); the
    hard ones read as strain and the soft ones do not. Otherwise fix the
    fields that caused it and repeat from step 3.
-5. **Check the meaning.** `astro-arc-style meaning <file> --yes` replays the
+5. **Check the meaning.** `astro-arc-style meaning <file>` replays the
    last 8 real days and has a blind judge score them. Done when it prints
    `MEANING: PASS` (at least 6/8 hard/soft read right, at most 1
    near-duplicate pair, at most 2/8 in the theme's favourite scene). On FAIL
    it lists the failing prompts with reasons; fix by the table below and
    repeat from step 3.
-6. **Make the preview.** `astro-arc-style render <file>` shows the render
-   cost at the user's own image settings; with their yes,
-   `astro-arc-style render <file> --yes`. One render becomes `<key>.jpg`.
+6. **Make the preview.** `astro-arc-style render <file>` asks the user to
+   approve the render cost at their own image settings, in its dialog. One
+   render becomes `<key>.jpg`.
    With `--n 3`, show the user the files and set their pick with
    `astro-arc-style choose <file> <image>`. The user may instead give an
    image they have: `choose` it.
 7. **Finish.** `astro-arc-style validate <file>` shows 0 errors. Tell the
-   user the theme is in the Style dropdown as "<label> (custom)", what it
+   user the theme is in the style list as "<label>", tagged custom, what it
    cost, and any warning you left on purpose.
 
 ### When `meaning` fails

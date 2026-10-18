@@ -34,7 +34,7 @@ Column {
     spacing: Style.space(8)
 
     PanelButton {
-      visible: !Model.styleOnlyNeedsPreview(panel.failedStyle) && panel.defaultAgent !== ""
+      visible: !Model.styleOnlyNeedsPreview(panel.failedStyle) && panel.agentCanLaunch
       text: panel.styleAgentRunning ? "Opening…" : "Fix with AI"
       bordered: true
       fontSize: Style.font.caption

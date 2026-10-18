@@ -29,8 +29,9 @@ PanelHero {
   meta: {
     switch (panel.view) {
     case "settings": return ""
-    case "tweak": return "Custom style · with " + agentName
-    case "create": return panel.styleCreateMode === "import" ? "From a chat model's reply" : "With " + agentName + " or any chat model"
+    case "tweak": return "Custom style · with " + (panel.agentCanLaunch ? agentName : "a chat model")
+    case "create": return panel.styleCreateMode === "import" ? "From a chat model's reply"
+      : (panel.agentCanLaunch ? "With " + agentName + " or any chat model" : "With any chat model")
     case "browse": return panel.reviewsIndex.length + " image" + (panel.reviewsIndex.length === 1 ? "" : "s")
     case "fix": return "Failed validation"
     default: return panel.heroStatus

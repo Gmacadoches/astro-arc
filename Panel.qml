@@ -248,7 +248,10 @@ Panel {
 
   function startGeocode() {
     geocodeActiveQuery = geocodePendingQuery
-    geocodeProc.command = ["curl", "-fsS", "--max-time", "5",
+    // A deadline and a size cap: the reply is a few KB of JSON, and the
+    // output is buffered in the shell itself, so anything larger is refused
+    // rather than read (as astro-arc-generate's timezone lookup does).
+    geocodeProc.command = ["curl", "-fsS", "--max-time", "5", "--max-filesize", "1048576",
       "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(geocodeActiveQuery) + "&count=5&language=en&format=json"]
     geocodeProc.running = true
   }
@@ -1240,6 +1243,15 @@ Panel {
   property string defaultAgent: ""
   // An agent launch found no default agent: the form shows the copy path.
   property bool styleNoAgent: false
+  // Whether Astro-Arc will start the default agent at all: only an agent with
+  // a mode that asks the user before each action (Model.AGENTS_THAT_ASK), and
+  // it is always started in that mode. Otherwise the forms offer Copy prompt
+  // and say why.
+  readonly property bool agentCanLaunch: defaultAgent !== "" && !styleNoAgent && Model.agentAsks(defaultAgent)
+  readonly property string agentWontLaunch: (defaultAgent === "" || styleNoAgent)
+    ? "No default agent is set in Omarchy."
+    : Model.agentLabelStart(defaultAgent) + " can't be started in a mode that asks you before each step, "
+      + "so Astro-Arc doesn't start it (Claude Code, Codex, Gemini and Grok can be)."
   // astro-arc-style import's JSON: {key, path, label, errors, needsPreview, fixBlock, ...}.
   property var styleImportResult: null
   // render --estimate's JSON for the theme being given a preview.
@@ -1383,7 +1395,9 @@ Panel {
     var row = Model.findStyle(root.styleCatalog, root.styleRenderKey)
     var path = row ? row.path : (root.styleImportResult ? root.styleImportResult.path : "")
     if (path === "") return
-    root.runStyle(styleRenderProc, ["render", path, "--yes", "--json"])
+    // No approval flag: astro-arc-style asks the user in its own dialog,
+    // the same one an agent's run gets.
+    root.runStyle(styleRenderProc, ["render", path, "--json"])
   }
 
   function styleRenderButtonText() {
@@ -1397,9 +1411,9 @@ Panel {
     try { return JSON.parse(String(text || "")) } catch (e) { return null }
   }
 
-  // Install/update: link the skill where Omarchy's agents read skills. Run on
-  // every load, so an update (which needs a shell restart) re-links it.
-  Component.onCompleted: Quickshell.execDetached([root.python, root.styleBin, "install-skill"])
+  // The skill is not linked anywhere on load: the agent's brief names the
+  // skill file directly, and writing into other programs' folders is the
+  // user's call (astro-arc-style install-skill, documented in the README).
 
   Process {
     id: defaultAgentProc
@@ -1417,9 +1431,11 @@ Panel {
       onStreamFinished: {
         var r = root.parseStyleJson(text)
         if (r && r.ok) {
-          root.setStyleStatus(Model.agentLabelStart(r.agent) + " is opening in a terminal with the astro-arc-style skill. "
-            + "It asks before anything that costs money.", false)
+          root.setStyleStatus(Model.agentLabelStart(r.agent) + " is opening in a terminal. It asks you before each "
+            + "change, and anything that costs money waits for you to approve it in a dialog.", false)
           root.tweakBackupFile.reload()
+        } else if (r && r.unsupportedAgent) {
+          root.setStyleStatus(r.error, true)
         } else if (r && r.noAgent) {
           root.defaultAgent = ""
           root.styleNoAgent = true
@@ -1487,6 +1503,8 @@ Panel {
           root.styleImportResult = null
           root.stylePreviewVersion++
           root.loadStyleCatalog()
+        } else if (r && r.declined) {
+          root.setStyleStatus("Nothing spent: you didn't approve the render.", false)
         } else {
           root.setStyleStatus((r && r.error) || "The render failed.", true)
         }
@@ -1992,7 +2010,7 @@ Panel {
     onExited: function(exitCode) {
       if (exitCode === 0) {
         root.reviewsIndexFile.reload()
-        root.themeActionStatus = "Themes Generated history cleared."
+        root.themeActionStatus = "History cleared."
         root.themeActionStatusIsError = false
       } else {
         root.themeActionStatus = "Clear failed."

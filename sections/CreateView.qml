@@ -23,9 +23,9 @@ Column {
     spacing: Style.space(10)
     visible: panel.styleCreateMode === "create"
 
-    // Until a launch finds none, the agent is assumed and named by its
-    // display name ("your agent" before detection answers).
-    readonly property bool hasAgent: !panel.styleNoAgent
+    // Only an agent Astro-Arc can start in its asking mode (see
+    // panel.agentCanLaunch); otherwise Copy prompt, and why.
+    readonly property bool hasAgent: panel.agentCanLaunch
 
     Text {
       width: parent.width
@@ -45,8 +45,8 @@ Column {
       font.family: panel.bar.fontFamily
       text: panel.styleIdeaDraft
       onTextChanged: panel.styleIdeaDraft = text
-      Keys.onReturnPressed: panel.defaultAgent !== "" ? panel.createStyleWithAgent() : panel.copyCreatePrompt()
-      Keys.onEnterPressed: panel.defaultAgent !== "" ? panel.createStyleWithAgent() : panel.copyCreatePrompt()
+      Keys.onReturnPressed: panel.agentCanLaunch ? panel.createStyleWithAgent() : panel.copyCreatePrompt()
+      Keys.onEnterPressed: panel.agentCanLaunch ? panel.createStyleWithAgent() : panel.copyCreatePrompt()
     }
 
     // The primary action, filled with the accent like Set wallpaper.
@@ -95,10 +95,12 @@ Column {
       foreground: panel.bar.foreground
       fontFamily: panel.bar.fontFamily
       text: parent.hasAgent
-        ? Model.agentLabelStart(panel.defaultAgent) + " writes the theme with you in a terminal, and asks before "
-          + "checking it or rendering its preview with your API key. Copy prompt is for a web chat model."
-        : "No default agent is set in Omarchy. Copy prompt puts everything a chat model needs on the "
-          + "clipboard; paste it into any chat, then bring the file it writes back with Import theme."
+        ? Model.agentLabelStart(panel.defaultAgent) + " writes the theme with you in a terminal, one step at "
+          + "a time: it asks you before each change, and anything that uses your API key waits for you to "
+          + "approve its cost in a dialog. It sees your recent readings while it tests the theme. "
+          + "Copy prompt is for a web chat model."
+        : panel.agentWontLaunch + " Copy prompt puts everything a chat model needs on the clipboard; paste it "
+          + "into any chat, then bring the file it writes back with Import theme."
     }
   }
 
@@ -203,7 +205,7 @@ Column {
         }
 
         PanelButton {
-          visible: panel.defaultAgent !== ""
+          visible: panel.agentCanLaunch
           text: panel.styleAgentRunning ? "Opening…" : "Fix with AI"
           bordered: true
           fontSize: Style.font.caption
