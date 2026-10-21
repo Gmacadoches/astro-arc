@@ -66,6 +66,7 @@ PanelHero {
 
       Text {
         id: starText
+        textFormat: Text.PlainText
         visible: !hero.drilledIn
         text: panel.generating ? "✵" : "✦"
         color: Color.accent

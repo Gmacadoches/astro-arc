@@ -16,6 +16,7 @@ PanelButton {
   onClicked: panel.advancedOpen = true
 
   Text {
+    textFormat: Text.PlainText
     anchors.right: parent.right
     anchors.rightMargin: Style.spacing.controlPaddingX
     anchors.verticalCenter: parent.verticalCenter

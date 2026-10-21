@@ -74,6 +74,7 @@ Column {
             : (panel.tweakIncludeExample ? Color.accent : Qt.darker(panel.bar.foreground, 1.5))
 
           Text {
+            textFormat: Text.PlainText
             anchors.centerIn: parent
             visible: panel.tweakIncludeExample
             text: "󰄬"
@@ -85,6 +86,7 @@ Column {
 
         Text {
           id: exampleLabel
+          textFormat: Text.PlainText
           anchors.left: exampleBox.right
           anchors.leftMargin: Style.space(8)
           anchors.right: parent.right
@@ -110,6 +112,7 @@ Column {
     spacing: Style.space(6)
 
     Text {
+      textFormat: Text.PlainText
       text: "What's off about it?"
       color: view.dim
       font.family: panel.bar.fontFamily
@@ -179,6 +182,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: panel.styleActionStatus !== ""
     width: parent.width
     wrapMode: Text.WordWrap

@@ -32,6 +32,7 @@ Column {
 
     Text {
       id: statusText
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       text: section.keyState.masked
@@ -123,6 +124,7 @@ Column {
   // ---- Validation status — never shows the key itself, only whether
   // the last save authenticated. ---------------------------------------
   Text {
+    textFormat: Text.PlainText
     visible: section.keyState.validating || section.keyState.validation !== null
     width: parent.width
     wrapMode: Text.WordWrap

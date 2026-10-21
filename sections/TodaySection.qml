@@ -109,6 +109,7 @@ Column {
     }
 
     Text {
+      textFormat: Text.PlainText
       anchors.centerIn: parent
       visible: !todayImage.visible
       text: panel.generating ? "Generating…"
@@ -144,6 +145,7 @@ Column {
         opacity: live ? 1 : 0.35
 
         Text {
+          textFormat: Text.PlainText
           anchors.centerIn: parent
           text: parent.modelData.older ? "󰅁" : "󰅂"
           color: panel.bar.foreground
@@ -180,6 +182,7 @@ Column {
 
         Text {
           id: whenText
+          textFormat: Text.PlainText
           anchors.fill: parent
           anchors.leftMargin: Style.space(8)
           anchors.rightMargin: Style.space(8)
@@ -203,6 +206,7 @@ Column {
 
         Text {
           id: countText
+          textFormat: Text.PlainText
           anchors.centerIn: parent
           text: (section.index + 1) + " of " + section.count
           color: panel.bar.foreground
@@ -268,6 +272,10 @@ Column {
 
       Text {
         id: badge
+        // PlainText here and on every Text in the plugin: these strings come
+        // from the model, and AutoText would render markup in them, including
+        // an <img> Qt fetches with no size cap inside the shell.
+        textFormat: Text.PlainText
         width: parent.width
         text: panel.selectedPosition !== "" ? panel.selectedPosition : " "
         color: Color.accent
@@ -280,6 +288,7 @@ Column {
 
       Text {
         id: quote
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.WordWrap
         maximumLineCount: 4
@@ -303,6 +312,7 @@ Column {
       visible: panel.themeNamePromptOpen
 
       Text {
+        textFormat: Text.PlainText
         text: "Save a copy as a theme named"
         color: section.dim
         font.family: panel.bar.fontFamily

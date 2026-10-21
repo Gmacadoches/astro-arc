@@ -28,6 +28,7 @@ Column {
     readonly property bool hasAgent: panel.agentCanLaunch
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.WordWrap
       text: "Describe the style in one line"
@@ -112,6 +113,7 @@ Column {
     visible: panel.styleCreateMode === "import"
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.WordWrap
       text: "Copy the theme your chat model wrote (the whole TOML file, code fences are fine), "
@@ -164,6 +166,7 @@ Column {
       visible: panel.styleImportResult !== null && panel.styleImportResult.errors.length > 0
 
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.WordWrap
         text: panel.styleImportResult
@@ -183,6 +186,7 @@ Column {
 
         Text {
           id: importErrorsText
+          textFormat: Text.PlainText
           anchors.fill: parent
           anchors.margins: Style.space(6)
           wrapMode: Text.WordWrap
@@ -224,6 +228,7 @@ Column {
         && panel.styleImportResult.needsPreview
 
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.WordWrap
         text: panel.styleImportResult
@@ -264,6 +269,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: panel.styleActionStatus !== ""
     width: parent.width
     wrapMode: Text.WordWrap

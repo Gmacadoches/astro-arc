@@ -193,6 +193,7 @@ Item {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.top: tile.bottom
         anchors.topMargin: Style.space(4)
         width: tile.width
@@ -204,6 +205,7 @@ Item {
       }
 
       Text {
+        textFormat: Text.PlainText
         anchors.top: tile.bottom
         anchors.topMargin: Style.space(4) + cellText.lineSpacing
         width: tile.width
@@ -243,6 +245,7 @@ Item {
 
     Text {
       id: sizeText
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.right: browserBtn.left
       anchors.rightMargin: Style.space(8)

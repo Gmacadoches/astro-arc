@@ -13,6 +13,7 @@ import qs.Ui
 // byte cap.
 TextArea {
   id: safeArea
+  textFormat: TextEdit.PlainText
 
   property color foreground: Color.foreground
   property color accent: Color.accent

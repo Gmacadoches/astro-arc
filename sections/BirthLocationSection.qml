@@ -20,6 +20,7 @@ Column {
   spacing: Style.space(10)
 
   component FieldLabel: Text {
+    textFormat: Text.PlainText
     color: section.dim
     font.family: section.panel.bar.fontFamily
     font.pixelSize: Style.font.caption
@@ -97,6 +98,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: panel.birthError !== ""
     width: parent.width
     text: panel.birthError
@@ -131,6 +133,7 @@ Column {
         border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.18)
 
         Text {
+          textFormat: Text.PlainText
           anchors.left: parent.left
           anchors.leftMargin: Style.spacing.controlPaddingX
           anchors.right: parent.right
@@ -218,12 +221,14 @@ Column {
             spacing: Style.space(8)
 
             Text {
+              textFormat: Text.PlainText
               text: modelData.name
               color: panel.bar.foreground
               font.family: panel.bar.fontFamily
               font.pixelSize: Style.font.bodySmall
             }
             Text {
+              textFormat: Text.PlainText
               visible: text !== ""
               text: modelData.description
               color: Qt.darker(panel.bar.foreground, 1.5)
@@ -244,6 +249,7 @@ Column {
     }
 
     Text {
+      textFormat: Text.PlainText
       visible: panel.configState.latitude !== null
       text: panel.configState.latitude !== null
         ? ("Coordinates: " + panel.configState.latitude.toFixed(4) + ", " + panel.configState.longitude.toFixed(4))

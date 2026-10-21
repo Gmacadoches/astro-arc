@@ -24,6 +24,7 @@ Column {
 
     Text {
       id: backgroundSizeLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -66,6 +67,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: panel.backgroundSizeError !== ""
     width: parent.width
     text: panel.backgroundSizeError

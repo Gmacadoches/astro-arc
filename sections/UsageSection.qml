@@ -20,6 +20,7 @@ Column {
 
     Text {
       id: spentLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -31,6 +32,7 @@ Column {
 
     Text {
       id: spentText
+      textFormat: Text.PlainText
       anchors.left: spentLabel.right
       anchors.leftMargin: Style.space(8)
       anchors.right: resetUsageBtn.left
@@ -58,6 +60,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: panel.resetUsageError !== ""
     width: parent.width
     wrapMode: Text.WordWrap

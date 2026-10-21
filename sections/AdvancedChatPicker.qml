@@ -17,6 +17,7 @@ Item {
 
   Text {
     id: pickerLabel
+    textFormat: Text.PlainText
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     width: panel.labelColW

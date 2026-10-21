@@ -13,6 +13,7 @@ Item {
 
   Text {
     id: icon
+    textFormat: Text.PlainText
     anchors.left: parent.left
     anchors.top: parent.top
     text: "󰋽"
@@ -23,6 +24,7 @@ Item {
 
   Text {
     id: body
+    textFormat: Text.PlainText
     anchors.left: icon.right
     anchors.leftMargin: Style.space(6)
     anchors.right: parent.right

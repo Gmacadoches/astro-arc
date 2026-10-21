@@ -53,6 +53,7 @@ Column {
 
     Text {
       id: providerLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -87,6 +88,7 @@ Column {
   // ("sk-...CxYA") and an unlabelled row of characters gives no clue
   // what it is or why it is there.
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     text: "API key"
     color: Qt.darker(panel.bar.foreground, 1.3)

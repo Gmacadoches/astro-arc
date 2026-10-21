@@ -19,6 +19,7 @@ Column {
 
     Text {
       id: advImageLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -59,6 +60,7 @@ Column {
 
     Text {
       id: advCeilingLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -89,6 +91,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     wrapMode: Text.WordWrap
     visible: panel.maxCostPerImageError !== ""

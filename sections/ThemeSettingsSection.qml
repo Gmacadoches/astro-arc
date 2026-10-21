@@ -24,6 +24,7 @@ Column {
 
     Text {
       id: themeGeneratorLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -64,6 +65,7 @@ Column {
 
     Text {
       id: historyRetentionLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -95,6 +97,7 @@ Column {
 
     Text {
       id: historyRetentionDaysLabel
+      textFormat: Text.PlainText
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       text: "days"
@@ -105,6 +108,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: panel.historyRetentionError !== ""
     width: parent.width
     text: panel.historyRetentionError
@@ -114,6 +118,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     wrapMode: Text.WordWrap
     readonly property var estimate: Model.estimateHistorySpace(panel.reviewsIndex, panel.configState.historyRetentionDays, panel.configState.frequency, panel.configState.intervalHours)

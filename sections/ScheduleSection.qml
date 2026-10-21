@@ -43,6 +43,7 @@ Column {
 
     Text {
       id: intervalEveryLabel
+      textFormat: Text.PlainText
       anchors.right: intervalHoursDropdown.left
       anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter

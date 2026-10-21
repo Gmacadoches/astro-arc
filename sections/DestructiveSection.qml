@@ -21,6 +21,7 @@ Column {
     spacing: Style.space(4)
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.WordWrap
       text: "Deletes every generation in History immediately, ignoring the retention window. Saved themes are not affected."

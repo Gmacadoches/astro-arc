@@ -17,6 +17,7 @@ Column {
   spacing: Style.space(12)
 
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     wrapMode: Text.WordWrap
     text: panel.failedStyle
@@ -83,6 +84,7 @@ Column {
   }
 
   Text {
+    textFormat: Text.PlainText
     visible: panel.styleActionStatus !== ""
     width: parent.width
     wrapMode: Text.WordWrap

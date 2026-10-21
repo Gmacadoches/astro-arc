@@ -68,6 +68,7 @@ PanelWindow {
 
         Text {
           id: advancedTitle
+          textFormat: Text.PlainText
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           text: "Advanced settings"
@@ -88,6 +89,7 @@ PanelWindow {
       }
 
       Text {
+        textFormat: Text.PlainText
         width: parent.width
         wrapMode: Text.WordWrap
         text: "Everything the panel itself doesn't need. A model picked under a stage overrides the quality preset, which will then read \"Custom\".Costs marked (est) are published rates applied to token counts measured from real runs; (actual) means this exact combination has been measured on this machine."

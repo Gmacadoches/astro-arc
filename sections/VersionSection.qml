@@ -18,6 +18,7 @@ Column {
 
     Text {
       id: versionRowLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -34,6 +35,7 @@ Column {
     // says to run `omarchy plugin update`.
     Text {
       id: versionText
+      textFormat: Text.PlainText
       anchors.left: versionRowLabel.right
       anchors.leftMargin: Style.space(8)
       anchors.right: parent.right
@@ -65,6 +67,7 @@ Column {
   // Updating is a terminal command on purpose — see the Updates note
   // above the version properties in Panel.qml for why the panel does not do it.
   Text {
+    textFormat: Text.PlainText
     width: parent.width
     wrapMode: Text.WordWrap
     text: "Update with: omarchy plugin update"

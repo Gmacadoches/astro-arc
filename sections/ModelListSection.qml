@@ -17,6 +17,7 @@ Column {
 
     Text {
       id: advModelStatus
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.right: advShowAllBtn.left
       anchors.rightMargin: Style.space(8)

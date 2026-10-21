@@ -19,6 +19,7 @@ Column {
 
     Text {
       id: qualityPresetLabel
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.verticalCenter: parent.verticalCenter
       width: panel.labelColW
@@ -59,6 +60,7 @@ Column {
     spacing: Style.space(2)
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.WordWrap
       text: "Chat models: " + (panel.configState.stage1Model === panel.configState.stage2Model
@@ -70,6 +72,7 @@ Column {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.WordWrap
       text: "Image model: " + panel.configState.openaiModel + " · " + panel.configState.openaiQuality
@@ -79,6 +82,7 @@ Column {
     }
 
     Text {
+      textFormat: Text.PlainText
       width: parent.width
       wrapMode: Text.WordWrap
       // Projected from a FRESH period, not from the cost log. The log

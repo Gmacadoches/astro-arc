@@ -144,6 +144,7 @@ Column {
 
     Text {
       id: statusText
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.right: detailsBtn.visible ? detailsBtn.left : parent.right
       anchors.rightMargin: detailsBtn.visible ? Style.space(8) : 0

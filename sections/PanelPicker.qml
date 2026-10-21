@@ -75,6 +75,7 @@ Item {
     HoverHandler { id: triggerHover }
 
     Text {
+      textFormat: Text.PlainText
       anchors.left: parent.left
       anchors.right: tagText.visible ? tagText.left : chevron.left
       anchors.verticalCenter: parent.verticalCenter
@@ -89,6 +90,7 @@ Item {
 
     Text {
       id: tagText
+      textFormat: Text.PlainText
       anchors.right: chevron.left
       anchors.rightMargin: Style.spacing.md
       anchors.verticalCenter: parent.verticalCenter
@@ -101,6 +103,7 @@ Item {
 
     Text {
       id: chevron
+      textFormat: Text.PlainText
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       anchors.rightMargin: trigger.borderRight + Style.spacing.controlGap
@@ -223,6 +226,7 @@ Item {
               ? Style.selectedFillFor(picker.foreground, Color.accent) : "transparent")
 
           Text {
+            textFormat: Text.PlainText
             anchors.left: parent.left
             anchors.leftMargin: Style.spacing.controlPaddingX
             anchors.right: rowTag.left
@@ -237,6 +241,7 @@ Item {
 
           Text {
             id: rowTag
+            textFormat: Text.PlainText
             anchors.right: parent.right
             anchors.rightMargin: Style.spacing.controlPaddingX
             anchors.verticalCenter: parent.verticalCenter
