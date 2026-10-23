@@ -238,6 +238,7 @@ def install_stubs(state_dir, cache_styles, control_style):
     def no_network(*_a, **_k):
         raise RuntimeError("fallback_audit: network access attempted")
     lp.urllib.request.urlopen = no_network
+    lp.open_no_redirect = no_network
     lp.get_api_key = no_network
 
     lp.STATE_DIR = state_dir

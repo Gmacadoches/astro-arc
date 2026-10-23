@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from cost_estimate import image_call_cost  # noqa: E402
-from http_limits import b64_image_bytes, read_error_capped, read_json_capped  # noqa: E402
+from http_limits import b64_image_bytes, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
 from image_fit import ImageError, closest_supported_size, fit_cover  # noqa: E402
 
 API_BASE = "https://api.openai.com/v1"
@@ -223,7 +223,8 @@ def _request(path, payload=None, method="GET", slot="image"):
     try:
         # Bounded read: see http_limits. The 60s timeout stays — it covers a
         # stalled peer, while the cap covers one that keeps talking forever.
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        # Redirects are refused unread: following one drains it uncapped.
+        with open_no_redirect(req, timeout=60) as resp:
             return read_json_capped(resp)
     except urllib.error.HTTPError as exc:
         body = read_error_capped(exc)
