@@ -13,6 +13,7 @@ response that has stopped making sense, not to second-guess the API.
 """
 
 import json
+import urllib.request
 
 # A chat completion, or an /images/generations envelope carrying one
 # base64 PNG. The image envelope is the big one: base64 costs 4 bytes per
@@ -27,6 +28,30 @@ MAX_ERROR_BYTES = 64 * 1024
 
 class ResponseTooLarge(RuntimeError):
     """A response exceeded its cap and was refused unparsed."""
+
+
+class _RefuseRedirects(urllib.request.HTTPRedirectHandler):
+    """Never follow a redirect, and never read the redirect's body.
+
+    The stock handler drains the 3xx body with an unbounded fp.read()
+    before following, which is exactly the read this module exists to
+    prevent. Returning None hands the response to the default error
+    handler, so the caller sees an ordinary HTTPError whose body is still
+    unread — and read_error_capped() quotes it through the cap. The OpenAI
+    API never redirects, so a 3xx here is itself a sign something is wrong;
+    refusing it also keeps the Authorization header from following it.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_OPENER = urllib.request.build_opener(_RefuseRedirects)
+
+
+def open_no_redirect(req, timeout):
+    """urlopen() for API calls: same result, but a 3xx raises HTTPError."""
+    return _OPENER.open(req, timeout=timeout)
 
 
 def read_capped(stream, limit):

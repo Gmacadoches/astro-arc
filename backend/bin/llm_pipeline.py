@@ -64,7 +64,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from openai_image_gen import ApiKeyError, get_api_key  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
-from http_limits import ResponseTooLarge, read_error_capped, read_json_capped  # noqa: E402
+from http_limits import ResponseTooLarge, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
 
 import urllib.error
 import urllib.request
@@ -178,8 +178,9 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
         )
         try:
             # Bounded read: see http_limits. The timeout covers a stalled
-            # peer; the cap covers one that keeps sending.
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            # peer; the cap covers one that keeps sending; redirects are
+            # refused unread, since following one drains it uncapped.
+            with open_no_redirect(req, timeout=60) as resp:
                 body = read_json_capped(resp)
             break
         except ResponseTooLarge as exc:
