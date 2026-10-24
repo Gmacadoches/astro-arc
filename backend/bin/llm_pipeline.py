@@ -258,19 +258,37 @@ def _parse_json_object(text):
 
 
 # ---------------------------------------------------------------------------
-# Config loading — registers/cliches/style are hand-edited TOML, read fresh
-# every run so an edit takes effect on the next generation with no restart.
+# The catalog — registers, actors, cliches and the themes are hand-edited TOML,
+# read once at the start of a run (Catalog.load) so an edit takes effect on the
+# next run with no restart. Every choice in a composition is made from one
+# catalog: build() loads it, a harness loads its own and passes it in.
 # ---------------------------------------------------------------------------
 
-def _load_register_families():
+# One file per theme (decision 4): styles/<key>.toml plus a required
+# styles/<key>.jpg preview. The key is the file name. Shipped themes sit beside
+# the code; a user's own go in USER_STYLES_DIR.
+SHIPPED_STYLES_DIR = PIPELINE_DIR / "styles"
+DEFAULT_STYLE = "symbolist"
+
+_NOTICES = set()
+
+
+def _notice(line):
+    """A loader warning, printed once per process however many catalogs a
+    process loads."""
+    if line not in _NOTICES:
+        _NOTICES.add(line)
+        print(line, file=sys.stderr)
+
+
+def _read_register_families(path):
     """{family: [register, ...]} straight from registers.toml.
 
     That file is the only place any of this is written down — see its header.
-    Everything below (the flat rotation list, the family lookup) is derived
+    Everything else (the flat rotation list, the family lookup) is derived
     from it, so adding a register is one edit in one file and cannot
     half-land. Who appears in the image is actors.toml's job, not this
-    file's — see _load_actors()."""
-    path = PIPELINE_DIR / "registers.toml"
+    file's — see _read_actors()."""
     if not path.exists():
         return {}
     try:
@@ -282,26 +300,9 @@ def _load_register_families():
             for fam, regs in families.items() if isinstance(regs, list)}
 
 
-def load_registers():
-    """Every register, in file order — which is the order a cold-start install
-    cycles through before the recency rotation takes over."""
-    return [r for regs in _load_register_families().values() for r in regs]
-
-
-def register_family(register):
-    """Which material family a register belongs to, or None if the file does
-    not place it. Two registers with family None would cohere with each other,
-    so `None` is a real answer callers have to handle, not a default."""
-    for fam, regs in _load_register_families().items():
-        if register in regs:
-            return fam
-    return None
-
-
-def _load_actors():
+def _read_actors(path):
     """actors.toml as {"kinds": {...}, "exclude": {...}}, or empty on a
     missing or malformed file."""
-    path = PIPELINE_DIR / "actors.toml"
     if not path.exists():
         return {}
     try:
@@ -313,258 +314,180 @@ def _load_actors():
         return {}
 
 
-def actor_kinds():
-    """Every actor kind, in file order — which is the order a cold-start
-    install cycles through before the recency rotation takes over, exactly as
-    the registers do."""
-    return list((_load_actors().get("kinds") or {}).keys())
-
-
-def actor_kind_summary(kind):
-    """The first sentence of a kind's guidance — enough for Stage 1.5 to
-    CHOOSE between kinds, without spending the whole paragraph Stage 2 needs
-    in order to RENDER one.
-
-    Stage 1.5 used to receive a bare list of names. `solitary` reads as itself
-    and `presence` does not, so a spirit with a body and a trade was
-    consistently typed `solitary`, and the guidance attached to the kind it
-    should have had never fired. The descriptions already existed in
-    actors.toml and only the stage that renders could see them.
-    """
-    text = actor_guidance(kind)
-    if not text:
-        return ""
-    head = text.split(". ")[0].strip().rstrip(".")
-    return head
-
-
-def actor_guidance(kind):
-    """How this kind is framed, or "" for `none` and for an unknown kind.
-
-    `none` is a real kind with an empty body: a purely material image is a
-    legitimate outcome, just no longer the default it was on ~88% of
-    generations.
-    """
-    return ((_load_actors().get("kinds") or {}).get(kind) or "").strip()
-
-
-def presence_allowed(style_key):
-    """Whether the `presence` actor kind is eligible in this world.
-
-    It shipped ineligible everywhere because most styles forbid the
-    immaterial outright and the prohibitions it needed to read lived in
-    `guidance`, which the charters replace. So it becomes what the actors
-    brief proposed: a question each charter answers. A world that describes
-    how the numinous takes a body can have one; a world that says nothing
-    cannot, because silence is not permission.
-    """
-    world = (load_styles().get(style_key) or {}).get("world") or {}
-    return bool(isinstance(world, dict) and str(world.get("numinous") or "").strip())
-
-
-def eligible_actor_kinds(style_key):
-    """The kinds Stage 1.5 may choose from in this world."""
-    kinds = actor_kinds()
-    if not presence_allowed(style_key):
-        kinds = [k for k in kinds if k != "presence"]
-    return kinds
-
-
-def actor_excluded_for(register):
-    """Actor kinds that collapse into the substance when paired with this
-    register — `automaton` with `mechanical` makes the actor out of the same
-    material as the world. From actors.toml's [exclude] table, so the pairing
-    rule lives beside the kinds rather than in code."""
-    return set((_load_actors().get("exclude") or {}).get(register, []))
-
-
-def load_cliches():
-    path = PIPELINE_DIR / "cliches.toml"
+def _read_cliches(path):
     if not path.exists():
         return []
     with open(path, "rb") as f:
         return tomllib.load(f).get("terms", [])
 
 
-# One file per theme (decision 4): styles/<key>.toml plus a required
-# styles/<key>.jpg preview. The key is the file name. Shipped themes sit beside
-# the code; a user's own go in USER_STYLES_DIR.
-SHIPPED_STYLES_DIR = PIPELINE_DIR / "styles"
-
-
-class Theme(dict):
-    """One theme: its file's TOML table, plus where it came from.
-
-    A dict, so every loader below reads it exactly as it read a styles.toml
-    table and the charter hash sees the same values. `valid`, `errors` and
-    `warnings` are validate_charter's verdict, worked out on first use because
-    the verb check reads every other theme too."""
-
-    def __init__(self, key, table, source, path, parse_error=None):
-        super().__init__(table)
-        self.key = key
-        self.source = source
-        self.path = path
-        self.preview = path.with_suffix(".jpg")
-        self.parse_error = parse_error
-        self._verdict = None
-
-    @property
-    def label(self):
-        label = self.get("label")
-        return label.strip() if isinstance(label, str) and label.strip() else self.key
-
-    def _validated(self):
-        if self._verdict is None:
-            self._verdict = validate_charter(self.key)
-        return self._verdict
-
-    @property
-    def errors(self):
-        return self._validated()[0]
-
-    @property
-    def warnings(self):
-        return self._validated()[1]
-
-    @property
-    def valid(self):
-        return not self.errors
-
-
-_STYLE_NOTICES = set()
-
-
-def _style_notice(line):
-    """A loader warning, printed once per process: load_styles() runs dozens
-    of times in one build()."""
-    if line not in _STYLE_NOTICES:
-        _STYLE_NOTICES.add(line)
-        print(f"astro-arc: warning: {line}", file=sys.stderr)
-
-
-def _read_theme(path, source):
+def _read_theme(path, source, catalog):
     try:
         with open(path, "rb") as f:
-            return Theme(path.stem, tomllib.load(f), source, path)
+            return Theme(path.stem, tomllib.load(f), source, path, catalog)
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as e:
-        return Theme(path.stem, {}, source, path, parse_error=str(e))
+        return Theme(path.stem, {}, source, path, catalog, parse_error=str(e))
 
 
-def load_styles():
-    """Every theme by key: the shipped ones, then the user's. Read fresh every
-    call, so an edit takes effect on the next run with no restart.
+class Catalog:
+    """The themes, registers, actor kinds and cliches as read at one moment.
 
-    A user file whose key is a shipped theme's is ignored with a warning: a
-    shipped key always means the shipped theme. A file that does not parse
-    still loads, empty, so it can be listed as failing validation."""
-    themes = {path.stem: _read_theme(path, "shipped")
-              for path in sorted(SHIPPED_STYLES_DIR.glob("*.toml"))}
-    user_dir = USER_STYLES_DIR
-    try:
-        user_dir.mkdir(parents=True, exist_ok=True)
-    except OSError:
-        pass
-    for path in sorted(user_dir.glob("*.toml")):
-        if path.stem in themes:
-            _style_notice(f"user theme {path} has the key of a shipped theme "
-                          f"('{path.stem}') and is ignored; rename the file to use it")
-            continue
-        themes[path.stem] = _read_theme(path, "user")
-    for path in _DRAFT_THEME_FILES:
-        source = "user" if path.parent == user_dir.resolve() else "draft"
-        themes[path.stem] = _read_theme(path, source)
-    return themes
+    Load one per run with Catalog.load() and pass it (or a theme from it)
+    down; nothing reads the files behind its back, so a run sees one
+    consistent set however long it takes. A script that writes a theme file
+    loads a new catalog to see it."""
 
+    def __init__(self, styles=None, register_families=None, actors=None, cliches=None):
+        self.styles = dict(styles or {})
+        self.register_families = dict(register_families or {})
+        self._actors = actors or {}
+        self.cliches = list(cliches or [])
+        self._verdicts = {}
+        self._warned = set()
 
-# Theme files outside both folders that load_styles() reads too, for the rest
-# of this process: astro-arc-style's draft, which may be written anywhere.
-_DRAFT_THEME_FILES = []
+    @classmethod
+    def load(cls, shipped_dir=SHIPPED_STYLES_DIR, user_dir=USER_STYLES_DIR, drafts=(),
+             pipeline_dir=PIPELINE_DIR):
+        """Every theme by key: the shipped ones, then the user's, then
+        `drafts` — theme files outside both folders (astro-arc-style's draft,
+        which may be written anywhere), each taking the place of a user theme
+        with its key.
 
+        A user file or draft whose key is a shipped theme's is not loaded: a
+        shipped key always means the shipped theme. A user file is ignored
+        with a warning; a draft raises ValueError, since its caller asked for
+        it by name. A file that does not parse still loads, empty, so it can
+        be listed as failing validation."""
+        shipped_dir, user_dir = Path(shipped_dir), Path(user_dir)
+        catalog = cls(register_families=_read_register_families(pipeline_dir / "registers.toml"),
+                      actors=_read_actors(pipeline_dir / "actors.toml"),
+                      cliches=_read_cliches(pipeline_dir / "cliches.toml"))
+        if not catalog.register_families:
+            _notice("llm_pipeline: warning — registers.toml has no [families] table; "
+                    "the register rotation will be empty")
+        themes = {path.stem: _read_theme(path, "shipped", catalog)
+                  for path in sorted(shipped_dir.glob("*.toml"))}
+        try:
+            user_dir.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        for path in sorted(user_dir.glob("*.toml")):
+            if path.stem in themes:
+                _notice(f"astro-arc: warning: user theme {path} has the key of a shipped theme "
+                        f"('{path.stem}') and is ignored; rename the file to use it")
+                continue
+            themes[path.stem] = _read_theme(path, "user", catalog)
+        for path in drafts:
+            path = Path(path).resolve()
+            if path.parent == shipped_dir.resolve():
+                continue  # a shipped theme, already loaded as itself
+            if (shipped_dir / f"{path.stem}.toml").exists():
+                raise ValueError(f"'{path.stem}' is the key of a shipped theme; rename {path.name}")
+            source = "user" if path.parent == user_dir.resolve() else "draft"
+            themes[path.stem] = _read_theme(path, source, catalog)
+        catalog.styles = themes
+        return catalog
 
-def add_draft_theme(path):
-    """Load one more theme file, by its file name, from wherever it is. It
-    takes the place of a user theme with the same key; a shipped key raises
-    ValueError, because a shipped key always means the shipped theme."""
-    path = Path(path).resolve()
-    if path.parent == SHIPPED_STYLES_DIR.resolve():
-        return path.stem  # a shipped theme, already loaded as itself
-    if (SHIPPED_STYLES_DIR / f"{path.stem}.toml").exists():
-        raise ValueError(f"'{path.stem}' is the key of a shipped theme; rename {path.name}")
-    if path not in _DRAFT_THEME_FILES:
-        _DRAFT_THEME_FILES.append(path)
-    return path.stem
+    # ---- themes ----------------------------------------------------------
 
+    def style(self, key):
+        """The theme `key`; KeyError if there is none. `key` is resolved."""
+        return self.styles[key]
 
-DEFAULT_STYLE = "symbolist"
+    def resolve(self, key):
+        """The configured `artStyle`, resolved once when a run reads the
+        config. A key with no theme file (stale, deleted, or a typo) falls back
+        to DEFAULT_STYLE with a warning rather than failing the day's image;
+        this is the only place an unknown key is forgiven, and everything else
+        takes a resolved key."""
+        if key and key in self.styles:
+            return key
+        if key:
+            print(f"astro-arc: warning: {missing_style_warning(key)}", file=sys.stderr)
+        return DEFAULT_STYLE
 
+    def validate(self, key):
+        """(errors, warnings) for one theme, worked out once per catalog: see
+        _validate_charter, which reads the other themes and the registers too."""
+        if key not in self._verdicts:
+            self._verdicts[key] = _validate_charter(self, key)
+        return self._verdicts[key]
 
-def resolve_style_key(key):
-    """The configured `artStyle`, resolved once when a run reads the config.
-    A key with no theme file (stale, deleted, or a typo) falls back to
-    DEFAULT_STYLE with a warning rather than failing the day's image; this is
-    the only place an unknown key is forgiven, and every loader below takes a
-    resolved key."""
-    if key and key in load_styles():
-        return key
-    if key:
-        print(f"astro-arc: warning: {missing_style_warning(key)}", file=sys.stderr)
-    return DEFAULT_STYLE
+    def require(self, key):
+        """validate for a run: print the warnings (the first time this catalog
+        is asked), refuse on any error."""
+        errors, warnings = self.validate(key)
+        if key not in self._warned:
+            self._warned.add(key)
+            for line in warnings:
+                print(f"astro-arc: style warning: {line}", file=sys.stderr)
+        if errors:
+            raise PipelineError(f"Style '{key}' has an incomplete charter and cannot be used "
+                                "for a run:\n  " + "\n  ".join(errors))
+
+    # ---- registers -------------------------------------------------------
+
+    @property
+    def registers(self):
+        """Every register, in file order — which is the order a cold-start
+        install cycles through before the recency rotation takes over."""
+        return [r for regs in self.register_families.values() for r in regs]
+
+    def register_family(self, register):
+        """Which material family a register belongs to, or None if the file
+        does not place it. Two registers with family None would cohere with
+        each other, so `None` is a real answer callers have to handle, not a
+        default."""
+        for fam, regs in self.register_families.items():
+            if register in regs:
+                return fam
+        return None
+
+    # ---- actors ----------------------------------------------------------
+
+    @property
+    def actor_kinds(self):
+        """Every actor kind, in file order — which is the order a cold-start
+        install cycles through before the recency rotation takes over, exactly
+        as the registers do."""
+        return list((self._actors.get("kinds") or {}).keys())
+
+    def actor_guidance(self, kind):
+        """How this kind is framed, or "" for `none` and for an unknown kind.
+
+        `none` is a real kind with an empty body: a purely material image is a
+        legitimate outcome, just no longer the default it was on ~88% of
+        generations.
+        """
+        return ((self._actors.get("kinds") or {}).get(kind) or "").strip()
+
+    def actor_kind_summary(self, kind):
+        """The first sentence of a kind's guidance — enough for Stage 1.5 to
+        CHOOSE between kinds, without spending the whole paragraph Stage 2
+        needs in order to RENDER one.
+
+        Stage 1.5 used to receive a bare list of names. `solitary` reads as
+        itself and `presence` does not, so a spirit with a body and a trade was
+        consistently typed `solitary`, and the guidance attached to the kind it
+        should have had never fired. The descriptions already existed in
+        actors.toml and only the stage that renders could see them.
+        """
+        text = self.actor_guidance(kind)
+        if not text:
+            return ""
+        return text.split(". ")[0].strip().rstrip(".")
+
+    def actor_excluded_for(self, register):
+        """Actor kinds that collapse into the substance when paired with this
+        register — `automaton` with `mechanical` makes the actor out of the
+        same material as the world. From actors.toml's [exclude] table, so the
+        pairing rule lives beside the kinds rather than in code."""
+        return set((self._actors.get("exclude") or {}).get(register, []))
 
 
 def missing_style_warning(key):
     """What a run and the panel both say about a configured key with no theme."""
     return f"art style '{key}' is not an installed theme; using '{DEFAULT_STYLE}'"
-
-
-def load_style_suffix(style_key, has_people=False):
-    """The style's technique, appended to every image prompt. `style_key` is
-    already resolved (resolve_style_key).
-
-    Two coexisting schemas (added 2026-09-08 for ghibli's split — see
-    CHANGELOG.md): a preset either defines a bare `suffix` (applied to
-    every generation regardless of content — the original shape, still
-    exactly how every other preset works, unchanged and unmigrated here)
-    or `suffix_base` (always applied) + optional `suffix_figures`
-    (appended only when has_people is true). The point of the split is
-    that a style's figure-rendering instructions stop being dead text on
-    every generation that has no figure in it — previously ~88% of
-    ghibli's real output.
-
-    No separator is inserted between `suffix_base` and `suffix_figures` —
-    straight concatenation — so each preset's `suffix_figures` must carry
-    whatever leading punctuation actually joins correctly onto its own
-    `suffix_base`'s ending. ghibli's `suffix_base` is a comma-joined
-    descriptive list ending with no trailing period (matching this
-    project's older bare-`suffix` presets' style), so its
-    `suffix_figures` leads with a comma and continues the list. This is
-    NOT a universal convention: an earlier interim version of ghibli's
-    `suffix_base` was full-sentence prose ending in a period, and a
-    leading comma on `suffix_figures` against *that* produced a real bug
-    caught while implementing this ("...Kazuo Oga., figures..." — a
-    period directly followed by a comma). Check the actual ending every
-    time a preset is written or migrated to this schema; don't assume.
-
-    has_people defaults to False so any existing call site that hasn't
-    been updated to pass it still gets suffix_base alone, never a
-    surprise figure-rendering clause.
-    """
-    preset = load_styles()[style_key]
-    if "suffix_base" in preset:
-        suffix = preset.get("suffix_base", "")
-        if has_people and preset.get("suffix_figures"):
-            suffix += preset["suffix_figures"]
-        return suffix
-
-    return preset.get("suffix", "")
-
-
-def final_image_prompt(image_prompt, style_key, has_people):
-    """Stage 2's prompt joined with the style suffix: exactly what the image
-    model is sent. build() and the sweep/replay harnesses all call this, so a
-    sweep renders the prompt production would."""
-    style_suffix = load_style_suffix(style_key, has_people)
-    return f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
 
 
 # The order the charter's fields are read out to Stage 2. Fixed here rather
@@ -589,22 +512,188 @@ _CHARTER_FIELDS = (
 )
 
 
+class Theme(dict):
+    """One theme: its file's TOML table, plus where it came from and the
+    catalog it was loaded into.
+
+    A dict, so the charter hash and the validator read the file's own values.
+    The properties and methods below are what the pipeline asks of a style;
+    they read a charter as if it were complete, because build() refuses a
+    theme its catalog's validate finds errors in before anything is billed.
+    `valid`, `errors` and `warnings` are that verdict."""
+
+    def __init__(self, key, table, source, path, catalog, parse_error=None):
+        super().__init__(table)
+        self.key = key
+        self.source = source
+        self.path = path
+        self.preview = path.with_suffix(".jpg")
+        self.parse_error = parse_error
+        self.catalog = catalog
+
+    @property
+    def label(self):
+        label = self.get("label")
+        return label.strip() if isinstance(label, str) and label.strip() else self.key
+
+    @property
+    def errors(self):
+        return self.catalog.validate(self.key)[0]
+
+    @property
+    def warnings(self):
+        return self.catalog.validate(self.key)[1]
+
+    @property
+    def valid(self):
+        return not self.errors
+
+    # ---- the charter -----------------------------------------------------
+
+    @property
+    def charter(self):
+        """The `[<style>.world]` charter as a block of prose, in
+        _CHARTER_FIELDS order. The fields are fixed so that every style
+        answers the same questions; validation says which are required."""
+        world = self["world"]
+        parts = [f"{label}: {str(world[key]).strip()}"
+                 for key, label in _CHARTER_FIELDS
+                 if world.get(key) and str(world[key]).strip()]
+        return "\n".join(parts)
+
+    @property
+    def highlight(self):
+        """What a highlight is in this style's world: the charter's
+        `highlight`. The data key stays `anomaly`, so archived records and
+        sweeps keep reading."""
+        return self["world"]["highlight"].strip()
+
+    @property
+    def highlight_modes(self):
+        """`highlight_modes` under `[<style>.world]`: the kinds of wrongness,
+        one drawn per run."""
+        return [str(v).strip() for v in self["world"]["highlight_modes"]]
+
+    @property
+    def has_myth(self):
+        """Whether the charter has a `myth` field, which sends MYTH_LENS to the
+        meaning call."""
+        world = self.get("world") or {}
+        return isinstance(world, dict) and bool(str(world.get("myth") or "").strip())
+
+    @property
+    def presence_allowed(self):
+        """Whether the `presence` actor kind is eligible in this world.
+
+        It shipped ineligible everywhere because most styles forbid the
+        immaterial outright and the prohibitions it needed to read lived in
+        `guidance`, which the charters replace. So it becomes what the actors
+        brief proposed: a question each charter answers. A world that
+        describes how the numinous takes a body can have one; a world that
+        says nothing cannot, because silence is not permission.
+        """
+        world = self.get("world") or {}
+        return bool(isinstance(world, dict) and str(world.get("numinous") or "").strip())
+
+    @property
+    def actor_kinds(self):
+        """The kinds Stage 1.5 may choose from in this world."""
+        kinds = self.catalog.actor_kinds
+        if not self.presence_allowed:
+            kinds = [k for k in kinds if k != "presence"]
+        return kinds
+
+    # ---- what Stage 2 is told --------------------------------------------
+
+    @property
+    def brief_rules(self):
+        """The rules Stage 2's brief carries for this style: `[<style>.brief]`,
+        in file order. Rule text may use the dial's string values as
+        {placeholders} ({wonderTone}, {light}, ...)."""
+        return [str(v).strip() for v in self["brief"].values()]
+
+    def register_line(self, register):
+        """What this register means in this style's world: the style's
+        `[<style>.registers]` line. Validation requires one for every
+        register, so there is no generic fallback."""
+        if not register:
+            return ""
+        return str(self["registers"][register]).strip()
+
+    def suffix_for(self, has_people=False):
+        """The style's technique, appended to every image prompt.
+
+        Two coexisting schemas (added 2026-09-08 for ghibli's split — see
+        CHANGELOG.md): a preset either defines a bare `suffix` (applied to
+        every generation regardless of content — the original shape, still
+        exactly how every other preset works, unchanged and unmigrated here)
+        or `suffix_base` (always applied) + optional `suffix_figures`
+        (appended only when has_people is true). The point of the split is
+        that a style's figure-rendering instructions stop being dead text on
+        every generation that has no figure in it — previously ~88% of
+        ghibli's real output.
+
+        No separator is inserted between `suffix_base` and `suffix_figures` —
+        straight concatenation — so each preset's `suffix_figures` must carry
+        whatever leading punctuation actually joins correctly onto its own
+        `suffix_base`'s ending. ghibli's `suffix_base` is a comma-joined
+        descriptive list ending with no trailing period (matching this
+        project's older bare-`suffix` presets' style), so its
+        `suffix_figures` leads with a comma and continues the list. This is
+        NOT a universal convention: an earlier interim version of ghibli's
+        `suffix_base` was full-sentence prose ending in a period, and a
+        leading comma on `suffix_figures` against *that* produced a real bug
+        caught while implementing this ("...Kazuo Oga., figures..." — a
+        period directly followed by a comma). Check the actual ending every
+        time a preset is written or migrated to this schema; don't assume.
+
+        has_people defaults to False so a call that doesn't pass it gets
+        suffix_base alone, never a surprise figure-rendering clause.
+        """
+        if "suffix_base" in self:
+            suffix = self.get("suffix_base", "")
+            if has_people and self.get("suffix_figures"):
+                suffix += self["suffix_figures"]
+            return suffix
+        return self.get("suffix", "")
+
+    # ---- what a run draws from ------------------------------------------
+
+    @property
+    def verbs(self):
+        """`[<style>.verbs]` as {array: [verb, ...]}, the actor arrays as
+        {activity: [verb, ...]} in ACTIVITIES order. Validation has already
+        checked the counts and activities: a half-written list would quietly
+        hand Stage 2 three verbs from a dozen."""
+        table = self["verbs"]
+        out = {}
+        for name in VERB_ARRAYS:
+            raw = table[name]
+            if name.startswith("actor_"):
+                out[name] = {k: [str(v).strip() for v in raw[k]] for k in ACTIVITIES if raw.get(k)}
+            else:
+                out[name] = [str(v).strip() for v in raw]
+        return out
+
+    @property
+    def space(self):
+        """`space` under `[<style>]`: the depth recipes, one drawn per run."""
+        return [str(v).strip() for v in self["space"]]
+
+    def light_for(self, exposure_band):
+        """The style's `[<style>.light]` line for an exposure band."""
+        return str(self["light"][exposure_band]).strip()
+
+
+def final_image_prompt(image_prompt, style, has_people):
+    """Stage 2's prompt joined with the style suffix: exactly what the image
+    model is sent. build() and the sweep/replay harnesses all call this, so a
+    sweep renders the prompt production would."""
+    style_suffix = style.suffix_for(has_people)
+    return f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
 
 
 HIGHLIGHT_MODES_LEN = (4, 6)
-
-
-def load_style_highlight(style_key):
-    """What a highlight is in this style's world: the charter's `highlight`.
-    The data key stays `anomaly`, so archived records and sweeps keep
-    reading."""
-    return load_styles()[style_key]["world"]["highlight"].strip()
-
-
-def load_highlight_modes(style_key):
-    """`highlight_modes` under `[<style>.world]`: the kinds of wrongness, one
-    drawn per run."""
-    return [str(v).strip() for v in load_styles()[style_key]["world"]["highlight_modes"]]
 
 
 def highlight_with_mode(highlight, dial):
@@ -622,26 +711,6 @@ class _BriefValues(dict):
 
     def __missing__(self, key):
         return "{" + key + "}"
-
-
-
-
-def load_style_brief(style_key):
-    """The rules Stage 2's brief carries for this style: `[<style>.brief]`,
-    in file order. Rule text may use the dial's string values as
-    {placeholders} ({wonderTone}, {light}, ...)."""
-    return [str(v).strip() for v in load_styles()[style_key]["brief"].values()]
-
-
-def load_style_world(style_key):
-    """The `[<style>.world]` charter as a block of prose, in _CHARTER_FIELDS
-    order. The fields are fixed so that every style answers the same
-    questions; validate_charter says which are required."""
-    world = load_styles()[style_key]["world"]
-    parts = [f"{label}: {str(world[key]).strip()}"
-             for key, label in _CHARTER_FIELDS
-             if world.get(key) and str(world[key]).strip()]
-    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -741,23 +810,12 @@ def recent_material(history, window=MATERIAL_AVOID_WINDOW):
     return out
 
 
-# Registers grouped by what they're actually made of, used only to pick a
-# *non-cohering* secondary (see pick_registers). A pairing inside one group
-# — botanical + bodily, architectural + domestic interior — collapses back
-# into the single-material monoculture the pair exists to break, so the
+# Registers are grouped by what they're actually made of (registers.toml's
+# families), used here to pick a *non-cohering* secondary. A pairing inside one
+# group — botanical + bodily, architectural + domestic interior — collapses
+# back into the single-material monoculture the pair exists to break, so the
 # secondary is drawn from a different group whenever one is available.
-# Backwards-compatible module-level views of registers.toml, for call sites
-# (sweep.py, this file) that read them as plain data. Computed at import, which
-# is fine because every generation is a fresh process — the file is still read
-# fresh on every run.
-REGISTER_FAMILIES = {r: fam for fam, regs in _load_register_families().items() for r in regs}
-
-if not REGISTER_FAMILIES:
-    print("llm_pipeline: warning — registers.toml has no [families] table; "
-          "the register rotation will be empty", file=sys.stderr)
-
-
-def pick_registers(history, registers, cohesion="collide"):
+def pick_registers(history, catalog, cohesion="collide"):
     """Returns (primary, secondary). The primary keeps the original
     recency-rotation behavior exactly (pick_register below is still the
     implementation).
@@ -778,6 +836,7 @@ def pick_registers(history, registers, cohesion="collide"):
     this is the single most important thing to check in a sweep, because if it does
     regress, it regresses toward the exact output this project already rejected.
     """
+    registers = catalog.registers
     primary = pick_register(history, registers)
     if not primary:
         return None, None
@@ -786,7 +845,7 @@ def pick_registers(history, registers, cohesion="collide"):
     if not candidates:
         return primary, None
 
-    primary_family = REGISTER_FAMILIES.get(primary)
+    primary_family = catalog.register_family(primary)
     if cohesion == "cohere":
         # Same family, so the frame reads as one material world. Falling through
         # to None is a legitimate outcome, which the prompt already handles by
@@ -795,12 +854,12 @@ def pick_registers(history, registers, cohesion="collide"):
         # `geological` until the 2026-09-13 expansion gave it two partners; it
         # now happens only to the human registers, which are never eligible as a
         # secondary at all and so can never find a same-family one.
-        near = [r for r in candidates if REGISTER_FAMILIES.get(r) == primary_family]
+        near = [r for r in candidates if catalog.register_family(r) == primary_family]
         if not near:
             return primary, None
         pool = near
     else:
-        distant = [r for r in candidates if REGISTER_FAMILIES.get(r) != primary_family]
+        distant = [r for r in candidates if catalog.register_family(r) != primary_family]
         pool = distant or candidates
 
     # Don't re-run the same pairing two cycles in a row.
@@ -935,7 +994,7 @@ def stage1_cache_key(config):
     return {"natalHash": _natal_hash(config), "schemaVersion": STAGE1_SCHEMA_VERSION}
 
 
-def meaning_cache_key(config, style_key, style_world):
+def meaning_cache_key(config, style):
     """What a cached Stage 1.5 meaning must have been written under: the birth
     data, the style and its charter, and the Stage 1.5 schema version.
 
@@ -947,8 +1006,8 @@ def meaning_cache_key(config, style_key, style_world):
     written for the old wording."""
     return {
         "natalHash": _natal_hash(config),
-        "styleKey": style_key,
-        "charterHash": hashlib.sha256(style_world.encode()).hexdigest()[:12],
+        "styleKey": style.key,
+        "charterHash": hashlib.sha256(style.charter.encode()).hexdigest()[:12],
         "schemaVersion": STAGE15_SCHEMA_VERSION,
     }
 
@@ -1314,27 +1373,6 @@ SPACE_ARRAY_LEN = (6, 8)
 STYLE_RECENCY = 2
 
 
-def _style_table(style_key, name):
-    table = (load_styles().get(style_key) or {}).get(name)
-    return table if table is not None else None
-
-
-def load_style_verbs(style_key):
-    """`[<style>.verbs]` as {array: [verb, ...]}, the actor arrays as
-    {activity: [verb, ...]} in ACTIVITIES order. validate_charter has already
-    checked the counts and activities: a half-written list would quietly hand
-    Stage 2 three verbs from a dozen."""
-    table = load_styles()[style_key]["verbs"]
-    out = {}
-    for name in VERB_ARRAYS:
-        raw = table[name]
-        if name.startswith("actor_"):
-            out[name] = {k: [str(v).strip() for v in raw[k]] for k in ACTIVITIES if raw.get(k)}
-        else:
-            out[name] = [str(v).strip() for v in raw]
-    return out
-
-
 # How worn things are, drawn per run for every style (STYLE-OVERHAUL Prompt 1,
 # Step 5). Wear used to be a constant -- the highlight, THE IMPOSSIBLE, the
 # soft/lo actor relation and both charters all required it -- so every image
@@ -1363,11 +1401,6 @@ WALLPAPER_RULE = ("WALLPAPER — The frame always has somewhere for the eye to g
                   "today's space line says where. A sealed close-up with nothing past the subject "
                   "is a failed response. Name what is there rather than that it is far: not "
                   "\"beyond\", \"in the distance\" or \"far off\".")
-
-
-def load_style_space(style_key):
-    """`space` under `[<style>]`: the depth recipes, one drawn per run."""
-    return [str(v).strip() for v in load_styles()[style_key]["space"]]
 
 
 def _style_history(history, style_key):
@@ -1400,16 +1433,17 @@ def _draw(rng, pool, used, k):
     return rng.sample(fresh, min(k, len(fresh)))
 
 
-def draw_style_choices(style_key, dial, history, period_key):
+def draw_style_choices(style, dial, history, period_key):
     """This run's draws from the style's charter arrays, and the dial with them
     applied: (dial, draws). `draws` is what goes into the history entry (so the
     next run can exclude it) and into pipeline-meta (so the run page can show
     it). Keys a style has no array for are simply absent."""
+    style_key = style.key
     draws = {}
     rng = _style_rng(period_key, style_key, history)
     hard = dial["polarity"] == "hard"
 
-    verbs = load_style_verbs(style_key)
+    verbs = style.verbs
     process = verbs["process_hard" if hard else "process_soft"]
     actor = verbs["actor_hard" if hard else "actor_soft"]
     draws["processVerbs"] = _draw(rng, process, _recent_draws(history, style_key, "processVerbs"), VERB_DRAW)
@@ -1422,7 +1456,7 @@ def draw_style_choices(style_key, dial, history, period_key):
     draws["actorVerbs"] = _draw(rng, actor[draws["activity"]],
                                 _recent_draws(history, style_key, "actorVerbs"), VERB_DRAW)
 
-    space = load_style_space(style_key)
+    space = style.space
     if space:
         draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
 
@@ -1431,14 +1465,14 @@ def draw_style_choices(style_key, dial, history, period_key):
     weights = _CONDITION_WEIGHTS["hard" if hard else "soft"]
     draws["condition"] = rng.choices(pool, weights=[weights.get(c, 1) for c in pool])[0]
 
-    modes = load_highlight_modes(style_key)
+    modes = style.highlight_modes
     if modes:
         draws["highlightMode"] = _draw(rng, modes, _recent_draws(history, style_key, "highlightMode"), 1)[0]
 
-    return apply_draws(style_key, dial, draws), draws
+    return apply_draws(style, dial, draws), draws
 
 
-def apply_draws(style_key, dial, draws):
+def apply_draws(style, dial, draws):
     """The dial with a set of draws applied, whether drawn just now or pinned
     from an earlier run (see compose). The light line is not a draw: the
     style's line for today's exposure band always applies."""
@@ -1448,7 +1482,7 @@ def apply_draws(style_key, dial, draws):
     dial["activity"] = draws["activity"]
     if "space" in draws:
         dial["space"] = draws["space"]
-    dial["light"] = str(_style_table(style_key, "light")[dial["exposureBand"]]).strip()
+    dial["light"] = style.light_for(dial["exposureBand"])
     dial["condition"] = draws["condition"]
     if "highlightMode" in draws:
         dial["highlightMode"] = draws["highlightMode"]
@@ -1459,7 +1493,7 @@ def apply_draws(style_key, dial, draws):
 #
 # The one place that says what a complete charter is (decision 2 in
 # docs/decisions/2026-10-styles.md). There are no neutral fallbacks any more:
-# the loaders above read a charter as if it were complete, and build() refuses
+# Theme's accessors read a charter as if it were complete, and build() refuses
 # a style this finds errors in before anything is billed. Each error names the
 # style, the field and the rule, so whoever wrote the charter can fix it from
 # the message alone. Warnings are choices the schema allows but advises
@@ -1482,14 +1516,14 @@ def _flat_verbs(value):
     return list(value) if isinstance(value, list) else []
 
 
-def _brief_keys(style_key):
+def _brief_keys(style):
     """The dial keys a brief rule may use as {placeholders}: the string values
     of a real dial after this style's draws, which is exactly what
     _BriefValues hands format_map."""
     texture = {"polarity": "soft", "intensityBand": "mid", "exposureBand": "mid", "multiplicity": 0}
     dial = dial_from_texture(texture)
     try:
-        dial, _ = draw_style_choices(style_key, dial, [], "validate")
+        dial, _ = draw_style_choices(style, dial, [], "validate")
     except Exception:  # an incomplete charter; its errors are reported elsewhere
         pass
     return {k for k, v in dial.items() if isinstance(v, str)}
@@ -1516,10 +1550,13 @@ def _theme_strings(value, path=""):
             yield from _theme_strings(v, path)
 
 
-def validate_charter(style_key):
-    """(errors, warnings) for one theme. An empty error list means the charter
-    is complete, the preview exists, and the theme can be used for a run."""
-    styles = load_styles()
+def _validate_charter(catalog, style_key):
+    """(errors, warnings) for one theme of `catalog` (see Catalog.validate).
+    An empty error list means the charter is complete, the preview exists,
+    and the theme can be used for a run. The verdict reads the rest of the
+    catalog too: the registers it must have a line for, and the other themes
+    its verbs should not share."""
+    styles = catalog.styles
     errors, warnings = [], []
 
     def error(field, rule):
@@ -1572,7 +1609,7 @@ def validate_charter(style_key):
         for key in ("signature", "temper"):
             if not _text(brief.get(key)):
                 error(f"[brief] {key}", "required")
-        allowed = _brief_keys(style_key)
+        allowed = _brief_keys(style)
         moods = _CAPTION_EMOTION | _CAPTION_MOTIVE | _CAPTION_SIDES
         for key, rule in brief.items():
             rule = _text(rule)
@@ -1636,7 +1673,7 @@ def validate_charter(style_key):
     if not isinstance(registers, dict):
         error("[registers]", "table required")
     else:
-        for register in load_registers():
+        for register in catalog.registers:
             if not _text(registers.get(register)):
                 error(f"[registers] {register}", "required (one line per register in registers.toml)")
 
@@ -1669,16 +1706,6 @@ def validate_charter(style_key):
                     "describe what the frame looks like instead")
 
     return errors, warnings
-
-
-def require_charter(style_key):
-    """validate_charter for a run: print the warnings, refuse on any error."""
-    errors, warnings = validate_charter(style_key)
-    for line in warnings:
-        print(f"astro-arc: style warning: {line}", file=sys.stderr)
-    if errors:
-        raise PipelineError(f"Style '{style_key}' has an incomplete charter and cannot be used "
-                            "for a run:\n  " + "\n  ".join(errors))
 
 
 # The anomaly (2026-09-12, was "intrusion"): it used to be an object from "a
@@ -1833,14 +1860,8 @@ MYTH_LENS = ("THIS WORLD'S MYTHS — Jung and Neumann above say what kind of sit
              "the world below. Name the constellation in their terms where one fits.")
 
 
-def style_has_myth(style_key):
-    world = (load_styles().get(style_key) or {}).get("world") or {}
-    return isinstance(world, dict) and bool(str(world.get("myth") or "").strip())
-
-
 def stage15_meaning(stage1_result, model, period_key, config, state=None, dial=None,
-                    avoid_archetypes=None, avoid_kinds=None, style_key=None,
-                    style_world="", chat=None):
+                    avoid_archetypes=None, avoid_kinds=None, style=None, chat=None):
     """The MEANING half of Stage 1.5: constellation, movement, affect, actor and
     actorKind. Split from the material half on 2026-09-26 (see stage15_amplify)
     so that the day's meaning is fixed while its material is not.
@@ -1868,12 +1889,15 @@ def stage15_meaning(stage1_result, model, period_key, config, state=None, dial=N
     """
     if dial is None:
         raise PipelineError("Stage 1.5 needs the day's dial (dial_from_texture)")
-    cache_key = meaning_cache_key(config, style_key, style_world)
+    if style is None:
+        raise PipelineError("Stage 1.5 needs the style (a Theme from the run's catalog)")
+    cache_key = meaning_cache_key(config, style)
     cached = state.cached_meaning(period_key, cache_key) if state else None
     if cached:
         return cached, None
 
-    kinds = eligible_actor_kinds(style_key)
+    kinds = style.actor_kinds
+    catalog = style.catalog
     system_prompt = (
         STAGE15_SYSTEM
         # Injected rather than written into the prompt, so the enum cannot fall
@@ -1881,18 +1905,19 @@ def stage15_meaning(stage1_result, model, period_key, config, state=None, dial=N
         # list used to be injected into STAGE2_SYSTEM.
         .replace("{{ACTOR_KINDS}}", ", ".join(kinds) or "none")
         .replace("{{ACTOR_KIND_TABLE}}", "\n".join(
-            f"    {k} — {actor_kind_summary(k)}" if actor_kind_summary(k)
+            f"    {k} — {catalog.actor_kind_summary(k)}" if catalog.actor_kind_summary(k)
             else f"    {k} — no one at all; the materials and the place carry the image alone"
             for k in kinds) or "    none")
     )
 
     user_lines = []
+    style_world = style.charter
     if style_world:
         user_lines.append(
             "THE WORLD — every object you name, and the anomaly, must belong to it:\n"
             + style_world
         )
-        if style_has_myth(style_key):
+        if style.has_myth:
             user_lines.append(MYTH_LENS)
     user_lines += [
         f"Reading: {stage1_result['reading']}",
@@ -1968,20 +1993,10 @@ def stage15_meaning(stage1_result, model, period_key, config, state=None, dial=N
     return result, chat_call_cost(model, usage)
 
 
-def load_register_line(style_key, register):
-    """What this register means in this style's world: the style's
-    `[<style>.registers]` line. validate_charter requires one for every
-    register, so there is no generic fallback."""
-    if not register:
-        return ""
-    return str(load_styles()[style_key]["registers"][register]).strip()
-
-
-def stage15_material(stage1_result, meaning, model, config, dial=None, style_key=None,
-                     style_world="", register=None, secondary_register=None,
-                     avoid_material=None, chat=None):
+def stage15_material(stage1_result, meaning, model, config, dial=None, style=None,
+                     register=None, secondary_register=None, avoid_material=None, chat=None):
     """The MATERIAL half of Stage 1.5: objects and the highlight (key
-    `anomaly`, see load_style_highlight), built
+    `anomaly`, see Theme.highlight), built
     from the day's register. Never cached -- every generation, regenerates
     included, gets fresh material, which is the point of the split: the same
     meaning, a new register, new objects.
@@ -2006,22 +2021,25 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
         .replace("{{OBJECT_RANGE}}", f"{object_lo} to {object_hi}")
     )
 
+    if style is None:
+        raise PipelineError("Stage 1.5 needs the style (a Theme from the run's catalog)")
     user_lines = []
+    style_world = style.charter
     if style_world:
         user_lines.append(
             "THE WORLD — every piece you name, and the highlight, must belong to it:\n"
             + style_world
         )
     if register:
-        line = load_register_line(style_key, register)
+        line = style.register_line(register)
         user_lines.append(f"PRIMARY REGISTER — at least half the pieces, and the highlight, are made of this: {register}"
                           + (f"\n  In this world: {line}" if line else ""))
     if secondary_register:
-        line = load_register_line(style_key, secondary_register)
+        line = style.register_line(secondary_register)
         user_lines.append(f"SECONDARY REGISTER — may supply one or two pieces: {secondary_register}"
                           + (f"\n  In this world: {line}" if line else ""))
     user_lines.append("THE HIGHLIGHT — what it is in this world: "
-                      + highlight_with_mode(load_style_highlight(style_key), dial))
+                      + highlight_with_mode(style.highlight, dial))
     user_lines += [
         f"Reading: {stage1_result['reading']}",
         f"Distillation: {stage1_result['distillation']}",
@@ -2066,8 +2084,8 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
 
 
 def stage15_amplify(stage1_result, model, period_key, config, state=None, dial=None,
-                    avoid_archetypes=None, avoid_kinds=None, style_key=None,
-                    style_world="", register=None, secondary_register=None, material=True,
+                    avoid_archetypes=None, avoid_kinds=None, style=None,
+                    register=None, secondary_register=None, material=True,
                     avoid_material=None, chat=None):
     """Stage 1.5, both halves: the day's MEANING (cached per period, see
     stage15_meaning) and fresh MATERIAL for this register (never cached, see
@@ -2082,12 +2100,12 @@ def stage15_amplify(stage1_result, model, period_key, config, state=None, dial=N
     meaning, meaning_cost = stage15_meaning(
         stage1_result, model, period_key, config, state=state, dial=dial,
         avoid_archetypes=avoid_archetypes, avoid_kinds=avoid_kinds,
-        style_key=style_key, style_world=style_world, chat=chat)
+        style=style, chat=chat)
     if not material:
         return meaning, meaning_cost
     mat, material_cost = stage15_material(
-        stage1_result, meaning, model, config, dial=dial, style_key=style_key,
-        style_world=style_world, register=register, secondary_register=secondary_register,
+        stage1_result, meaning, model, config, dial=dial, style=style,
+        register=register, secondary_register=secondary_register,
         avoid_material=avoid_material, chat=chat)
     cost = (meaning_cost or 0.0) + (material_cost or 0.0)
     return {**meaning, **mat}, cost
@@ -2319,15 +2337,20 @@ def stage2_system():
     return STAGE2_SYSTEM
 
 
-def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_model,
-                         style_world=None, secondary_register=None,
-                         amplification=None, dial=None, register_guidance=None,
-                         style_brief=None, secondary_register_guidance=None,
-                         highlight=None, chat=None):
-    """`amplification` is Stage 1.5's output (see stage15_amplify). It is
-    passed last and defaults to None so the function still works without a
-    Stage 1.5 result — sweep.py relies on that to produce a pre-Stage-1.5
-    baseline against the same code."""
+def stage2_image_prompt(stage1_result, register, avoid_tags, stage2_model, style,
+                         secondary_register=None, amplification=None, dial=None, chat=None):
+    """`style` is the run's Theme: its charter, register lines, brief and
+    highlight, and through its catalog the cliches and actor kinds.
+    `amplification` is Stage 1.5's output (see stage15_amplify). It defaults
+    to None so the function still works without a Stage 1.5 result — sweep.py
+    relies on that to produce a pre-Stage-1.5 baseline against the same code."""
+    catalog = style.catalog
+    style_world = style.charter
+    register_guidance = style.register_line(register)
+    secondary_register_guidance = style.register_line(secondary_register)
+    style_brief = style.brief_rules
+    highlight = style.highlight
+    cliches = catalog.cliches
     user_lines = [
         f"Reading: {stage1_result['reading']}",
         f"Distillation: {stage1_result['distillation']}",
@@ -2383,9 +2406,9 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
     actor = (amplification or {}).get("actor") or ""
     actor_kind = (amplification or {}).get("actorKind") or ""
     if amplification and not actor_kind:
-        actor_kind = "solitary" if "solitary" in actor_kinds() else "none"
-    if actor_kind in actor_excluded_for(register):
-        actor_kind = "solitary" if "solitary" in actor_kinds() else "none"
+        actor_kind = "solitary" if "solitary" in catalog.actor_kinds else "none"
+    if actor_kind in catalog.actor_excluded_for(register):
+        actor_kind = "solitary" if "solitary" in catalog.actor_kinds else "none"
         actor = ""
     thing_lo, thing_hi = dial["thingRange"]
     word_lo, word_hi = dial["wordRange"]
@@ -2432,7 +2455,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         who = f"{actor} ({actor_kind})" if actor else actor_kind
         brief += [
             f"  THE ACTOR — required, and not an extra: {who}.",
-            f"    How this kind is framed: {actor_guidance(actor_kind) or 'no further framing.'}",
+            f"    How this kind is framed: {catalog.actor_guidance(actor_kind) or 'no further framing.'}",
             f"    Toward the objects: {dial['objectRelation']}",
             f"    Toward the place: {dial['siteRelation']}",
             (f"    What the actor is doing — {dial['activity']}: {dial['actorVerbs']}. "
@@ -2448,7 +2471,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
             "  THE ACTOR: none. This is one of the few constellations with nobody in it — "
             "the materials and the place carry the image alone. Do not add a figure."
         )
-    # The style's own rules, from `[<style>.brief]` (load_style_brief), each
+    # The style's own rules, from `[<style>.brief]` (Theme.brief_rules), each
     # phrased as a count and a failure condition because mood words are not
     # obeyed. They sit in the brief rather than STAGE2_SYSTEM because the brief
     # is demonstrably the part that gets obeyed. Until 2026-09-26 THE
@@ -2491,7 +2514,7 @@ CAPTION_POLICIES = ("resample", "record", "skip")
 _COMPOSE_ONLY_KEYS = ("meaning", "material", "meaningCost", "materialCost")
 
 
-def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
+def compose(stage1, arc, dial, style, config, history, *, chat=None,
             caption="resample", draws=None, registers=None, meaning=None,
             avoided_concepts=None, avoid_archetypes=(), avoid_kinds=(),
             state=None):
@@ -2504,7 +2527,9 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
       arc         the reading's arc: periodKey, frequency, and texture (the
                   texture is only recorded; the dial is what acts).
       dial        dial_from_texture's dial, or a harness's own.
-      style_key   a resolved key whose charter has passed require_charter.
+      style       the Theme, from the run's catalog, whose charter has passed
+                  catalog.require. Its catalog supplies the registers, actor
+                  kinds and cliches.
       history     the runs this one's recency comes from, newest first. Never
                   read from or written to disk here: production passes
                   state.history(), a harness passes its own list and inserts
@@ -2536,34 +2561,33 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     stage2_model = config.get("stage2Model") or "gpt-4o-mini"
     period_key = arc["periodKey"]
+    style_key = style.key
+    catalog = style.catalog
 
-    cliches = load_cliches()
     # Per-style draws (verbs, ...) from the charter's arrays, never repeating
     # what this style drew in its last STYLE_RECENCY runs. Before Stage 1.5,
     # because the dial they change is one of its inputs.
     if draws is None:
-        dial, draws = draw_style_choices(style_key, dial, history, period_key)
+        dial, draws = draw_style_choices(style, dial, history, period_key)
     else:
-        dial = apply_draws(style_key, dial, draws)
+        dial = apply_draws(style, dial, draws)
     # Registers are picked BEFORE Stage 1.5 as of 2026-09-26, because they are
     # now one of its inputs: the material half builds the objects and the
     # anomaly out of the primary register. Picked after, the register could
     # only reach Stage 2 as an adjective on a scene already cast without it.
     if registers is None:
-        register, secondary_register = pick_registers(history, load_registers(), dial["registerCohesion"])
+        register, secondary_register = pick_registers(history, catalog, dial["registerCohesion"])
     else:
         register, secondary_register = registers
-    style_world = load_style_world(style_key)
-
     meaning_cost = None
     if meaning is None:
         meaning, meaning_cost = stage15_meaning(
             stage1, stage1_model, period_key, config, state=state, dial=dial,
             avoid_archetypes=list(avoid_archetypes), avoid_kinds=list(avoid_kinds),
-            style_key=style_key, style_world=style_world, chat=chat)
+            style=style, chat=chat)
     material, material_cost = stage15_material(
-        stage1, meaning, stage1_model, config, dial=dial, style_key=style_key,
-        style_world=style_world, register=register, secondary_register=secondary_register,
+        stage1, meaning, stage1_model, config, dial=dial, style=style,
+        register=register, secondary_register=secondary_register,
         avoid_material=recent_material(history), chat=chat)
     amplification = {**meaning, **material}
     stage15_cost = (meaning_cost or 0.0) + (material_cost or 0.0)
@@ -2582,15 +2606,10 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     stage2_cost = 0.0
     for _attempt in range(1 + (CAPTION_RESAMPLES if caption == "resample" else 0)):
         image_prompt, concept_tags, has_people, attempt_cost = stage2_image_prompt(
-            stage1, register, avoid, cliches, stage2_model,
-            style_world,
+            stage1, register, avoid, stage2_model, style,
             secondary_register=secondary_register,
             amplification=amplification,
             dial=dial,
-            register_guidance=load_register_line(style_key, register),
-            secondary_register_guidance=load_register_line(style_key, secondary_register),
-            style_brief=load_style_brief(style_key),
-            highlight=load_style_highlight(style_key),
             chat=chat,
         )
         stage2_cost += attempt_cost or 0.0
@@ -2604,9 +2623,9 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     # has_people is already known by this point (stage2_image_prompt above
     # returned it) — no call-ordering change needed, just threading the
     # value through so a suffix_base/suffix_figures preset (see
-    # load_style_suffix) only pays for figure-rendering instructions on a
+    # Theme.suffix_for) only pays for figure-rendering instructions on a
     # generation that actually has a figure in it.
-    final_prompt = final_image_prompt(image_prompt, style_key, has_people)
+    final_prompt = final_image_prompt(image_prompt, style, has_people)
 
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -2669,7 +2688,7 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
         # anything captioning a run — the "Themes Generated" entry's
         # title, the exported theme's README — can name the style the
         # way the Style dropdown does without re-reading the TOML.
-        "artStyleLabel": load_styles()[style_key]["label"],
+        "artStyleLabel": style["label"],
         "imagePrompt": image_prompt,
         "finalPrompt": final_prompt,
         # stage1Cost is set by build(), which runs Stage 1; a harness that
@@ -2684,18 +2703,22 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     }
 
 
-def build(reading, config, chat=None, state=None):
+def build(reading, config, chat=None, state=None, catalog=None):
     """Production's composition: Stage 1, the real history and the real
     Stage 1.5 recency and cache, the melodrama resample. Returns
     (final_prompt, metadata), the metadata astro-arc-generate writes.
 
     `state` is where the history and caches come from: production's
     PipelineState() unless a test or the audit passes one rooted elsewhere.
-    build() only reads the history (see commit_history)."""
+    build() only reads the history (see commit_history). `catalog` is the
+    themes, registers and actors it chooses from: loaded fresh unless a test
+    or the audit passes its own."""
     state = state or PipelineState()
+    catalog = catalog or Catalog.load()
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
-    style_key = resolve_style_key(config.get("artStyle"))
-    require_charter(style_key)
+    style_key = catalog.resolve(config.get("artStyle"))
+    catalog.require(style_key)
+    style = catalog.style(style_key)
     period_key = reading["arc"]["periodKey"]
 
     # The dial has to exist BEFORE Stage 1.5, because it sets how many objects to
@@ -2705,7 +2728,7 @@ def build(reading, config, chat=None, state=None):
     stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config,
                                            chat=chat, state=state)
     result = compose(
-        stage1, reading["arc"], dial, style_key, config, state.history(), chat=chat,
+        stage1, reading["arc"], dial, style, config, state.history(), chat=chat,
         caption="resample",
         # Production's Stage 1.5 recency comes from the amplification cache,
         # this period excluded (see PipelineState.recent_constellations).
@@ -2728,13 +2751,14 @@ def build(reading, config, chat=None, state=None):
     return result["finalPrompt"], result
 
 
-def next_run_cached(config, period_key, state=None):
+def next_run_cached(config, period_key, state=None, catalog=None):
     """(Stage 1 cached, Stage 1.5's meaning cached) for a run of `config` in
     `period_key`: the question the cost estimate asks before a run, answered
-    with the keys build() would look up. `state` defaults to production's."""
+    with the keys build() would look up. `state` and `catalog` default to
+    production's."""
     state = state or PipelineState()
-    style_key = resolve_style_key(config.get("artStyle"))
-    meaning_key = meaning_cache_key(config, style_key, load_style_world(style_key))
+    catalog = catalog or Catalog.load()
+    meaning_key = meaning_cache_key(config, catalog.style(catalog.resolve(config.get("artStyle"))))
     return (state.cached_reading(period_key, stage1_cache_key(config)) is not None,
             state.cached_meaning(period_key, meaning_key) is not None)
 

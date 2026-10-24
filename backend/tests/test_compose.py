@@ -20,6 +20,7 @@ from pipeline_state import PipelineState  # noqa: E402
 STYLE = "cosmic"
 CONFIG = {"stage1Model": "stub", "stage2Model": "stub", "captionModel": "stub"}
 STAGE1 = {"reading": "A reading.", "distillation": "A distillation.", "narrativePosition": "threshold"}
+CATALOG = lp.Catalog.load()
 TEXTURE = {"polarity": "soft", "intensityBand": "mid", "exposureBand": "mid", "multiplicity": 1}
 
 
@@ -63,7 +64,8 @@ class ComposeTest(unittest.TestCase):
     def compose(self, history, chat=None, day=1, **kwargs):
         chat = chat or StubChat()
         dial = lp.dial_from_texture(TEXTURE)
-        return lp.compose(STAGE1, arc(day), dial, STYLE, CONFIG, history, chat=chat, **kwargs), chat
+        return lp.compose(STAGE1, arc(day), dial, CATALOG.style(STYLE), CONFIG, history, chat=chat,
+                          **kwargs), chat
 
     def run_days(self, n, **kwargs):
         """n consecutive compositions, each one's history entry inserted the
@@ -77,7 +79,7 @@ class ComposeTest(unittest.TestCase):
 
     def test_draw_recency_advances_across_days(self):
         # An activity does not repeat until every other one has had a turn.
-        activities = lp.load_style_verbs(STYLE)["actor_soft"]
+        activities = CATALOG.style(STYLE).verbs["actor_soft"]
         results = self.run_days(len(activities))
         drawn = [r["draws"]["activity"] for r in results]
         self.assertEqual(sorted(drawn), sorted(activities))

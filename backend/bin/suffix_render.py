@@ -27,7 +27,7 @@ from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
 
 
 def render(prompt, style, has_people, out_dir, stem, config):
-    final = lp.final_image_prompt(prompt, style, has_people)
+    final = lp.final_image_prompt(prompt, lp.Catalog.load().style(style), has_people)
     model = config.get("openaiModel") or "gpt-image-1-mini"
     quality = config.get("openaiQuality") or "medium"
     width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))

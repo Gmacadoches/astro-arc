@@ -80,6 +80,7 @@ class Audit:
         self.chat_calls = defaultdict(int)
         self.chat = None  # the stub chat client, set by install_stubs
         self.state = None  # the temporary PipelineState, set by install_stubs
+        self.catalog = None  # the run's Catalog, set by install_stubs
 
     def hit(self, symbol, how):
         self.fired[f"{symbol}: {how}"][self.style] += 1
@@ -107,7 +108,7 @@ def _wrap(name, after):
 
 
 def _style(style_key):
-    return lp.load_styles().get(style_key) or {}
+    return AUDIT.catalog.styles.get(style_key) or {}
 
 
 def install_detectors():
@@ -171,10 +172,10 @@ def install_detectors():
 
     original_draw = lp.draw_style_choices
 
-    def draw(style_key, dial, history, period_key):
+    def draw(style, dial, history, period_key):
         if not dial.get("polarity"):
             AUDIT.hit("draw_style_choices", 'dial has no polarity, `or "soft"` used')
-        return original_draw(style_key, dial, history, period_key)
+        return original_draw(style, dial, history, period_key)
     lp.draw_style_choices = draw
 
     for name in ("stage15_meaning", "stage15_material"):
@@ -194,9 +195,14 @@ def install_detectors():
         dial = kwargs.get("dial")
         if dial is None:
             AUDIT.hit("NO_TEXTURE_DIAL", "stage2_image_prompt, called with dial=None")
-        if kwargs.get("style_brief") is None:
+        # Since the catalog (2026-10-24) the brief and highlight come from the
+        # style Stage 2 is handed; before it they were keywords of their own.
+        style = kwargs.get("style") or (args[4] if len(args) > 4 else None)
+        brief = style.brief_rules if style is not None else kwargs.get("style_brief")
+        highlight = style.highlight if style is not None else kwargs.get("highlight")
+        if brief is None:
             AUDIT.hit("DEFAULT_STAGE2_BRIEF", "stage2_image_prompt, style_brief is None")
-        if not kwargs.get("highlight"):
+        if not highlight:
             AUDIT.hit("DEFAULT_HIGHLIGHT", "stage2_image_prompt, `highlight or DEFAULT_HIGHLIGHT`")
         d = dial or getattr(lp, "NO_TEXTURE_DIAL", {})
         if not d.get("prominence"):
@@ -255,38 +261,23 @@ def install_stubs(state_dir, cache_styles, control_style):
     # The registers are the variable under test, so build() is handed them.
     lp.pick_registers = lambda history, registers, cohesion="collide": AUDIT.registers
 
-    original_load = lp.load_styles
+    # One catalog for every build() unless --no-cache, with the control style
+    # added: a plain table with no file and no preview, so the only thing it
+    # can show is the charter refusal.
+    original_load = lp.Catalog.load
     cached = {}
 
-    def load_styles():
-        if cache_styles and "styles" in cached:
-            return cached["styles"]
-        styles = original_load()
+    def load(*args, **kwargs):
+        if cache_styles and "catalog" in cached:
+            return cached["catalog"]
+        catalog = original_load(*args, **kwargs)
         if control_style:
-            styles[CONTROL_STYLE] = {"label": "Unchartered Control", "suffix": "control suffix"}
-        cached["styles"] = styles
-        return styles
-    lp.load_styles = load_styles
-
-    if cache_styles:
-        actors = lp._load_actors()
-        lp._load_actors = lambda: actors
-
-    # build() validates the charter on every run. Validate each style once
-    # instead, so 1,120 runs do not print the same warnings 1,120 times, and
-    # keep the warnings for fallbacks.json. Errors still refuse the run.
-    if hasattr(lp, "require_charter"):
-        checked = {}
-
-        def require_charter(style_key):
-            if style_key not in checked:
-                checked[style_key] = lp.validate_charter(style_key)
-            errors, _ = checked[style_key]
-            if errors:
-                raise lp.PipelineError(f"Style '{style_key}' has an incomplete charter: "
-                                       + "; ".join(errors))
-        lp.require_charter = require_charter
-        AUDIT.charters = checked
+            catalog.styles[CONTROL_STYLE] = {"label": "Unchartered Control", "suffix": "control suffix"}
+        cached["catalog"] = catalog
+        AUDIT.catalog = AUDIT.catalog or catalog
+        return catalog
+    lp.Catalog.load = load
+    lp.Catalog.load()
 
 
 def seed_stage1_cache(config):
@@ -335,7 +326,7 @@ def run_style(style_key, registers, out):
                     AUDIT.hit("dial_from_texture", "refused a reading with no texture")
                     continue
                 raise SystemExit(f"{style_key}: a reading with no texture was not refused")
-            if style_key == CONTROL_STYLE and hasattr(lp, "require_charter"):
+            if style_key == CONTROL_STYLE:
                 # Since charter-required, an unchartered style must be refused
                 # before anything is billed. That refusal is the control.
                 try:
@@ -375,9 +366,9 @@ def main():
         seed_stage1_cache(CONFIG)
 
         # Shipped themes only: a user's own themes would change the baseline.
-        shipped = [k for k, t in lp.load_styles().items() if getattr(t, "source", None) == "shipped"]
+        shipped = [k for k, t in AUDIT.catalog.styles.items() if getattr(t, "source", None) == "shipped"]
         styles = args.styles or shipped
-        registers = lp.load_registers()
+        registers = AUDIT.catalog.registers
 
         prompts_path = out_dir / "prompts.jsonl"
         with open(prompts_path, "w") as out:
@@ -404,15 +395,14 @@ def main():
         "chatCalls": dict(AUDIT.chat_calls),
         "firedForShippedStyles": shipped_fired,
         "firedOnlyForControl": control_only,
-        "charterWarnings": {k: w for k, (_, w) in sorted(getattr(AUDIT, "charters", {}).items())
-                            if k != CONTROL_STYLE},
+        "charterWarnings": {k: AUDIT.catalog.validate(k)[1] for k in sorted(styles)},
         "seconds": round(time.monotonic() - started, 1),
     }
     (out_dir / "fallbacks.json").write_text(json.dumps(summary, indent=2, sort_keys=True))
 
     print(f"{runs} Stage 2 prompts -> {prompts_path}")
     print(f"sha256 {digest}")
-    print(f"{summary['seconds']}s, load_styles()/_load_actors() cache {'on' if summary['styleCache'] else 'off'}")
+    print(f"{summary['seconds']}s, catalog cache {'on' if summary['styleCache'] else 'off'}")
     print("\nFIRED FOR SHIPPED STYLES")
     for key in sorted(shipped_fired):
         per = shipped_fired[key]

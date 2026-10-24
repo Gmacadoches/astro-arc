@@ -67,7 +67,8 @@ def main():
     reading = json.loads(Path(args.reading or newest_reading()).read_text())
     period_key = reading["arc"]["periodKey"]
 
-    styles = lp.load_styles()
+    catalog = lp.Catalog.load()
+    styles = catalog.styles
     # The gallery documents the shipped set; a user's own themes are named explicitly.
     shipped = [k for k, t in styles.items() if t.source == "shipped"]
     wanted = [s.strip() for s in args.styles.split(",")] if args.styles else shipped
@@ -97,12 +98,12 @@ def main():
     rows, total = [], 0.0
 
     for i, key in enumerate(wanted, start=1):
-        label = lp.load_styles()[key]["label"]
+        label = styles[key]["label"]
         print("[%d/%d] %s" % (i, len(wanted), label), file=sys.stderr)
         # One composition per world, with its own draws (verbs, space,
         # condition, highlight mode) as production applies them, the
         # registers pinned, no history and no caption check.
-        result = lp.compose(stage1, reading["arc"], dial, key, config, [], caption="skip",
+        result = lp.compose(stage1, reading["arc"], dial, styles[key], config, [], caption="skip",
                             registers=(args.register, args.secondary))
         total += (result["stage15Cost"] or 0.0) + (result["stage2Cost"] or 0.0)
         prompt, tags, final = result["imagePrompt"], result["conceptTags"], result["finalPrompt"]
@@ -135,7 +136,6 @@ def main():
         % (args.register, args.secondary),
         "",
     ]
-    styles = lp.load_styles()
     for r in rows:
         world = (styles.get(r["key"]) or {}).get("world") or {}
         brief = (styles.get(r["key"]) or {}).get("brief") or {}

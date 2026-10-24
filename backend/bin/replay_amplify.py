@@ -85,7 +85,9 @@ def run_arm(arm, days, model, config, out_dir, axis="archetype", seed=0):
     """
     rng = random.Random(seed)
     used_constellations, used_kinds, rows, total = [], [], [], 0.0
-    kinds = [k for k in lp.actor_kinds() if k != "none"]
+    catalog = lp.Catalog.load()
+    style = catalog.style(config.get("artStyle") or "symbolist")
+    kinds = [k for k in catalog.actor_kinds if k != "none"]
 
     for key, reading, dial in days:
         # Archetype recency applies on the B0 "full" arm and on every B6 arm,
@@ -100,11 +102,9 @@ def run_arm(arm, days, model, config, out_dir, axis="archetype", seed=0):
         avoid_k = None
         if axis == "actor-kind" and arm == "D-constrained":
             avoid_k = list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW]
-        style_key = config.get("artStyle") or "symbolist"
         result, cost = lp.stage15_amplify(
             reading, model, key, config, dial=dial,
-            avoid_archetypes=avoid, avoid_kinds=avoid_k,
-            style_key=style_key, style_world=lp.load_style_world(style_key),
+            avoid_archetypes=avoid, avoid_kinds=avoid_k, style=style,
             # Archetype and actor only: the material half is not what this
             # harness measures, and skipping it halves the cost of a replay.
             material=False,

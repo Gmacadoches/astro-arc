@@ -340,7 +340,7 @@ applied as the `astro-arc` theme too.
 
 ## Styles are files
 
-**Runs:** `load_styles()`, `validate_charter()` · **Cost:** free · **Knob:** `artStyle`, `~/.config/astro-arc/styles/`
+**Runs:** `Catalog.load()`, `catalog.validate()` · **Cost:** free · **Knob:** `artStyle`, `~/.config/astro-arc/styles/`
 
 A style is one self-contained file: `<key>.toml` plus a required `<key>.jpg`
 preview. Everything about how a world looks lives in that file (its world
@@ -350,14 +350,14 @@ style (the meaning machinery, the wallpaper rule, exposure bands, registers,
 actor kinds, the wear scale) lives once in the pipeline. No style-specific
 field exists outside a style's file, and there are no neutral fallbacks.
 
-`load_styles()` reads two folders:
+`Catalog.load()` reads two folders, once at the start of a run:
 
 | Folder | What is there |
 | --- | --- |
 | `backend/pipeline/styles/` | the 7 shipped styles |
 | `~/.config/astro-arc/styles/` (`$XDG_CONFIG_HOME` respected) | the user's own, untouched by `omarchy plugin update`. A file with a shipped key is ignored with a warning |
 
-Every file goes through `validate_charter()` on load. The style list is built
+Every file goes through `catalog.validate()`. The style list is built
 from the result: shipped styles by label, the user's tagged "custom", and an
 invalid one as "(Failed Validation)", which cannot generate.
 

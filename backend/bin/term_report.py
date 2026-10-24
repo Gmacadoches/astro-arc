@@ -182,7 +182,7 @@ def verb_sources():
     m = re.search(r"Something is being ([^.]+)\.", lp.STAGE2_SYSTEM)
     if m:
         add(_split(m.group(1).replace(" and ", ", ")), "STAGE2_SYSTEM")
-    for style, table in lp.load_styles().items():
+    for style, table in lp.Catalog.load().styles.items():
         verbs = table.get("verbs") if isinstance(table, dict) else None
         if isinstance(verbs, dict):
             for arr, values in verbs.items():

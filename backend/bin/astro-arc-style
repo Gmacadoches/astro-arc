@@ -126,8 +126,10 @@ def load_config():
         return {}
 
 
-def theme_key(file):
-    """Load FILE as a theme for this process, by its file name."""
+def open_theme(file):
+    """FILE as a theme, by its file name: its Theme, from a fresh catalog that
+    has it (as a draft when it is outside both theme folders). Call it again
+    after writing the file to see the new text."""
     path = Path(file).expanduser()
     if not path.is_file():
         raise StyleError(f"{path} is not a file")
@@ -137,7 +139,7 @@ def theme_key(file):
         raise StyleError(f"{path.name}: the key (the file name) must be lowercase "
                          "letters, digits and hyphens, e.g. art-deco-posters.toml")
     try:
-        return lp.add_draft_theme(path)
+        return lp.Catalog.load(drafts=[path]).style(path.stem)
     except ValueError as e:
         raise StyleError(str(e)) from None
 
@@ -179,8 +181,9 @@ def real_days(limit):
 # ---- validate ------------------------------------------------------------
 
 def cmd_validate(args):
-    key = theme_key(args.file)
-    errors, warnings = lp.validate_charter(key)
+    theme = open_theme(args.file)
+    key = theme.key
+    errors, warnings = theme.catalog.validate(key)
     if args.json:
         print(json.dumps({"key": key, "errors": errors, "warnings": warnings}, indent=2))
         return 1 if errors else 0
@@ -197,7 +200,6 @@ def cmd_validate(args):
         print("\nWARNINGS (allowed; fix each unless it is deliberate):")
         for line in warnings:
             print(f"  - {strip(line)}")
-    theme = lp.load_styles()[key]
     if not errors and theme.source == "user":
         print(f"\nValid. It shows in the style list as \"{theme.label}\", tagged custom.")
     elif not errors and theme.source == "shipped":
@@ -208,10 +210,10 @@ def cmd_validate(args):
     return 1 if errors else 0
 
 
-def require_usable(key):
+def require_usable(theme):
     """Refuse a theme with any error except the missing preview, which is what
     `render` and `choose` are for."""
-    errors, _ = lp.validate_charter(key)
+    errors, _ = theme.catalog.validate(theme.key)
     errors = [e for e in errors if not is_preview_error(e)]
     if errors:
         raise StyleError("the theme has errors; fix them first (run `validate`):\n  "
@@ -220,21 +222,20 @@ def require_usable(key):
 
 # ---- shared: prompts for one real day ------------------------------------
 
-def day_prompts(key, day, registers, config, history):
+def day_prompts(theme, day, registers, config, history):
     """The day's meaning once, then one composition per register pair, for
-    one real day on theme `key`. Returns ([record], cost). `history` is the
+    one real day on `theme`. Returns ([record], cost). `history` is the
     caller's in-memory history, and each composition's entry is added to it;
     nothing production owns is read or written."""
     date, stage1, dial = day
     model1 = config.get("stage1Model") or "gpt-4o-mini"
     base = {k: v for k, v in dial.items() if k not in STYLE_DRAW_KEYS}
     meaning, cost = lp.stage15_meaning(stage1, model1, date, config, dial=base,
-                                       avoid_archetypes=[], avoid_kinds=[],
-                                       style_key=key, style_world=lp.load_style_world(key))
+                                       avoid_archetypes=[], avoid_kinds=[], style=theme)
     cost = cost or 0.0
     out = []
     for primary, secondary in registers:
-        result = lp.compose(stage1, {"periodKey": date, "frequency": "daily"}, base, key, config,
+        result = lp.compose(stage1, {"periodKey": date, "frequency": "daily"}, base, theme, config,
                             history, caption="skip", registers=(primary, secondary),
                             meaning=meaning, avoided_concepts=[])
         cost += (result["materialCost"] or 0.0) + (result["stage2Cost"] or 0.0)
@@ -247,11 +248,11 @@ def day_prompts(key, day, registers, config, history):
     return out, cost
 
 
-def register_spread(n, seed):
+def register_spread(n, seed, catalog):
     """n (primary, secondary) pairs whose primaries cover every family before
     any repeats; the secondary from another family, as a colliding day's."""
     rng = random.Random(seed)
-    families = lp._load_register_families()
+    families = catalog.register_families
     names = list(families)
     rng.shuffle(names)
     pairs = []
@@ -274,8 +275,9 @@ def save_record(kind, key, record):
 # ---- preview -------------------------------------------------------------
 
 def cmd_preview(args):
-    key = theme_key(args.file)
-    require_usable(key)
+    theme = open_theme(args.file)
+    key = theme.key
+    require_usable(theme)
     config = load_config()
     days = real_days(30)
     hard = next((d for d in reversed(days) if d[2]["polarity"] == "hard"), None)
@@ -288,13 +290,13 @@ def cmd_preview(args):
     cost = chat_cost(model, len(picked) + n, n)
     if estimate_or_announce(args, f"preview: {n} prompts, no images, on {model}: {usd(cost)}"):
         return 0
-    pairs = register_spread(n, key)
+    pairs = register_spread(n, key, theme.catalog)
     history, records, spent = [], [], 0.0
     for i, day in enumerate(picked):
-        recs, c = day_prompts(key, day, pairs[3 * i:3 * i + 3], config, history)
+        recs, c = day_prompts(theme, day, pairs[3 * i:3 * i + 3], config, history)
         records += recs
         spent += c
-    print(f"\nTechnique (the suffix, added to every prompt):\n  {lp.load_style_suffix(key, True)}\n")
+    print(f"\nTechnique (the suffix, added to every prompt):\n  {theme.suffix_for(True)}\n")
     for i, r in enumerate(records, 1):
         print(f"[{i}] {r['polarity']} day {r['day']} · light {r['exposure']} · "
               f"{r['register']} + {r['secondary']} · actor {r['actorKind']}")
@@ -364,8 +366,9 @@ def score(ids, result):
 
 
 def cmd_meaning(args):
-    key = theme_key(args.file)
-    require_usable(key)
+    theme = open_theme(args.file)
+    key = theme.key
+    require_usable(theme)
     config = load_config()
     days = real_days(MEANING_DAYS)
     if len(days) < MEANING_DAYS:
@@ -382,7 +385,7 @@ def cmd_meaning(args):
                                   f"and one judge call on {model2}: {usd(total)}"):
         return 0
     log = (lambda *_: None) if args.json else print
-    rows, spent = replay(key, days, config, redraw=True, log=log)
+    rows, spent = replay(theme, days, config, redraw=True, log=log)
     ids, result, jcost = judge(rows, config)
     spent += jcost or 0.0
     verdict = score(ids, result)
@@ -447,7 +450,7 @@ def set_preview(file, image):
 
 
 def cmd_choose(args):
-    theme_key(args.file)
+    open_theme(args.file)
     if not Path(args.image).is_file():
         raise StyleError(f"{args.image} is not a file")
     print(f"preview: {set_preview(args.file, args.image)}")
@@ -474,7 +477,8 @@ def render_cost(n, config, model, quality, size):
 
 
 def cmd_render(args):
-    key = theme_key(args.file)
+    theme = open_theme(args.file)
+    key = theme.key
     config = load_config()
     model, quality, size = render_settings(args, config)
     n = max(1, args.n)
@@ -484,14 +488,15 @@ def cmd_render(args):
         print(json.dumps({"cost": cost, "n": n, "model": model, "quality": quality, "size": size,
                           "line": line}) if args.json else line)
         return 0
-    require_usable(key)
+    require_usable(theme)
     # The panel shows the estimate on its button, and the click is the yes;
     # an agent's run was approved by the user as a command.
     estimate_or_announce(args, line)
     days = real_days(1)
     if not days:
         raise StyleError("no cached daily readings yet; generate a wallpaper first")
-    records, spent = day_prompts(key, days[-1], register_spread(n, key + "render"), config, [])
+    records, spent = day_prompts(theme, days[-1], register_spread(n, key + "render", theme.catalog),
+                                 config, [])
     file = Path(args.file).expanduser().resolve()
     w, h = (int(x) for x in size.split("x"))
     stamp = f"{datetime.now():%Y%m%d-%H%M%S}"
@@ -614,11 +619,12 @@ def cmd_import(args):
         # this way): back it up now, so Undo last tweak puts it back.
         backup = str(backup_files(key, target))
     target.write_text(text)
-    errors, warnings = lp.validate_charter(theme_key(target))
+    theme = open_theme(target)
+    errors, warnings = theme.catalog.validate(theme.key)
     blocking = [e for e in errors if not is_preview_error(e)]
     print(json.dumps({
         "ok": True, "key": key, "path": str(target), "replaced": replaced, "backup": backup,
-        "label": lp.load_styles()[key].label, "errors": blocking, "warnings": warnings,
+        "label": theme.label, "errors": blocking, "warnings": warnings,
         "needsPreview": any(is_preview_error(e) for e in errors),
         "fixBlock": fix_block(blocking) if blocking else "",
     }, indent=2))
@@ -642,8 +648,8 @@ def create_prompt(idea):
 
 
 def fix_prompt(file):
-    key = theme_key(file)
-    errors, _ = lp.validate_charter(key)
+    theme = open_theme(file)
+    errors, _ = theme.catalog.validate(theme.key)
     errors = [e for e in errors if not is_preview_error(e)]
     return (f"This Astro-Arc theme fails validation. Fix it using the guide below, keeping "
             f"everything that already works.\n\nErrors:\n"
@@ -660,13 +666,13 @@ def tweak_example_line(example):
 
 
 def tweak_prompt(file, note, example):
-    key = theme_key(file)
+    theme = open_theme(file)
     if example:
         example_line = ("\n\nI'm attaching a wallpaper this theme made as an example; it shows what "
                         "the note is about.")
     else:
         example_line = ""
-    return (f"Change my Astro-Arc theme \"{lp.load_styles()[key].label}\" using the guide below. "
+    return (f"Change my Astro-Arc theme \"{theme.label}\" using the guide below. "
             f"What's off about it:\n\n{note}{example_line}\n\nKeep everything the note doesn't "
             f"touch.\n\nThe file, {Path(file).name}:\n```toml\n{Path(file).read_text()}```\n\n"
             f"<guide>\n{skill_text()}\n</guide>\n\n{WEB_FOOTER}\n")
@@ -679,7 +685,7 @@ def user_theme(file):
     to a tweak — its files are the plugin's, and an update would put them
     back anyway."""
     path = Path(file).expanduser().resolve()
-    key = theme_key(path)
+    key = open_theme(path).key
     if path.parent != USER_STYLES_DIR.resolve():
         raise StyleError(f"{path.name} is not one of your themes, so it can't be tweaked")
     return key, path
@@ -785,8 +791,9 @@ def agent_brief(kind, target, note="", example=""):
         task = (f"Create an Astro-Arc theme (a style for the Astro-Arc wallpaper plugin) from this idea:\n\n"
                 f"  {target}\n\nWrite it into {folder}/.")
     elif kind == "tweak":
-        key = theme_key(target)
-        task = (f"Tweak my Astro-Arc theme \"{lp.load_styles()[key].label}\", "
+        theme = open_theme(target)
+        key = theme.key
+        task = (f"Tweak my Astro-Arc theme \"{theme.label}\", "
                 f"{Path(target).resolve()}. What's off about it:\n\n"
                 + "\n".join(f"  {line}" for line in note.strip().splitlines())
                 + tweak_example_line(example)
@@ -794,8 +801,8 @@ def agent_brief(kind, target, note="", example=""):
                 f"version is backed up in {TWEAK_BACKUP_ROOT / key}/ (Undo last tweak in the panel "
                 "restores it), so edit the file in place; validate it when you're done.")
     else:
-        key = theme_key(target)
-        errors, _ = lp.validate_charter(key)
+        theme = open_theme(target)
+        errors, _ = theme.catalog.validate(theme.key)
         task = (f"Fix my Astro-Arc theme {Path(target).resolve()}. It fails validation:\n\n"
                 + "\n".join(f"  - {e.split(': ', 1)[1]}" for e in errors)
                 + "\n\nKeep everything that already works.")

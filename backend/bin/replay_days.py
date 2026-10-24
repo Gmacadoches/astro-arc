@@ -90,9 +90,9 @@ def stored_draws(dial):
     return draws
 
 
-def replay(style_key, days, config, out_dir=None, render=False, quality="medium",
+def replay(style, days, config, out_dir=None, render=False, quality="medium",
            redraw=False, log=print):
-    """Replay `days` (load_days) on `style_key` in date order, with the
+    """Replay `days` (load_days) on `style` (a Theme) in date order, with the
     recency pressure accumulating as it would in production. Returns
     (rows, spent). Writes one JSON per day (and the render) under `out_dir`
     when it is given; nothing production owns is ever written."""
@@ -108,7 +108,7 @@ def replay(style_key, days, config, out_dir=None, render=False, quality="medium"
         if redraw:
             dial = {k: v for k, v in dial.items() if k not in STYLE_DRAW_KEYS}
         result = lp.compose(
-            stage1, {"periodKey": key, "frequency": "daily"}, dial, style_key, config, history,
+            stage1, {"periodKey": key, "frequency": "daily"}, dial, style, config, history,
             caption="resample", draws=stored_draws(dial),
             avoid_archetypes=list(reversed(used_constellations))[:lp.AMPLIFY_AVOID_WINDOW],
             avoid_kinds=list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW])
@@ -143,7 +143,7 @@ def replay(style_key, days, config, out_dir=None, render=False, quality="medium"
             "affect": result["affect"],
             "amplificationObjects": result["amplificationObjects"] or [],
             "stage1Model": result["stage1Model"], "stage2Model": result["stage2Model"],
-            "artStyle": style_key,
+            "artStyle": style.key,
             "captionCheck": result["captionCheck"],
         }
 
@@ -208,7 +208,8 @@ def main():
 
     config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
     style_key = args.style or config.get("artStyle") or "symbolist"
-    lp.require_charter(style_key)
+    catalog = lp.Catalog.load()
+    catalog.require(style_key)
 
     days = load_days(args.days, args.cell)
     if not days:
@@ -228,7 +229,7 @@ def main():
         return 0
 
     out_dir = VERIFY_DIR / args.out
-    rows, total = replay(style_key, days, config, out_dir=out_dir,
+    rows, total = replay(catalog.style(style_key), days, config, out_dir=out_dir,
                          render=not args.no_image, quality=args.quality, redraw=args.redraw)
 
     cols = ["day", "register", "secondary", "actorKind", "actor", "family",

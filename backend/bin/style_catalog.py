@@ -34,7 +34,7 @@ PREVIEW_PX = 1200
 
 def catalog():
     rows = []
-    for key, theme in lp.load_styles().items():
+    for key, theme in lp.Catalog.load().styles.items():
         rows.append({
             "key": key,
             "label": theme.label,
@@ -53,7 +53,7 @@ class PreviewError(Exception):
 
 
 def set_preview(key, image):
-    theme = lp.load_styles().get(key)
+    theme = lp.Catalog.load().styles.get(key)
     if theme is None:
         raise PreviewError(f"No theme '{key}'.")
     if theme.source != "user":

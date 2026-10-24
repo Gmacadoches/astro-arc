@@ -219,7 +219,9 @@ def main():
     if args.stage2_model:
         config["stage2Model"] = args.stage2_model
     style_key = args.style or config.get("artStyle") or "symbolist"
-    lp.require_charter(style_key)
+    catalog = lp.Catalog.load()
+    catalog.require(style_key)
+    style = catalog.style(style_key)
     image_model = args.image_model or config.get("openaiModel") or "gpt-image-1-mini"
     size = args.size or config.get("backgroundSize") or "1600x900"
     width, height = (int(x) for x in size.split("x"))
@@ -263,10 +265,10 @@ def main():
     amplification, amp_cost = lp.stage15_meaning(
         stage1, stage1_model, reading["arc"]["periodKey"], config,
         dial=dial, avoid_archetypes=[], avoid_kinds=[],
-        style_key=style_key, style_world=lp.load_style_world(style_key))
+        style=style)
     (out_dir / "00_amplification.json").write_text(json.dumps(amplification, indent=2))
 
-    registers = lp.load_registers()
+    registers = catalog.registers
     if args.registers != "all":
         wanted = [r.strip() for r in args.registers.split(",")]
         registers = [r for r in registers if r in wanted] or wanted
@@ -282,7 +284,7 @@ def main():
         # from a different material family, or the pair collapses back into
         # one material. Deterministic offset-walk instead of a random pick
         # so a sweep is reproducible.
-        families = lp.REGISTER_FAMILIES
+        family = catalog.register_family
         # Honor the dial's cohesion, or a cohere cell would be tested with
         # colliding pairs and prove nothing about the mode it claims to test.
         jobs = []
@@ -293,9 +295,9 @@ def main():
                 # Same family, and genuinely no partner where a family has no
                 # other member — matching production, where that correctly
                 # yields no secondary at all.
-                pool = [r for r in pool if families.get(r) == families.get(primary)]
+                pool = [r for r in pool if family(r) == family(primary)]
             else:
-                distant = [r for r in pool if families.get(r) != families.get(primary)]
+                distant = [r for r in pool if family(r) != family(primary)]
                 pool = distant or pool
             jobs.append((primary, pool[i % len(pool)] if pool else None))
     else:
@@ -316,7 +318,7 @@ def main():
         # (see build()), but a sweep records the verdict on the first draw so
         # it measures how often production WOULD resample, instead of hiding it.
         result = lp.compose(
-            stage1, reading["arc"], job_dials[i - 1], style_key, config, sweep_history,
+            stage1, reading["arc"], job_dials[i - 1], style, config, sweep_history,
             caption="record", registers=(primary, secondary), meaning=amplification,
             avoided_concepts=[])
         prompt = result["imagePrompt"]

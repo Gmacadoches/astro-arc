@@ -453,7 +453,7 @@ def _period_key(frequency, now_local=None):
     return cache_key(frequency, now_local)
 
 
-def next_run_cost(width=1024, height=1024, settings=None, state=None):
+def next_run_cost(width=1024, height=1024, settings=None, state=None, catalog=None):
     """What the NEXT generation will actually cost, and what a generation costs
     when nothing is cached.
 
@@ -476,8 +476,8 @@ def next_run_cost(width=1024, height=1024, settings=None, state=None):
     Which stages are cached is asked of llm_pipeline.next_run_cached, the
     pipeline's own rule. Until 2026-10-24 this re-derived it without the
     style, the charter or Stage 1's distillation, so a style switch was
-    quoted as a cache hit. `state` is the PipelineState to ask (production's
-    by default).
+    quoted as a cache hit. `state` is the PipelineState to ask and `catalog`
+    the themes to read (production's by default).
     """
     settings = settings if settings is not None else load_settings()
     rates, learned = load_rates(), load_learned_usage()
@@ -493,7 +493,7 @@ def next_run_cost(width=1024, height=1024, settings=None, state=None):
     # a top-level import of llm_pipeline would close the loop.
     try:
         from llm_pipeline import CAPTION_MODEL, next_run_cached  # noqa: PLC0415
-        cached_stage1, cached_stage15 = next_run_cached(settings, period_key, state)
+        cached_stage1, cached_stage15 = next_run_cached(settings, period_key, state, catalog)
         caption_model = settings.get("captionModel") or CAPTION_MODEL
         cache_known = True
     except Exception:  # noqa: BLE001 — a cost readout must not break on this
