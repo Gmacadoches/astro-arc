@@ -88,7 +88,7 @@ AVOID_WINDOW = 8
 COLD_START_THRESHOLD = 10
 REGISTER_LOOKBACK_DAYS = 5
 
-# Bounded retry for the chat API — see _chat_json. 5 attempts with the wait the
+# Bounded retry for the chat API — see openai_chat. 5 attempts with the wait the
 # API itself suggests, or doubling from 2s, covers a TPM limit refilling without
 # turning a hard failure into a silent 10-minute hang.
 CHAT_MAX_ATTEMPTS = 5
@@ -106,12 +106,12 @@ class PipelineError(Exception):
 # nothing here stores it, logs it, or returns it.
 #
 # This is the OpenAI adapter at the chat seam. Every stage takes `chat=`, any
-# callable with _chat_json's signature returning (json_dict, usage), and falls
+# callable with openai_chat's signature returning (json_dict, usage), and falls
 # back to this one when it is None. fallback_audit.py passes a stub there, so a
 # prompts-only run makes no call and writes no usage or capability state.
 # ---------------------------------------------------------------------------
 
-def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=None):
+def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=None):
     """`slot` picks which of the three independently-stored API keys
     (astro-arc-apikey's stage1/stage2/image) authenticates this call —
     Stage 1 and Stage 2 use separate keys/models by design, since they're
@@ -1058,7 +1058,7 @@ def stage1_interpret(reading, stage1_model, period_key, config, chat=None, cache
     arc = reading["arc"]
     user_prompt = f"Natal: {describe_natal(natal)}.\n{describe_arc(arc)}"
 
-    result, usage = (chat or _chat_json)(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1", temperature=0.7, stage="stage1")
+    result, usage = (chat or openai_chat)(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1", temperature=0.7, stage="stage1")
     for key in ("reading", "distillation", "narrativePosition"):
         if not result.get(key):
             raise PipelineError(f"Stage 1 response missing '{key}': {result!r}")
@@ -2014,7 +2014,7 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
             "the constellation from the rest: " + ", ".join(avoid_kinds)
         )
 
-    result, usage = (chat or _chat_json)(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
+    result, usage = (chat or openai_chat)(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
 
     for key in ("constellation", "movement", "affect"):
         if not result.get(key):
@@ -2123,8 +2123,8 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
             + "\n".join(f"  - {m}" for m in avoid_material)
         )
 
-    result, usage = (chat or _chat_json)(model, system_prompt, "\n".join(user_lines), "stage1",
-                                         temperature=0.95, stage="stage15")
+    result, usage = (chat or openai_chat)(model, system_prompt, "\n".join(user_lines), "stage1",
+                                          temperature=0.95, stage="stage15")
     for key in ("objects", "anomaly"):
         if not result.get(key):
             raise PipelineError(f"Stage 1.5 material response missing '{key}': {result!r}")
@@ -2349,8 +2349,8 @@ def caption_check(prompt, model, chat=None):
     render because the cheap check fell over would be a bad trade.
     """
     try:
-        result, _ = (chat or _chat_json)(model, CAPTION_CHECK_SYSTEM, prompt, "stage2",
-                                         temperature=0.0, stage="caption")
+        result, _ = (chat or openai_chat)(model, CAPTION_CHECK_SYSTEM, prompt, "stage2",
+                                          temperature=0.0, stage="caption")
         caption = (result.get("caption") or "").strip()
     except Exception:  # noqa: BLE001 — a failed check must never fail a generation
         return "", [], None
@@ -2545,7 +2545,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         brief.append(f"  Light and concealment: {dial['light']}")
     user_lines += brief
 
-    result, usage = (chat or _chat_json)(stage2_model, stage2_system(), "\n".join(user_lines), "stage2", temperature=0.95, stage="stage2")
+    result, usage = (chat or openai_chat)(stage2_model, stage2_system(), "\n".join(user_lines), "stage2", temperature=0.95, stage="stage2")
     if not result.get("prompt"):
         raise PipelineError(f"Stage 2 response missing 'prompt': {result!r}")
     concept_tags = result.get("conceptTags") or []
@@ -2589,7 +2589,7 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
                   the returned historyEntry to move recency on.
 
     Keywords:
-      chat        the chat client (see _chat_json); None means OpenAI.
+      chat        the chat client (see openai_chat); None means OpenAI.
       caption     the melodrama check: "resample" (production: a failure
                   re-runs Stage 2 up to CAPTION_RESAMPLES times), "record"
                   (check once, never resample) or "skip" (no check).

@@ -229,8 +229,8 @@ def classify_activity(path, samples):
         if (key not in cache or cache[key].get("prompt") != s["imagePrompt"]
                 or cache[key].get("v") != ACTIVITY_VERSION):
             try:
-                result, _ = lp._chat_json(model, ACTIVITY_SYSTEM, s["imagePrompt"], "stage2",
-                                          temperature=0.0)
+                result, _ = lp.openai_chat(model, ACTIVITY_SYSTEM, s["imagePrompt"], "stage2",
+                                           temperature=0.0)
                 act = str(result.get("activity") or "none").strip().lower()
             except Exception as exc:  # noqa: BLE001 — a report must survive one bad call
                 print(f"term_report: activity call failed: {exc}", file=sys.stderr)

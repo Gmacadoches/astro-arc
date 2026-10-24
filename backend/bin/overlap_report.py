@@ -41,7 +41,7 @@ def nouns_for(path, data, model):
         key = str(s["index"])
         if cache.get(key, {}).get("prompt") != s["imagePrompt"]:
             try:
-                result, _ = lp._chat_json(model, NOUN_SYSTEM, s["imagePrompt"], "stage2", temperature=0.0)
+                result, _ = lp.openai_chat(model, NOUN_SYSTEM, s["imagePrompt"], "stage2", temperature=0.0)
                 found = sorted({str(n).strip().lower() for n in result.get("nouns") or [] if str(n).strip()})
             except Exception as exc:  # noqa: BLE001
                 print(f"overlap_report: noun call failed: {exc}", file=sys.stderr)

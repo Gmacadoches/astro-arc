@@ -32,7 +32,7 @@ def _tag(text):
 
 
 class StubChat:
-    """A chat client (see llm_pipeline._chat_json) that answers by stage and
+    """A chat client (see llm_pipeline.openai_chat) that answers by stage and
     records every call. `caption_passes=False` makes every melodrama check fail."""
 
     def __init__(self, caption_passes=True):

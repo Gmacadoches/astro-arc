@@ -241,7 +241,7 @@ def install_stubs(state_dir, cache_styles, control_style):
     # rather than reaching the network or the keyring.
     def no_network(*_a, **_k):
         raise RuntimeError("fallback_audit: network access attempted")
-    lp._chat_json = no_network
+    lp.openai_chat = no_network
     lp.urllib.request.urlopen = no_network
     lp.open_no_redirect = no_network
     lp.get_api_key = no_network
