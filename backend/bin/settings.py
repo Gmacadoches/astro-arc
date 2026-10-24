@@ -26,6 +26,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from paths import CONFIG_FILE  # noqa: E402
 
 SCHEMA_FILE = Path(__file__).resolve().parents[1] / "pipeline" / "settings.toml"
+# The defaults as JSON, generated from SCHEMA_FILE (`settings.py
+# --write-defaults`; a test fails when it is stale). The panel starts from it,
+# so it has a whole config before its first astro-arc-config read lands.
+DEFAULTS_FILE = SCHEMA_FILE.with_name("settings-defaults.json")
 SIZE_PATTERN = re.compile(r"^[0-9]{2,5}x[0-9]{2,5}$")
 
 _schema = None
@@ -238,3 +242,17 @@ def dumps(value, indent=2, _level=0):
     if isinstance(value, str):
         return _string(value)
     return json.dumps(value)
+
+
+def defaults_json():
+    """DEFAULTS_FILE's contents: the OpenAI defaults, as astro-arc-config prints them."""
+    return dumps(defaults()) + "\n"
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["--write-defaults"]:
+        DEFAULTS_FILE.write_text(defaults_json())
+        print(f"wrote {DEFAULTS_FILE}")
+    else:
+        print("usage: settings.py --write-defaults", file=sys.stderr)
+        sys.exit(1)

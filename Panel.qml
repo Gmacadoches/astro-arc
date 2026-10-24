@@ -97,9 +97,17 @@ Panel {
   // ---- Config state ----------------------------------------------------
   // The settings, as astro-arc-config prints them: every key present and every
   // value one its key may hold (backend/pipeline/settings.toml). The panel
-  // keeps no defaults of its own; until the first read lands, configState is
-  // empty and configLoaded false.
-  property var configState: ({})
+  // keeps no defaults of its own. Until the first read lands (configLoaded
+  // false) it holds the schema's defaults, read before anything binds to it
+  // from settings-defaults.json, which settings.py generates from the schema.
+  property FileView settingsDefaults: FileView {
+    path: root.pluginRoot + "/backend/pipeline/settings-defaults.json"
+    blockLoading: true
+    printErrors: false
+  }
+  property var configState: {
+    try { return JSON.parse(settingsDefaults.text()) } catch (e) { return ({}) }
+  }
   property bool configLoaded: false
   property var lastRun: null
 

@@ -56,6 +56,10 @@ class SettingsTest(unittest.TestCase):
     def test_the_defaults_are_the_shell_scripts(self):
         self.assertEqual(settings.dumps(settings.defaults(), indent=None), SHELL_DEFAULTS)
 
+    def test_the_panels_defaults_file_is_generated_from_the_schema(self):
+        self.assertEqual(settings.DEFAULTS_FILE.read_text(), settings.defaults_json(),
+                         "settings-defaults.json is stale: run backend/bin/settings.py --write-defaults")
+
     def test_numbers_are_kept_as_written(self):
         self.file.write_text('{"maxCostPerImage": 0.50, "latitude": 40.0, "intervalHours": 3}')
         out = settings.dumps(settings.read(self.file, keep_numbers=True))
