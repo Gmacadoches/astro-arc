@@ -62,7 +62,6 @@ def main():
 
     config = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
-    stage2_model = config.get("stage2Model") or "gpt-4o-mini"
     image_model = config.get("openaiModel") or "gpt-image-1-mini"
     quality = config.get("openaiQuality") or "low"
 
@@ -79,8 +78,8 @@ def main():
 
     # --- pin everything that is not the style ------------------------------
     dial = lp.dial_from_texture(reading["arc"].get("texture"))
-    stage1, _ = lp.stage1_interpret(reading, stage1_model, period_key, config)
-    cliches = lp.load_cliches()
+    # Uncached, so building the gallery never seeds the production readings cache.
+    stage1, _ = lp.stage1_interpret(reading, stage1_model, period_key, config, cache=False)
 
     # The amplification used to be pinned here, beside Stage 1, on the premise that everything except the style should be
     # held constant. That premise died on 2026-09-20: the style is now a
@@ -99,33 +98,15 @@ def main():
     rows, total = [], 0.0
 
     for i, key in enumerate(wanted, start=1):
-        label, world = lp.load_styles()[key]["label"], lp.load_style_world(key)
+        label = lp.load_styles()[key]["label"]
         print("[%d/%d] %s" % (i, len(wanted), label), file=sys.stderr)
-        # Each world's own draws (verbs, space, condition, highlight mode), as
-        # production applies them; without this the gallery would show every
-        # world on the fallback lists.
-        style_dial, _ = lp.draw_style_choices(key, dial, [], period_key)
-
-        amplification, amp_cost = lp.stage15_amplify(
-            stage1, stage1_model, period_key, config, cache=False, dial=style_dial,
-            style_key=key, style_world=world,
-            register=args.register, secondary_register=args.secondary,
-        )
-        total += amp_cost or 0.0
-
-        prompt, tags, has_people, cost = lp.stage2_image_prompt(
-            stage1, args.register, [], cliches, stage2_model,
-            world,
-            secondary_register=args.secondary,
-            amplification=amplification,
-            dial=style_dial,
-            register_guidance=lp.load_register_line(key, args.register),
-            secondary_register_guidance=lp.load_register_line(key, args.secondary),
-            style_brief=lp.load_style_brief(key),
-            highlight=lp.load_style_highlight(key),
-        )
-        total += cost or 0.0
-        final = lp.final_image_prompt(prompt, key, has_people)
+        # One composition per world, with its own draws (verbs, space,
+        # condition, highlight mode) as production applies them, the
+        # registers pinned, no history and no caption check.
+        result = lp.compose(stage1, reading["arc"], dial, key, config, [], caption="skip",
+                            registers=(args.register, args.secondary))
+        total += (result["stage15Cost"] or 0.0) + (result["stage2Cost"] or 0.0)
+        prompt, tags, final = result["imagePrompt"], result["conceptTags"], result["finalPrompt"]
 
         rel = "images/styles/%s.jpg" % key
         if not args.no_image:
