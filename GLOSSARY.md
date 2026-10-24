@@ -31,3 +31,7 @@ _Avoid_: cache validity, natal hash (one input among several)
 **Catalog**:
 The styles, registers, actor kinds and clichés as read at the start of a run. Every choice in a composition is made from one catalog, and whether a style is usable is a question about the whole catalog, since its rules name the registers and its advice compares it with the other styles.
 _Avoid_: style list, config, loaders
+
+**Setting**:
+One thing the user chooses, such as the schedule, the style or the models. Each has one default and one set of values it may hold, the same for the panel and the pipeline. A value outside that set is read as the default.
+_Avoid_: config option, preference, flag (a flag is how a setting is changed)
