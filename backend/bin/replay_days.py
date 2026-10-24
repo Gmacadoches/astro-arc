@@ -45,12 +45,10 @@ import llm_pipeline as lp  # noqa: E402
 import model_catalog as mc  # noqa: E402
 from sweep import dial_for_day, report_filled  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
-from paths import STATE_DIR  # noqa: E402
+from paths import CONFIG_FILE, PIPELINE_STATE_DIR, STATE_DIR, VERIFY_DIR  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402
 
-READINGS_DIR = STATE_DIR / "pipeline" / "readings"
-VERIFY_ROOT = STATE_DIR / "verification"
-CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
+READINGS_DIR = PIPELINE_STATE_DIR / "readings"
 
 
 def load_days(limit, cell, textured_only=False):
@@ -218,7 +216,7 @@ def main():
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
 
-    config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
     style_key = args.style or config.get("artStyle") or "symbolist"
     lp.require_charter(style_key)
 
@@ -239,7 +237,7 @@ def main():
         print("\nDry run. Re-run with --yes to spend it.")
         return 0
 
-    out_dir = VERIFY_ROOT / args.out
+    out_dir = VERIFY_DIR / args.out
     rows, total = replay(style_key, days, config, out_dir=out_dir,
                          render=not args.no_image, quality=args.quality, redraw=args.redraw)
 

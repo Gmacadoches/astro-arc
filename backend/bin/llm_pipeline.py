@@ -51,7 +51,6 @@ metadata_out.json, for last-run.json and the review log to pick up.
 
 import hashlib
 import json
-import os
 import random
 import re
 import string
@@ -65,6 +64,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from openai_image_gen import ApiKeyError, get_api_key  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
 from http_limits import ResponseTooLarge, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
+from paths import CONFIG_FILE, PIPELINE_STATE_DIR, USER_STYLES_DIR  # noqa: E402
 
 import urllib.error
 import urllib.request
@@ -72,7 +72,7 @@ import urllib.request
 # Ships beside the code — backend/pipeline, one directory up from backend/bin —
 # so the tables travel with the checkout and need no install step.
 PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
-STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc/pipeline"
+STATE_DIR = PIPELINE_STATE_DIR
 HISTORY_FILE = STATE_DIR / "history.json"
 READINGS_DIR = STATE_DIR / "readings"
 AMPLIFICATIONS_DIR = STATE_DIR / "amplifications"
@@ -393,14 +393,8 @@ def load_cliches():
 
 # One file per theme (decision 4): styles/<key>.toml plus a required
 # styles/<key>.jpg preview. The key is the file name. Shipped themes sit beside
-# the code; a user's own go in user_styles_dir().
+# the code; a user's own go in USER_STYLES_DIR.
 SHIPPED_STYLES_DIR = PIPELINE_DIR / "styles"
-
-
-def user_styles_dir():
-    """~/.config/astro-arc/styles, or under $XDG_CONFIG_HOME when it is set."""
-    base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
-    return Path(base) / "astro-arc" / "styles"
 
 
 class Theme(dict):
@@ -471,7 +465,7 @@ def load_styles():
     still loads, empty, so it can be listed as failing validation."""
     themes = {path.stem: _read_theme(path, "shipped")
               for path in sorted(SHIPPED_STYLES_DIR.glob("*.toml"))}
-    user_dir = user_styles_dir()
+    user_dir = USER_STYLES_DIR
     try:
         user_dir.mkdir(parents=True, exist_ok=True)
     except OSError:
@@ -2823,8 +2817,7 @@ def main():
         print(f"Cannot build a prompt: {reading['error']}", file=sys.stderr)
         sys.exit(1)
 
-    config_path = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
-    config = json.loads(config_path.read_text()) if config_path.exists() else {}
+    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
 
     try:
         final_prompt, metadata = build(reading, config)

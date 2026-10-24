@@ -39,11 +39,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from paths import STATE_DIR  # noqa: E402
+from paths import CONFIG_FILE, PIPELINE_STATE_DIR, VERIFY_DIR  # noqa: E402
 
-VERIFY_ROOT = STATE_DIR / "verification"
-READINGS_DIR = STATE_DIR / "pipeline" / "readings"
-CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
+READINGS_DIR = PIPELINE_STATE_DIR / "readings"
 
 
 def chart_for(day, scratch):
@@ -179,11 +177,11 @@ def main():
                          "CONFIGURED style and will be wrong.")
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
-    config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
 
     jobs = []  # (batch name, png, row, day, stage1, reading path or None)
     for name in args.batch:
-        batch = VERIFY_ROOT / name
+        batch = VERIFY_DIR / name
         if not batch.is_dir():
             raise SystemExit(f"No such batch: {batch}")
         sweep = sweep_rows(batch)
@@ -218,7 +216,7 @@ def main():
 
     filed = 0
     for name, png, row, day, stage1, reading in jobs:
-        scratch = VERIFY_ROOT / name / ".archive-scratch"
+        scratch = VERIFY_DIR / name / ".archive-scratch"
         scratch.mkdir(exist_ok=True)
         how = "the chart is that day's own reading"
         if reading is None:

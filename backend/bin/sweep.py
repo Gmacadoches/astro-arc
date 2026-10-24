@@ -48,14 +48,12 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
+from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
 
-VERIFY_ROOT = Path.home() / ".local/state/omarchy/astro-arc/verification"
-CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
-STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc"
 
 
 def load_config():
-    return json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+    return json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
 
 
 def latest_reading():
@@ -232,7 +230,7 @@ def main():
     reading_path = Path(args.reading) if args.reading else latest_reading()
     reading = json.loads(reading_path.read_text())
 
-    out_dir = VERIFY_ROOT / args.out
+    out_dir = VERIFY_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # --- pin the dial ------------------------------------------------

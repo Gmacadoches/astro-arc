@@ -25,12 +25,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ephemeris  # noqa: E402  — Astronomy Engine; see that file for why and how accurate
 from period_key import period_key  # noqa: E402  — see that file: one definition, called from everywhere
+from paths import CONFIG_FILE  # noqa: E402
 
 # Overridable via ASTRO_ARC_CONFIG for testing against a scratch file
 # without ever touching the user's real saved birth data.
 CONFIG_PATH = Path(os.environ.get(
     "ASTRO_ARC_CONFIG",
-    str(Path.home() / ".local/state/omarchy/settings/astro-arc.json"),
+    str(CONFIG_FILE),
 ))
 
 # ---- Reference tables --------------------------------------------------

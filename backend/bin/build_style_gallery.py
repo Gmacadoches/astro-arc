@@ -32,12 +32,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
+from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 OUT_IMAGES = REPO / "docs" / "images" / "styles"
 OUT_PAGE = REPO / "docs" / "styles.md"
-STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc"
-CONFIG = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 THUMB_PX = 900
 
@@ -60,7 +59,7 @@ def main():
     ap.add_argument("--no-image", action="store_true", help="prompts only — free")
     args = ap.parse_args()
 
-    config = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     image_model = config.get("openaiModel") or "gpt-image-1-mini"
     quality = config.get("openaiQuality") or "low"

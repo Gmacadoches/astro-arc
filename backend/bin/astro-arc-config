@@ -111,7 +111,9 @@
 
 set -euo pipefail
 
-CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"   # CONFIG_FILE
 # frequency defaults to "manual": a fresh install generates nothing until it is
 # asked to. Every generation spends real money on an image API, so the cadence
 # that costs nothing is the only one safe to choose on a new user's behalf.

@@ -22,9 +22,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate  # noqa: E402
+from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
 
-VERIFY_ROOT = Path.home() / ".local/state/omarchy/astro-arc/verification"
-CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 
 def render(prompt, style, has_people, out_dir, stem, config):
@@ -52,8 +51,8 @@ def main():
     ap.add_argument("--style")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
-    config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
-    out_dir = VERIFY_ROOT / args.out
+    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    out_dir = VERIFY_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.prompt:
@@ -65,7 +64,7 @@ def main():
         ap.error("give --from or --prompt")
     source = Path(args.source)
     if not source.is_dir():
-        source = VERIFY_ROOT / args.source
+        source = VERIFY_DIR / args.source
     data = json.loads((source / "00_sweep.json").read_text())
     wanted = {int(i) for i in args.indices.split(",")} if args.indices else None
     total = 0.0

@@ -44,18 +44,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
 from sweep import dial_for_day, report_filled  # noqa: E402
-from paths import STATE_DIR  # noqa: E402
+from paths import CONFIG_FILE, PIPELINE_STATE_DIR, STATE_DIR, VERIFY_DIR  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402  — one definition, shared
 
-READINGS_DIR = STATE_DIR / "pipeline" / "readings"
-OUT_ROOT = STATE_DIR / "verification"
-CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
+READINGS_DIR = PIPELINE_STATE_DIR / "readings"
 
 
 def load_config():
     """Same one-liner sweep.py uses; only `stage1Model` and the natal hash
     matter here."""
-    return json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+    return json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
 
 
 def load_days(cell):
@@ -219,7 +217,7 @@ def main():
         print("\nDry run. Re-run with --yes to spend it.")
         return 0
 
-    out_dir = OUT_ROOT / out_name
+    out_dir = VERIFY_DIR / out_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     summaries, total = [], 0.0

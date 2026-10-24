@@ -37,7 +37,7 @@ source "$BIN_DIR/astro-arc-paths.sh"   # STATE_DIR, CONFIG_FILE, the archive
 PY=python3
 HISTORY_DIR="$STATE_DIR/history"
 LAST_RUN_FILE="$STATE_DIR/last-run.json"
-THEME_DIR="$HOME/.config/omarchy/themes/astro-arc"
+THEME_DIR="$OMARCHY_THEMES_DIR/astro-arc"
 PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
 COSTS_FILE="$PIPELINE_STATE_DIR/costs.json"
 COSTS_MAX=200

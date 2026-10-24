@@ -27,7 +27,7 @@ BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=astro-arc-paths.sh
 source "$BIN_DIR/astro-arc-paths.sh"
 INDEX_FILE="$GENERATIONS_INDEX"
-THEME_DIR="$HOME/.config/omarchy/themes/astro-arc"
+THEME_DIR="$OMARCHY_THEMES_DIR/astro-arc"
 
 review_id="${1:-}"
 if [[ -z $review_id ]]; then

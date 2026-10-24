@@ -33,11 +33,15 @@ Panel {
     return u.replace(/\/+$/, "")
   }
   readonly property string binDir: pluginRoot + "/backend/bin"
-  // The archive: every generation's page, wallpaper and theme, plus the
-  // gallery. The user's data, so it lives in ~/.local/share rather than in
-  // state, and outlives the plugin. Must match backend/bin/astro-arc-paths.sh.
+  // Where Astro-Arc keeps things: the QML copy of backend/bin/paths.py and
+  // astro-arc-paths.sh, which explain the split. Change a location in all
+  // three. The archive is every generation's page, wallpaper and theme, plus
+  // the gallery: the user's data, so it lives in ~/.local/share rather than
+  // in state, and outlives the plugin.
   readonly property string archiveDir: (Quickshell.env("XDG_DATA_HOME") || (home + "/.local/share")) + "/astro-arc"
   readonly property string galleryFile: archiveDir + "/index.html"
+  readonly property string stateDir: home + "/.local/state/omarchy/astro-arc"
+  readonly property string configPath: home + "/.local/state/omarchy/settings/astro-arc.json"
 
   readonly property string configBin: binDir + "/astro-arc-config"
   readonly property string generateBin: binDir + "/astro-arc-generate"
@@ -95,7 +99,7 @@ Panel {
   property var lastRun: null
 
   property FileView configFile: FileView {
-    path: root.home + "/.local/state/omarchy/settings/astro-arc.json"
+    path: root.configPath
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
@@ -107,7 +111,7 @@ Panel {
   }
 
   property FileView lastRunFile: FileView {
-    path: root.home + "/.local/state/omarchy/astro-arc/last-run.json"
+    path: root.stateDir + "/last-run.json"
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
@@ -1316,7 +1320,7 @@ Panel {
 
   property FileView tweakBackupFile: FileView {
     path: root.tweakTheme
-      ? root.home + "/.local/state/omarchy/astro-arc/tweak-backups/" + root.tweakTheme.key + "/manifest.json" : ""
+      ? root.stateDir + "/tweak-backups/" + root.tweakTheme.key + "/manifest.json" : ""
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
@@ -1661,7 +1665,7 @@ Panel {
   property var costsSummary: ({ total: 0, unknownCount: 0, generationCount: 0 })
 
   property FileView costsFile: FileView {
-    path: root.home + "/.local/state/omarchy/astro-arc/pipeline/costs.json"
+    path: root.stateDir + "/pipeline/costs.json"
     watchChanges: true
     printErrors: false
     onFileChanged: reload()

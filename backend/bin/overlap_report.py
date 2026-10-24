@@ -25,9 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
+from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
 
-VERIFY_ROOT = Path.home() / ".local/state/omarchy/astro-arc/verification"
-CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 FLAG = 0.30
 
 NOUN_SYSTEM = """List the concrete nouns in a described image: the physical things, materials, creatures, people and places named. Singular, lower case, one or two words each, no adjectives, no abstract nouns (no light, shadow, scene, frame, distance, edge, side). Respond with JSON: {"nouns": ["..."]}"""
@@ -58,11 +57,11 @@ def main():
         print(__doc__, file=sys.stderr)
         sys.exit(1)
     prefix, styles = sys.argv[1], sys.argv[2:]
-    config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
     model = config.get("captionModel") or lp.CAPTION_MODEL
     by_style = {}
     for st in styles:
-        path = VERIFY_ROOT / f"{prefix}-{st}"
+        path = VERIFY_DIR / f"{prefix}-{st}"
         by_style[st] = nouns_for(path, json.loads((path / "00_sweep.json").read_text()), model)
 
     scores, shared = {}, {}

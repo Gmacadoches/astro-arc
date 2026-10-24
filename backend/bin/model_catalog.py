@@ -46,10 +46,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
 from period_key import cache_key  # noqa: E402  — one definition, see period_key.py
 
 PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
-STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc"
 AVAILABILITY_CACHE = STATE_DIR / "model-availability.json"
 LEARNED_USAGE_FILE = STATE_DIR / "model-usage.json"
 
@@ -434,12 +434,11 @@ def render_size_for(width, height):
     return closest_supported_size(width, height, OPENAI_IMAGE_SIZES)
 
 
-SETTINGS_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 
 def load_settings():
     try:
-        return json.loads(SETTINGS_PATH.read_text())
+        return json.loads(CONFIG_FILE.read_text())
     except (json.JSONDecodeError, OSError):
         return {}
 

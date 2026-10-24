@@ -36,9 +36,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
+from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
 
-VERIFY_ROOT = Path.home() / ".local/state/omarchy/astro-arc/verification"
-CONFIG_PATH = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 TERMS = ("far off", "distance", "beyond", "barn", "enormous", "ancient", "older",
          "centuries", "moss", "patched", "mended", "worn", "weathered", "cracked",
@@ -194,7 +193,7 @@ def verb_sources():
 def load_sweep(arg):
     path = Path(arg)
     if not path.is_dir():
-        path = VERIFY_ROOT / arg
+        path = VERIFY_DIR / arg
     data = json.loads((path / "00_sweep.json").read_text())
     return path, data
 
@@ -218,7 +217,7 @@ def classify_activity(path, samples):
     cache = {}
     if cache_path.exists():
         cache = json.loads(cache_path.read_text())
-    config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
+    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
     # The writing model, not the caption judge: gpt-4o-mini returned "none" for
     # 5 of 12 prompts that plainly had a nurse in them (2026-10-10).
     model = config.get("stage2Model") or config.get("captionModel") or lp.CAPTION_MODEL

@@ -31,8 +31,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from model_catalog import image_cost, load_rates, render_size_for  # noqa: E402
 from openai_image_gen import generate  # noqa: E402
+from paths import VERIFY_DIR  # noqa: E402
 
-OUT_ROOT = Path.home() / ".local/state/omarchy/astro-arc/verification"
 
 
 def prompt_from_review(review_dir):
@@ -85,7 +85,7 @@ def main():
         print("\nDry run. Re-run with --yes to spend.")
         return
 
-    out_dir = OUT_ROOT / args.out
+    out_dir = VERIFY_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "00_prompt.txt").write_text(prompt)
 

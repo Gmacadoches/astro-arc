@@ -16,13 +16,15 @@ import sys
 import tempfile
 from pathlib import Path
 
-VERIFY_ROOT = Path.home() / ".local/state/omarchy/astro-arc/verification"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from paths import VERIFY_DIR  # noqa: E402
+
 TILE = "480x270"
 
 
 def resolve(p):
     path = Path(p)
-    return path if path.is_absolute() or path.exists() else VERIFY_ROOT / p
+    return path if path.is_absolute() or path.exists() else VERIFY_DIR / p
 
 
 def main():

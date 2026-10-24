@@ -44,8 +44,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import llm_pipeline as lp  # noqa: E402
+from paths import VERIFY_DIR  # noqa: E402
 
-VERIFY_ROOT = Path.home() / ".local/state/omarchy/astro-arc/verification"
 
 PERIOD_KEY = "audit-2026-10-16"
 CONFIG = {"stage1Model": "stub-model", "stage2Model": "stub-model", "captionModel": "stub-model"}
@@ -369,7 +369,7 @@ def main():
     parser.add_argument("--no-control", action="store_true", help="skip the unchartered control style")
     args = parser.parse_args()
 
-    out_dir = VERIFY_ROOT / args.out
+    out_dir = VERIFY_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 
     started = time.monotonic()

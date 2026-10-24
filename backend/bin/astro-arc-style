@@ -68,7 +68,7 @@ import model_catalog as mc  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
 from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
-from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
+from paths import CONFIG_FILE, STATE_DIR, USER_STYLES_DIR, VERIFY_DIR  # noqa: E402
 from replay_days import STYLE_DRAW_KEYS, load_days, projected_cost, replay  # noqa: E402
 from style_catalog import PREVIEW_PX  # noqa: E402
 
@@ -76,7 +76,6 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[2]
 SKILL_DIR = PLUGIN_ROOT / "skills" / "astro-arc-style"
 SKILL_FILE = SKILL_DIR / "SKILL.md"
 THIS = Path(__file__).resolve()
-VERIFY_ROOT = STATE_DIR / "verification"
 # One backup per user theme, the state before its last tweak. Outside the
 # styles folder so the catalog never lists it. The panel watches
 # <key>/manifest.json to know whether "Undo last tweak" has anything to do.
@@ -204,7 +203,7 @@ def cmd_validate(args):
     elif not errors and theme.source == "shipped":
         print("\nValid (a shipped theme).")
     elif not errors:
-        print(f"\nValid. Copy it into {lp.user_styles_dir()}/ to use it; "
+        print(f"\nValid. Copy it into {USER_STYLES_DIR}/ to use it; "
               f"it then shows in the style list as \"{theme.label}\", tagged custom.")
     return 1 if errors else 0
 
@@ -265,7 +264,7 @@ def register_spread(n, seed):
 
 
 def save_record(kind, key, record):
-    out = VERIFY_ROOT / f"style-{kind}"
+    out = VERIFY_DIR / f"style-{kind}"
     out.mkdir(parents=True, exist_ok=True)
     path = out / f"{key}-{datetime.now():%Y%m%d-%H%M%S}.json"
     path.write_text(json.dumps(record, indent=2))
@@ -605,7 +604,7 @@ def cmd_import(args):
     shipped = {p.stem for p in lp.SHIPPED_STYLES_DIR.glob("*.toml")}
     if key in shipped:
         key += "-custom"
-    folder = lp.user_styles_dir()
+    folder = USER_STYLES_DIR
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{key}.toml"
     replaced = target.exists()
@@ -681,7 +680,7 @@ def user_theme(file):
     back anyway."""
     path = Path(file).expanduser().resolve()
     key = theme_key(path)
-    if path.parent != lp.user_styles_dir().resolve():
+    if path.parent != USER_STYLES_DIR.resolve():
         raise StyleError(f"{path.name} is not one of your themes, so it can't be tweaked")
     return key, path
 
@@ -781,7 +780,7 @@ def cmd_tweak_prompt(args):
 
 
 def agent_brief(kind, target, note="", example=""):
-    folder = lp.user_styles_dir()
+    folder = USER_STYLES_DIR
     if kind == "create":
         task = (f"Create an Astro-Arc theme (a style for the Astro-Arc wallpaper plugin) from this idea:\n\n"
                 f"  {target}\n\nWrite it into {folder}/.")
@@ -843,7 +842,7 @@ def cmd_agent(args):
     # files.
     if args.kind == "tweak":
         backup_theme(args.target)
-    folder = lp.user_styles_dir()
+    folder = USER_STYLES_DIR
     folder.mkdir(parents=True, exist_ok=True)
     # The same terminal window omarchy-agent opens (omarchy-launch-tui, one
     # app-id for every agent), but with the agent in its asking mode rather
