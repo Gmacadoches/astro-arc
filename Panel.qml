@@ -95,19 +95,79 @@ Panel {
   }
 
   // ---- Config state ----------------------------------------------------
-  property var configState: Model.DEFAULT_CONFIG
+  // The settings, as astro-arc-config prints them: every key present and every
+  // value one its key may hold (backend/pipeline/settings.toml). The panel
+  // keeps no defaults of its own; until the first read lands, configState is
+  // empty and configLoaded false.
+  property var configState: ({})
+  property bool configLoaded: false
   property var lastRun: null
 
+  // Watched only as the signal that the settings changed; they are read
+  // through astro-arc-config, so the panel sees what every other reader sees.
   property FileView configFile: FileView {
     path: root.configPath
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: {
-      root.configState = Model.parseConfig(text())
-      root.checkAutoGenerate()
+    onLoaded: root.readConfig()
+    onLoadFailed: root.readConfig()
+  }
+
+  property bool configReadPending: false
+  function readConfig() {
+    if (configReadProc.running) { configReadPending = true; return }
+    configReadProc.running = true
+  }
+
+  Process {
+    id: configReadProc
+    command: [root.configBin]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        try {
+          root.configState = JSON.parse(String(text || "{}"))
+          root.configLoaded = true
+          root.checkAutoGenerate()
+        } catch (e) {}
+      }
     }
-    onLoadFailed: root.configState = Model.parseConfig("")
+    onExited: {
+      if (root.configReadPending) {
+        root.configReadPending = false
+        root.readConfig()
+      }
+    }
+  }
+
+  // Every settings write, one at a time, in order: two quick toggles can never
+  // race each other to the file. `onDone(exitCode)` runs after the write; a
+  // successful one is read back through readConfig.
+  property var configWriteQueue: []
+  property var configWriteDone: null
+  function writeConfig(args, onDone) {
+    configWriteQueue = configWriteQueue.concat([{ args: args, onDone: onDone || null }])
+    if (!configWriteProc.running) nextConfigWrite()
+  }
+  function nextConfigWrite() {
+    if (configWriteQueue.length === 0) return
+    var job = configWriteQueue[0]
+    configWriteQueue = configWriteQueue.slice(1)
+    configWriteDone = job.onDone
+    configWriteProc.command = [root.configBin].concat(job.args)
+    configWriteProc.running = true
+  }
+
+  Process {
+    id: configWriteProc
+    onExited: function(exitCode) {
+      var done = root.configWriteDone
+      root.configWriteDone = null
+      if (exitCode === 0) root.configFile.reload()
+      if (done) done(exitCode)
+      root.nextConfigWrite()
+    }
   }
 
   property FileView lastRunFile: FileView {
@@ -160,15 +220,7 @@ Panel {
       && (draftBirthTime !== "" ? draftBirthTime === root.configState.birthTime : root.configState.birthTimeUnknown)
     if (unchanged) return
 
-    birthWriteProc.command = [root.configBin, "--set-birth", draftBirthDate, timeArg]
-    birthWriteProc.running = true
-  }
-
-  Process {
-    id: birthWriteProc
-    onExited: function(exitCode) {
-      if (exitCode === 0) root.configFile.reload()
-    }
+    root.writeConfig(["--set-birth", draftBirthDate, timeArg])
   }
 
   // ---- Location editing (mirrors weather's click-to-edit + geocode flow)
@@ -220,24 +272,19 @@ Panel {
   }
 
   function persistLocation(name, latitude, longitude, timezone) {
+    var args
     if (name && Model.isValidCoordinate(latitude, longitude))
-      locationWriteProc.command = timezone
-        ? [root.configBin, "--set-location", name, latitude + "," + longitude, timezone]
-        : [root.configBin, "--set-location", name, latitude + "," + longitude]
+      args = timezone
+        ? ["--set-location", name, latitude + "," + longitude, timezone]
+        : ["--set-location", name, latitude + "," + longitude]
     else if (name)
-      locationWriteProc.command = [root.configBin, "--set-location", name]
+      args = ["--set-location", name]
     else
-      locationWriteProc.command = [root.configBin, "--clear-location"]
-    locationWriteProc.running = true
-  }
-
-  Process {
-    id: locationWriteProc
-    onExited: function(exitCode) {
+      args = ["--clear-location"]
+    root.writeConfig(args, function() {
       root.savingLocation = false
-      if (exitCode === 0) root.configFile.reload()
       root.cancelEditingLocation()
-    }
+    })
   }
 
   function requestGeocode() {
@@ -284,27 +331,11 @@ Panel {
 
   // ---- Frequency ------------------------------------------------------
   function commitFrequency(value) {
-    frequencyWriteProc.command = [root.configBin, "--set-frequency", value]
-    frequencyWriteProc.running = true
-  }
-
-  Process {
-    id: frequencyWriteProc
-    onExited: function(exitCode) {
-      if (exitCode === 0) root.configFile.reload()
-    }
+    root.writeConfig(["--set-frequency", value])
   }
 
   function commitIntervalHours(value) {
-    intervalHoursWriteProc.command = [root.configBin, "--set-interval-hours", value]
-    intervalHoursWriteProc.running = true
-  }
-
-  Process {
-    id: intervalHoursWriteProc
-    onExited: function(exitCode) {
-      if (exitCode === 0) root.configFile.reload()
-    }
+    root.writeConfig(["--set-interval-hours", value])
   }
 
   Connections {
@@ -343,51 +374,37 @@ Panel {
   // ---- Automatic scheduling ---------------------------------------------
   // This Timer IS the scheduler. The bar widget loads this panel eagerly (see
   // BarWidget.qml's Loader), so it polls from the moment the shell starts,
-  // whether or not the panel is ever opened, and calls
-  // `astro-arc-generate --if-due`, which does nothing unless the period is due
-  // and holds a lock so a manual click can never double-render.
+  // whether or not the panel is ever opened. Each tick asks
+  // `astro-arc-generate --check-due`, and only on a yes starts
+  // `astro-arc-generate --if-due`, which re-checks and holds a lock so a manual
+  // click can never double-render. The panel keeps no copy of the rule:
+  // period_key.py says what a period is, and astro-arc-generate whether the
+  // current one is covered or was already attempted.
   //
   // There used to be a systemd timer too, installed by an install script as a
   // "backstop". On Omarchy the shell IS the desktop, so it only ever added
   // coverage for a logged-in session with no shell — and it outlived the
   // plugin, firing into a deleted script after removal. Both are gone.
   //
-  // "New period" is a plain string comparison against Model.currentPeriodKey
-  // (which mirrors astro-arc-generate's own `date +%Y-%m-%d`/`+%G-W%V`/
-  // `+%Y-%m`) — never elapsed-time math — so "daily" means "the calendar
-  // date changed", not "24 hours since the last run". 11pm and 1am the next
-  // morning are different dates the moment the clock crosses midnight, so
-  // the very next timer tick (at most autoGenerateCheckInterval later)
-  // starts that day's generation, however few hours actually separated them.
+  // "New period" is a period-key comparison, never elapsed-time math, so
+  // "daily" means "the calendar date changed", not "24 hours since the last
+  // run": the first tick after midnight (at most autoGenerateCheckInterval
+  // later) starts that day's generation.
   property bool lastRunLoaded: false
-  property string autoAttemptedPeriodKey: ""
   readonly property int autoGenerateCheckInterval: 5 * 60 * 1000
 
   function checkAutoGenerate() {
-    if (!root.lastRunLoaded || root.generating) return
-    // Nothing to generate from yet (fresh install, birth data never set) —
-    // don't nag the API with a doomed request every interval.
-    if (root.configState.birthDate === "") return
-
-    // Nothing is scheduled on "manual" — astro-arc-generate --if-due would
-    // exit immediately anyway, but there is no reason to spawn it to be told
-    // that.
+    if (!root.configLoaded || !root.lastRunLoaded || root.generating || dueCheckProc.running) return
+    // "manual" schedules nothing, so there is no need to spawn a process to be
+    // told so.
     if (root.configState.frequency === "manual") return
+    dueCheckProc.running = true
+  }
 
-    var currentKey = Model.currentPeriodKey(root.configState.frequency, undefined, root.configState.intervalHours)
-    // Model.runCoversPeriod, not a comparison against lastRun.periodKey: that
-    // key was filed under whatever frequency was set when the run happened, so
-    // comparing it across a frequency CHANGE made switching Daily -> Monthly
-    // generate on the spot. See its comment in Model.js.
-    if (Model.runCoversPeriod(root.lastRun, root.configState.frequency, undefined, root.configState.intervalHours)) return
-    // Already tried this exact period this session (regardless of whether
-    // it succeeded) — avoid hammering a misconfigured setup (e.g. no API
-    // key) every autoGenerateCheckInterval; the next real period, or a
-    // manual "Regenerate" click, will try again.
-    if (root.autoAttemptedPeriodKey === currentKey) return
-
-    root.autoAttemptedPeriodKey = currentKey
-    root.startGenerate(true)
+  Process {
+    id: dueCheckProc
+    command: [root.generateBin, "--check-due"]
+    onExited: function(exitCode) { if (exitCode === 0) root.startGenerate(true) }
   }
 
   Timer {
@@ -878,24 +895,12 @@ Panel {
 
   // ---- Image backend + OpenAI model/quality ------------------------------
   function commitImageBackend(value) {
-    imageBackendWriteProc.command = [root.configBin, "--set-image-backend", value]
-    imageBackendWriteProc.running = true
-  }
-
-  Process {
-    id: imageBackendWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-image-backend", value])
   }
 
   function commitOpenaiModel(compositeValue) {
     var parts = compositeValue.split("|")
-    openaiModelWriteProc.command = [root.configBin, "--set-openai-model", parts[0], parts[1] || ""]
-    openaiModelWriteProc.running = true
-  }
-
-  Process {
-    id: openaiModelWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-openai-model", parts[0], parts[1] || ""])
   }
 
   // ---- Stage 1 / Stage 2 chat models — separate from the image-render
@@ -904,24 +909,12 @@ Panel {
   // different models (and different API keys — see apiKeyState). ---------
   function commitStage1Model(value) {
     if (!value) return
-    stage1ModelWriteProc.command = [root.configBin, "--set-stage1-model", value]
-    stage1ModelWriteProc.running = true
-  }
-
-  Process {
-    id: stage1ModelWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-stage1-model", value])
   }
 
   function commitStage2Model(value) {
     if (!value) return
-    stage2ModelWriteProc.command = [root.configBin, "--set-stage2-model", value]
-    stage2ModelWriteProc.running = true
-  }
-
-  Process {
-    id: stage2ModelWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-stage2-model", value])
   }
 
   // ---- Background size — "auto" (default) re-detects the focused
@@ -932,15 +925,8 @@ Panel {
   property string backgroundSizeError: ""
   // ---- Provider: the one global setting. -----------------------------
   function commitProvider(value) {
-    providerWriteProc.command = [root.configBin, "--set-provider", value]
-    providerWriteProc.running = true
-  }
-
-  Process {
-    id: providerWriteProc
-    onExited: function(exitCode) {
+    root.writeConfig(["--set-provider", value], function(exitCode) {
       if (exitCode !== 0) return
-      root.configFile.reload()
       // Everything the panel shows is scoped to the provider: its key, its
       // model list and its prices. astro-arc-config has already moved the
       // models to the new provider's recommended preset.
@@ -948,7 +934,7 @@ Panel {
       root.refreshApiKeyStatus("stage2")
       root.refreshApiKeyStatus("image")
       root.loadModelCatalog(false)
-    }
+    })
   }
 
   // ---- The popout. The panel's settings view holds only what a reading
@@ -982,14 +968,8 @@ Panel {
     // ONE write for all four. Writing them separately would put the config
     // through intermediate states that match no preset, so the picker would
     // flicker through "Custom" on its way to the tier just chosen.
-    presetWriteProc.command = [root.configBin, "--set-models",
-      preset.chat, preset.chat, preset.image, preset.quality, preset.reasoning || "default"]
-    presetWriteProc.running = true
-  }
-
-  Process {
-    id: presetWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-models",
+      preset.chat, preset.chat, preset.image, preset.quality, preset.reasoning || "default"])
   }
 
   // ---- Per-image cost ceiling (dollars; 0 = none). -------------------
@@ -1003,13 +983,7 @@ Panel {
       return
     }
     root.maxCostPerImageError = ""
-    maxCostPerImageWriteProc.command = [root.configBin, "--set-max-cost-per-image", trimmed]
-    maxCostPerImageWriteProc.running = true
-  }
-
-  Process {
-    id: maxCostPerImageWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-max-cost-per-image", trimmed])
   }
 
   // ---- Updates: deliberately not done from in here. The plugin does not
@@ -1147,13 +1121,7 @@ Panel {
       return
     }
     backgroundSizeError = ""
-    backgroundSizeWriteProc.command = [root.configBin, "--set-background-size", value]
-    backgroundSizeWriteProc.running = true
-  }
-
-  Process {
-    id: backgroundSizeWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-background-size", value])
   }
 
   function detectBackgroundSize() {
@@ -1247,8 +1215,7 @@ Panel {
   }
 
   function commitArtStyle(value) {
-    artStyleWriteProc.command = [root.configBin, "--set-art-style", value]
-    artStyleWriteProc.running = true
+    root.writeConfig(["--set-art-style", value])
   }
 
   // ---- Create your own style (decision 9). The plugin never asks a model
@@ -1598,11 +1565,6 @@ Panel {
     }
   }
 
-  Process {
-    id: artStyleWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
-  }
-
   // ---- Theme generator: "built-in" (palette_extract.py, default) or
   // "aether" (shells out to Omarchy's own theme generator for a richer
   // theme — see palette_extract.py's icons.theme comment for why the
@@ -1610,13 +1572,7 @@ Panel {
   // astro-arc-generate falls back to built-in automatically if aether is
   // missing or fails, so picking it here never risks a broken generation.
   function commitThemeGenerator(value) {
-    themeGeneratorWriteProc.command = [root.configBin, "--set-theme-generator", value]
-    themeGeneratorWriteProc.running = true
-  }
-
-  Process {
-    id: themeGeneratorWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-theme-generator", value])
   }
 
   // ---- Background only (default on): each generation changes the wallpaper
@@ -1624,24 +1580,12 @@ Panel {
   // astro-arc theme — which repaints every app a theme touches, and replaces
   // whatever theme the user was running. -----------------------------------
   function commitBackgroundOnly(value) {
-    backgroundOnlyWriteProc.command = [root.configBin, "--set-background-only", value ? "true" : "false"]
-    backgroundOnlyWriteProc.running = true
-  }
-
-  Process {
-    id: backgroundOnlyWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-background-only", value ? "true" : "false"])
   }
 
   // ---- Animated background: whether the orbits behind the panel move.
   function commitAnimatedBackground(value) {
-    animatedBackgroundWriteProc.command = [root.configBin, "--set-animated-background", value ? "true" : "false"]
-    animatedBackgroundWriteProc.running = true
-  }
-
-  Process {
-    id: animatedBackgroundWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-animated-background", value ? "true" : "false"])
   }
 
   // ---- History retention: how many days of "Themes Generated" entries
@@ -1657,13 +1601,7 @@ Panel {
       return
     }
     historyRetentionError = ""
-    historyRetentionWriteProc.command = [root.configBin, "--set-history-retention-days", String(parseInt(value, 10))]
-    historyRetentionWriteProc.running = true
-  }
-
-  Process {
-    id: historyRetentionWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    root.writeConfig(["--set-history-retention-days", String(parseInt(value, 10))])
   }
 
   // ---- API usage: a running total from astro-arc-generate's costs.json

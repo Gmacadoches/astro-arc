@@ -1,4 +1,4 @@
-// Pure logic for the Astro-Arc panel: config/last-run parsing, geocoding
+// Pure logic for the Astro-Arc panel: last-run parsing, geocoding
 // parsing (mirrors the weather plugin's Model.js), and small validators.
 // Kept side-effect free and module.exports-able so it can be unit tested
 // the same way weather/Model.js is.
@@ -9,47 +9,6 @@
 // known here; it is what a config with no style, or with a key whose theme is
 // gone, falls back to (llm_pipeline.DEFAULT_STYLE says the same).
 var DEFAULT_ART_STYLE = "symbolist"
-
-var DEFAULT_CONFIG = {
-  birthDate: "",
-  birthTime: "",
-  birthTimeUnknown: false,
-  locationName: "",
-  latitude: null,
-  longitude: null,
-  timezone: "",
-  // "manual" — a fresh install generates nothing until asked. Every
-  // generation spends real money on an image API, so the cadence that
-  // costs nothing is the only safe thing to pick on someone's behalf;
-  // an explicit "daily" in an existing config.json still wins over this.
-  frequency: "manual",
-  // Hours between runs when frequency is "hourly"; ignored otherwise. See
-  // INTERVAL_HOURS_CHOICES.
-  intervalHours: 1,
-  // "openai" — the legacy key `provider` superseded. It defaulted to "local"
-  // (Stable Diffusion) long after that path stopped being offered in the UI,
-  // which meant the default named a backend a new install could not reach.
-  // astro-arc-generate reads `provider` first and this only as a fallback, so
-  // the two must at least agree.
-  imageBackend: "openai",
-  openaiModel: "",
-  openaiQuality: "",
-  stage1Model: "gpt-4o-mini",
-  stage2Model: "gpt-4o-mini",
-  backgroundSize: "auto",
-  artStyle: DEFAULT_ART_STYLE,
-  themeGenerator: "built-in",
-  // true — change only the wallpaper and leave the user's theme colors alone.
-  // Most people already run a theme they chose, often several theme plugins;
-  // repainting all of it every day is the opt-in, not the default.
-  backgroundOnly: true,
-  // The solar system behind the panel moves; false draws it still.
-  animatedBackground: true,
-  historyRetentionDays: 30,
-  maxCostPerImage: 0,
-  provider: "openai",
-  chatReasoning: "default"
-}
 
 // How many days one "Themes Generated" entry represents, by frequency —
 // used only to estimate how many entries a retention window will hold
@@ -347,53 +306,6 @@ function openaiModelDropdownValue(model, quality) {
   return String(model || "") + "|" + String(quality || "")
 }
 
-function parseConfig(raw) {
-  try {
-    var data = JSON.parse(String(raw || "{}"))
-    if (!data || typeof data !== "object") return Object.assign({}, DEFAULT_CONFIG)
-
-    var lat = parseFloat(data.latitude)
-    var lon = parseFloat(data.longitude)
-    var hasCoords = !isNaN(lat) && !isNaN(lon)
-
-    return {
-      birthDate: typeof data.birthDate === "string" ? data.birthDate : "",
-      birthTime: typeof data.birthTime === "string" ? data.birthTime : "",
-      birthTimeUnknown: !!data.birthTimeUnknown,
-      locationName: typeof data.locationName === "string" ? data.locationName : "",
-      latitude: hasCoords ? lat : null,
-      longitude: hasCoords ? lon : null,
-      timezone: typeof data.timezone === "string" ? data.timezone : "",
-      frequency: ["hourly", "daily", "weekly", "monthly", "manual"].indexOf(data.frequency) >= 0 ? data.frequency : "manual",
-      intervalHours: intervalHours(data.intervalHours),
-      imageBackend: data.imageBackend === "local" ? "local" : "openai",
-      openaiModel: typeof data.openaiModel === "string" ? data.openaiModel : "",
-      openaiQuality: typeof data.openaiQuality === "string" ? data.openaiQuality : "",
-      stage1Model: typeof data.stage1Model === "string" && data.stage1Model !== "" ? data.stage1Model : "gpt-4o-mini",
-      stage2Model: typeof data.stage2Model === "string" && data.stage2Model !== "" ? data.stage2Model : "gpt-4o-mini",
-      backgroundSize: data.backgroundSize === "auto" || (typeof data.backgroundSize === "string" && SIZE_PATTERN.test(data.backgroundSize)) ? data.backgroundSize : "auto",
-      artStyle: typeof data.artStyle === "string" && data.artStyle !== "" ? data.artStyle : DEFAULT_ART_STYLE,
-      themeGenerator: data.themeGenerator === "aether" ? "aether" : "built-in",
-      // Only an explicit false turns it off, matching astro-arc-generate.
-      backgroundOnly: data.backgroundOnly !== false,
-      animatedBackground: data.animatedBackground !== false,
-      historyRetentionDays: Number.isInteger(data.historyRetentionDays) && data.historyRetentionDays >= 1 && data.historyRetentionDays <= 3650
-        ? data.historyRetentionDays : 30,
-      // 0 (or anything unparseable) means no ceiling.
-      maxCostPerImage: typeof data.maxCostPerImage === "number" && data.maxCostPerImage >= 0
-        ? data.maxCostPerImage : 0,
-      // Falls back to the legacy imageBackend so an existing config keeps
-      // working, including one that still says "local".
-      provider: typeof data.provider === "string" && data.provider !== ""
-        ? data.provider : (typeof data.imageBackend === "string" && data.imageBackend !== "" ? data.imageBackend : "openai"),
-      chatReasoning: typeof data.chatReasoning === "string" && data.chatReasoning !== ""
-        ? data.chatReasoning : "default"
-    }
-  } catch (e) {
-    return Object.assign({}, DEFAULT_CONFIG)
-  }
-}
-
 // astro-arc-apikey status's output: {"present":true,"masked":"sk-...ab12"}
 // or {"present":false}. Never carries the actual key.
 function parseApiKeyStatus(raw) {
@@ -668,71 +580,6 @@ function isValidCoordinate(lat, lon) {
   return !isNaN(la) && !isNaN(lo) && la >= -90 && la <= 90 && lo >= -180 && lo <= 180
 }
 
-function pad2(n) {
-  return (n < 10 ? "0" : "") + n
-}
-
-// ISO 8601 week-numbering date's "%G-W%V" — same key astro_engine.py's
-// `date +%G-W%V` derives for a weekly period. ISO weeks start Monday, and
-// the year is whichever one owns that week's Thursday, so late-December/
-// early-January dates can belong to a week numbered under the other
-// calendar year (e.g. 2027-01-01 is still ISO week 2026-W53).
-function isoWeekKey(date) {
-  var d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  var dayNum = (d.getDay() + 6) % 7 // Mon=0 ... Sun=6
-  d.setDate(d.getDate() - dayNum + 3) // Thursday of this ISO week
-  var isoYear = d.getFullYear()
-  var jan4 = new Date(isoYear, 0, 4)
-  var jan4DayNum = (jan4.getDay() + 6) % 7
-  var week1Monday = new Date(jan4)
-  week1Monday.setDate(jan4.getDate() - jan4DayNum)
-  var week = Math.floor(Math.round((d - week1Monday) / 86400000) / 7) + 1
-  return isoYear + "-W" + pad2(week)
-}
-
-// The period key "now" resolves to for a given frequency, on the *local*
-// calendar — mirrors astro-arc-generate's `date +%Y-%m-%d` / `+%G-W%V` /
-// `+%Y-%m`, which also run in local time. This is what makes "daily" mean
-// "the calendar date changed", not "24 hours since the last run": comparing
-// this against lastRun.periodKey is a plain string check with no elapsed-
-// time math at all, so 11pm on one date and 1am the next both resolve to
-// their own date's key regardless of how few hours separate them.
-//
-// `hours` is the Hourly interval: the key names the hour its slot starts on,
-// so at every 3 hours 14:05 falls in "T12". Ignored by the other frequencies.
-function currentPeriodKey(frequency, now, hours) {
-  var d = now || new Date()
-  if (frequency === "weekly") return isoWeekKey(d)
-  if (frequency === "monthly") return d.getFullYear() + "-" + pad2(d.getMonth() + 1)
-  var day = d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
-  if (frequency === "hourly") {
-    var n = intervalHours(hours)
-    return day + "T" + pad2(Math.floor(d.getHours() / n) * n)
-  }
-  return day
-}
-
-// Does this run already cover the period the given frequency is in right now?
-//
-// The run's own stored periodKey CANNOT answer that, and comparing against it
-// was a real bug: the key was written under whatever frequency was set at the
-// time, so a run filed as "2026-09-13" under Daily, compared against "2026-09"
-// once the dropdown moved to Monthly, looks like a period that has never been
-// generated — and a paid render started as the immediate consequence of
-// changing a setting. Re-keying the run's TIMESTAMP under the frequency in
-// effect now is the comparison that actually means "already covered".
-//
-// Falls back to the stored key for a run old enough to predate generatedAt, or
-// one carrying a timestamp that won't parse.
-function runCoversPeriod(lastRun, frequency, now, hours) {
-  if (!lastRun) return false
-  var currentKey = currentPeriodKey(frequency, now, hours)
-  var generated = lastRun.generatedAt ? new Date(lastRun.generatedAt) : null
-  if (generated && !isNaN(generated.getTime()))
-    return currentPeriodKey(frequency, generated, hours) === currentKey
-  return lastRun.periodKey === currentKey
-}
-
 // Formats a generatedAt timestamp for display. Callers own the surrounding
 // wording (e.g. "Daily · " + this) so this only ever returns the date/time
 // part; `formatter` lets a caller pick a compact pattern instead of the
@@ -746,7 +593,6 @@ function formatGeneratedAt(iso, formatter) {
 
 if (typeof module !== "undefined") {
   module.exports = {
-    DEFAULT_CONFIG: DEFAULT_CONFIG,
     OPENAI_MODEL_CHOICES: OPENAI_MODEL_CHOICES,
     DEFAULT_ART_STYLE: DEFAULT_ART_STYLE,
     styleOptionLabel: styleOptionLabel,
@@ -782,7 +628,6 @@ if (typeof module !== "undefined") {
     openaiModelDropdownValue: openaiModelDropdownValue,
     formatDateDigits: formatDateDigits,
     formatTimeDigits: formatTimeDigits,
-    parseConfig: parseConfig,
     parseLastRun: parseLastRun,
     parseApiKeyStatus: parseApiKeyStatus,
     parseReviewsIndex: parseReviewsIndex,
@@ -794,8 +639,6 @@ if (typeof module !== "undefined") {
     isValidBackgroundSize: isValidBackgroundSize,
     isValidHistoryRetentionDays: isValidHistoryRetentionDays,
     isValidCoordinate: isValidCoordinate,
-    currentPeriodKey: currentPeriodKey,
-    runCoversPeriod: runCoversPeriod,
     formatGeneratedAt: formatGeneratedAt,
     sumCosts: sumCosts,
     formatBytes: formatBytes,

@@ -250,8 +250,8 @@ Column {
 
     Text {
       textFormat: Text.PlainText
-      visible: panel.configState.latitude !== null
-      text: panel.configState.latitude !== null
+      visible: panel.configState.latitude != null
+      text: panel.configState.latitude != null
         ? ("Coordinates: " + panel.configState.latitude.toFixed(4) + ", " + panel.configState.longitude.toFixed(4))
         : ""
       color: Qt.darker(panel.bar.foreground, 1.5)

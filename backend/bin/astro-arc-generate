@@ -22,9 +22,25 @@
 # "is this actually due" logic, and without risking a wasted paid render on a
 # period that's already generated. A manual Regenerate never passes it — a
 # click always means "regenerate right now", period match or not.
+#
+# --check-due: answer the same question and do nothing else: prints why not and
+# exits 1, or exits 0 when a run is due. The panel's poll asks this first, so
+# a poll that finds nothing due never shows "Generating…". This script is the
+# only place the question is answered; the panel keeps no copy of the rule.
+#
+# An --if-due run records the period it was started for (auto-attempt.json in
+# the state dir), and a period is not due again once it has been attempted,
+# succeeded or not. A misconfigured install (no key, a refused render) so
+# tries once per period rather than every five minutes; the next period, or a
+# Regenerate click, tries again.
 if_due=0
+check_due=0
 if [[ "${1:-}" == "--if-due" ]]; then
   if_due=1
+  shift
+elif [[ "${1:-}" == "--check-due" ]]; then
+  if_due=1
+  check_due=1
   shift
 fi
 
@@ -37,6 +53,8 @@ source "$BIN_DIR/astro-arc-paths.sh"   # STATE_DIR, CONFIG_FILE, the archive
 PY=python3
 HISTORY_DIR="$STATE_DIR/history"
 LAST_RUN_FILE="$STATE_DIR/last-run.json"
+# The period the last scheduled (--if-due) run was started for; see --check-due.
+AUTO_ATTEMPT_FILE="$STATE_DIR/auto-attempt.json"
 THEME_DIR="$OMARCHY_THEMES_DIR/astro-arc"
 PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
 COSTS_FILE="$PIPELINE_STATE_DIR/costs.json"
@@ -50,10 +68,13 @@ mkdir -p "$STATE_DIR" "$HISTORY_DIR" "$THEME_DIR/backgrounds" "$PIPELINE_STATE_D
 # for) two images at once. Whichever loses just skips this run entirely rather
 # than queuing: the next poll comes a few minutes later, and by then the winner
 # will have made it not-due anyway.
-exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-  echo "Astro-Arc: another generation is already running — skipping" >&2
-  exit 0
+# --check-due only answers a question, so it neither takes nor waits for it.
+if [[ $check_due == 0 ]]; then
+  exec 9>"$LOCK_FILE"
+  if ! flock -n 9; then
+    echo "Astro-Arc: another generation is already running — skipping" >&2
+    exit 0
+  fi
 fi
 
 # One read, through astro-arc-config --resolved: every key present, every value
@@ -94,10 +115,6 @@ period_key_for() {
   fi
 }
 
-case "$frequency" in
-  hourly|weekly|monthly|manual) ;;
-  *) frequency="daily" ;;
-esac
 period_key=$(period_key_for "$frequency")
 # Every reading, image, cache and review entry is named after this. An empty
 # key would quietly write files called "reading-.json" and compare due-ness
@@ -111,9 +128,20 @@ period_key=$(period_key_for "$frequency")
 # do nothing at all on "manual". A deliberate Regenerate click does not pass
 # --if-due, so the button keeps working — which is the entire point of the
 # setting: no surprise spending, generate when you ask.
+# Not due: say why, and stop. exit 0 for --if-due (nothing to do is success),
+# 1 for --check-due (the answer is no).
+not_due() {
+  echo "Astro-Arc: $1"
+  exit $((check_due))
+}
+
 if [[ $if_due == 1 && $frequency == manual ]]; then
-  echo "Astro-Arc: auto-generation is off (frequency is \"manual\") — nothing to do"
-  exit 0
+  not_due "auto-generation is off (frequency is \"manual\") — nothing to do"
+fi
+# Nothing to generate from yet (a fresh install, birth data never set): a run
+# would only fail, so a scheduled one is not attempted.
+if [[ $if_due == 1 && -z $(cfg '.birthDate') ]]; then
+  not_due "no birth date set yet — nothing to do"
 fi
 
 if [[ $if_due == 1 ]]; then
@@ -134,9 +162,19 @@ if [[ $if_due == 1 ]]; then
   fi
   [[ -n $last_covered_key ]] || last_covered_key="$last_period_key"
   if [[ -n $last_covered_key && $last_covered_key == "$period_key" ]]; then
-    echo "Astro-Arc: $frequency period $period_key already generated — nothing to do"
+    not_due "$frequency period $period_key already generated — nothing to do"
+  fi
+  attempted=$(jq -r '"\(.frequency)|\(.periodKey)"' "$AUTO_ATTEMPT_FILE" 2>/dev/null || true)
+  if [[ $attempted == "$frequency|$period_key" ]]; then
+    not_due "$frequency period $period_key was already attempted — the next period, or Regenerate, tries again"
+  fi
+  if [[ $check_due == 1 ]]; then
+    echo "Astro-Arc: $frequency period $period_key is due"
     exit 0
   fi
+  mkdir -p "$STATE_DIR"
+  jq -n --arg f "$frequency" --arg p "$period_key" --arg at "$(date -Is)" \
+    '{frequency: $f, periodKey: $p, attemptedAt: $at}' >"$AUTO_ATTEMPT_FILE"
 fi
 
 if [[ $image_backend != openai && $image_backend != openrouter ]]; then
