@@ -47,6 +47,7 @@ from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
 from pipeline_state import PipelineState  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402
+from providers import provider_of  # noqa: E402
 
 
 
@@ -169,19 +170,21 @@ def projected_cost(config, render, quality):
     the rate table for the models `replay` will use: two Stage 1.5 calls
     (meaning, material), Stage 2 and the melodrama check, plus a render.
     `unknown` names each model with no rate; the totals are None then."""
+    provider = provider_of(config)
+    rates = mc.load_rates(provider)
     model1 = config.get("stage1Model") or "gpt-4o-mini"
     model2 = config.get("stage2Model") or "gpt-4o-mini"
-    caption_model = config.get("captionModel") or lp.CAPTION_MODEL
-    stage15, _ = mc.stage_cost("stage15", model1)
-    stage2, _ = mc.stage_cost("stage2", model2)
-    caption, _ = mc.stage_cost("caption", caption_model)
+    caption_model = config.get("captionModel") or lp.caption_model_for(provider)
+    stage15, _ = mc.stage_cost("stage15", model1, rates)
+    stage2, _ = mc.stage_cost("stage2", model2, rates)
+    caption, _ = mc.stage_cost("caption", caption_model, rates)
     image = 0.0
     unknown = [m for m, c in ((model1, stage15), (model2, stage2), (caption_model, caption))
                if c is None]
     if render:
         image_model = config.get("openaiModel") or "gpt-image-1-mini"
         width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
-        image, _ = mc.image_cost(image_model, quality, mc.render_size_for(width, height))
+        image, _ = mc.image_cost(image_model, quality, mc.render_size_for(width, height), rates)
         if image is None:
             unknown.append(image_model)
     if unknown:

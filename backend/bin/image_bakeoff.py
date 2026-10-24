@@ -30,6 +30,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from model_catalog import image_cost, load_rates, render_size_for  # noqa: E402
+from providers import provider_of  # noqa: E402
 from openai_image_gen import generate  # noqa: E402
 from paths import VERIFY_DIR  # noqa: E402
 
@@ -67,7 +68,8 @@ def main():
     width, height = (int(x) for x in args.size.split("x"))
     render_size = render_size_for(width, height)
     combos = [tuple(c.split(":")) for c in args.combos.split(",")]
-    rates = load_rates()
+    # ASTRO_ARC_PROVIDER picks the provider here, as it does for the render.
+    rates = load_rates(provider_of({}))
 
     print(f"Prompt ({len(prompt.split())} words), rendered at {render_size}:")
     print(f"  {prompt[:150]}…\n")

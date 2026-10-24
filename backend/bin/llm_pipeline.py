@@ -2277,6 +2277,12 @@ CAPTION_MODEL = "gpt-4o-mini"
 CAPTION_RESAMPLES = 2
 
 
+def caption_model_for(provider):
+    """CAPTION_MODEL under `provider`'s naming, so the judge is the same model
+    the calibration was scored on either way."""
+    return "openai/" + CAPTION_MODEL if provider == "openrouter" else CAPTION_MODEL
+
+
 def caption_check(prompt, model, chat=None):
     """(caption, hits, passed) — would this image be filed under a feeling?
 

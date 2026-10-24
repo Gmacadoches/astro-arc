@@ -69,6 +69,7 @@ from cost_estimate import chat_call_cost  # noqa: E402
 from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import CONFIG_FILE, STATE_DIR, USER_STYLES_DIR, VERIFY_DIR  # noqa: E402
+from providers import provider_of  # noqa: E402
 from replay_days import STYLE_DRAW_KEYS, load_days, projected_cost, replay  # noqa: E402
 from style_catalog import PREVIEW_PX  # noqa: E402
 
@@ -164,10 +165,15 @@ def usd(cost):
     return "cost unknown (no rate for this model)" if cost is None else f"about ${cost:.2f}"
 
 
-def chat_cost(model, stage15_calls, stage2_calls):
+def rates_for(config):
+    """The rate table for the provider `config` runs on."""
+    return mc.load_rates(provider_of(config))
+
+
+def chat_cost(model, stage15_calls, stage2_calls, rates):
     """Projected dollars for that many Stage 1.5 and Stage 2 calls, or None."""
-    a, _ = mc.stage_cost("stage15", model)
-    b, _ = mc.stage_cost("stage2", model)
+    a, _ = mc.stage_cost("stage15", model, rates)
+    b, _ = mc.stage_cost("stage2", model, rates)
     if (stage15_calls and a is None) or (stage2_calls and b is None):
         return None
     return (a or 0) * stage15_calls + (b or 0) * stage2_calls
@@ -287,7 +293,7 @@ def cmd_preview(args):
         raise StyleError("no cached daily readings yet; generate a wallpaper first")
     model = config.get("stage2Model") or "gpt-4o-mini"
     n = 3 * len(picked)
-    cost = chat_cost(model, len(picked) + n, n)
+    cost = chat_cost(model, len(picked) + n, n, rates_for(config))
     if estimate_or_announce(args, f"preview: {n} prompts, no images, on {model}: {usd(cost)}"):
         return 0
     pairs = register_spread(n, key, theme.catalog)
@@ -334,8 +340,8 @@ def judge(records, config):
     return ids, result, chat_call_cost(model, usage)
 
 
-def judge_cost(model, records_words=8 * 170):
-    rate = mc.load_rates().get("chat", {}).get(model)
+def judge_cost(model, rates, records_words=8 * 170):
+    rate = rates.get("chat", {}).get(model)
     if not rate:
         return None
     tokens_in = len(JUDGE_SYSTEM.split()) * 1.4 + records_words * 1.4
@@ -379,7 +385,7 @@ def cmd_meaning(args):
     # replay_days' own projection: Stage 1.5, Stage 2 and the melodrama
     # check per day, at the configured models' rates.
     per_day, _, _ = projected_cost(config, False, None)
-    jc = judge_cost(model2)
+    jc = judge_cost(model2, rates_for(config))
     total = None if None in (per_day, jc) else per_day * MEANING_DAYS + jc
     if estimate_or_announce(args, f"meaning: {MEANING_DAYS} real days prompts-only ({model1} / {model2}) "
                                   f"and one judge call on {model2}: {usd(total)}"):
@@ -468,9 +474,10 @@ def render_settings(args, config):
 
 def render_cost(n, config, model, quality, size):
     w, h = (int(x) for x in size.split("x"))
-    image, _ = mc.image_cost(model, quality, mc.render_size_for(w, h))
-    text = chat_cost(config.get("stage1Model") or "gpt-4o-mini", 1 + n, 0)
-    s2 = chat_cost(config.get("stage2Model") or "gpt-4o-mini", 0, n)
+    rates = rates_for(config)
+    image, _ = mc.image_cost(model, quality, mc.render_size_for(w, h), rates)
+    text = chat_cost(config.get("stage1Model") or "gpt-4o-mini", 1 + n, 0, rates)
+    s2 = chat_cost(config.get("stage2Model") or "gpt-4o-mini", 0, n, rates)
     if None in (image, text, s2):
         return None
     return image * n + text + s2

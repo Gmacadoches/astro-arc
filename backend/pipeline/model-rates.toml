@@ -212,3 +212,98 @@ label = "Maximum"
 chat = "gpt-6-astra"
 image = "gpt-image-2.5-flare"
 quality = "high"
+
+# ---- OpenRouter ---------------------------------------------------------
+#
+# Used when the provider setting is "openrouter". No rates here: OpenRouter's
+# model listings are public and carry prices, so model_catalog.py reads them
+# from the API on Refresh. This table only holds the parts that are a taste
+# judgement rather than a fact.
+#
+# Low, Medium and High were rebuilt on 2026-10-24 from two local chat sweeps
+# (sweep.py, the second with ASTRO_ARC_REASONING=none): one pinned reading,
+# four registers, Sunburst low as the image throughout so only the writing
+# varied.
+#
+#   chat model            reasoning  chat $/run  caption check  notes
+#   openai/gpt-4o-mini    n/a        ~$0.0022    2/4            pads prompts with chart language
+#   deepseek-v4.1-flash   default    ~$0.013     4/4            6,850 reasoning tokens on one call
+#   deepseek-v4.1-flash   none       ~$0.0009    3/4            concrete, varied colour, sometimes crowded
+#   claude-haiku-5.5      default    ~$0.005     4/4            cleanest scenes
+#   claude-haiku-5.5      none       ~$0.0024    4/4            nearly as good, runs long
+#
+# Both newer models beat gpt-4o-mini on writing, and with reasoning off they
+# cost about the same or less. Stage 1 (the daily reading) was not exercised
+# by either sweep, since the sweep pins it. Four samples each is a small
+# test; if a tier's images go wrong, that is the first thing to suspect.
+#
+# `reasoning` is how hard the chat model thinks (providers.REASONING_EFFORTS).
+# Left out, the model uses its own default.
+#
+# OpenRouter passes each provider's per-token price through; what it charges
+# on top is a fee when you buy credits, which no per-call cost here includes.
+[openrouter.presets.low]
+label = "Low"
+chat = "deepseek/deepseek-v4.1-flash"
+reasoning = "none"
+image = "openai/gpt-image-2.5-sunburst"
+quality = "low"
+
+[openrouter.presets.medium]
+label = "Medium"
+chat = "anthropic/claude-haiku-5.5"
+reasoning = "none"
+image = "openai/gpt-image-2.5-sunburst"
+quality = "low"
+
+[openrouter.presets.high]
+label = "High (Recommended)"
+chat = "anthropic/claude-haiku-5.5"
+image = "openai/gpt-image-2.5-sunburst"
+quality = "low"
+
+# Ultra and Maximum are still the OpenAI tiers under OpenRouter's ids. They
+# differ from High mostly on the image side, which the chat sweeps could not
+# judge; an image sweep should rebuild them.
+[openrouter.presets.ultra]
+label = "Ultra"
+chat = "openai/gpt-5.4"
+image = "openai/gpt-image-2.5-sunburst"
+quality = "high"
+
+[openrouter.presets.maximum]
+label = "Maximum"
+chat = "openai/gpt-6-astra"
+image = "openai/gpt-image-2.5-flare"
+quality = "high"
+
+[openrouter.hierarchy]
+# The OpenAI models first, in the measured order above. Everything else
+# OpenRouter offers sorts after them alphabetically until someone has
+# rendered with it and decided where it belongs.
+image = [
+  "openai/gpt-image-2.5-sunburst",
+  "openai/gpt-image-2.5-flare",
+  "openai/gpt-image-2",
+  "openai/gpt-image-1",
+  "openai/gpt-image-1-mini",
+]
+chat = [
+  "anthropic/claude-haiku-5.5",
+  "deepseek/deepseek-v4.1-flash",
+  "openai/gpt-6-astra",
+  "openai/gpt-5.4",
+  "openai/gpt-4.1",
+  "openai/gpt-5.4-mini",
+  "openai/gpt-5-mini",
+  "openai/gpt-4.1-mini",
+  "openai/gpt-4o-mini",
+  "openai/gpt-5.4-nano",
+]
+
+[openrouter.shortlist]
+# The preset chat models and the OpenAI picks, plus a few from other vendors
+# that are untested in this pipeline, so there is something to try without
+# opening "Show all".
+chat = ["deepseek/deepseek-v4.1-flash", "anthropic/claude-haiku-5.5", "openai/gpt-4o-mini", "openai/gpt-4.1", "openai/gpt-5.4", "openai/gpt-6-astra", "google/gemini-3.8-flash"]
+image = ["openai/gpt-image-2.5-sunburst", "openai/gpt-image-2.5-flare", "openai/gpt-image-1-mini", "google/gemini-3.1-flash-image", "black-forest-labs/flux-3-image", "x-ai/grok-imagine-image-2.0"]

@@ -34,6 +34,17 @@ So an unpriced model becomes fully costed after (a) one real render, which
 measures the tokens, and (b) two numbers added to model-rates.toml. Neither
 half can be skipped: tokens cannot be priced without a rate, and a rate alone
 still needs to know how many tokens a tier burns.
+
+OPENROUTER IS EASIER ON TWO OF THE THREE. Its model listings are public and
+carry prices, so availability AND price both come from the API and nothing is
+hand-typed (model-rates.toml only holds its presets, ordering and shortlist,
+under [openrouter]). Some image models there are priced per image rather than
+per token, which needs no token count at all. And every response reports
+usage.cost, the dollars actually billed, which record_usage keeps as the
+measured cost. The one gap left: a non-OpenAI image model priced per token
+(the Gemini image models) has no published tokens-per-image, so it reads
+"cost known after first render" until one render measures it, rather than borrowing
+gpt-image-1's counts for a different vendor's tokenizer.
 """
 
 import json
@@ -48,9 +59,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
 from period_key import cache_key  # noqa: E402  — one definition, see period_key.py
+from providers import default_for, provider_of, reasoning_of  # noqa: E402
 
 PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
 AVAILABILITY_CACHE = STATE_DIR / "model-availability.json"
+
+
+# Every function below that depends on the provider takes it as an argument.
+# "openai" is the default because it is what each one did before OpenRouter;
+# a caller with a run config passes providers.provider_of(config).
+
+def availability_cache(provider="openai"):
+    """One cache per provider, so switching back and forth never shows the
+    other provider's models. OpenAI keeps the original filename."""
+    if provider == "openai":
+        return AVAILABILITY_CACHE
+    return STATE_DIR / f"model-availability-{provider}.json"
 LEARNED_USAGE_FILE = STATE_DIR / "model-usage.json"
 
 # How old the availability cache may get before the widget refreshes it on its
@@ -77,23 +101,73 @@ _NOT_CHAT_RE = re.compile(
 )
 
 
-def load_rates():
+def load_rates(provider="openai"):
     """pipeline/model-rates.toml, read fresh every call so a hand edit takes
     effect on the next generation with no restart — same contract as
-    registers.toml and the theme files."""
+    registers.toml and the theme files.
+
+    For OpenRouter the rates themselves come from the cached model listing
+    (see refresh_availability) and the TOML's [openrouter] table supplies only
+    presets, hierarchy and shortlist. Same shape either way, so every caller
+    below prices both providers with the same code."""
     path = PIPELINE_DIR / "model-rates.toml"
-    if not path.exists():
-        return {"chat": {}, "image": {}, "image_qualities": {}, "hierarchy": {}}
-    with open(path, "rb") as f:
-        data = tomllib.load(f)
+    data = {}
+    if path.exists():
+        with open(path, "rb") as f:
+            data = tomllib.load(f)
+    if provider == "openrouter":
+        data = _openrouter_rates(data.get("openrouter") or {})
+    else:
+        data.pop("openrouter", None)
     for key in ("chat", "image", "image_qualities", "hierarchy"):
         data.setdefault(key, {})
     return data
 
 
-def classify(model_id):
+def _openrouter_rates(toml_section):
+    """Rates in this module's own shape ($ per 1M tokens), built from the
+    cached OpenRouter listing. Per-image prices go under `perImage`, keyed by
+    the variant OpenRouter names ("1k", "low_1k"), or "" when there is one."""
+    from openrouter_image_gen import tiers_for  # noqa: PLC0415
+
+    data = dict(toml_section)
+    cached = load_availability("openrouter") or {}
+    chat = {}
+    for model_id, row in (cached.get("chatModels") or {}).items():
+        if row.get("input") is not None and row.get("output") is not None:
+            chat[model_id] = {"label": row.get("label"), "input": row["input"], "output": row["output"]}
+    image, qualities = {}, {}
+    for model_id, row in (cached.get("imageModels") or {}).items():
+        qualities[model_id] = tiers_for(row.get("supported"))
+        rate = {"label": row.get("label")}
+        for price in row.get("pricing") or []:
+            if price.get("billable") != "output_image" and price.get("unit") == "image":
+                continue  # an image-to-image input charge; never sent here
+            per = price.get("cost_usd")
+            if per is None:
+                continue
+            if price.get("unit") == "token":
+                field = {"input_text": "input", "output_image": "output", "input_image": "image_input"}.get(price.get("billable"))
+                if field:
+                    rate[field] = round(per * 1_000_000, 6)
+            elif price.get("unit") == "image":
+                rate.setdefault("perImage", {})[(price.get("variant") or "").lower()] = per
+        if "output" in rate:
+            rate.setdefault("input", 0.0)
+        if "output" in rate or "perImage" in rate:
+            image[model_id] = rate
+    data["chat"], data["image"], data["image_qualities"] = chat, image, qualities
+    return data
+
+
+def classify(model_id, cached=None):
     """'image', 'chat', or None. See the regexes above for why this is done by
-    id rather than by asking the API."""
+    id rather than by asking the API. OpenRouter's listing does say, so its
+    cache records the kind directly and that wins when it is there."""
+    if cached and "imageModels" in cached:
+        if model_id in cached["imageModels"]:
+            return "image"
+        return "chat" if model_id in (cached.get("chatModels") or {}) else None
     if _IMAGE_RE.search(model_id):
         return "image"
     if _CHAT_RE.match(model_id) and not _NOT_CHAT_RE.search(model_id):
@@ -101,13 +175,14 @@ def classify(model_id):
     return None
 
 
-def load_availability():
+def load_availability(provider="openai"):
     """The cached model list, or None if never fetched. Never raises — a
     missing or corrupt cache just means 'refresh needed', not a failure."""
-    if not AVAILABILITY_CACHE.exists():
+    path = availability_cache(provider)
+    if not path.exists():
         return None
     try:
-        return json.loads(AVAILABILITY_CACHE.read_text())
+        return json.loads(path.read_text())
     except (json.JSONDecodeError, OSError):
         return None
 
@@ -122,7 +197,7 @@ def cache_is_stale(cached):
     return datetime.now(timezone.utc) - fetched > CACHE_TTL
 
 
-def refresh_availability():
+def refresh_availability(provider="openai"):
     """GET /v1/models -> cache. Free (no tokens billed) and about a second.
 
     Imported lazily so that merely reading the catalog never touches the
@@ -131,15 +206,66 @@ def refresh_availability():
     """
     from openai_image_gen import _request  # noqa: PLC0415 — see docstring
 
-    data = _request("/models")
-    ids = sorted(m["id"] for m in data.get("data", []))
-    payload = {
-        "fetchedAt": datetime.now(timezone.utc).isoformat(),
-        "models": ids,
-    }
-    AVAILABILITY_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    AVAILABILITY_CACHE.write_text(json.dumps(payload, indent=2))
+    if provider == "openrouter":
+        payload = _refresh_openrouter(lambda path, **kw: _request(path, provider="openrouter", **kw))
+    else:
+        data = _request("/models")
+        ids = sorted(m["id"] for m in data.get("data", []))
+        payload = {
+            "fetchedAt": datetime.now(timezone.utc).isoformat(),
+            "models": ids,
+        }
+    path = availability_cache(provider)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2))
     return payload
+
+
+def _refresh_openrouter(request):
+    """Both of OpenRouter's listings, public and free, so no key is sent and a
+    fresh install can browse models and prices before pasting one.
+
+    Chat models are kept only when they output text alone and accept
+    response_format: every chat stage here asks for a JSON object, and a
+    model that ignores the request breaks the parse downstream. That trims
+    the listing from roughly 470 to the ones that can actually do the job."""
+    from openrouter_image_gen import fetch_image_models  # noqa: PLC0415
+
+    chat = {}
+    for m in request("/models", auth=False).get("data", []):
+        arch = m.get("architecture") or {}
+        params = m.get("supported_parameters") or []
+        if arch.get("output_modalities") != ["text"] or "response_format" not in params:
+            continue
+        # The :batch twins are the same model on a deferred queue, and this
+        # pipeline waits on every reply.
+        if m["id"].endswith(":batch"):
+            continue
+        pricing = m.get("pricing") or {}
+        try:
+            input_rate = float(pricing.get("prompt")) * 1_000_000
+            output_rate = float(pricing.get("completion")) * 1_000_000
+        except (TypeError, ValueError):
+            input_rate = output_rate = None
+        # OpenRouter quotes -1 for "varies by route"; that is not a price.
+        if input_rate is not None and (input_rate < 0 or output_rate < 0):
+            input_rate = output_rate = None
+        chat[m["id"]] = {
+            "label": m.get("name") or m["id"],
+            "input": None if input_rate is None else round(input_rate, 6),
+            "output": None if output_rate is None else round(output_rate, 6),
+            "temperature": "temperature" in params,
+            # {mandatory, supported_efforts, default_effort} or None. See
+            # providers.reasoning_for for how the chatReasoning setting uses it.
+            "reasoning": (m.get("reasoning") or None) if "reasoning" in params else None,
+        }
+    images = fetch_image_models()
+    return {
+        "fetchedAt": datetime.now(timezone.utc).isoformat(),
+        "models": sorted(set(chat) | set(images)),
+        "chatModels": chat,
+        "imageModels": images,
+    }
 
 
 def load_learned_usage():
@@ -171,16 +297,24 @@ def usage_key(model, quality, size):
 def record_usage(model, quality, size, usage):
     """Store what a real call actually consumed. Called after a successful
     render; never fabricates, and silently does nothing if the API reported no
-    usage block at all."""
+    usage block at all.
+
+    OpenRouter adds usage.cost, the dollars billed. It is kept beside the
+    tokens and preferred by measured_cost, since it needs no rate at all, and
+    it is the only measurement a per-image model reports (its token counts
+    can be zero)."""
     if not usage:
         return None
     output_tokens = usage.get("output_tokens", usage.get("completion_tokens"))
     input_tokens = usage.get("input_tokens", usage.get("prompt_tokens"))
-    if not output_tokens:
+    billed = usage.get("cost")
+    if not output_tokens and billed is None:
         return None
     learned = load_learned_usage()
     key = usage_key(model, quality, size)
     previous = learned.get(key) or {}
+    if not output_tokens:
+        output_tokens = previous.get("outputTokens") or 0
     # Keep a short history and project from the MEDIAN, because `auto` is not a
     # fixed tier: the same model at the same size was measured at 343, 601 and
     # 1372 output tokens on three runs, a 4x swing, and projecting from whichever
@@ -197,6 +331,11 @@ def record_usage(model, quality, size, usage):
         "history": history,
         "measuredAt": datetime.now(timezone.utc).isoformat(),
     }
+    if billed is not None:
+        # Median for the same reason as the tokens above.
+        cost_history = (previous.get("costHistory") or [])[-4:] + [billed]
+        learned[key]["costHistory"] = cost_history
+        learned[key]["costUsd"] = sorted(cost_history)[len(cost_history) // 2]
     _write_learned(learned)
     return learned[usage_key(model, quality, size)]
 
@@ -219,8 +358,31 @@ def record_usage(model, quality, size, usage):
 STAGES = ("stage1", "stage15", "stage2", "caption")
 
 
+def stage_model_key(model, effort="default", cached=None):
+    """What a stage measurement is filed under: the model id, plus the
+    reasoning effort actually sent when one was ("anthropic/claude-haiku-5.5@none").
+
+    Reasoning changes a stage's cost far more than the model does: on the
+    2026-10-24 sweeps Haiku spent 3,551 output tokens on a Stage 2 with its
+    default reasoning and 317 with it off. Filing both under the bare id meant
+    whichever ran last priced the other, so a High preset using Haiku's
+    default reasoning showed half its real cost after a reasoning-off sweep.
+
+    Uses the effort that would really be SENT (providers.reasoning_for), so a
+    model that rejects "none" and gets "low" instead is filed under "@low"."""
+    if effort == "default":
+        return model
+    from providers import reasoning_for  # noqa: PLC0415
+
+    if cached is None:
+        cached = load_availability("openrouter") or {}
+    sent = reasoning_for((cached.get("chatModels") or {}).get(model), effort)
+    return f"{model}@{sent['effort']}" if sent else model
+
+
 def record_stage_usage(stage, model, usage):
-    """Called after every chat call. Cheap, and never allowed to break a run."""
+    """Called after every chat call. Cheap, and never allowed to break a run.
+    `model` is the stage_model_key, so a reasoning effort is kept apart."""
     if not usage or stage not in STAGES:
         return None
     prompt_tokens = usage.get("prompt_tokens", usage.get("input_tokens"))
@@ -295,15 +457,16 @@ def _without_reasoning(entry):
     return dict(entry, outputTokens=max(entry["outputTokens"] - reasoning, 1))
 
 
-def stage_cost(stage, model, rates=None, learned=None):
+def stage_cost(stage, model, rates=None, learned=None, effort="default"):
     """(cost, source) for one call of `stage` on `model`. source is "actual",
-    "est", or None when it genuinely cannot be known."""
+    "est", or None when it genuinely cannot be known. `effort` is the
+    chatReasoning setting it would run under (see stage_model_key)."""
     rates = rates if rates is not None else load_rates()
     learned = learned if learned is not None else load_learned_usage()
     rate = rates.get("chat", {}).get(model)
     if not rate:
         return None, None
-    own = ((learned.get("stages") or {}).get(stage) or {}).get(model)
+    own = ((learned.get("stages") or {}).get(stage) or {}).get(stage_model_key(model, effort))
     # `own` is used as measured, reasoning included — that is cost this model
     # really incurs. Only a BORROWED measurement gets its reasoning stripped.
     entry, source = (own, "actual") if own else (_representative_stage_tokens(stage, learned), "est")
@@ -338,8 +501,25 @@ def image_cost(model, quality, size, rates=None, learned=None):
     if measured is not None:
         return measured, "actual"
     rate = rates.get("image", {}).get(model)
+    # openai/gpt-image-2.5-sunburst on OpenRouter is the same model as
+    # gpt-image-2.5-sunburst on OpenAI, so tokens measured on either provider
+    # predict the other far better than gpt-image-1's borrowed counts below.
+    # Still "est": the tokens are measured, but not on this route.
+    if rate and "output" in rate and model.startswith("openai/"):
+        twin = learned.get(usage_key(model.split("/", 1)[1], quality, size))
+        if twin and twin.get("outputTokens"):
+            cost = (twin.get("inputTokens", 0) * rate.get("input", 0) + twin["outputTokens"] * rate["output"]) / 1_000_000
+            return round(cost, 6), "est"
+    if rate and "perImage" in rate:
+        cost = _per_image_cost(model, quality, rate["perImage"], rates)
+        return (cost, "est") if cost is not None else (None, None)
     tokens = _TIER_OUTPUT_TOKENS.get(quality)
-    if not rate or not tokens:
+    # gpt-image-1's tier tokens only stand in for OpenAI models. On OpenRouter
+    # that means the openai/ ones; another vendor's tokenizer is not the same
+    # unit, so its first render is what prices it.
+    if "/" in model and not model.startswith("openai/"):
+        tokens = None
+    if not rate or not tokens or "output" not in rate:
         return None, None
     # Tier counts are per 1024x1024; scale by the real render area.
     try:
@@ -354,7 +534,27 @@ def image_cost(model, quality, size, rates=None, learned=None):
     return round(cost, 6), "est"
 
 
-def run_cost(chat_model, image_model, quality, size, rates=None, learned=None):
+def _per_image_cost(model, quality, prices, rates):
+    """A per-image price for the variant this tier will actually request.
+    OpenRouter names variants by what is sent ("1k", "low_1k"), so the
+    variant is rebuilt from the same tier_params the render uses."""
+    if "" in prices and len(prices) == 1:
+        return prices[""]
+    try:
+        from openrouter_image_gen import tier_params  # noqa: PLC0415
+
+        cached = (load_availability("openrouter") or {}).get("imageModels") or {}
+        params = tier_params((cached.get(model) or {}).get("supported"), quality)
+    except Exception:  # noqa: BLE001
+        params = {}
+    q, res = params.get("quality"), (params.get("resolution") or "").lower()
+    for variant in ("_".join(x for x in (q, res) if x), res, q, ""):
+        if variant is not None and variant in prices:
+            return prices[variant]
+    return None
+
+
+def run_cost(chat_model, image_model, quality, size, rates=None, learned=None, effort="default"):
     """Projected cost of one whole generation: the three chat stages plus the
     render. `source` is "actual" only when EVERY part of it was measured for the
     exact model in question — one estimated part makes the whole thing an
@@ -365,7 +565,7 @@ def run_cost(chat_model, image_model, quality, size, rates=None, learned=None):
     learned = learned if learned is not None else load_learned_usage()
     total, source = 0.0, "actual"
     for stage in ("stage1", "stage15", "stage2"):
-        cost, st = stage_cost(stage, chat_model, rates, learned)
+        cost, st = stage_cost(stage, chat_model, rates, learned, effort)
         if cost is None:
             return None, None
         # Stage 1.5 is two calls (meaning + material), see above.
@@ -409,8 +609,10 @@ def measured_cost(model, quality, size, rates=None, learned=None):
     rates = rates if rates is not None else load_rates()
     learned = learned if learned is not None else load_learned_usage()
     entry = learned.get(usage_key(model, quality, size))
+    if entry and entry.get("costUsd") is not None:
+        return round(entry["costUsd"], 6)
     rate = rates.get("image", {}).get(model) or rates.get("chat", {}).get(model)
-    if not entry or not rate:
+    if not entry or not rate or "output" not in rate:
         return None
     return round(
         entry["inputTokens"] * rate["input"] / 1_000_000
@@ -480,25 +682,27 @@ def next_run_cost(width=1024, height=1024, settings=None, state=None, catalog=No
     the themes to read (production's by default).
     """
     settings = settings if settings is not None else load_settings()
-    rates, learned = load_rates(), load_learned_usage()
+    provider = provider_of(settings)
+    rates, learned = load_rates(provider), load_learned_usage()
 
-    chat_stage1 = settings.get("stage1Model") or "gpt-4o-mini"
-    chat_stage2 = settings.get("stage2Model") or "gpt-4o-mini"
-    image_model = settings.get("openaiModel") or "gpt-image-1-mini"
-    quality = settings.get("openaiQuality") or "medium"
+    chat_stage1 = settings.get("stage1Model") or default_for("Chat", provider)
+    chat_stage2 = settings.get("stage2Model") or default_for("Chat", provider)
+    image_model = settings.get("openaiModel") or default_for("Image", provider)
+    quality = settings.get("openaiQuality") or default_for("Quality", provider)
+    effort = reasoning_of(settings)
     size = render_size_for(width, height)
     period_key = _period_key(settings.get("frequency") or "daily")
 
     # Imported here, not at module scope: cost_estimate imports this module, so
     # a top-level import of llm_pipeline would close the loop.
     try:
-        from llm_pipeline import CAPTION_MODEL, next_run_cached  # noqa: PLC0415
+        from llm_pipeline import caption_model_for, next_run_cached  # noqa: PLC0415
         cached_stage1, cached_stage15 = next_run_cached(settings, period_key, state, catalog)
-        caption_model = settings.get("captionModel") or CAPTION_MODEL
+        caption_model = settings.get("captionModel") or caption_model_for(provider)
         cache_known = True
     except Exception:  # noqa: BLE001 — a cost readout must not break on this
         cached_stage1 = cached_stage15 = False
-        caption_model = settings.get("captionModel") or "gpt-4o-mini"
+        caption_model = settings.get("captionModel") or default_for("Chat", provider)
         cache_known = False
 
     image, image_source = image_cost(image_model, quality, size, rates, learned)
@@ -510,7 +714,7 @@ def next_run_cost(width=1024, height=1024, settings=None, state=None, catalog=No
         ("stage2", chat_stage2, False),             # always runs
         ("caption", caption_model, False),          # always runs, at least once
     ):
-        cost, src = stage_cost(name, model, rates, learned)
+        cost, src = stage_cost(name, model, rates, learned, effort)
         parts[name] = {"model": model, "cached": is_cached, "cost": cost, "source": src}
         if cost is None:
             next_total = full_total = None
@@ -544,6 +748,7 @@ def next_run_cost(width=1024, height=1024, settings=None, state=None, catalog=No
         "cacheKnown": cache_known,
         "stages": parts,
         "image": {"model": image_model, "quality": quality, "cost": image, "source": image_source},
+        "reasoning": effort,
         "next": None if next_total is None else round(next_total, 6),
         "full": None if full_total is None else round(full_total, 6),
         "source": source,
@@ -554,7 +759,7 @@ def _label_for(model_id, rate_row):
     return (rate_row or {}).get("label") or model_id
 
 
-def catalog(width=1024, height=1024):
+def catalog(width=1024, height=1024, settings=None):
     """Everything the widget needs, in one JSON-able dict.
 
     Every available model is listed whether or not it has a rate. `cost` is
@@ -562,10 +767,13 @@ def catalog(width=1024, height=1024):
     of the two is missing so the UI can tell the user what to do about it
     rather than just showing a blank.
     """
-    rates = load_rates()
-    cached = load_availability() or {}
+    settings = settings if settings is not None else load_settings()
+    provider = provider_of(settings)
+    rates = load_rates(provider)
+    cached = load_availability(provider) or {}
     learned = load_learned_usage()
     available = cached.get("models") or []
+    effort = reasoning_of(settings)
     shortlist_chat = set(rates.get("shortlist", {}).get("chat", []))
     shortlist_image = set(rates.get("shortlist", {}).get("image", []))
 
@@ -573,7 +781,7 @@ def catalog(width=1024, height=1024):
     for model_id in available:
         if _SNAPSHOT_RE.search(model_id):
             continue
-        kind = classify(model_id)
+        kind = classify(model_id, cached)
         if kind == "chat":
             rate = rates["chat"].get(model_id)
             # Per-stage cost for THIS model whether or not it has ever run:
@@ -582,7 +790,7 @@ def catalog(width=1024, height=1024):
             stages = {}
             run_total, run_source = 0.0, "actual"
             for stage in ("stage1", "stage15", "stage2"):
-                cost, src = stage_cost(stage, model_id, rates, learned)
+                cost, src = stage_cost(stage, model_id, rates, learned, effort)
                 stages[stage] = {"cost": cost, "source": src}
                 if cost is None:
                     run_total, run_source = None, None
@@ -611,13 +819,25 @@ def catalog(width=1024, height=1024):
                     cost_state = "measured"
                 elif cost_source == "est":
                     cost_state = "estimated"
+                elif rate is not None:
+                    # Priced per token with no tokens-per-image to apply yet
+                    # (OpenRouter's non-OpenAI token-priced models). One
+                    # render measures it.
+                    cost_state = "unmeasured"
                 else:
                     cost_state = "no-rate"
                 label = _label_for(model_id, rate)
+                tier = quality.capitalize()
+                if provider == "openrouter":
+                    from openrouter_image_gen import tier_params  # noqa: PLC0415
+
+                    sent = tier_params(((cached.get("imageModels") or {}).get(model_id) or {}).get("supported"), quality)
+                    if sent.get("resolution"):
+                        tier = f"{tier} ({sent['resolution']})"
                 image_rows.append({
                     "model": model_id,
                     "quality": quality,
-                    "label": label if quality == "auto" else f"{label} — {quality.capitalize()}",
+                    "label": label if quality == "auto" else f"{label} — {tier}",
                     "hasRate": rate is not None,
                     "cost": cost,
                     "costState": cost_state,
@@ -639,13 +859,17 @@ def catalog(width=1024, height=1024):
     for key, row in (rates.get("presets") or {}).items():
         chat_model, image_model = row.get("chat"), row.get("image")
         quality = row.get("quality", "medium")
-        cost, source = run_cost(chat_model, image_model, quality, render_size_for(width, height), rates, learned)
+        cost, source = run_cost(chat_model, image_model, quality, render_size_for(width, height), rates, learned,
+                                row.get("reasoning", "default") if provider == "openrouter" else "default")
         presets.append({
             "key": key,
             "label": row.get("label", key.capitalize()),
             "chat": chat_model,
             "image": image_model,
             "quality": quality,
+            # OpenRouter only: how hard the chat model thinks. See
+            # providers.REASONING_EFFORTS.
+            "reasoning": row.get("reasoning", "default"),
             "available": chat_model in available_set and image_model in available_set,
             "runCost": cost,
             "runSource": source,
@@ -655,7 +879,7 @@ def catalog(width=1024, height=1024):
     presets.sort(key=lambda p: (p["runCost"] is None, p["runCost"] or 0))
 
     return {
-        "nextRun": next_run_cost(width, height),
+        "nextRun": next_run_cost(width, height, settings=settings),
         "presets": presets,
         "fetchedAt": cached.get("fetchedAt"),
         "stale": cache_is_stale(cached),
@@ -663,6 +887,7 @@ def catalog(width=1024, height=1024):
         "chat": rank(chat_rows, rates["hierarchy"].get("chat", []), "model"),
         "image": rank(image_rows, rates["hierarchy"].get("image", []), "model"),
         "ratesPath": str(PIPELINE_DIR / "model-rates.toml"),
+        "provider": provider,
     }
 
 
@@ -693,12 +918,18 @@ def parse_size(value, default_width, default_height):
 
 def main():
     args = sys.argv[1:]
+    # astro-arc-config asks for this when the provider changes. Straight from
+    # the TOML, so it works before the new provider's models were ever fetched.
+    if args[:1] == ["--preset"] and len(args) > 1:
+        row = (load_rates(provider_of(load_settings())).get("presets") or {}).get(args[1]) or {}
+        print(json.dumps({k: row.get(k) for k in ("chat", "image", "quality", "reasoning") if row.get(k)}))
+        return
     # astro-arc-generate asks for this before deciding whether it can afford a
     # quality bump. Prints a number, or "null" when the cost is genuinely not
     # known — the caller must treat null as "unknown", never as "free".
     if "--refresh" in args:
         try:
-            refresh_availability()
+            refresh_availability(provider_of(load_settings()))
         except Exception as exc:  # noqa: BLE001 — the widget needs a reason, not a traceback
             print(json.dumps({"ok": False, "error": str(exc)[:300]}))
             sys.exit(1)
