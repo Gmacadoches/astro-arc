@@ -68,7 +68,8 @@ import model_catalog as mc  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
 from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
-from paths import CONFIG_FILE, STATE_DIR, USER_STYLES_DIR, VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
+from paths import STATE_DIR, USER_STYLES_DIR, VERIFY_DIR  # noqa: E402
 from providers import provider_of  # noqa: E402
 from replay_days import STYLE_DRAW_KEYS, load_days, projected_cost, replay  # noqa: E402
 from style_catalog import PREVIEW_PX  # noqa: E402
@@ -121,10 +122,7 @@ class StyleError(Exception):
 
 
 def load_config():
-    try:
-        return json.loads(CONFIG_FILE.read_text())
-    except (OSError, json.JSONDecodeError):
-        return {}
+    return settings.load()
 
 
 def open_theme(file):
@@ -234,7 +232,7 @@ def day_prompts(theme, day, registers, config, history):
     caller's in-memory history, and each composition's entry is added to it;
     nothing production owns is read or written."""
     date, stage1, dial = day
-    model1 = config.get("stage1Model") or "gpt-4o-mini"
+    model1 = config["stage1Model"]
     base = {k: v for k, v in dial.items() if k not in STYLE_DRAW_KEYS}
     meaning, cost = lp.stage15_meaning(stage1, model1, date, config, dial=base,
                                        avoid_archetypes=[], avoid_kinds=[], style=theme)
@@ -291,7 +289,7 @@ def cmd_preview(args):
     picked = [d for d in (hard, soft) if d]
     if not picked:
         raise StyleError("no cached daily readings yet; generate a wallpaper first")
-    model = config.get("stage2Model") or "gpt-4o-mini"
+    model = config["stage2Model"]
     n = 3 * len(picked)
     cost = chat_cost(model, len(picked) + n, n, rates_for(config))
     if estimate_or_announce(args, f"preview: {n} prompts, no images, on {model}: {usd(cost)}"):
@@ -331,7 +329,7 @@ near_duplicates: pairs that would make nearly the same wallpaper: the same setti
 
 
 def judge(records, config):
-    model = config.get("stage2Model") or "gpt-4o-mini"
+    model = config["stage2Model"]
     order = list(range(len(records)))
     random.SystemRandom().shuffle(order)
     ids = {str(i + 1): records[j] for i, j in enumerate(order)}
@@ -380,8 +378,8 @@ def cmd_meaning(args):
     if len(days) < MEANING_DAYS:
         raise StyleError(f"needs {MEANING_DAYS} days of cached readings with a texture; "
                          f"this machine has {len(days)}")
-    model1 = config.get("stage1Model") or "gpt-4o-mini"
-    model2 = config.get("stage2Model") or "gpt-4o-mini"
+    model1 = config["stage1Model"]
+    model2 = config["stage2Model"]
     # replay_days' own projection: Stage 1.5, Stage 2 and the melodrama
     # check per day, at the configured models' rates.
     per_day, _, _ = projected_cost(config, False, None)
@@ -464,11 +462,9 @@ def cmd_choose(args):
 
 
 def render_settings(args, config):
-    model = args.model or config.get("openaiModel") or "gpt-image-1-mini"
-    quality = args.quality or config.get("openaiQuality") or "medium"
-    size = config.get("backgroundSize") or "1600x900"
-    if not re.fullmatch(r"\d+x\d+", size):  # "auto"
-        size = "1600x900"
+    model = args.model or config["openaiModel"]
+    quality = args.quality or config["openaiQuality"]
+    size = "x".join(map(str, settings.fixed_size(config)))
     return model, quality, size
 
 
@@ -476,8 +472,8 @@ def render_cost(n, config, model, quality, size):
     w, h = (int(x) for x in size.split("x"))
     rates = rates_for(config)
     image, _ = mc.image_cost(model, quality, mc.render_size_for(w, h), rates)
-    text = chat_cost(config.get("stage1Model") or "gpt-4o-mini", 1 + n, 0, rates)
-    s2 = chat_cost(config.get("stage2Model") or "gpt-4o-mini", 0, n, rates)
+    text = chat_cost(config["stage1Model"], 1 + n, 0, rates)
+    s2 = chat_cost(config["stage2Model"], 0, n, rates)
     if None in (image, text, s2):
         return None
     return image * n + text + s2

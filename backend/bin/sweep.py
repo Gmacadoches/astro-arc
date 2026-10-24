@@ -48,13 +48,14 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
-from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
+from paths import STATE_DIR, VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
 from providers import provider_of  # noqa: E402
 
 
 
 def load_config():
-    return json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    return settings.load()
 
 
 def latest_reading():
@@ -219,16 +220,16 @@ def main():
         config["stage1Model"] = args.stage1_model
     if args.stage2_model:
         config["stage2Model"] = args.stage2_model
-    style_key = args.style or config.get("artStyle") or "symbolist"
+    style_key = args.style or config["artStyle"]
     catalog = lp.Catalog.load()
     catalog.require(style_key)
     style = catalog.style(style_key)
-    image_model = args.image_model or config.get("openaiModel") or "gpt-image-1-mini"
-    size = args.size or config.get("backgroundSize") or "1600x900"
+    image_model = args.image_model or config["openaiModel"]
+    size = args.size or "x".join(map(str, settings.fixed_size(config)))
     width, height = (int(x) for x in size.split("x"))
 
-    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
-    stage2_model = config.get("stage2Model") or "gpt-4o-mini"
+    stage1_model = config["stage1Model"]
+    stage2_model = config["stage2Model"]
 
     reading_path = Path(args.reading) if args.reading else latest_reading()
     reading = json.loads(reading_path.read_text())
@@ -335,7 +336,7 @@ def main():
         # then sweeps rendered figure and non-figure frames at different tiers
         # from each other AND from production. --force-quality is kept so old
         # command lines still parse; it no longer changes anything.
-        quality = args.quality or config.get("openaiQuality") or "medium"
+        quality = args.quality or config["openaiQuality"]
         record = {
             "index": i,
             "primaryRegister": primary,

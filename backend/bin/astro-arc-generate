@@ -56,33 +56,31 @@ if ! flock -n 9; then
   exit 0
 fi
 
-# One read, through astro-arc-config, so the defaults live in exactly one place.
-# Reading $CONFIG_FILE directly meant every value here carried a second copy of
-# a default, and the frequency copy had already drifted from DEFAULTS.
-config_json=$("$BIN_DIR/astro-arc-config" 2>/dev/null || echo '{}')
+# One read, through astro-arc-config --resolved: every key present, every value
+# one its key may hold, "" image model and quality already the provider's
+# (backend/pipeline/settings.toml). So nothing below carries a default of its
+# own; reading $CONFIG_FILE directly meant every value here had a second copy,
+# and the frequency copy had already drifted.
+if ! config_json=$("$BIN_DIR/astro-arc-config" --resolved); then
+  echo "astro-arc-generate: could not read the settings (astro-arc-config --resolved failed)" >&2
+  exit 1
+fi
 cfg() { jq -r "$1" <<<"$config_json" 2>/dev/null; }
 
-frequency=$(cfg '.frequency // "manual"')
-# Only read under hourly. period_key.py falls back to 1 for anything it does
-# not offer, so a hand-edited value cannot produce an odd key.
-interval_hours=$(cfg '.intervalHours // 1')
+frequency=$(cfg '.frequency')
+# Only read under hourly.
+interval_hours=$(cfg '.intervalHours')
 # `provider` is the global setting now (see astro-arc-config --set-provider);
 # `imageBackend` is the legacy key it supersedes. OpenAI and OpenRouter are the
 # renderers (openai_image_gen.py hands OpenRouter to openrouter_image_gen.py):
 # the local Stable Diffusion path (image_gen.py) was removed on 2026-09-19,
 # because it needed torch in a Python venv, and the plugin no longer installs
-# anything. A config still naming "local" is refused below with a clear message
-# rather than silently rendered somewhere the user did not choose.
-image_backend=$(cfg '.provider // .imageBackend // "openai"')
-# `// "default"` is NOT enough on these two. jq's // only substitutes for null
-# and false, and astro-arc-config DEFAULTS both of them to the empty string —
-# so on a config where the image model has never been picked, `//` passed ""
-# through and the render failed with an unhelpful API error instead of falling
-# back. Test the value, don't just test for null.
-if [[ $image_backend == openrouter ]]; then default_image_model="openai/gpt-image-1-mini"; else default_image_model="gpt-image-1-mini"; fi
-openai_model=$(cfg '(.openaiModel // "") | if . == "" then "'"$default_image_model"'" else . end')
-openai_quality=$(cfg '(.openaiQuality // "") | if . == "" then "medium" else . end')
-background_size=$(cfg '.backgroundSize // "auto"')
+# anything. Anything but the two providers is refused below with a clear
+# message rather than silently rendered somewhere the user did not choose.
+image_backend=$(cfg '.provider')
+openai_model=$(cfg '.openaiModel')
+openai_quality=$(cfg '.openaiQuality')
+background_size=$(cfg '.backgroundSize')
 
 # Delegates to period_key.py, which is the single definition of what a period
 # key is — see that file's header for why it stopped being four hand-synced
@@ -275,7 +273,7 @@ find "$THEME_DIR" -mindepth 1 -maxdepth 1 ! -name backgrounds -exec rm -rf {} +
 mkdir -p "$THEME_DIR/backgrounds"
 cp -f "$bg_file" "$THEME_DIR/backgrounds/background.png"
 
-theme_generator=$(cfg '.themeGenerator // "built-in"')
+theme_generator=$(cfg '.themeGenerator')
 
 # Theming: derive colors.toml + icons.theme from the rendered image.
 # icons.theme is the file GNOME/Nautilus's icon color actually comes from
@@ -408,10 +406,7 @@ fi
 # theme — its colors and every app it themes — exactly as it was. The palette
 # above is still derived, because the archive's theme snapshot and Save
 # Selected Theme are built from it; it is just not applied.
-#
-# NOT `.backgroundOnly // true`: jq's // treats false as missing, so that would
-# turn an explicit "off" back into "on". Only a literal false turns it off.
-background_only=$(cfg 'if .backgroundOnly == false then "false" else "true" end')
+background_only=$(cfg '.backgroundOnly')
 if [[ $background_only == true ]]; then
   wallpaper="$bg_file"
   if [[ -n $review_path && -f "$(dirname "$review_path")/theme/backgrounds/background.png" ]]; then
@@ -428,7 +423,7 @@ fi
 # cron needed. Never touches a theme astro-arc-save-theme exported; that's
 # a permanent copy outside this whole system. Best-effort: a failure here
 # must never fail the generation that already succeeded.
-history_retention_days=$(cfg '.historyRetentionDays // 30')
+history_retention_days=$(cfg '.historyRetentionDays')
 "$BIN_DIR/astro-arc-prune-history" --older-than-days "$history_retention_days" >/dev/null 2>&1 \
   || echo "Astro-Arc: warning — history pruning failed" >&2
 

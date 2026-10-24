@@ -31,6 +31,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from model_catalog import image_cost, load_rates, render_size_for  # noqa: E402
 from providers import provider_of  # noqa: E402
+import settings  # noqa: E402
 from openai_image_gen import generate  # noqa: E402
 from paths import VERIFY_DIR  # noqa: E402
 
@@ -69,7 +70,7 @@ def main():
     render_size = render_size_for(width, height)
     combos = [tuple(c.split(":")) for c in args.combos.split(",")]
     # ASTRO_ARC_PROVIDER picks the provider here, as it does for the render.
-    rates = load_rates(provider_of({}))
+    rates = load_rates(provider_of(settings.load()))
 
     print(f"Prompt ({len(prompt.split())} words), rendered at {render_size}:")
     print(f"  {prompt[:150]}…\n")
@@ -96,7 +97,7 @@ def main():
     for i, (model, quality) in enumerate(combos, 1):
         stem = f"{i:02d}_{model.replace('.', '-')}_{quality}"
         try:
-            _, info = generate(prompt, out_dir / f"{stem}.png", model, quality, width, height, provider_of({}))
+            _, info = generate(prompt, out_dir / f"{stem}.png", model, quality, width, height, provider_of(settings.load()))
             cost = info.get("cost")
             actual_total += cost or 0
             usage = info.get("usage") or {}

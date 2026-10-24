@@ -25,7 +25,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
-from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
+from paths import VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
 
 FLAG = 0.30
 
@@ -57,7 +58,7 @@ def main():
         print(__doc__, file=sys.stderr)
         sys.exit(1)
     prefix, styles = sys.argv[1], sys.argv[2:]
-    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    config = settings.load()
     model = config.get("captionModel") or lp.caption_model_for(lp.provider_of(config))
     chat = lp.chat_client(config)
     by_style = {}

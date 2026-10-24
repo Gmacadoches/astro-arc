@@ -44,7 +44,8 @@ import llm_pipeline as lp  # noqa: E402
 import model_catalog as mc  # noqa: E402
 from sweep import dial_for_day, report_filled  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
-from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
+from paths import STATE_DIR, VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
 from pipeline_state import PipelineState  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402
 from providers import provider_of  # noqa: E402
@@ -97,8 +98,8 @@ def replay(style, days, config, out_dir=None, render=False, quality="medium",
     recency pressure accumulating as it would in production. Returns
     (rows, spent). Writes one JSON per day (and the render) under `out_dir`
     when it is given; nothing production owns is ever written."""
-    image_model = config.get("openaiModel") or "gpt-image-1-mini"
-    width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
+    image_model = config["openaiModel"]
+    width, height = settings.fixed_size(config)
     if out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -172,8 +173,8 @@ def projected_cost(config, render, quality):
     `unknown` names each model with no rate; the totals are None then."""
     provider = provider_of(config)
     rates = mc.load_rates(provider)
-    model1 = config.get("stage1Model") or "gpt-4o-mini"
-    model2 = config.get("stage2Model") or "gpt-4o-mini"
+    model1 = config["stage1Model"]
+    model2 = config["stage2Model"]
     caption_model = config.get("captionModel") or lp.caption_model_for(provider)
     stage15, _ = mc.stage_cost("stage15", model1, rates)
     stage2, _ = mc.stage_cost("stage2", model2, rates)
@@ -182,8 +183,8 @@ def projected_cost(config, render, quality):
     unknown = [m for m, c in ((model1, stage15), (model2, stage2), (caption_model, caption))
                if c is None]
     if render:
-        image_model = config.get("openaiModel") or "gpt-image-1-mini"
-        width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
+        image_model = config["openaiModel"]
+        width, height = settings.fixed_size(config)
         image, _ = mc.image_cost(image_model, quality, mc.render_size_for(width, height), rates)
         if image is None:
             unknown.append(image_model)
@@ -209,8 +210,8 @@ def main():
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
 
-    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
-    style_key = args.style or config.get("artStyle") or "symbolist"
+    config = settings.load()
+    style_key = args.style or config["artStyle"]
     catalog = lp.Catalog.load()
     catalog.require(style_key)
 

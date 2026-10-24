@@ -9,6 +9,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -20,6 +21,7 @@ import cost_estimate  # noqa: E402
 import llm_pipeline as lp  # noqa: E402
 import openai_image_gen as og  # noqa: E402
 import providers  # noqa: E402
+import settings  # noqa: E402
 from test_compose import STAGE1, TEXTURE, StubChat, arc  # noqa: E402
 
 OPENROUTER = {"provider": "openrouter", "chatReasoning": "none"}
@@ -60,14 +62,20 @@ class ProvidersTest(unittest.TestCase):
         self.assertEqual(providers.provider_of({}), "openai")
         self.assertEqual(providers.provider_of({"provider": "openrouter"}), "openrouter")
         self.assertEqual(providers.provider_of({"provider": "bogus"}), "openai")
+
+    def test_the_harness_overrides_apply_when_the_settings_are_loaded(self):
+        saved = Path(tempfile.mkdtemp()) / "astro-arc.json"
+        saved.write_text(json.dumps({"provider": "openai", "chatReasoning": "none"}))
+        self.assertEqual(providers.provider_of(settings.load(saved)), "openai")
         os.environ["ASTRO_ARC_PROVIDER"] = "openrouter"
-        self.assertEqual(providers.provider_of({"provider": "openai"}), "openrouter")
+        os.environ["ASTRO_ARC_REASONING"] = "low"
+        loaded = settings.load(saved)
+        self.assertEqual(providers.provider_of(loaded), "openrouter")
+        self.assertEqual(providers.reasoning_of(loaded), "low")
 
     def test_reasoning_is_only_openrouters(self):
         self.assertEqual(providers.reasoning_of({"chatReasoning": "none"}), "default")
         self.assertEqual(providers.reasoning_of(OPENROUTER), "none")
-        os.environ["ASTRO_ARC_REASONING"] = "low"
-        self.assertEqual(providers.reasoning_of(OPENROUTER), "low")
 
     def test_an_openai_run_uses_the_openai_adapter_itself(self):
         self.assertIs(lp.chat_client({}), lp.openai_chat)

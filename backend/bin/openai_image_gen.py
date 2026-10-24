@@ -33,17 +33,15 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cost_estimate import image_call_cost  # noqa: E402
 from http_limits import b64_image_bytes, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
 from image_fit import ImageError, closest_supported_size, fit_cover  # noqa: E402
-from paths import CONFIG_FILE  # noqa: E402
 from providers import api_base, extra_headers, label, provider_of  # noqa: E402
 
 
 def saved_provider():
     """The saved setting's provider, for an entry point that has no run config
     of its own (the panel's key check). Everything else is handed one."""
-    try:
-        return provider_of(json.loads(CONFIG_FILE.read_text()))
-    except (OSError, json.JSONDecodeError):
-        return provider_of({})
+    import settings  # noqa: PLC0415
+
+    return provider_of(settings.load())
 
 # The sizes OpenAI's image models actually accept — arbitrary desktop
 # resolutions aren't among them, so generate() picks whichever of these is

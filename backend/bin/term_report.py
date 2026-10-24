@@ -36,7 +36,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
-from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
+from paths import VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
 
 
 TERMS = ("far off", "distance", "beyond", "barn", "enormous", "ancient", "older",
@@ -217,10 +218,10 @@ def classify_activity(path, samples):
     cache = {}
     if cache_path.exists():
         cache = json.loads(cache_path.read_text())
-    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    config = settings.load()
     # The writing model, not the caption judge: gpt-4o-mini returned "none" for
     # 5 of 12 prompts that plainly had a nurse in them (2026-10-10).
-    model = config.get("stage2Model") or config.get("captionModel") or lp.caption_model_for(lp.provider_of(config))
+    model = config["stage2Model"]
     chat = lp.chat_client(config)
     changed = False
     out = []

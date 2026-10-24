@@ -18,44 +18,30 @@ sizes. See openrouter_image_gen.py.
 
 Nothing here reads the settings file. The provider is a fact about a run's
 config, so the caller hands the config in (provider_of) and passes the answer
-down; only an entry point with no config of its own (a CLI main) reads the
-saved settings. ASTRO_ARC_PROVIDER overrides the config, which is what the
-bakeoff and sweep scripts use to try the other provider without touching the
-saved setting.
+down. The config comes from settings.load(), which is also where the
+ASTRO_ARC_PROVIDER / ASTRO_ARC_REASONING overrides the bakeoff and sweep
+scripts use are applied, and where each provider's default models live
+(settings.toml's [providers] tables).
 """
-
-import os
 
 PROVIDERS = {
     "openai": {
         "label": "OpenAI",
         "apiBase": "https://api.openai.com/v1",
-        # Defaults for a config that has never had a model picked. They match
-        # astro-arc-config's DEFAULTS and astro-arc-generate's fallbacks.
-        "defaultChat": "gpt-4o-mini",
-        "defaultImage": "gpt-image-1-mini",
-        "defaultQuality": "medium",
         # The keyring account prefix (see astro-arc-apikey).
         "keyAccount": "openai-api-key",
     },
     "openrouter": {
         "label": "OpenRouter",
         "apiBase": "https://openrouter.ai/api/v1",
-        "defaultChat": "openai/gpt-4o-mini",
-        "defaultImage": "openai/gpt-image-1-mini",
-        "defaultQuality": "medium",
         "keyAccount": "openrouter-api-key",
     },
 }
 
 
 def provider_of(config):
-    """The provider a run of `config` uses: ASTRO_ARC_PROVIDER if set to a
-    known provider, else the config's `provider`, else OpenAI."""
-    override = os.environ.get("ASTRO_ARC_PROVIDER")
-    if override in PROVIDERS:
-        return override
-    provider = (config or {}).get("provider") or "openai"
+    """The provider a run of `config` uses: its `provider`, or OpenAI."""
+    provider = (config or {}).get("provider")
     return provider if provider in PROVIDERS else "openai"
 
 
@@ -65,11 +51,6 @@ def label(provider):
 
 def api_base(provider):
     return PROVIDERS[provider]["apiBase"]
-
-
-def default_for(kind, provider):
-    """kind is "Chat", "Image" or "Quality"."""
-    return PROVIDERS[provider]["default" + kind]
 
 
 # How hard OpenRouter's thinking models think before answering. Reasoning
@@ -82,15 +63,11 @@ REASONING_EFFORTS = ("default", "none", "minimal", "low", "medium", "high")
 
 
 def reasoning_of(config):
-    """The chatReasoning a run of `config` uses: ASTRO_ARC_REASONING if set to
-    a known effort, else the config's, else "default". Only OpenRouter sends
-    it; on OpenAI it is always "default"."""
+    """The chatReasoning a run of `config` uses, or "default". Only
+    OpenRouter sends it; on OpenAI it is always "default"."""
     if provider_of(config) != "openrouter":
         return "default"
-    override = os.environ.get("ASTRO_ARC_REASONING")
-    if override in REASONING_EFFORTS:
-        return override
-    value = (config or {}).get("chatReasoning") or "default"
+    value = (config or {}).get("chatReasoning")
     return value if value in REASONING_EFFORTS else "default"
 
 

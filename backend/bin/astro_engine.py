@@ -25,7 +25,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ephemeris  # noqa: E402  — Astronomy Engine; see that file for why and how accurate
 from period_key import period_key  # noqa: E402  — see that file: one definition, called from everywhere
+import settings  # noqa: E402
 from paths import CONFIG_FILE  # noqa: E402
+
+NOON = "12:00"
 
 # Overridable via ASTRO_ARC_CONFIG for testing against a scratch file
 # without ever touching the user's real saved birth data.
@@ -95,7 +98,7 @@ class AstroError(Exception):
 def load_config():
     if not CONFIG_PATH.exists():
         raise AstroError(f"No config at {CONFIG_PATH} yet — set birth data and location in the Astro-Arc widget first.")
-    data = json.loads(CONFIG_PATH.read_text())
+    data = settings.load(CONFIG_PATH)
     if not data.get("birthDate"):
         raise AstroError("No birth date set yet — set it in the Astro-Arc widget first.")
     if data.get("latitude") is None or data.get("longitude") is None:
@@ -453,9 +456,11 @@ def main():
 
     lat = float(config["latitude"])
     lon = float(config["longitude"])
-    birth_time_unknown = bool(config.get("birthTimeUnknown"))
+    birth_time_unknown = config["birthTimeUnknown"]
     birth_date = config["birthDate"]
-    birth_time = "12:00" if birth_time_unknown else config.get("birthTime") or "12:00"
+    # An unknown birth time is cast for noon, the convention for a chart
+    # with no time: the Moon is then at most half a day's travel out.
+    birth_time = NOON if birth_time_unknown else config["birthTime"] or NOON
 
     # The birth place's zone, stored with the location. The location picker
     # takes it from the geocoder, and astro-arc-generate fills it in once for a
@@ -465,7 +470,7 @@ def main():
     #
     # No silent UTC fallback: a wrong zone moves the birth time by hours, which
     # moves the Moon by degrees and the Ascendant by whole signs. Refuse instead.
-    tz_name = config.get("timezone") or ""
+    tz_name = config["timezone"]
     try:
         tz = ZoneInfo(tz_name)
     except (ZoneInfoNotFoundError, ValueError, OSError):
@@ -519,7 +524,7 @@ def main():
 
     transits_now = {"planets": compute_bodies(now_utc)}
 
-    frequency = config.get("frequency", "daily")
+    frequency = config["frequency"]
     arc = derive_arc(frequency, now_utc, natal, transits_now, now_local)
 
     result = {
@@ -528,7 +533,7 @@ def main():
             "birthDate": birth_date,
             "birthTime": None if birth_time_unknown else birth_time,
             "birthTimeUnknown": birth_time_unknown,
-            "locationName": config.get("locationName", ""),
+            "locationName": config["locationName"],
             "latitude": lat,
             "longitude": lon,
             "timezone": tz_name,

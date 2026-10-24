@@ -39,7 +39,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
+from paths import VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
 from pipeline_state import PipelineState  # noqa: E402
 
 
@@ -132,7 +133,7 @@ def meta_for(row, day, config, scratch, style_override=None, stage1=None):
         "reading": stage1.get("reading", ""),
         "distillation": stage1.get("distillation", ""),
         "narrativePosition": stage1.get("narrativePosition", ""),
-        "artStyle": style_override or row.get("artStyle") or config.get("artStyle") or "",
+        "artStyle": style_override or row.get("artStyle") or config["artStyle"],
         "register": row.get("register") or "",
         "secondaryRegister": row.get("secondary") or "",
         "conceptTags": [t for t in (row.get("conceptTags") or "").split("|") if t],
@@ -150,9 +151,9 @@ def meta_for(row, day, config, scratch, style_override=None, stage1=None):
         "draws": row.get("draws") or {},
         "imagePrompt": row.get("imagePrompt") or "",
         "finalPrompt": row.get("finalPrompt") or row.get("imagePrompt") or "",
-        "stage1Model": row.get("stage1Model") or config.get("stage1Model") or "",
-        "stage15Model": row.get("stage1Model") or config.get("stage1Model") or "",
-        "stage2Model": row.get("stage2Model") or config.get("stage2Model") or "",
+        "stage1Model": row.get("stage1Model") or config["stage1Model"],
+        "stage15Model": row.get("stage1Model") or config["stage1Model"],
+        "stage2Model": row.get("stage2Model") or config["stage2Model"],
         "pipelineMode": "replay",
     }
     path = scratch / f"meta-{day}-{row.get('register') or 'x'}-{row.get('secondary') or 'x'}.json"
@@ -172,7 +173,7 @@ def main():
                          "CONFIGURED style and will be wrong.")
     ap.add_argument("--yes", action="store_true")
     args = ap.parse_args()
-    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    config = settings.load()
 
     jobs = []  # (batch name, png, row, day, stage1, reading path or None)
     for name in args.batch:
@@ -219,7 +220,7 @@ def main():
             how = "the chart is recomputed for this date at noon local"
         meta = meta_for(row, day, config, scratch, args.style, stage1)
         pretty = datetime.strptime(day, "%Y-%m-%d").strftime("%b %-d") if day else "undated"
-        style = (args.style or row.get("artStyle") or config.get("artStyle") or "").title()
+        style = (args.style or row.get("artStyle") or config["artStyle"]).title()
         register = row.get("register", "")
         if row.get("secondary"):
             register += " + " + row["secondary"]

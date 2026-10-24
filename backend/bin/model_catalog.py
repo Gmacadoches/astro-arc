@@ -57,9 +57,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
+from paths import STATE_DIR  # noqa: E402
 from period_key import cache_key  # noqa: E402  — one definition, see period_key.py
-from providers import default_for, provider_of, reasoning_of  # noqa: E402
+import settings as settings_schema  # noqa: E402  — the module; `settings` below is a config dict
+from providers import provider_of, reasoning_of  # noqa: E402
 
 PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
 AVAILABILITY_CACHE = STATE_DIR / "model-availability.json"
@@ -639,10 +640,8 @@ def render_size_for(width, height):
 
 
 def load_settings():
-    try:
-        return json.loads(CONFIG_FILE.read_text())
-    except (json.JSONDecodeError, OSError):
-        return {}
+    """The saved settings as a run uses them (settings.load)."""
+    return settings_schema.load()
 
 
 def _period_key(frequency, now_local=None):
@@ -685,13 +684,13 @@ def next_run_cost(width=1024, height=1024, settings=None, state=None, catalog=No
     provider = provider_of(settings)
     rates, learned = load_rates(provider), load_learned_usage()
 
-    chat_stage1 = settings.get("stage1Model") or default_for("Chat", provider)
-    chat_stage2 = settings.get("stage2Model") or default_for("Chat", provider)
-    image_model = settings.get("openaiModel") or default_for("Image", provider)
-    quality = settings.get("openaiQuality") or default_for("Quality", provider)
+    chat_stage1 = settings_schema.value(settings, "stage1Model")
+    chat_stage2 = settings_schema.value(settings, "stage2Model")
+    image_model = settings_schema.value(settings, "openaiModel")
+    quality = settings_schema.value(settings, "openaiQuality")
     effort = reasoning_of(settings)
     size = render_size_for(width, height)
-    period_key = _period_key(settings.get("frequency") or "daily")
+    period_key = _period_key(settings_schema.value(settings, "frequency"))
 
     # Imported here, not at module scope: cost_estimate imports this module, so
     # a top-level import of llm_pipeline would close the loop.
@@ -702,7 +701,7 @@ def next_run_cost(width=1024, height=1024, settings=None, state=None, catalog=No
         cache_known = True
     except Exception:  # noqa: BLE001 — a cost readout must not break on this
         cached_stage1 = cached_stage15 = False
-        caption_model = settings.get("captionModel") or default_for("Chat", provider)
+        caption_model = settings.get("captionModel") or settings_schema.default("stage1Model", provider)
         cache_known = False
 
     image, image_source = image_cost(image_model, quality, size, rates, learned)

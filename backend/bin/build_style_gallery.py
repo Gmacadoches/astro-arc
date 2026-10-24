@@ -32,7 +32,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
-from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
+from paths import STATE_DIR  # noqa: E402
+import settings  # noqa: E402
 from providers import provider_of  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
@@ -40,6 +41,9 @@ OUT_IMAGES = REPO / "docs" / "images" / "styles"
 OUT_PAGE = REPO / "docs" / "styles.md"
 
 THUMB_PX = 900
+
+
+GALLERY_QUALITY = "low"
 
 
 def newest_reading():
@@ -60,10 +64,11 @@ def main():
     ap.add_argument("--no-image", action="store_true", help="prompts only — free")
     args = ap.parse_args()
 
-    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
-    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
-    image_model = config.get("openaiModel") or "gpt-image-1-mini"
-    quality = config.get("openaiQuality") or "low"
+    config = settings.load()
+    stage1_model = config["stage1Model"]
+    image_model = config["openaiModel"]
+    # The gallery renders at GALLERY_QUALITY unless a quality was chosen.
+    quality = settings.read(warn=False)["openaiQuality"] or GALLERY_QUALITY
 
     reading = json.loads(Path(args.reading or newest_reading()).read_text())
     period_key = reading["arc"]["periodKey"]

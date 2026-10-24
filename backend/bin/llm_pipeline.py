@@ -65,10 +65,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 from openai_image_gen import ApiKeyError, get_api_key  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
 from http_limits import ResponseTooLarge, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
-from paths import CONFIG_FILE, USER_STYLES_DIR  # noqa: E402
+import settings  # noqa: E402
+from paths import USER_STYLES_DIR  # noqa: E402
 from pipeline_state import PipelineState  # noqa: E402
 from providers import (  # noqa: E402
-    api_base, default_for, extra_headers, label as provider_label, provider_of, reasoning_for, reasoning_of,
+    api_base, extra_headers, label as provider_label, provider_of, reasoning_for, reasoning_of,
 )
 
 import urllib.error
@@ -2605,8 +2606,8 @@ def compose(stage1, arc, dial, style, config, history, *, chat=None,
         raise PipelineError(f"compose: caption must be one of {CAPTION_POLICIES}, not {caption!r}")
     provider = provider_of(config)
     chat = chat or chat_client(config)
-    stage1_model = config.get("stage1Model") or default_for("Chat", provider)
-    stage2_model = config.get("stage2Model") or default_for("Chat", provider)
+    stage1_model = settings.value(config, "stage1Model")
+    stage2_model = settings.value(config, "stage2Model")
     period_key = arc["periodKey"]
     style_key = style.key
     catalog = style.catalog
@@ -2763,8 +2764,8 @@ def build(reading, config, chat=None, state=None, catalog=None):
     state = state or PipelineState()
     catalog = catalog or Catalog.load()
     chat = chat or chat_client(config)
-    stage1_model = config.get("stage1Model") or default_for("Chat", provider_of(config))
-    style_key = catalog.resolve(config.get("artStyle"))
+    stage1_model = settings.value(config, "stage1Model")
+    style_key = catalog.resolve(settings.value(config, "artStyle"))
     catalog.require(style_key)
     style = catalog.style(style_key)
     period_key = reading["arc"]["periodKey"]
@@ -2806,7 +2807,7 @@ def next_run_cached(config, period_key, state=None, catalog=None):
     production's."""
     state = state or PipelineState()
     catalog = catalog or Catalog.load()
-    meaning_key = meaning_cache_key(config, catalog.style(catalog.resolve(config.get("artStyle"))))
+    meaning_key = meaning_cache_key(config, catalog.style(catalog.resolve(settings.value(config, "artStyle"))))
     return (state.cached_reading(period_key, stage1_cache_key(config)) is not None,
             state.cached_meaning(period_key, meaning_key) is not None)
 
@@ -2835,7 +2836,7 @@ def main():
         print(f"Cannot build a prompt: {reading['error']}", file=sys.stderr)
         sys.exit(1)
 
-    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    config = settings.load()
 
     try:
         final_prompt, metadata = build(reading, config)

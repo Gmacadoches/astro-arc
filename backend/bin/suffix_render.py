@@ -22,16 +22,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate  # noqa: E402
-from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
+from paths import VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
 from providers import provider_of  # noqa: E402
 
 
 
 def render(prompt, style, has_people, out_dir, stem, config):
     final = lp.final_image_prompt(prompt, lp.Catalog.load().style(style), has_people)
-    model = config.get("openaiModel") or "gpt-image-1-mini"
-    quality = config.get("openaiQuality") or "medium"
-    width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
+    model = config["openaiModel"]
+    quality = config["openaiQuality"]
+    width, height = settings.fixed_size(config)
     record = {"style": style, "imagePrompt": prompt, "finalPrompt": final, "hasPeople": has_people}
     try:
         _, cost = generate(final, out_dir / f"{stem}.png", model, quality, width, height, provider_of(config))
@@ -52,7 +53,7 @@ def main():
     ap.add_argument("--style")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
-    config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    config = settings.load()
     out_dir = VERIFY_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
 

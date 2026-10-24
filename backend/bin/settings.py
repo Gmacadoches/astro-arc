@@ -186,6 +186,30 @@ def load(path=None, warn=True):
     return config
 
 
+def value(config, key):
+    """`key` from a config dict as a run uses it, whatever the dict holds:
+    its value if it fits, else the default, with "" resolved where the
+    schema says what it means. For code handed a config it did not load (a
+    harness's own, a test's partial one)."""
+    provider = config.get("provider") if fits("provider", config.get("provider")) else "openai"
+    v = config.get(key)
+    if not fits(key, v):
+        return default(key, provider)
+    empty = schema()["keys"][key].get("empty")
+    if empty and v == "":
+        return _provider_value(empty.split(".", 1)[1], provider)
+    return _num(v) if isinstance(v, Number) else v
+
+
+def fixed_size(config, fallback="1600x900"):
+    """(width, height) for a harness render: the configured backgroundSize,
+    or `fallback` when it is "auto" (only astro-arc-generate can ask the
+    monitor) or unset."""
+    size = value(config, "backgroundSize")
+    w, h = (size if size != "auto" else fallback).split("x")
+    return int(w), int(h)
+
+
 # ---- jq-compatible JSON ---------------------------------------------------
 
 def _string(text):

@@ -44,7 +44,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
 from sweep import dial_for_day, report_filled  # noqa: E402
-from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
+from paths import STATE_DIR, VERIFY_DIR  # noqa: E402
+import settings  # noqa: E402
 from pipeline_state import PipelineState  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402  — one definition, shared
 
@@ -53,7 +54,7 @@ from preflight_actors import archetype_family  # noqa: E402  — one definition,
 def load_config():
     """Same one-liner sweep.py uses; only `stage1Model` and the natal hash
     matter here."""
-    return json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
+    return settings.load()
 
 
 def load_days(cell):
@@ -86,7 +87,7 @@ def run_arm(arm, days, model, config, out_dir, axis="archetype", seed=0):
     rng = random.Random(seed)
     used_constellations, used_kinds, rows, total = [], [], [], 0.0
     catalog = lp.Catalog.load()
-    style = catalog.style(config.get("artStyle") or "symbolist")
+    style = catalog.style(config["artStyle"])
     kinds = [k for k in catalog.actor_kinds if k != "none"]
 
     for key, reading, dial in days:
@@ -189,7 +190,7 @@ def main():
     args = ap.parse_args()
 
     config = load_config()
-    model = args.model or config.get("stage1Model") or "gpt-4o-mini"
+    model = args.model or config["stage1Model"]
     if args.veto_window is not None:
         lp.ACTOR_VETO_WINDOW = args.veto_window
     days = load_days(args.cell)
