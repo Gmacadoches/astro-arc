@@ -2,6 +2,8 @@
 
 Project context lives in `CONTEXT.md`. Changes go on the `development` branch, not `master`.
 
+Tests: `python3 -m unittest discover backend/tests` (stubbed, free). Prompts unchanged: `python3 backend/bin/fallback_audit.py --out <name>` and compare its sha256.
+
 ## Agent skills
 
 ### Issue tracker
