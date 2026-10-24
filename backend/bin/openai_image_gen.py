@@ -21,6 +21,7 @@ before relying on this for real budgeting.
 """
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -32,8 +33,17 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cost_estimate import image_call_cost  # noqa: E402
 from http_limits import b64_image_bytes, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
 from image_fit import ImageError, closest_supported_size, fit_cover  # noqa: E402
+from paths import CONFIG_FILE  # noqa: E402
+from providers import api_base, extra_headers, label, provider_of  # noqa: E402
 
-API_BASE = "https://api.openai.com/v1"
+
+def saved_provider():
+    """The saved setting's provider, for an entry point that has no run config
+    of its own (the panel's key check). Everything else is handed one."""
+    try:
+        return provider_of(json.loads(CONFIG_FILE.read_text()))
+    except (OSError, json.JSONDecodeError):
+        return provider_of({})
 
 # The sizes OpenAI's image models actually accept — arbitrary desktop
 # resolutions aren't among them, so generate() picks whichever of these is
@@ -186,11 +196,12 @@ class ApiKeyError(Exception):
 _SLOTS = ("stage1", "stage2", "image")
 
 
-def get_api_key(slot="image"):
+def get_api_key(slot="image", provider="openai"):
     """The one place a key ever exists: the return value of this call.
     Never assign this to a module-level/global variable, never print it,
     never write it anywhere — pass it straight into the request that needs
-    it and let it go out of scope."""
+    it and let it go out of scope. `provider` picks whose key (see
+    astro-arc-apikey: each provider's are stored apart)."""
     if slot not in _SLOTS:
         raise ValueError(f"Unknown API key slot: {slot!r}")
     # Not on PATH — it's a sibling script in this same bin/ directory, like
@@ -200,44 +211,47 @@ def get_api_key(slot="image"):
         result = subprocess.run(
             [str(apikey_bin), "lookup", slot],
             capture_output=True, text=True, timeout=10,
+            env={**os.environ, "ASTRO_ARC_PROVIDER": provider},
         )
     except FileNotFoundError:
         raise ApiKeyError(f"{apikey_bin} not found.")
     if result.returncode != 0 or not result.stdout.strip():
-        raise ApiKeyError(f"No OpenAI API key stored for '{slot}' yet — set one in Astro-Arc's settings.")
+        raise ApiKeyError(f"No {label(provider)} API key stored for '{slot}' yet — set one in Astro-Arc's settings.")
     return result.stdout.strip()
 
 
-def _request(path, payload=None, method="GET", slot="image"):
-    """One HTTP call. The Authorization header is built inline from
-    get_api_key()'s return value — never stored en route."""
-    url = f"{API_BASE}{path}"
+def _request(path, payload=None, method="GET", slot="image", auth=True, timeout=60, provider="openai"):
+    """One HTTP call to `provider`. The Authorization header is built inline
+    from get_api_key()'s return value — never stored en route.
+
+    auth=False is for OpenRouter's public model listings, which need no key;
+    leaving it off there means browsing models never touches the keyring."""
+    url = f"{api_base(provider)}{path}"
     data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(
-        url, data=data, method=method,
-        headers={
-            "Authorization": f"Bearer {get_api_key(slot)}",
-            "Content-Type": "application/json",
-        },
-    )
+    headers = {"Content-Type": "application/json", **extra_headers(provider)}
+    if auth:
+        headers["Authorization"] = f"Bearer {get_api_key(slot, provider)}"
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
         # Bounded read: see http_limits. The 60s timeout stays — it covers a
         # stalled peer, while the cap covers one that keeps talking forever.
         # Redirects are refused unread: following one drains it uncapped.
-        with open_no_redirect(req, timeout=60) as resp:
+        with open_no_redirect(req, timeout=timeout) as resp:
             return read_json_capped(resp)
     except urllib.error.HTTPError as exc:
         body = read_error_capped(exc)
         # Never include headers (which carried the key) in an error dump.
-        raise RuntimeError(f"OpenAI API error {exc.code}: {body[:300]}") from None
+        raise RuntimeError(f"{label(provider)} API error {exc.code}: {body[:300]}") from None
 
 
-def validate_key(slot="image"):
+def validate_key(slot="image", provider="openai"):
     """The cheap, free validation call the settings UI runs right after
     saving a key: GET /models costs nothing and just confirms the key
-    authenticates. Returns (ok, message); message never contains the key."""
+    authenticates. Returns (ok, message); message never contains the key.
+    OpenRouter's /models is public and would pass any key at all, so it
+    checks /key instead, which is also free and does need a real one."""
     try:
-        _request("/models", slot=slot)
+        _request("/key" if provider == "openrouter" else "/models", slot=slot, provider=provider)
         return True, "Key works."
     except ApiKeyError as exc:
         return False, str(exc)
@@ -353,7 +367,7 @@ if __name__ == "__main__":
     # keeps the rate table in one place instead of duplicating it in bash.
     if len(sys.argv) > 1 and sys.argv[1] == "--validate":
         slot = sys.argv[2] if len(sys.argv) > 2 else "image"
-        ok, message = validate_key(slot)
+        ok, message = validate_key(slot, saved_provider())
         print(json.dumps({"ok": ok, "message": message}))
         sys.exit(0 if ok else 1)
     if len(sys.argv) > 1 and sys.argv[1] == "--model-choices":

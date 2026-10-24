@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Manages Astro-Arc's OpenAI API keys, stored ONLY via secret-tool
+# Manages Astro-Arc's API keys, stored ONLY via secret-tool
 # (libsecret / the Secret Service API) — never in a plaintext file, never
 # inside this plugin's own install/repo directory.
 #
@@ -8,7 +8,13 @@
 # different accounts (or just different models) for each stage:
 #   stage1   Stage 1 interpretation (llm_pipeline.py's chart -> reading)
 #   stage2   Stage 2 image-prompt writing (llm_pipeline.py's reading -> prompt)
-#   image    the actual OpenAI image-rendering call (openai_image_gen.py)
+#   image    the actual image-rendering call (openai_image_gen.py)
+#
+# Keys are scoped to the provider: OpenAI's under openai-api-key*, OpenRouter's
+# under openrouter-api-key*, so switching provider never overwrites the other
+# one's key. The provider is ASTRO_ARC_PROVIDER when a caller passes it (the
+# pipeline does, for the provider of the run it is making), else the saved
+# setting.
 #
 # This script never handles the key itself for --set: the caller (Panel.qml)
 # pipes the raw key straight into `secret-tool store`'s stdin — see the
@@ -33,11 +39,24 @@ set -euo pipefail
 
 SERVICE="astro-arc"
 
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"   # CONFIG_FILE
+
+provider="${ASTRO_ARC_PROVIDER:-}"
+if [[ -z $provider ]]; then
+  provider=$(jq -r '.provider // "openai"' "$CONFIG_FILE" 2>/dev/null || echo openai)
+fi
+case "$provider" in
+  openrouter) prefix="openrouter-api-key"; label_provider="OpenRouter" ;;
+  *) prefix="openai-api-key"; label_provider="OpenAI" ;;
+esac
+
 account_for_slot() {
   case "$1" in
-    stage1) echo "openai-api-key-stage1" ;;
-    stage2) echo "openai-api-key-stage2" ;;
-    image) echo "openai-api-key" ;;  # kept as the original name for continuity
+    stage1) echo "$prefix-stage1" ;;
+    stage2) echo "$prefix-stage2" ;;
+    image) echo "$prefix" ;;  # kept as the original name for continuity
     *) echo "Unknown slot: $1 (expected stage1, stage2, or image)" >&2; exit 1 ;;
   esac
 }
@@ -55,7 +74,7 @@ action="${1:-}"
 # below, which the other three actions all require.
 if [[ $action == store-all ]]; then
   require_secret_tool
-  label="Astro-Arc API Key"
+  label="Astro-Arc $label_provider API Key"
   # tee fans the same stdin into three stores. The key streams through pipes and
   # is never assigned to a variable, which is the same guarantee the per-slot
   # path gives (see the header). `wait` is what makes the exit status meaningful:
