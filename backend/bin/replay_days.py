@@ -26,8 +26,8 @@ the composition production runs:
 Nothing production owns is written. cache=False on every stage, output goes to
 verification/<name>/, and history is synthetic and in-memory.
 
-Costs real money (about $0.025 a day with renders). Prints a projection and
-needs --yes.
+Costs real money. Prints a projection from the model rate table
+(model_catalog) for the configured models and needs --yes.
 
     python3 backend/bin/replay_days.py --days 8
     python3 backend/bin/replay_days.py --days 8 --yes
@@ -42,6 +42,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
+import model_catalog as mc  # noqa: E402
 from sweep import dial_for_day, report_filled  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import STATE_DIR  # noqa: E402
@@ -175,6 +176,33 @@ def replay(style_key, days, config, out_dir=None, render=False, quality="medium"
     return rows, total
 
 
+def projected_cost(config, render, quality):
+    """(per_day, per_day_if_every_check_resamples, unknown) in dollars, from
+    the rate table for the models `replay` will use: two Stage 1.5 calls
+    (meaning, material), Stage 2 and the melodrama check, plus a render.
+    `unknown` names each model with no rate; the totals are None then."""
+    model1 = config.get("stage1Model") or "gpt-4o-mini"
+    model2 = config.get("stage2Model") or "gpt-4o-mini"
+    caption_model = config.get("captionModel") or lp.CAPTION_MODEL
+    stage15, _ = mc.stage_cost("stage15", model1)
+    stage2, _ = mc.stage_cost("stage2", model2)
+    caption, _ = mc.stage_cost("caption", caption_model)
+    image = 0.0
+    unknown = [m for m, c in ((model1, stage15), (model2, stage2), (caption_model, caption))
+               if c is None]
+    if render:
+        image_model = config.get("openaiModel") or "gpt-image-1-mini"
+        width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
+        image, _ = mc.image_cost(image_model, quality, mc.render_size_for(width, height))
+        if image is None:
+            unknown.append(image_model)
+    if unknown:
+        return None, None, unknown
+    once = 2 * stage15 + stage2 + caption + image
+    worst = once + lp.CAPTION_RESAMPLES * (stage2 + caption)
+    return once, worst, []
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -199,10 +227,14 @@ def main():
         print(f"No cached daily readings under {READINGS_DIR}.")
         return 1
 
-    per = 0.012 if args.no_image else 0.025
     print(f"{len(days)} days on {style_key}, everything varying "
           f"({'prompts only' if args.no_image else 'with renders'})")
-    print(f"projected cost: about ${len(days) * per:.2f}")
+    once, worst, unknown = projected_cost(config, not args.no_image, args.quality)
+    if unknown:
+        print(f"projected cost: unknown (no rate for {', '.join(sorted(set(unknown)))})")
+    else:
+        print(f"projected cost: about ${len(days) * once:.3f} "
+              f"(up to ${len(days) * worst:.3f} if every melodrama check resamples)")
     if not args.yes:
         print("\nDry run. Re-run with --yes to spend it.")
         return 0

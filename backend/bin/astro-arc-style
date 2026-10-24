@@ -69,7 +69,7 @@ from cost_estimate import chat_call_cost  # noqa: E402
 from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
-from replay_days import STYLE_DRAW_KEYS, load_days, replay  # noqa: E402
+from replay_days import STYLE_DRAW_KEYS, load_days, projected_cost, replay  # noqa: E402
 from style_catalog import PREVIEW_PX  # noqa: E402
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
@@ -374,10 +374,11 @@ def cmd_meaning(args):
                          f"this machine has {len(days)}")
     model1 = config.get("stage1Model") or "gpt-4o-mini"
     model2 = config.get("stage2Model") or "gpt-4o-mini"
-    replay_cost = chat_cost(model1, 2 * MEANING_DAYS, 0)
-    s2 = chat_cost(model2, 0, MEANING_DAYS)
+    # replay_days' own projection: Stage 1.5, Stage 2 and the melodrama
+    # check per day, at the configured models' rates.
+    per_day, _, _ = projected_cost(config, False, None)
     jc = judge_cost(model2)
-    total = None if None in (replay_cost, s2, jc) else replay_cost + s2 + jc
+    total = None if None in (per_day, jc) else per_day * MEANING_DAYS + jc
     if estimate_or_announce(args, f"meaning: {MEANING_DAYS} real days prompts-only ({model1} / {model2}) "
                                   f"and one judge call on {model2}: {usd(total)}"):
         return 0
