@@ -1043,18 +1043,20 @@ Respond with a JSON object with exactly these keys:
 STAGE1_SCHEMA_VERSION = 3
 
 
-def stage1_interpret(reading, stage1_model, period_key, config, chat=None):
+def stage1_interpret(reading, stage1_model, period_key, config, chat=None, cache=True):
     """Cached per period_key, but keyed to the birth data too (see
     _natal_hash): regenerating the same day/week/month's image (e.g. while
     comparing style variants) shouldn't re-run Stage 1, but editing the
     birth date/time/location must invalidate the cache even within the same
     period, since Ascendant and transit-house placements feed straight into
     describe_natal()/describe_arc()'s prompt text below. Returns (result_dict,
-    cost) — cost is None on a cache hit."""
-    READINGS_DIR.mkdir(parents=True, exist_ok=True)
+    cost) — cost is None on a cache hit.
+
+    `cache=False` neither reads nor writes the production readings cache, for
+    harnesses (sweep.py, build_style_gallery.py) that must leave it as it was."""
     cache_path = READINGS_DIR / f"{period_key}.json"
     natal_hash = _natal_hash(config)
-    if cache_path.exists():
+    if cache and cache_path.exists():
         try:
             cached = json.loads(cache_path.read_text())
             if (cached.get("reading") and cached.get("distillation")
@@ -1076,7 +1078,9 @@ def stage1_interpret(reading, stage1_model, period_key, config, chat=None):
     result["generatedAt"] = datetime.now(timezone.utc).isoformat()
     result["natalHash"] = natal_hash
     result["schemaVersion"] = STAGE1_SCHEMA_VERSION
-    cache_path.write_text(json.dumps(result, indent=2))
+    if cache:
+        READINGS_DIR.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(result, indent=2))
     return result, chat_call_cost(stage1_model, usage)
 
 
