@@ -32,7 +32,7 @@ FLAG = 0.30
 NOUN_SYSTEM = """List the concrete nouns in a described image: the physical things, materials, creatures, people and places named. Singular, lower case, one or two words each, no adjectives, no abstract nouns (no light, shadow, scene, frame, distance, edge, side). Respond with JSON: {"nouns": ["..."]}"""
 
 
-def nouns_for(path, data, model):
+def nouns_for(path, data, model, chat):
     cache_path = path / "00_nouns.json"
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
     changed = False
@@ -40,7 +40,7 @@ def nouns_for(path, data, model):
         key = str(s["index"])
         if cache.get(key, {}).get("prompt") != s["imagePrompt"]:
             try:
-                result, _ = lp.openai_chat(model, NOUN_SYSTEM, s["imagePrompt"], "stage2", temperature=0.0)
+                result, _ = chat(model, NOUN_SYSTEM, s["imagePrompt"], "stage2", temperature=0.0)
                 found = sorted({str(n).strip().lower() for n in result.get("nouns") or [] if str(n).strip()})
             except Exception as exc:  # noqa: BLE001
                 print(f"overlap_report: noun call failed: {exc}", file=sys.stderr)
@@ -58,11 +58,12 @@ def main():
         sys.exit(1)
     prefix, styles = sys.argv[1], sys.argv[2:]
     config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
-    model = config.get("captionModel") or lp.CAPTION_MODEL
+    model = config.get("captionModel") or lp.caption_model_for(lp.provider_of(config))
+    chat = lp.chat_client(config)
     by_style = {}
     for st in styles:
         path = VERIFY_DIR / f"{prefix}-{st}"
-        by_style[st] = nouns_for(path, json.loads((path / "00_sweep.json").read_text()), model)
+        by_style[st] = nouns_for(path, json.loads((path / "00_sweep.json").read_text()), model, chat)
 
     scores, shared = {}, {}
     for a, b in combinations(styles, 2):

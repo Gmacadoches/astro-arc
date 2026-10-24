@@ -336,7 +336,7 @@ def judge(records, config):
     random.SystemRandom().shuffle(order)
     ids = {str(i + 1): records[j] for i, j in enumerate(order)}
     user = "\n\n".join(f"Prompt {i}:\n{r['imagePrompt']}" for i, r in ids.items())
-    result, usage = lp.openai_chat(model, JUDGE_SYSTEM, user, "stage2", temperature=0.2)
+    result, usage = lp.chat_client(config)(model, JUDGE_SYSTEM, user, "stage2", temperature=0.2)
     return ids, result, chat_call_cost(model, usage)
 
 

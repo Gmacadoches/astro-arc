@@ -220,7 +220,8 @@ def classify_activity(path, samples):
     config = json.loads(CONFIG_FILE.read_text()) if CONFIG_FILE.exists() else {}
     # The writing model, not the caption judge: gpt-4o-mini returned "none" for
     # 5 of 12 prompts that plainly had a nurse in them (2026-10-10).
-    model = config.get("stage2Model") or config.get("captionModel") or lp.CAPTION_MODEL
+    model = config.get("stage2Model") or config.get("captionModel") or lp.caption_model_for(lp.provider_of(config))
+    chat = lp.chat_client(config)
     changed = False
     out = []
     for s in samples:
@@ -228,8 +229,7 @@ def classify_activity(path, samples):
         if (key not in cache or cache[key].get("prompt") != s["imagePrompt"]
                 or cache[key].get("v") != ACTIVITY_VERSION):
             try:
-                result, _ = lp.openai_chat(model, ACTIVITY_SYSTEM, s["imagePrompt"], "stage2",
-                                           temperature=0.0)
+                result, _ = chat(model, ACTIVITY_SYSTEM, s["imagePrompt"], "stage2", temperature=0.0)
                 act = str(result.get("activity") or "none").strip().lower()
             except Exception as exc:  # noqa: BLE001 — a report must survive one bad call
                 print(f"term_report: activity call failed: {exc}", file=sys.stderr)

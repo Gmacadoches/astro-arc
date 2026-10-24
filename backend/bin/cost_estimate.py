@@ -67,9 +67,13 @@ def _rate_cost(rates, input_tokens, output_tokens):
 
 def chat_call_cost(model, usage):
     """usage is a chat completion response's `usage` dict
-    ({"prompt_tokens":..., "completion_tokens":...}) or None."""
+    ({"prompt_tokens":..., "completion_tokens":...}) or None. OpenRouter adds
+    `cost`, the dollars it billed, which is used as it stands: it needs no
+    rate, and it is the real figure rather than an estimate of one."""
     if not usage:
         return None
+    if usage.get("cost") is not None:
+        return round(usage["cost"], 6)
     rates = CHAT_MODEL_RATES.get(model)
     return _rate_cost(rates, usage.get("prompt_tokens"), usage.get("completion_tokens"))
 

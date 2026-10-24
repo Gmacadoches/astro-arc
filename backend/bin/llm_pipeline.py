@@ -49,6 +49,7 @@ the full metadata (reading, distillation, concept tags, register, ...) to
 metadata_out.json, for last-run.json and the review log to pick up.
 """
 
+import functools
 import hashlib
 import json
 import random
@@ -66,6 +67,9 @@ from cost_estimate import chat_call_cost  # noqa: E402
 from http_limits import ResponseTooLarge, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
 from paths import CONFIG_FILE, USER_STYLES_DIR  # noqa: E402
 from pipeline_state import PipelineState  # noqa: E402
+from providers import (  # noqa: E402
+    api_base, default_for, extra_headers, label as provider_label, provider_of, reasoning_for, reasoning_of,
+)
 
 import urllib.error
 import urllib.request
@@ -88,7 +92,6 @@ REGISTER_LOOKBACK_DAYS = 5
 # turning a hard failure into a silent 10-minute hang.
 CHAT_MAX_ATTEMPTS = 5
 CHAT_BACKOFF_BASE = 2.0
-CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
 
 
 class PipelineError(Exception):
@@ -100,13 +103,17 @@ class PipelineError(Exception):
 # secret-tool subprocess call) and used only inline in this one header dict;
 # nothing here stores it, logs it, or returns it.
 #
-# This is the OpenAI adapter at the chat seam. Every stage takes `chat=`, any
-# callable with openai_chat's signature returning (json_dict, usage), and falls
-# back to this one when it is None. fallback_audit.py passes a stub there, so a
-# prompts-only run makes no call and writes no usage or capability state.
+# This is the adapter at the chat seam: OpenAI's /chat/completions request,
+# which OpenRouter takes too, so one adapter serves both and `provider` says
+# where it goes. Every stage takes `chat=`, any callable with openai_chat's
+# signature returning (json_dict, usage); with none, a stage that has the
+# run's config uses chat_client(config). fallback_audit.py passes a stub
+# there, so a prompts-only run makes no call and writes no usage or
+# capability state.
 # ---------------------------------------------------------------------------
 
-def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=None):
+def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=None, *,
+                provider="openai", reasoning="default"):
     """`slot` picks which of the three independently-stored API keys
     (astro-arc-apikey's stage1/stage2/image) authenticates this call —
     Stage 1 and Stage 2 use separate keys/models by design, since they're
@@ -117,7 +124,12 @@ def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=
     only to record how many tokens that stage actually consumes, which is what
     lets the widget price a model that has never been run: measured tokens for
     the stage times that model's published rate. See model_catalog.stage_cost.
+
+    `provider` is where the call goes (see providers.py) and whose key it
+    uses; `reasoning` is the chatReasoning effort, sent only to an OpenRouter
+    model that lists it. chat_client(config) binds both from a run's config.
     """
+    label = provider_label(provider)
     payload = {
         "model": model,
         "messages": [
@@ -140,10 +152,20 @@ def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=
     # slightly looser than configured. That beats failing the generation, but it
     # is the reason the widget marks such a model rather than hiding the fact.
     try:
-        from model_catalog import get_capability  # noqa: PLC0415
+        from model_catalog import get_capability, load_availability  # noqa: PLC0415
 
         if get_capability(model, "temperature") is False:
             payload.pop("temperature", None)
+        # OpenRouter's listing says up front which models take it, so there
+        # is no wasted first attempt to discover it.
+        if provider == "openrouter":
+            listed = ((load_availability("openrouter") or {}).get("chatModels") or {}).get(model)
+            if listed and listed.get("temperature") is False:
+                payload.pop("temperature", None)
+            # See providers.REASONING_EFFORTS for why this exists at all.
+            sent = reasoning_for(listed, reasoning)
+            if sent:
+                payload["reasoning"] = sent
     except Exception:  # noqa: BLE001
         pass
     # Retry on 429 and 5xx with backoff (added 2026-09-12). Without this a single
@@ -167,13 +189,14 @@ def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=
     attempt = 0
     while attempt < CHAT_MAX_ATTEMPTS:
         req = urllib.request.Request(
-            CHAT_API_URL,
+            api_base(provider) + "/chat/completions",
             data=json.dumps(payload).encode(),
             method="POST",
             headers={
                 # Rebuilt per attempt so the key is never held across a sleep.
-                "Authorization": f"Bearer {get_api_key(slot)}",
+                "Authorization": f"Bearer {get_api_key(slot, provider)}",
                 "Content-Type": "application/json",
+                **extra_headers(provider),
             },
         )
         try:
@@ -186,10 +209,10 @@ def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=
         except ResponseTooLarge as exc:
             # Not congestion and not transient: a reply this size is broken,
             # and retrying only invites it again. Fail the stage outright.
-            raise PipelineError(f"OpenAI chat API: {exc}") from None
+            raise PipelineError(f"{label} chat API: {exc}") from None
         except urllib.error.HTTPError as exc:
             detail = read_error_capped(exc)[:300]
-            last_detail = f"OpenAI chat API error {exc.code}: {detail}"
+            last_detail = f"{label} chat API error {exc.code}: {detail}"
 
             # A rejected temperature is a capability mismatch, not congestion:
             # retry immediately without it and remember. Deliberately does NOT
@@ -223,7 +246,7 @@ def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=
             time.sleep(wait)
             attempt += 1
     else:  # pragma: no cover — loop always breaks or raises
-        raise PipelineError(last_detail or "OpenAI chat API call failed")
+        raise PipelineError(last_detail or f"{label} chat API call failed")
 
     # Bookkeeping only — never allowed to break a call that has already been paid
     # for, hence the guard and the placement after the response is in hand.
@@ -231,7 +254,10 @@ def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=
         try:
             from model_catalog import record_stage_usage  # noqa: PLC0415
 
-            record_stage_usage(stage, model, body.get("usage"))
+            # Filed under the effort actually sent, so a reasoning-off run
+            # never prices the same model's default (model_catalog.stage_model_key).
+            sent = payload.get("reasoning")
+            record_stage_usage(stage, f"{model}@{sent['effort']}" if sent else model, body.get("usage"))
         except Exception:  # noqa: BLE001
             pass
 
@@ -241,6 +267,16 @@ def openai_chat(model, system_prompt, user_prompt, slot, temperature=0.8, stage=
     # take.
     usage = body.get("usage")
     return _parse_json_object(content), usage
+
+
+def chat_client(config):
+    """The chat client for a run of `config`: openai_chat bound to the
+    config's provider and reasoning effort. OpenAI with no effort is
+    openai_chat itself."""
+    provider, reasoning = provider_of(config), reasoning_of(config)
+    if provider == "openai" and reasoning == "default":
+        return openai_chat
+    return functools.partial(openai_chat, provider=provider, reasoning=reasoning)
 
 
 def _parse_json_object(text):
@@ -1060,7 +1096,8 @@ def stage1_interpret(reading, stage1_model, period_key, config, chat=None, state
     arc = reading["arc"]
     user_prompt = f"Natal: {describe_natal(natal)}.\n{describe_arc(arc)}"
 
-    result, usage = (chat or openai_chat)(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1", temperature=0.7, stage="stage1")
+    result, usage = (chat or chat_client(config))(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1",
+                                                  temperature=0.7, stage="stage1")
     for key in ("reading", "distillation", "narrativePosition"):
         if not result.get(key):
             raise PipelineError(f"Stage 1 response missing '{key}': {result!r}")
@@ -1965,7 +2002,8 @@ def stage15_meaning(stage1_result, model, period_key, config, state=None, dial=N
             "the constellation from the rest: " + ", ".join(avoid_kinds)
         )
 
-    result, usage = (chat or openai_chat)(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
+    result, usage = (chat or chat_client(config))(model, system_prompt, "\n".join(user_lines), "stage1",
+                                                  temperature=0.95, stage="stage15")
 
     for key in ("constellation", "movement", "affect"):
         if not result.get(key):
@@ -2063,7 +2101,7 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style=Non
             + "\n".join(f"  - {m}" for m in avoid_material)
         )
 
-    result, usage = (chat or openai_chat)(model, system_prompt, "\n".join(user_lines), "stage1",
+    result, usage = (chat or chat_client(config))(model, system_prompt, "\n".join(user_lines), "stage1",
                                           temperature=0.95, stage="stage15")
     for key in ("objects", "anomaly"):
         if not result.get(key):
@@ -2542,7 +2580,8 @@ def compose(stage1, arc, dial, style, config, history, *, chat=None,
                   the returned historyEntry to move recency on.
 
     Keywords:
-      chat        the chat client (see openai_chat); None means OpenAI.
+      chat        the chat client (see openai_chat); None means chat_client(config),
+                  the config's provider.
       caption     the melodrama check: "resample" (production: a failure
                   re-runs Stage 2 up to CAPTION_RESAMPLES times), "record"
                   (check once, never resample) or "skip" (no check).
@@ -2564,8 +2603,10 @@ def compose(stage1, arc, dial, style, config, history, *, chat=None,
     is never saved here (see build)."""
     if caption not in CAPTION_POLICIES:
         raise PipelineError(f"compose: caption must be one of {CAPTION_POLICIES}, not {caption!r}")
-    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
-    stage2_model = config.get("stage2Model") or "gpt-4o-mini"
+    provider = provider_of(config)
+    chat = chat or chat_client(config)
+    stage1_model = config.get("stage1Model") or default_for("Chat", provider)
+    stage2_model = config.get("stage2Model") or default_for("Chat", provider)
     period_key = arc["periodKey"]
     style_key = style.key
     catalog = style.catalog
@@ -2607,7 +2648,7 @@ def compose(stage1, arc, dial, style, config, history, *, chat=None,
     # failure is recorded: a strict judge must never cost the day its image.
     # passed=None (the judge errored) counts as "not checked", per
     # caption_check's own contract.
-    caption_model = config.get("captionModel") or CAPTION_MODEL
+    caption_model = config.get("captionModel") or caption_model_for(provider)
     caption_attempts = []
     stage2_cost = 0.0
     for _attempt in range(1 + (CAPTION_RESAMPLES if caption == "resample" else 0)):
@@ -2721,7 +2762,8 @@ def build(reading, config, chat=None, state=None, catalog=None):
     or the audit passes its own."""
     state = state or PipelineState()
     catalog = catalog or Catalog.load()
-    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
+    chat = chat or chat_client(config)
+    stage1_model = config.get("stage1Model") or default_for("Chat", provider_of(config))
     style_key = catalog.resolve(config.get("artStyle"))
     catalog.require(style_key)
     style = catalog.style(style_key)
