@@ -1472,7 +1472,6 @@ def draw_style_choices(style_key, dial, history, period_key):
     applied: (dial, draws). `draws` is what goes into the history entry (so the
     next run can exclude it) and into pipeline-meta (so the run page can show
     it). Keys a style has no array for are simply absent."""
-    dial = dict(dial)
     draws = {}
     rng = _style_rng(period_key, style_key, history)
     hard = dial["polarity"] == "hard"
@@ -1489,31 +1488,38 @@ def draw_style_choices(style_key, dial, history, period_key):
     draws["activity"] = _draw(rng, list(actor), last, 1)[0]
     draws["actorVerbs"] = _draw(rng, actor[draws["activity"]],
                                 _recent_draws(history, style_key, "actorVerbs"), VERB_DRAW)
-    dial["verbs"] = ", ".join(draws["processVerbs"])
-    dial["actorVerbs"] = ", ".join(draws["actorVerbs"])
-    dial["activity"] = draws["activity"]
 
     space = load_style_space(style_key)
     if space:
         draws["space"] = _draw(rng, space, _recent_draws(history, style_key, "space"), 1)[0]
-        dial["space"] = draws["space"]
-
-    # The style's light line for today's exposure band. Not a draw: the band
-    # decides.
-    dial["light"] = str(_style_table(style_key, "light")[dial["exposureBand"]]).strip()
 
     used = _recent_draws(history, style_key, "condition")
     pool = [c for c in CONDITIONS if c not in used] or list(CONDITIONS)
     weights = _CONDITION_WEIGHTS["hard" if hard else "soft"]
     draws["condition"] = rng.choices(pool, weights=[weights.get(c, 1) for c in pool])[0]
-    dial["condition"] = draws["condition"]
 
     modes = load_highlight_modes(style_key)
     if modes:
         draws["highlightMode"] = _draw(rng, modes, _recent_draws(history, style_key, "highlightMode"), 1)[0]
-        dial["highlightMode"] = draws["highlightMode"]
 
-    return dial, draws
+    return apply_draws(style_key, dial, draws), draws
+
+
+def apply_draws(style_key, dial, draws):
+    """The dial with a set of draws applied, whether drawn just now or pinned
+    from an earlier run (see compose). The light line is not a draw: the
+    style's line for today's exposure band always applies."""
+    dial = dict(dial)
+    dial["verbs"] = ", ".join(draws["processVerbs"])
+    dial["actorVerbs"] = ", ".join(draws["actorVerbs"])
+    dial["activity"] = draws["activity"]
+    if "space" in draws:
+        dial["space"] = draws["space"]
+    dial["light"] = str(_style_table(style_key, "light")[dial["exposureBand"]]).strip()
+    dial["condition"] = draws["condition"]
+    if "highlightMode" in draws:
+        dial["highlightMode"] = draws["highlightMode"]
+    return dial
 
 
 # ---- The charter validator (charter-required, 2026-10-16) ------------------
@@ -1987,13 +1993,12 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     # Recency pressure on the archetype, for the reason recent_constellations
     # documents. Passed as data in the user message rather than baked into the
     # system prompt, exactly like Stage 2's avoided concepts: the rule is policy
-    # and belongs above, the list changes every run and belongs here. `None`
-    # means "work it out from the cache"; an explicit list (sweep.py, the B0
-    # replay harness) overrides, and `[]` disables it for a control run.
-    if avoid_archetypes is None:
-        avoid_archetypes = recent_constellations(exclude=period_key)
-    if avoid_kinds is None:
-        avoid_kinds = recent_actor_kinds(exclude=period_key)
+    # and belongs above, the list changes every run and belongs here. The
+    # caller passes the lists: build() hands in the real ones from the cache
+    # (recent_constellations, recent_actor_kinds), a harness its own. None is
+    # no recency, never "go and read the production cache".
+    avoid_archetypes = avoid_archetypes or []
+    avoid_kinds = avoid_kinds or []
     if avoid_archetypes:
         user_lines.append(
             "RECENTLY USED — these archetypes are spent; reach elsewhere unless "
@@ -2566,42 +2571,88 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
 # Orchestration
 # ---------------------------------------------------------------------------
 
-def build(reading, config, chat=None):
+CAPTION_POLICIES = ("resample", "record", "skip")
+# Keys compose() returns beyond build()'s metadata. build() drops them, so its
+# metadata (and every pipeline-meta-*.json) keeps exactly the shape it had.
+_COMPOSE_ONLY_KEYS = ("meaning", "material", "meaningCost", "materialCost")
+
+
+def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
+            caption="resample", draws=None, registers=None, meaning=None,
+            avoided_concepts=None, avoid_archetypes=(), avoid_kinds=(),
+            cache_meaning=False):
+    """One composition: a Stage 1 result to a final image prompt. Production
+    (build) and every harness run this, so a harness measures the code that
+    ships rather than a copy of its sequence.
+
+    Inputs:
+      stage1      Stage 1's result (reading, distillation, narrativePosition).
+      arc         the reading's arc: periodKey, frequency, and texture (the
+                  texture is only recorded; the dial is what acts).
+      dial        dial_from_texture's dial, or a harness's own.
+      style_key   a resolved key whose charter has passed require_charter.
+      history     the runs this one's recency comes from, newest first. Never
+                  read from or written to disk here: production passes
+                  load_history(), a harness passes its own list and inserts
+                  the returned historyEntry to move recency on.
+
+    Keywords:
+      chat        the chat client (see _chat_json); None means OpenAI.
+      caption     the melodrama check: "resample" (production: a failure
+                  re-runs Stage 2 up to CAPTION_RESAMPLES times), "record"
+                  (check once, never resample) or "skip" (no check).
+      draws, registers, meaning
+                  pins: supplied, they replace what this run would choose.
+                  `draws` is an earlier run's draws, `registers` a
+                  (primary, secondary) pair, `meaning` a Stage 1.5 meaning
+                  (only the material half then runs).
+      avoided_concepts  overrides the concepts worked out from `history`.
+      avoid_archetypes, avoid_kinds
+                  Stage 1.5's recent constellations and actor kinds. Empty by
+                  default; production passes the real ones.
+      cache_meaning   read and write the production Stage 1.5 cache. Only
+                  build() sets it.
+
+    Returns build()'s metadata plus the meaning and material halves of Stage
+    1.5 and their costs. The history entry is in it under "historyEntry"; it
+    is never saved here (see build)."""
+    if caption not in CAPTION_POLICIES:
+        raise PipelineError(f"compose: caption must be one of {CAPTION_POLICIES}, not {caption!r}")
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     stage2_model = config.get("stage2Model") or "gpt-4o-mini"
-    style_key = resolve_style_key(config.get("artStyle"))
-    require_charter(style_key)
-    period_key = reading["arc"]["periodKey"]
+    period_key = arc["periodKey"]
 
-    # The dial has to exist BEFORE Stage 1.5, because it sets how many objects to
-    # ask for and gets stored in that stage's cache entry.
-    dial = dial_from_texture(reading["arc"].get("texture"))
-
-    stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config, chat=chat)
-    # Registers are picked BEFORE Stage 1.5 as of 2026-09-26, because they are
-    # now one of its inputs: the material half builds the objects and the
-    # anomaly out of the primary register. Picked after, the register could
-    # only reach Stage 2 as an adjective on a scene already cast without it.
-    #
-    # The "cached dial" workaround that used to follow this call is gone: it
-    # kept a cached object list paired with the object count it was written
-    # for, and objects are no longer cached.
-    history = load_history()
-    registers = load_registers()
     cliches = load_cliches()
     # Per-style draws (verbs, ...) from the charter's arrays, never repeating
     # what this style drew in its last STYLE_RECENCY runs. Before Stage 1.5,
     # because the dial they change is one of its inputs.
-    dial, draws = draw_style_choices(style_key, dial, history, period_key)
-    register, secondary_register = pick_registers(history, registers, dial["registerCohesion"])
+    if draws is None:
+        dial, draws = draw_style_choices(style_key, dial, history, period_key)
+    else:
+        dial = apply_draws(style_key, dial, draws)
+    # Registers are picked BEFORE Stage 1.5 as of 2026-09-26, because they are
+    # now one of its inputs: the material half builds the objects and the
+    # anomaly out of the primary register. Picked after, the register could
+    # only reach Stage 2 as an adjective on a scene already cast without it.
+    if registers is None:
+        register, secondary_register = pick_registers(history, load_registers(), dial["registerCohesion"])
+    else:
+        register, secondary_register = registers
     style_world = load_style_world(style_key)
-    amplification, stage15_cost = stage15_amplify(
-        stage1, stage1_model, period_key, config, dial=dial,
-        style_key=style_key, style_world=style_world,
-        register=register, secondary_register=secondary_register,
-        avoid_material=recent_material(history), chat=chat,
-    )
-    avoid = avoid_concepts(history)
+
+    meaning_cost = None
+    if meaning is None:
+        meaning, meaning_cost = stage15_meaning(
+            stage1, stage1_model, period_key, config, cache=cache_meaning, dial=dial,
+            avoid_archetypes=list(avoid_archetypes), avoid_kinds=list(avoid_kinds),
+            style_key=style_key, style_world=style_world, chat=chat)
+    material, material_cost = stage15_material(
+        stage1, meaning, stage1_model, config, dial=dial, style_key=style_key,
+        style_world=style_world, register=register, secondary_register=secondary_register,
+        avoid_material=recent_material(history), chat=chat)
+    amplification = {**meaning, **material}
+    stage15_cost = (meaning_cost or 0.0) + (material_cost or 0.0)
+    avoid = avoid_concepts(history) if avoided_concepts is None else list(avoided_concepts)
 
     # The melodrama rule, enforced before the image call as B4 specified. It was
     # built and calibrated on 2026-09-20 (21/21 against Garrett's labels) but
@@ -2614,7 +2665,7 @@ def build(reading, config, chat=None):
     caption_model = config.get("captionModel") or CAPTION_MODEL
     caption_attempts = []
     stage2_cost = 0.0
-    for _attempt in range(1 + CAPTION_RESAMPLES):
+    for _attempt in range(1 + (CAPTION_RESAMPLES if caption == "resample" else 0)):
         image_prompt, concept_tags, has_people, attempt_cost = stage2_image_prompt(
             stage1, register, avoid, cliches, stage2_model,
             style_world,
@@ -2628,8 +2679,10 @@ def build(reading, config, chat=None):
             chat=chat,
         )
         stage2_cost += attempt_cost or 0.0
-        caption, hits, passed = caption_check(image_prompt, caption_model, chat=chat)
-        caption_attempts.append({"caption": caption, "hits": hits, "passed": passed})
+        if caption == "skip":
+            break
+        caption_text, hits, passed = caption_check(image_prompt, caption_model, chat=chat)
+        caption_attempts.append({"caption": caption_text, "hits": hits, "passed": passed})
         if passed is not False:
             break
 
@@ -2643,7 +2696,7 @@ def build(reading, config, chat=None):
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "periodKey": period_key,
-        "frequency": reading["arc"]["frequency"],
+        "frequency": arc["frequency"],
         "prompt": image_prompt,
         "conceptTags": concept_tags,
         # "register" keeps its original meaning (the primary) so
@@ -2660,14 +2713,8 @@ def build(reading, config, chat=None):
         "objects": amplification.get("objects") or [],
         "highlight": amplification.get("anomaly") or "",
     }
-    # NOT saved here as of 2026-10-08. build() runs before the image call, so
-    # saving the entry now meant a render refused by the provider still counted
-    # as a generation: the register rotation and the avoided-concepts window
-    # both moved on for a day that produced no image. The entry rides in the
-    # metadata instead, and astro-arc-generate commits it with
-    # `llm_pipeline.py --commit-history` once the image exists.
 
-    metadata = {
+    return {
         "reading": stage1["reading"],
         "distillation": stage1["distillation"],
         "narrativePosition": stage1["narrativePosition"],
@@ -2686,9 +2733,10 @@ def build(reading, config, chat=None):
         "hasPeople": has_people,
         "historyEntry": entry,
         # One row per Stage 2 attempt; more than one means the melodrama check
-        # caught something and Stage 2 was resampled.
-        "captionCheck": {"model": caption_model, "attempts": caption_attempts,
-                         "passed": caption_attempts[-1]["passed"]},
+        # caught something and Stage 2 was resampled. None when caption="skip".
+        "captionCheck": ({"model": caption_model, "attempts": caption_attempts,
+                          "passed": caption_attempts[-1]["passed"]}
+                         if caption_attempts else None),
         # Which model actually ran each stage. Previously only the COSTS were
         # recorded, so a review page could show what a stage cost but not what
         # produced it — and with the models now freely switchable from the
@@ -2697,7 +2745,7 @@ def build(reading, config, chat=None):
         "stage15Model": stage1_model,  # Stage 1.5 deliberately runs on Stage 1's model
         "stage2Model": stage2_model,
         "pipelineMode": dial["mode"],
-        "texture": reading["arc"].get("texture"),
+        "texture": arc.get("texture"),
         "dial": {k: v for k, v in dial.items() if k != "mode"},
         "draws": draws,
         "avoidedConcepts": avoid,
@@ -2709,14 +2757,54 @@ def build(reading, config, chat=None):
         "artStyleLabel": load_styles()[style_key]["label"],
         "imagePrompt": image_prompt,
         "finalPrompt": final_prompt,
-        # Cost of the chat calls this run actually made — None means
-        # "cached, no call made" (stage1/stage1.5) or "model not
-        # in cost_estimate.py's rate table" (unknown, not zero).
-        "stage1Cost": stage1_cost,
+        # stage1Cost is set by build(), which runs Stage 1; a harness that
+        # brought its own Stage 1 result has no such cost.
+        "stage1Cost": None,
         "stage15Cost": stage15_cost,
         "stage2Cost": stage2_cost,
+        "meaning": meaning,
+        "material": material,
+        "meaningCost": meaning_cost,
+        "materialCost": material_cost,
     }
-    return final_prompt, metadata
+
+
+def build(reading, config, chat=None):
+    """Production's composition: Stage 1, the real history and the real
+    Stage 1.5 recency and cache, the melodrama resample. Returns
+    (final_prompt, metadata), the metadata astro-arc-generate writes."""
+    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
+    style_key = resolve_style_key(config.get("artStyle"))
+    require_charter(style_key)
+    period_key = reading["arc"]["periodKey"]
+
+    # The dial has to exist BEFORE Stage 1.5, because it sets how many objects to
+    # ask for and gets stored in that stage's cache entry.
+    dial = dial_from_texture(reading["arc"].get("texture"))
+
+    stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config, chat=chat)
+    result = compose(
+        stage1, reading["arc"], dial, style_key, config, load_history(), chat=chat,
+        caption="resample",
+        # Production's Stage 1.5 recency comes from the amplification cache,
+        # this period excluded (see recent_constellations).
+        avoid_archetypes=recent_constellations(exclude=period_key),
+        avoid_kinds=recent_actor_kinds(exclude=period_key),
+        cache_meaning=True,
+    )
+    # NOT saved here as of 2026-10-08. build() runs before the image call, so
+    # saving the entry now meant a render refused by the provider still counted
+    # as a generation: the register rotation and the avoided-concepts window
+    # both moved on for a day that produced no image. The entry rides in the
+    # metadata instead, and astro-arc-generate commits it with
+    # `llm_pipeline.py --commit-history` once the image exists.
+    for key in _COMPOSE_ONLY_KEYS:
+        result.pop(key)
+    # Cost of the chat calls this run actually made — None means
+    # "cached, no call made" (stage1/stage1.5) or "model not
+    # in cost_estimate.py's rate table" (unknown, not zero).
+    result["stage1Cost"] = stage1_cost
+    return result["finalPrompt"], result
 
 
 def commit_history(metadata_path):
