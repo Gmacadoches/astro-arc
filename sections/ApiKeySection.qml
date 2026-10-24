@@ -85,7 +85,7 @@ Column {
         width: parent.width - saveKeyBtn.width - Style.space(8)
         password: true
         enabled: !section.keyState.saving
-        placeholderText: "sk-…"
+        placeholderText: panel.configState.provider === "openrouter" ? "sk-or-…" : "sk-…"
         foreground: panel.bar.foreground
         font.family: panel.bar.fontFamily
         onTextChanged: {

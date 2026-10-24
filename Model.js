@@ -47,7 +47,8 @@ var DEFAULT_CONFIG = {
   animatedBackground: true,
   historyRetentionDays: 30,
   maxCostPerImage: 0,
-  provider: "openai"
+  provider: "openai",
+  chatReasoning: "default"
 }
 
 // How many days one "Themes Generated" entry represents, by frequency —
@@ -91,13 +92,19 @@ function scheduleLabel(frequency, hours) {
 // "built-in" if aether is missing or fails, so picking it never risks a
 // broken generation.
 // The global provider. Everything else in the panel is scoped to it: which key
-// you paste, which models are offered, what they cost. Only OpenAI today — the
-// list exists so adding a second provider is a data change rather than a
-// redesign of the settings tab. (Supersedes the old imageBackend picker, which
-// offered local Stable Diffusion; that path still works if set by hand.)
+// you paste, which models are offered, what they cost. OpenRouter fronts
+// OpenAI's models and many others behind one key; see backend/bin/providers.py.
+// (Supersedes the old imageBackend picker, which offered local Stable
+// Diffusion; that path is gone.)
 var PROVIDER_CHOICES = [
-  { key: "openai", label: "OpenAI" }
+  { key: "openai", label: "OpenAI" },
+  { key: "openrouter", label: "OpenRouter" }
 ]
+
+function providerLabel(key) {
+  var match = PROVIDER_CHOICES.filter(function(p) { return p.key === key })[0]
+  return match ? match.label : "OpenAI"
+}
 
 var THEME_GENERATOR_CHOICES = [
   // Labelled "Astro-Arc" rather than "Built-in": from the panel the choice is
@@ -209,6 +216,7 @@ function chatModelLabel(row) {
 function imageModelLabel(row) {
   if (!row) return ""
   if (row.costState === "no-rate") return row.label + "  · cost unknown (no rate)"
+  if (row.costState === "unmeasured") return row.label + "  · cost known after first render"
   return row.label + "  · " + costSuffix(row.cost, row.costState) + "/image"
 }
 
@@ -273,6 +281,7 @@ function resolvePresetKey(config, presets) {
   var match = (presets || []).filter(function(p) {
     return p.chat === config.stage1Model && p.chat === config.stage2Model
       && p.image === config.openaiModel && p.quality === config.openaiQuality
+      && (p.reasoning || "default") === (config.chatReasoning || "default")
   })[0]
   return match ? match.key : "custom"
 }
@@ -376,7 +385,9 @@ function parseConfig(raw) {
       // Falls back to the legacy imageBackend so an existing config keeps
       // working, including one that still says "local".
       provider: typeof data.provider === "string" && data.provider !== ""
-        ? data.provider : (typeof data.imageBackend === "string" && data.imageBackend !== "" ? data.imageBackend : "openai")
+        ? data.provider : (typeof data.imageBackend === "string" && data.imageBackend !== "" ? data.imageBackend : "openai"),
+      chatReasoning: typeof data.chatReasoning === "string" && data.chatReasoning !== ""
+        ? data.chatReasoning : "default"
     }
   } catch (e) {
     return Object.assign({}, DEFAULT_CONFIG)
@@ -753,6 +764,7 @@ if (typeof module !== "undefined") {
     agentAsks: agentAsks,
     THEME_GENERATOR_CHOICES: THEME_GENERATOR_CHOICES,
     PROVIDER_CHOICES: PROVIDER_CHOICES,
+    providerLabel: providerLabel,
     FREQUENCY_CHOICES: FREQUENCY_CHOICES,
     INTERVAL_HOURS_CHOICES: INTERVAL_HOURS_CHOICES,
     intervalHours: intervalHours,

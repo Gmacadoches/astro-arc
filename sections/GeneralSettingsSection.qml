@@ -41,8 +41,8 @@ Column {
 
   // ---- Provider: the global setting everything else is scoped
   // to. The key you paste, which models are offered, what they cost
-  // — all of it follows from this. Only OpenAI today; the control
-  // exists so a second provider is a data change, not a redesign.
+  // — all of it follows from this. OpenAI or OpenRouter; switching
+  // also moves the models to the new provider's High preset.
   // (This replaced a "Backend" picker that lived under IMAGE
   // GENERATION and offered local Stable Diffusion. Local is no longer
   // offered here, but a config that still says "local" is honored —

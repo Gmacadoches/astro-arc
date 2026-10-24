@@ -126,8 +126,9 @@ they put in frame.
 ## Requirements
 
 - **Omarchy.** This is a bar-widget plugin; it does not run standalone.
-- **An OpenAI API key.** Every stage is an API call, so a key is required
-  regardless of which models you pick.
+- **An OpenAI or OpenRouter API key.** Every stage is an API call, so a key is
+  required regardless of which models you pick. Pick which one under
+  **Provider** in the panel's settings.
 - **Optional, to make your own styles:** an Omarchy default agent
   (`omarchy default agent`), or any chat model on the web.
 
@@ -250,16 +251,55 @@ image prompt, never the reading that produced them.
   `~/.local/state/omarchy/settings/astro-arc.json`, caches in
   `~/.local/state/omarchy/astro-arc/` (safe to delete), your archive in
   `~/.local/share/astro-arc/`. Nothing in this repository contains them.
-- Your prompts and chart facts are sent to OpenAI to generate each image, which
-  is the entire mechanism — if that is not acceptable to you, this is not the
-  tool for you. The birth place is looked up with Open-Meteo's geocoder, which
-  also supplies its timezone.
+- Your prompts and chart facts are sent to OpenAI (or OpenRouter, and from
+  there to whichever vendor serves the model you picked) to generate each
+  image, which is the entire mechanism — if that is not acceptable to you,
+  this is not the tool for you. The birth place is looked up with Open-Meteo's
+  geocoder, which also supplies its timezone.
 - **Your agent, only when you start it.** Creating, fixing or tweaking a style
   with your agent sends what it works on to that agent's model provider: the
   style file, your note, the example image if you tick it, and — while it tests
   a style — prompts built from your recent readings (`preview` and `meaning`
   print them). Nothing goes to an agent unless you click its button; Copy
   prompt keeps it to whichever chat you paste into.
+
+## OpenRouter
+
+OpenRouter puts OpenAI's models and about sixty image models from other vendors
+behind one key. Choose it under **Provider** and paste an OpenRouter key
+(`sk-or-…`). Each provider keeps its own key in the keyring and remembers its
+own model picks, so switching back and forth loses nothing. The first switch
+lands on OpenRouter's **High** preset.
+
+Low, Medium and High use cheaper chat models than on OpenAI: DeepSeek V4.1
+Flash for Low and Claude Haiku 5.5 for Medium and High, with reasoning turned
+off on Low and Medium. On my test runs both wrote better scenes than
+gpt-4o-mini for about the same chat cost or less. All three keep Sunburst at
+low quality for the image, the same as on OpenAI. Ultra and Maximum are still
+the OpenAI tiers.
+
+Models that think before answering bill those reasoning tokens as output, and
+on DeepSeek that made one call cost more than a whole gpt-4o-mini run. The
+presets set `chatReasoning` for that reason; a hand-picked model keeps its own
+default unless you set it with `astro-arc-config --set-chat-reasoning`.
+
+Image models outside OpenAI don't share one quality knob, so the tier is
+translated per model:
+
+- **OpenAI models** take `quality` exactly as they do on OpenAI.
+- **Models with a resolution setting** (FLUX, Gemini, Qwen, Seedream and
+  others) map Low, Medium and High to 1K, 2K and the largest size they offer.
+  The dropdown shows which, e.g. "Low (1K)".
+- **Grok Imagine** has both and tops out at Medium.
+- **Models with neither** (Recraft, MAI) offer one setting.
+
+Prices come from OpenRouter's own model listing, so nothing has to be typed
+into `model-rates.toml`. Image models priced per image get an estimate right
+away. OpenAI models reuse the token counts measured on your OpenAI runs. The
+Gemini image models are priced per token with no published count per image,
+so they show "cost known after first render" until you render once. After any
+render the figure is the dollars OpenRouter reports billing. OpenRouter's fee
+for buying credits isn't in any of these numbers.
 
 ## Tuning it
 

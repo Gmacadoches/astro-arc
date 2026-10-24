@@ -41,19 +41,23 @@
 #                                          astro-arc-detect-resolution)
 #   --set-art-style <key>                 which theme (pipeline/styles/<key>.toml or a user theme)
 #                                          Stage 2's prompt is suffixed with
-#   --set-provider <openai>                 which AI provider everything else is
+#   --set-provider <openai|openrouter>     which AI provider everything else is
 #                                          scoped to — the key you paste, which
 #                                          models are offered, what they cost.
-#                                          Only "openai" today; the setting
-#                                          exists so adding a second provider is
-#                                          a data change rather than a redesign.
+#                                          Changing it also moves all four model
+#                                          settings to the new provider's
+#                                          recommended preset, since a model id
+#                                          from one ("gpt-4.1") is not a valid
+#                                          id on the other ("openai/gpt-4.1").
 #                                          Supersedes imageBackend, which is kept
 #                                          only so an existing config that says
 #                                          "local" still reaches the local
 #                                          Stable Diffusion path (no longer
 #                                          offered in the UI).
-#   --set-models <stage1> <stage2> <image-model> <image-quality>
-#                                          all four model settings in ONE write.
+#   --set-models <stage1> <stage2> <image-model> <image-quality> [reasoning]
+#                                          all four model settings in ONE write,
+#                                          plus the chat reasoning effort when
+#                                          the preset names one (OpenRouter).
 #                                          Used by the widget's quality-preset
 #                                          picker: writing them separately would
 #                                          leave the config in states that match
@@ -119,7 +123,7 @@ source "$BIN_DIR/astro-arc-paths.sh"   # CONFIG_FILE
 # that costs nothing is the only one safe to choose on a new user's behalf.
 # A frequency already written to CONFIG_FILE still wins — these are only the
 # values a missing key falls back to (see the jq merge in read_config).
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"timezone":"","frequency":"manual","intervalHours":1,"imageBackend":"openai","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","backgroundOnly":true,"animatedBackground":true,"historyRetentionDays":30,"maxCostPerImage":0,"provider":"openai"}'
+DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"timezone":"","frequency":"manual","intervalHours":1,"imageBackend":"openai","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","backgroundOnly":true,"animatedBackground":true,"historyRetentionDays":30,"maxCostPerImage":0,"provider":"openai","chatReasoning":"default"}'
 COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
 # IANA zone names: Area/Location[/Sub], plus the bare ones like UTC. Letters,
 # digits, _ + - only, so nothing a shell or jq could read as syntax.
@@ -127,6 +131,7 @@ TZ_PATTERN='^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
 TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
 DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
 SIZE_PATTERN='^[0-9]{2,5}x[0-9]{2,5}$'
+REASONING_PATTERN='^(default|none|minimal|low|medium|high)$'
 
 read_config() {
   if [[ -f $CONFIG_FILE ]]; then
@@ -232,16 +237,42 @@ case "${1:-}" in
   write_config "$updated"
   ;;
 --set-provider)
-  [[ ${2:-} =~ ^(openai)$ ]] || { echo "Usage: astro-arc-config --set-provider <openai>" >&2; exit 1; }
+  [[ ${2:-} =~ ^(openai|openrouter)$ ]] || { echo "Usage: astro-arc-config --set-provider <openai|openrouter>" >&2; exit 1; }
   current=$(read_config)
-  updated=$(jq --arg p "$2" '.provider=$p' <<<"$current")
+  if [[ $(jq -r '.provider // "openai"' <<<"$current") == "$2" ]]; then
+    exit 0
+  fi
+  # The outgoing provider's four models are parked under providerModels and
+  # the incoming one's restored, so a round trip lands where it started. A
+  # provider never used before gets its recommended preset, read from
+  # model-rates.toml so the tiers live in one place. If that fails the models
+  # are blanked, and every reader falls back to the provider's own default
+  # (providers.py).
+  preset=$(ASTRO_ARC_PROVIDER="$2" python3 "$(dirname "$0")/model_catalog.py" --preset high 2>/dev/null || echo '{}')
+  updated=$(jq --arg p "$2" --argjson preset "$preset" \
+    '(.provider // "openai") as $old
+     | .providerModels[$old] = {stage1Model, stage2Model, openaiModel, openaiQuality, chatReasoning}
+     | (.providerModels[$p] // {
+         stage1Model: ($preset.chat // ""), stage2Model: ($preset.chat // ""),
+         openaiModel: ($preset.image // ""), openaiQuality: ($preset.quality // ""),
+         chatReasoning: ($preset.reasoning // "default")
+       }) as $next
+     | .provider=$p | . * $next' <<<"$current")
   write_config "$updated"
   ;;
 --set-models)
-  [[ -n ${2:-} && -n ${3:-} && -n ${4:-} && -n ${5:-} ]] || { echo "Usage: astro-arc-config --set-models <stage1> <stage2> <image-model> <image-quality>" >&2; exit 1; }
+  [[ -n ${2:-} && -n ${3:-} && -n ${4:-} && -n ${5:-} ]] || { echo "Usage: astro-arc-config --set-models <stage1> <stage2> <image-model> <image-quality> [reasoning]" >&2; exit 1; }
+  [[ ${6:-default} =~ $REASONING_PATTERN ]] || { echo "Invalid reasoning effort: $6" >&2; exit 1; }
   current=$(read_config)
-  updated=$(jq --arg a "$2" --arg b "$3" --arg c "$4" --arg d "$5" \
-    '.stage1Model=$a | .stage2Model=$b | .openaiModel=$c | .openaiQuality=$d' <<<"$current")
+  updated=$(jq --arg a "$2" --arg b "$3" --arg c "$4" --arg d "$5" --arg r "${6:-default}" \
+    '.stage1Model=$a | .stage2Model=$b | .openaiModel=$c | .openaiQuality=$d | .chatReasoning=$r' <<<"$current")
+  write_config "$updated"
+  ;;
+# How hard OpenRouter's thinking models think. See providers.py.
+--set-chat-reasoning)
+  [[ ${2:-} =~ $REASONING_PATTERN ]] || { echo "Usage: astro-arc-config --set-chat-reasoning <default|none|minimal|low|medium|high>" >&2; exit 1; }
+  current=$(read_config)
+  updated=$(jq --arg r "$2" '.chatReasoning=$r' <<<"$current")
   write_config "$updated"
   ;;
 --set-max-cost-per-image)
