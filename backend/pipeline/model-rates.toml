@@ -237,6 +237,9 @@ quality = "high"
 # by either sweep, since the sweep pins it. Four samples each is a small
 # test; if a tier's images go wrong, that is the first thing to suspect.
 #
+# PROVISIONAL (2026-10-24): Low, Medium and High rest on the two four-sample
+# sweeps above. Revisit them after a week of real OpenRouter runs.
+#
 # `reasoning` is how hard the chat model thinks (providers.REASONING_EFFORTS).
 # Left out, the model uses its own default.
 #
