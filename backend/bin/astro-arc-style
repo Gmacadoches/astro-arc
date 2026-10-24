@@ -513,7 +513,7 @@ def cmd_render(args):
     for i, rec in enumerate(records, 1):
         out = render_dir / f"{key}-render-{stamp}-{i}.png"
         try:
-            _, info = openai_generate(rec["finalPrompt"], out, model, quality, w, h)
+            _, info = openai_generate(rec["finalPrompt"], out, model, quality, w, h, provider_of(config))
         except Exception as e:  # noqa: BLE001 — report it; the others may still render
             print(f"render {i} failed: {str(e)[:200]}", file=sys.stderr)
             continue

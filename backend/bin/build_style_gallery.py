@@ -33,6 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
+from providers import provider_of  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
 OUT_IMAGES = REPO / "docs" / "images" / "styles"
@@ -111,7 +112,7 @@ def main():
         rel = "images/styles/%s.jpg" % key
         if not args.no_image:
             png = OUT_IMAGES / ("%s.png" % key)
-            _, info = openai_generate(final, png, image_model, quality, 1600, 900)
+            _, info = openai_generate(final, png, image_model, quality, 1600, 900, provider_of(config))
             total += info.get("cost") or 0.0
             from image_fit import thumbnail_jpeg
             thumbnail_jpeg(png, OUT_IMAGES / ("%s.jpg" % key), THUMB_PX, quality=86)

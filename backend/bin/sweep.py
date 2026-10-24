@@ -49,6 +49,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
+from providers import provider_of  # noqa: E402
 
 
 
@@ -376,7 +377,8 @@ def main():
             for attempt in range(3):
                 try:
                     _, cost_info = openai_generate(
-                        final_prompt, out_dir / f"{stem}.png", image_model, quality, width, height
+                        final_prompt, out_dir / f"{stem}.png", image_model, quality, width, height,
+                        provider_of(config),
                     )
                     record["imageCost"] = cost_info.get("cost")
                     total_cost += cost_info.get("cost") or 0.0

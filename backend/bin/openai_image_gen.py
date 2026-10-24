@@ -262,7 +262,15 @@ def validate_key(slot="image", provider="openai"):
         return False, f"Validation call failed: {message}"
 
 
-def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", target_width=1024, target_height=1024):
+def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", target_width=1024, target_height=1024,
+             provider="openai"):
+    if provider == "openrouter":
+        # Imported here: it imports this module for _request and the safety
+        # retry, so a top-level import would be circular.
+        from openrouter_image_gen import generate as openrouter_generate  # noqa: PLC0415
+
+        return openrouter_generate(prompt, output_path, model, quality, target_width, target_height)
+
     # OpenAI can only render at OPENAI_IMAGE_SIZES, not the arbitrary
     # target the background is actually supposed to end up at — render at
     # the closest-matching aspect ratio, then crop/scale to the exact
@@ -341,7 +349,7 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate one Astro-Arc image via the OpenAI API.")
+    parser = argparse.ArgumentParser(description="Generate one Astro-Arc image via the OpenAI or OpenRouter API.")
     parser.add_argument("prompt")
     parser.add_argument("output_path")
     parser.add_argument("--model", default="gpt-image-1-mini")
@@ -349,10 +357,13 @@ def main():
     parser.add_argument("--width", type=int, default=1024)
     parser.add_argument("--height", type=int, default=1024)
     parser.add_argument("--cost-out", help="write {cost, costSource, usage} JSON here for astro-arc-generate's cost log")
+    parser.add_argument("--provider", choices=("openai", "openrouter"), default=None,
+                        help="where to render (default: the saved setting)")
     args = parser.parse_args()
 
     try:
-        out, cost_info = generate(args.prompt, args.output_path, args.model, args.quality, args.width, args.height)
+        out, cost_info = generate(args.prompt, args.output_path, args.model, args.quality, args.width, args.height,
+                                  args.provider or saved_provider())
     except (ApiKeyError, RuntimeError, ImageError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)

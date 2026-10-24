@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
 from openai_image_gen import generate  # noqa: E402
 from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
+from providers import provider_of  # noqa: E402
 
 
 
@@ -33,7 +34,7 @@ def render(prompt, style, has_people, out_dir, stem, config):
     width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
     record = {"style": style, "imagePrompt": prompt, "finalPrompt": final, "hasPeople": has_people}
     try:
-        _, cost = generate(final, out_dir / f"{stem}.png", model, quality, width, height)
+        _, cost = generate(final, out_dir / f"{stem}.png", model, quality, width, height, provider_of(config))
         record["imageCost"] = cost.get("cost")
     except Exception as exc:  # noqa: BLE001 — one refusal must not stop the batch
         record["imageError"] = str(exc)[:300]

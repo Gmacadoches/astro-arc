@@ -151,7 +151,7 @@ def replay(style, days, config, out_dir=None, render=False, quality="medium",
         if render:
             try:
                 _, info = openai_generate(final, out_dir / f"{stem}.png",
-                                          image_model, quality, width, height)
+                                          image_model, quality, width, height, provider_of(config))
                 total += info.get("cost") or 0.0
             except Exception as exc:  # noqa: BLE001 — one bad render must not end the run
                 row["imageError"] = str(exc)[:200]

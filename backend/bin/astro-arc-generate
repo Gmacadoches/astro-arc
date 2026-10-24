@@ -67,7 +67,8 @@ frequency=$(cfg '.frequency // "manual"')
 # not offer, so a hand-edited value cannot produce an odd key.
 interval_hours=$(cfg '.intervalHours // 1')
 # `provider` is the global setting now (see astro-arc-config --set-provider);
-# `imageBackend` is the legacy key it supersedes. OpenAI is the only renderer:
+# `imageBackend` is the legacy key it supersedes. OpenAI and OpenRouter are the
+# renderers (openai_image_gen.py hands OpenRouter to openrouter_image_gen.py):
 # the local Stable Diffusion path (image_gen.py) was removed on 2026-09-19,
 # because it needed torch in a Python venv, and the plugin no longer installs
 # anything. A config still naming "local" is refused below with a clear message
@@ -78,7 +79,8 @@ image_backend=$(cfg '.provider // .imageBackend // "openai"')
 # so on a config where the image model has never been picked, `//` passed ""
 # through and the render failed with an unhelpful API error instead of falling
 # back. Test the value, don't just test for null.
-openai_model=$(cfg '(.openaiModel // "") | if . == "" then "gpt-image-1-mini" else . end')
+if [[ $image_backend == openrouter ]]; then default_image_model="openai/gpt-image-1-mini"; else default_image_model="gpt-image-1-mini"; fi
+openai_model=$(cfg '(.openaiModel // "") | if . == "" then "'"$default_image_model"'" else . end')
 openai_quality=$(cfg '(.openaiQuality // "") | if . == "" then "medium" else . end')
 background_size=$(cfg '.backgroundSize // "auto"')
 
@@ -139,9 +141,9 @@ if [[ $if_due == 1 ]]; then
   fi
 fi
 
-if [[ $image_backend != openai ]]; then
-  echo "astro-arc-generate: the image provider is set to \"$image_backend\", but only OpenAI is supported." >&2
-  echo "  Choose OpenAI under Settings → Provider in the Astro-Arc widget." >&2
+if [[ $image_backend != openai && $image_backend != openrouter ]]; then
+  echo "astro-arc-generate: the image provider is set to \"$image_backend\", but only OpenAI and OpenRouter are supported." >&2
+  echo "  Choose one under Settings → Provider in the Astro-Arc widget." >&2
   exit 1
 fi
 
@@ -254,7 +256,7 @@ prompt=$("$PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
 # now, because build_review.py reads it and every archived run carries it.
 
 "$PY" "$BIN_DIR/openai_image_gen.py" "$prompt" "$bg_file" \
-  --model "$openai_model" --quality "$openai_quality" \
+  --model "$openai_model" --quality "$openai_quality" --provider "$image_backend" \
   --width "$bg_width" --height "$bg_height" --cost-out "$image_cost_file"
 
 # The image exists, so this run counts: only now does it enter history.json.

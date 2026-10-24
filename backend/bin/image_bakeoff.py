@@ -96,7 +96,7 @@ def main():
     for i, (model, quality) in enumerate(combos, 1):
         stem = f"{i:02d}_{model.replace('.', '-')}_{quality}"
         try:
-            _, info = generate(prompt, out_dir / f"{stem}.png", model, quality, width, height)
+            _, info = generate(prompt, out_dir / f"{stem}.png", model, quality, width, height, provider_of({}))
             cost = info.get("cost")
             actual_total += cost or 0
             usage = info.get("usage") or {}
