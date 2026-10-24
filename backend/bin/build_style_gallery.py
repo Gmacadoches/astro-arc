@@ -78,7 +78,7 @@ def main():
     # --- pin everything that is not the style ------------------------------
     dial = lp.dial_from_texture(reading["arc"].get("texture"))
     # Uncached, so building the gallery never seeds the production readings cache.
-    stage1, _ = lp.stage1_interpret(reading, stage1_model, period_key, config, cache=False)
+    stage1, _ = lp.stage1_interpret(reading, stage1_model, period_key, config)
 
     # The amplification used to be pinned here, beside Stage 1, on the premise that everything except the style should be
     # held constant. That premise died on 2026-09-20: the style is now a

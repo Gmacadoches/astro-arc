@@ -228,7 +228,7 @@ def day_prompts(key, day, registers, config, history):
     date, stage1, dial = day
     model1 = config.get("stage1Model") or "gpt-4o-mini"
     base = {k: v for k, v in dial.items() if k not in STYLE_DRAW_KEYS}
-    meaning, cost = lp.stage15_meaning(stage1, model1, date, config, cache=False, dial=base,
+    meaning, cost = lp.stage15_meaning(stage1, model1, date, config, dial=base,
                                        avoid_archetypes=[], avoid_kinds=[],
                                        style_key=key, style_world=lp.load_style_world(key))
     cost = cost or 0.0

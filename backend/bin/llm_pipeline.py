@@ -64,7 +64,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from openai_image_gen import ApiKeyError, get_api_key  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
 from http_limits import ResponseTooLarge, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
-from paths import CONFIG_FILE, PIPELINE_STATE_DIR, USER_STYLES_DIR  # noqa: E402
+from paths import CONFIG_FILE, USER_STYLES_DIR  # noqa: E402
+from pipeline_state import PipelineState  # noqa: E402
 
 import urllib.error
 import urllib.request
@@ -72,12 +73,6 @@ import urllib.request
 # Ships beside the code — backend/pipeline, one directory up from backend/bin —
 # so the tables travel with the checkout and need no install step.
 PIPELINE_DIR = Path(__file__).resolve().parents[1] / "pipeline"
-STATE_DIR = PIPELINE_STATE_DIR
-HISTORY_FILE = STATE_DIR / "history.json"
-READINGS_DIR = STATE_DIR / "readings"
-AMPLIFICATIONS_DIR = STATE_DIR / "amplifications"
-
-HISTORY_MAX = 30
 # Narrowed from 14 to 8 on 2026-09-09. At 14 this was handing Stage 2 a
 # 40-item "avoid all of this" list on every call — a very large negative-
 # constraint load on a model that also has to honor two registers, a style
@@ -653,23 +648,6 @@ def load_style_world(style_key):
 # Rolling history (concept-level anti-repetition + register rotation)
 # ---------------------------------------------------------------------------
 
-def load_history():
-    if not HISTORY_FILE.exists():
-        return []
-    try:
-        return json.loads(HISTORY_FILE.read_text())
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def save_history_entry(entry, history):
-    history = [entry] + history
-    history = history[:HISTORY_MAX]
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    HISTORY_FILE.write_text(json.dumps(history, indent=2))
-    return history
-
-
 def avoid_concepts(history, window=AVOID_WINDOW):
     """Deduped concept tags from the most recent `window` generations —
     passed to Stage 2 as territory to avoid. Tags, not raw prompt text: a
@@ -743,31 +721,10 @@ def veto_overused_kind(proposed, recent_kinds, kinds):
     return max(eligible, key=lambda k: (staleness[k], -kinds.index(k)))
 
 
-def recent_constellations(window=AMPLIFY_AVOID_WINDOW, exclude=None):
-    """The last `window` constellations, most recent first, for Stage 1.5 to
-    reach past. `exclude` drops one period key — the one being regenerated,
-    which must not count as its own precedent."""
-    if not AMPLIFICATIONS_DIR.is_dir():
-        return []
-    out = []
-    for path in sorted(AMPLIFICATIONS_DIR.glob("*.json"), reverse=True):
-        if exclude and path.stem == exclude:
-            continue
-        try:
-            text = (json.loads(path.read_text()).get("constellation") or "").strip()
-        except (json.JSONDecodeError, OSError):
-            continue
-        if text and text not in out:
-            out.append(text)
-        if len(out) >= window:
-            break
-    return out
-
-
 # Objects and highlights are drawn fresh every run, but nothing stopped the
 # same ones coming back: the archive has one day's divination cup and votive
 # liver in 12 runs across 4 styles. The last few runs' material is passed to
-# the material call as spent, the way recent_constellations is to the meaning.
+# the material call as spent, the way recent constellations are to the meaning.
 MATERIAL_AVOID_WINDOW = 6
 
 
@@ -781,32 +738,6 @@ def recent_material(history, window=MATERIAL_AVOID_WINDOW):
             item = (item or "").strip() if isinstance(item, str) else ""
             if item and item not in out:
                 out.append(item)
-    return out
-
-
-def recent_actor_kinds(window=ACTOR_VETO_WINDOW, exclude=None):
-    """The last `window` actor kinds, most recent first, for Stage 1.5 to pick
-    around. Same source and same shape as recent_constellations, because it is
-    the same mechanism applied to the other field the model over-uses.
-
-    `none` is skipped: it has its own recency rule (never two days running, at
-    most twice in seven) and blocking a kind that is meant to be rare would
-    invert that.
-    """
-    if not AMPLIFICATIONS_DIR.is_dir():
-        return []
-    out = []
-    for path in sorted(AMPLIFICATIONS_DIR.glob("*.json"), reverse=True):
-        if exclude and path.stem == exclude:
-            continue
-        try:
-            kind = (json.loads(path.read_text()).get("actorKind") or "").strip()
-        except (json.JSONDecodeError, OSError):
-            continue
-        if kind and kind != "none" and kind not in out:
-            out.append(kind)
-        if len(out) >= window:
-            break
     return out
 
 
@@ -998,6 +929,30 @@ def _natal_hash(config):
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
+def stage1_cache_key(config):
+    """What a cached reading must have been written under to be served: the
+    birth data and the Stage 1 prompt's schema version (see PipelineState)."""
+    return {"natalHash": _natal_hash(config), "schemaVersion": STAGE1_SCHEMA_VERSION}
+
+
+def meaning_cache_key(config, style_key, style_world):
+    """What a cached Stage 1.5 meaning must have been written under: the birth
+    data, the style and its charter, and the Stage 1.5 schema version.
+
+    styleKey joined as of 2026-09-20, because the style is an input: a ghibli
+    amplification handed to a cyberpunk render would be exactly the
+    foreign-object problem that change removed. Switching style mid-period
+    re-bills Stage 1.5, which is correct and costs about $0.003. The charter
+    is an input too: editing it must re-draw that day's meaning, not serve one
+    written for the old wording."""
+    return {
+        "natalHash": _natal_hash(config),
+        "styleKey": style_key,
+        "charterHash": hashlib.sha256(style_world.encode()).hexdigest()[:12],
+        "schemaVersion": STAGE15_SCHEMA_VERSION,
+    }
+
+
 
 # ---------------------------------------------------------------------------
 # Stage 1: interpretation
@@ -1025,7 +980,7 @@ Respond with a JSON object with exactly these keys:
 STAGE1_SCHEMA_VERSION = 3
 
 
-def stage1_interpret(reading, stage1_model, period_key, config, chat=None, cache=True):
+def stage1_interpret(reading, stage1_model, period_key, config, chat=None, state=None):
     """Cached per period_key, but keyed to the birth data too (see
     _natal_hash): regenerating the same day/week/month's image (e.g. while
     comparing style variants) shouldn't re-run Stage 1, but editing the
@@ -1034,19 +989,13 @@ def stage1_interpret(reading, stage1_model, period_key, config, chat=None, cache
     describe_natal()/describe_arc()'s prompt text below. Returns (result_dict,
     cost) — cost is None on a cache hit.
 
-    `cache=False` neither reads nor writes the production readings cache, for
-    harnesses (sweep.py, build_style_gallery.py) that must leave it as it was."""
-    cache_path = READINGS_DIR / f"{period_key}.json"
-    natal_hash = _natal_hash(config)
-    if cache and cache_path.exists():
-        try:
-            cached = json.loads(cache_path.read_text())
-            if (cached.get("reading") and cached.get("distillation")
-                    and cached.get("natalHash") == natal_hash
-                    and cached.get("schemaVersion") == STAGE1_SCHEMA_VERSION):
-                return cached, None
-        except (json.JSONDecodeError, OSError):
-            pass
+    `state` is the PipelineState whose readings cache is read and written;
+    None (the default) neither reads nor writes one, for harnesses
+    (sweep.py, build_style_gallery.py) that must leave production as it was."""
+    cache_key = stage1_cache_key(config)
+    cached = state.cached_reading(period_key, cache_key) if state else None
+    if cached:
+        return cached, None
 
     natal = reading["natal"]
     arc = reading["arc"]
@@ -1058,11 +1007,9 @@ def stage1_interpret(reading, stage1_model, period_key, config, chat=None, cache
             raise PipelineError(f"Stage 1 response missing '{key}': {result!r}")
 
     result["generatedAt"] = datetime.now(timezone.utc).isoformat()
-    result["natalHash"] = natal_hash
-    result["schemaVersion"] = STAGE1_SCHEMA_VERSION
-    if cache:
-        READINGS_DIR.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(json.dumps(result, indent=2))
+    result.update(cache_key)
+    if state:
+        state.store_reading(period_key, cache_key, result)
     return result, chat_call_cost(stage1_model, usage)
 
 
@@ -1840,9 +1787,10 @@ Respond with a JSON object with exactly these keys:
 # existed to remove, in 2 of 6 samples. "Older, and only older" is now stated as a
 # hard constraint with the failure cases named.
 # 3->4 on 2026-09-20: the archetype attractor fix — the "reach past the obvious
-# archetype" rule plus the RECENTLY USED list (see recent_constellations). Every
-# amplification cached under the old wording was one of the two archetypes this
-# change exists to break out of, so none of them should survive it.
+# archetype" rule plus the RECENTLY USED list (see
+# PipelineState.recent_constellations). Every amplification cached under the
+# old wording was one of the two archetypes this change exists to break out
+# of, so none of them should survive it.
 # 4->5 on 2026-09-20: Stage 1.5 now names the actor and its kind. Every
 # cached amplification predates those fields, so none can supply one.
 # 5->6 on 2026-09-20: Stage 1.5 is style-aware. Objects and the anomaly are
@@ -1890,7 +1838,7 @@ def style_has_myth(style_key):
     return isinstance(world, dict) and bool(str(world.get("myth") or "").strip())
 
 
-def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=None,
+def stage15_meaning(stage1_result, model, period_key, config, state=None, dial=None,
                     avoid_archetypes=None, avoid_kinds=None, style_key=None,
                     style_world="", chat=None):
     """The MEANING half of Stage 1.5: constellation, movement, affect, actor and
@@ -1898,14 +1846,16 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     so that the day's meaning is fixed while its material is not.
 
     Cached per period_key exactly like stage1_interpret() — regenerating
-    the same day's image must not re-bill this call — and invalidated by the
-    same natalHash plus a schema version.
+    the same day's image must not re-bill this call — and invalidated by
+    meaning_cache_key's inputs: the birth data, the style, its charter and a
+    schema version.
 
     Uses Stage 1's model and key slot, not Stage 2's: this is meaning-work,
     not imagery-work.
 
-    `cache=False` is for sweep.py, which needs a fresh amplification per run
-    and must never write into the production cache.
+    `state` is the PipelineState whose meanings cache is read and written;
+    None (the default) is for harnesses like sweep.py, which need a fresh
+    amplification per run and must never write into the production cache.
 
     `dial` (see dial_from_texture) sets how many objects to ask for and which
     tonal direction to push, and is STORED IN THE CACHE ENTRY. That storage
@@ -1918,28 +1868,10 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     """
     if dial is None:
         raise PipelineError("Stage 1.5 needs the day's dial (dial_from_texture)")
-    natal_hash = _natal_hash(config)
-    # The charter is an input as well as the style key: editing it must
-    # re-draw that day's meaning, not serve one written for the old wording.
-    charter_hash = hashlib.sha256(style_world.encode()).hexdigest()[:12]
-    cache_path = AMPLIFICATIONS_DIR / f"{period_key}.json"
-    if cache and cache_path.exists():
-        try:
-            cached = json.loads(cache_path.read_text())
-            # styleKey joins natalHash and the schema version as a cache
-            # input, because as of 2026-09-20 the style is one: a ghibli
-            # amplification handed to a cyberpunk render would be exactly the
-            # foreign-object problem this change exists to remove. Switching
-            # style mid-period now re-bills Stage 1.5, which is correct and
-            # costs about $0.003.
-            if (cached.get("constellation")
-                    and cached.get("natalHash") == natal_hash
-                    and cached.get("styleKey") == style_key
-                    and cached.get("charterHash") == charter_hash
-                    and cached.get("schemaVersion") == STAGE15_SCHEMA_VERSION):
-                return cached, None
-        except (json.JSONDecodeError, OSError):
-            pass
+    cache_key = meaning_cache_key(config, style_key, style_world)
+    cached = state.cached_meaning(period_key, cache_key) if state else None
+    if cached:
+        return cached, None
 
     kinds = eligible_actor_kinds(style_key)
     system_prompt = (
@@ -1976,13 +1908,13 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
     if dial.get("tonalDirection"):
         user_lines.append(f"Direction for this timeframe: {dial['tonalDirection']}")
 
-    # Recency pressure on the archetype, for the reason recent_constellations
+    # Recency pressure on the archetype, for the reason AMPLIFY_AVOID_WINDOW
     # documents. Passed as data in the user message rather than baked into the
     # system prompt, exactly like Stage 2's avoided concepts: the rule is policy
     # and belongs above, the list changes every run and belongs here. The
-    # caller passes the lists: build() hands in the real ones from the cache
-    # (recent_constellations, recent_actor_kinds), a harness its own. None is
-    # no recency, never "go and read the production cache".
+    # caller passes the lists: build() hands in the real ones from its state
+    # (PipelineState.recent_constellations, recent_actor_kinds), a harness its
+    # own. None is no recency, never "go and read the production cache".
     avoid_archetypes = avoid_archetypes or []
     avoid_kinds = avoid_kinds or []
     if avoid_archetypes:
@@ -2030,13 +1962,9 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
 
     result["dial"] = {k: v for k, v in dial.items() if k in ("mode", "tonalDirection")}
     result["generatedAt"] = datetime.now(timezone.utc).isoformat()
-    result["natalHash"] = natal_hash
-    result["styleKey"] = style_key
-    result["charterHash"] = charter_hash
-    result["schemaVersion"] = STAGE15_SCHEMA_VERSION
-    if cache:
-        AMPLIFICATIONS_DIR.mkdir(parents=True, exist_ok=True)
-        cache_path.write_text(json.dumps(result, indent=2))
+    result.update(cache_key)
+    if state:
+        state.store_meaning(period_key, cache_key, result)
     return result, chat_call_cost(model, usage)
 
 
@@ -2137,7 +2065,7 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
     }, chat_call_cost(model, usage)
 
 
-def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
+def stage15_amplify(stage1_result, model, period_key, config, state=None, dial=None,
                     avoid_archetypes=None, avoid_kinds=None, style_key=None,
                     style_world="", register=None, secondary_register=None, material=True,
                     avoid_material=None, chat=None):
@@ -2152,7 +2080,7 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     Returns (result_dict, cost); cost is None only when the meaning was a cache
     hit and no material was asked for."""
     meaning, meaning_cost = stage15_meaning(
-        stage1_result, model, period_key, config, cache=cache, dial=dial,
+        stage1_result, model, period_key, config, state=state, dial=dial,
         avoid_archetypes=avoid_archetypes, avoid_kinds=avoid_kinds,
         style_key=style_key, style_world=style_world, chat=chat)
     if not material:
@@ -2566,7 +2494,7 @@ _COMPOSE_ONLY_KEYS = ("meaning", "material", "meaningCost", "materialCost")
 def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
             caption="resample", draws=None, registers=None, meaning=None,
             avoided_concepts=None, avoid_archetypes=(), avoid_kinds=(),
-            cache_meaning=False):
+            state=None):
     """One composition: a Stage 1 result to a final image prompt. Production
     (build) and every harness run this, so a harness measures the code that
     ships rather than a copy of its sequence.
@@ -2579,7 +2507,7 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
       style_key   a resolved key whose charter has passed require_charter.
       history     the runs this one's recency comes from, newest first. Never
                   read from or written to disk here: production passes
-                  load_history(), a harness passes its own list and inserts
+                  state.history(), a harness passes its own list and inserts
                   the returned historyEntry to move recency on.
 
     Keywords:
@@ -2596,8 +2524,9 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
       avoid_archetypes, avoid_kinds
                   Stage 1.5's recent constellations and actor kinds. Empty by
                   default; production passes the real ones.
-      cache_meaning   read and write the production Stage 1.5 cache. Only
-                  build() sets it.
+      state       the PipelineState whose Stage 1.5 meanings cache is read and
+                  written. None (the default) uses no cache; build() passes
+                  its own. History and recency never come from it here.
 
     Returns build()'s metadata plus the meaning and material halves of Stage
     1.5 and their costs. The history entry is in it under "historyEntry"; it
@@ -2629,7 +2558,7 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     meaning_cost = None
     if meaning is None:
         meaning, meaning_cost = stage15_meaning(
-            stage1, stage1_model, period_key, config, cache=cache_meaning, dial=dial,
+            stage1, stage1_model, period_key, config, state=state, dial=dial,
             avoid_archetypes=list(avoid_archetypes), avoid_kinds=list(avoid_kinds),
             style_key=style_key, style_world=style_world, chat=chat)
     material, material_cost = stage15_material(
@@ -2755,10 +2684,15 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     }
 
 
-def build(reading, config, chat=None):
+def build(reading, config, chat=None, state=None):
     """Production's composition: Stage 1, the real history and the real
     Stage 1.5 recency and cache, the melodrama resample. Returns
-    (final_prompt, metadata), the metadata astro-arc-generate writes."""
+    (final_prompt, metadata), the metadata astro-arc-generate writes.
+
+    `state` is where the history and caches come from: production's
+    PipelineState() unless a test or the audit passes one rooted elsewhere.
+    build() only reads the history (see commit_history)."""
+    state = state or PipelineState()
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     style_key = resolve_style_key(config.get("artStyle"))
     require_charter(style_key)
@@ -2768,15 +2702,16 @@ def build(reading, config, chat=None):
     # ask for and gets stored in that stage's cache entry.
     dial = dial_from_texture(reading["arc"].get("texture"))
 
-    stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config, chat=chat)
+    stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config,
+                                           chat=chat, state=state)
     result = compose(
-        stage1, reading["arc"], dial, style_key, config, load_history(), chat=chat,
+        stage1, reading["arc"], dial, style_key, config, state.history(), chat=chat,
         caption="resample",
         # Production's Stage 1.5 recency comes from the amplification cache,
-        # this period excluded (see recent_constellations).
-        avoid_archetypes=recent_constellations(exclude=period_key),
-        avoid_kinds=recent_actor_kinds(exclude=period_key),
-        cache_meaning=True,
+        # this period excluded (see PipelineState.recent_constellations).
+        avoid_archetypes=state.recent_constellations(AMPLIFY_AVOID_WINDOW, exclude=period_key),
+        avoid_kinds=state.recent_actor_kinds(ACTOR_VETO_WINDOW, exclude=period_key),
+        state=state,
     )
     # NOT saved here as of 2026-10-08. build() runs before the image call, so
     # saving the entry now meant a render refused by the provider still counted
@@ -2793,7 +2728,7 @@ def build(reading, config, chat=None):
     return result["finalPrompt"], result
 
 
-def commit_history(metadata_path):
+def commit_history(metadata_path, state=None):
     """Append the history entry build() left in a run's metadata. Called by
     astro-arc-generate only after the image has rendered, so a refused or
     failed render never advances the rotation. A metadata file with no entry
@@ -2801,7 +2736,7 @@ def commit_history(metadata_path):
     metadata = json.loads(Path(metadata_path).read_text())
     entry = metadata.get("historyEntry")
     if entry:
-        save_history_entry(entry, load_history())
+        (state or PipelineState()).append_history(entry)
 
 
 def main():

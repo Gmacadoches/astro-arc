@@ -1,8 +1,7 @@
 """compose(), tested through its interface with a stub chat client.
 
-No network, no keyring, no bill: every model call goes to StubChat. The
-production state paths are pointed at an empty temporary directory, and one
-test checks that it is still empty afterwards.
+No network, no keyring, no bill: every model call goes to StubChat. compose()
+is given no pipeline state unless a test passes one in a temporary directory.
 
     python3 -m unittest discover backend/tests
 """
@@ -16,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "bin"))
 
 import llm_pipeline as lp  # noqa: E402
+from pipeline_state import PipelineState  # noqa: E402
 
 STYLE = "cosmic"
 CONFIG = {"stage1Model": "stub", "stage2Model": "stub", "captionModel": "stub"}
@@ -60,19 +60,6 @@ class StubChat:
 
 
 class ComposeTest(unittest.TestCase):
-    def setUp(self):
-        self.state = Path(tempfile.mkdtemp())
-        self._saved = {k: getattr(lp, k) for k in
-                       ("STATE_DIR", "HISTORY_FILE", "READINGS_DIR", "AMPLIFICATIONS_DIR")}
-        lp.STATE_DIR = self.state
-        lp.HISTORY_FILE = self.state / "history.json"
-        lp.READINGS_DIR = self.state / "readings"
-        lp.AMPLIFICATIONS_DIR = self.state / "amplifications"
-
-    def tearDown(self):
-        for k, v in self._saved.items():
-            setattr(lp, k, v)
-
     def compose(self, history, chat=None, day=1, **kwargs):
         chat = chat or StubChat()
         dial = lp.dial_from_texture(TEXTURE)
@@ -149,11 +136,18 @@ class ComposeTest(unittest.TestCase):
         self.assertIsNone(result["captionCheck"])
 
     def test_history_is_neither_read_nor_written(self):
+        # Even given a state, compose() only caches the meaning in it: the
+        # history is the caller's.
+        root = Path(tempfile.mkdtemp())
+        state = PipelineState(root)
+        state.append_history({"register": "botanical", "conceptTags": ["saved tag"]})
         history = []
-        result, _ = self.compose(history)
+        result, _ = self.compose(history, state=state)
         self.assertEqual(history, [])
         self.assertIn("historyEntry", result)
-        self.assertEqual(list(self.state.rglob("*")), [])
+        self.assertEqual(result["avoidedConcepts"], [])
+        self.assertEqual(len(state.history()), 1)
+        self.assertEqual(sorted(p.name for p in root.iterdir()), ["amplifications", "history.json"])
 
     def test_unknown_caption_policy_is_refused(self):
         with self.assertRaises(lp.PipelineError):

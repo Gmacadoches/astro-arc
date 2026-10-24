@@ -23,7 +23,7 @@ the composition production runs:
   - the avoided concept tags, from that same history
   - the melodrama check, resampling Stage 2 on a failure
 
-Nothing production owns is written. cache=False on every stage, output goes to
+Nothing production owns is written. No stage is given the pipeline state, output goes to
 verification/<name>/, and history is synthetic and in-memory.
 
 Costs real money. Prints a projection from the model rate table
@@ -36,7 +36,6 @@ Costs real money. Prints a projection from the model rate table
 import argparse
 import csv
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -45,10 +44,10 @@ import llm_pipeline as lp  # noqa: E402
 import model_catalog as mc  # noqa: E402
 from sweep import dial_for_day, report_filled  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
-from paths import CONFIG_FILE, PIPELINE_STATE_DIR, STATE_DIR, VERIFY_DIR  # noqa: E402
+from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
+from pipeline_state import PipelineState  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402
 
-READINGS_DIR = PIPELINE_STATE_DIR / "readings"
 
 
 def load_days(limit, cell, textured_only=False):
@@ -58,16 +57,7 @@ def load_days(limit, cell, textured_only=False):
     stands in for a day that has none (see sweep.dial_for_day), or with
     `textured_only` the day is skipped, so every dial is one a day really had."""
     out, filled_days = [], []
-    for path in sorted(READINGS_DIR.glob("*.json")):
-        key = path.stem
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", key):
-            continue
-        try:
-            reading = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        if not all(reading.get(k) for k in ("reading", "distillation", "narrativePosition")):
-            continue
+    for key, reading in PipelineState().daily_readings():
         dial, source = dial_for_day(STATE_DIR, key, cell)
         if textured_only and source != "texture":
             continue
@@ -222,7 +212,7 @@ def main():
 
     days = load_days(args.days, args.cell)
     if not days:
-        print(f"No cached daily readings under {READINGS_DIR}.")
+        print(f"No cached daily readings under {PipelineState().readings_dir}.")
         return 1
 
     print(f"{len(days)} days on {style_key}, everything varying "

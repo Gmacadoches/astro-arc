@@ -39,9 +39,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from paths import CONFIG_FILE, PIPELINE_STATE_DIR, VERIFY_DIR  # noqa: E402
-
-READINGS_DIR = PIPELINE_STATE_DIR / "readings"
+from paths import CONFIG_FILE, VERIFY_DIR  # noqa: E402
+from pipeline_state import PipelineState  # noqa: E402
 
 
 def chart_for(day, scratch):
@@ -127,12 +126,8 @@ def meta_for(row, day, config, scratch, style_override=None, stage1=None):
     rather than invented; the review page renders a dash.
     """
     stage1 = stage1 or {}
-    cached = READINGS_DIR / f"{day}.json"
-    if not stage1 and cached.exists():
-        try:
-            stage1 = json.loads(cached.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
+    if not stage1:
+        stage1 = PipelineState().stored_reading(day) or {}
     meta = {
         "reading": stage1.get("reading", ""),
         "distillation": stage1.get("distillation", ""),

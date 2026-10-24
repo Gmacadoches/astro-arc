@@ -249,8 +249,7 @@ def main():
         stage1_cost = None
     else:
         period_key = reading["arc"]["periodKey"]
-        stage1, stage1_cost = lp.stage1_interpret(reading, stage1_model, period_key, config,
-                                                  cache=False)
+        stage1, stage1_cost = lp.stage1_interpret(reading, stage1_model, period_key, config)
     (out_dir / "00_stage1.json").write_text(json.dumps(stage1, indent=2))
 
 
@@ -262,7 +261,7 @@ def main():
     # as the only variable. Recency lists are off (`[]`): production history
     # must not steer a sweep.
     amplification, amp_cost = lp.stage15_meaning(
-        stage1, stage1_model, reading["arc"]["periodKey"], config, cache=False,
+        stage1, stage1_model, reading["arc"]["periodKey"], config,
         dial=dial, avoid_archetypes=[], avoid_kinds=[],
         style_key=style_key, style_world=lp.load_style_world(style_key))
     (out_dir / "00_amplification.json").write_text(json.dumps(amplification, indent=2))

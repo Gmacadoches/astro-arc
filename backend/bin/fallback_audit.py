@@ -22,8 +22,8 @@ Output, under ~/.local/state/omarchy/astro-arc/verification/<out>/:
                   proves build() refuses an unchartered style. Not part of
                   the hash.
 
-Pipeline state (history, the Stage 1 and 1.5 caches) is redirected to a
-temporary directory, so the real archive is neither read nor written.
+build() is given a PipelineState in a temporary directory (history, the
+Stage 1 and 1.5 caches), so the real state is neither read nor written.
 
 load_styles() and _load_actors() are cached for the run by default. Both
 re-parse their TOML on every call (actors.toml about 24 times per build()),
@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import llm_pipeline as lp  # noqa: E402
 from paths import VERIFY_DIR  # noqa: E402
+from pipeline_state import PipelineState  # noqa: E402
 
 
 PERIOD_KEY = "audit-2026-10-16"
@@ -78,6 +79,7 @@ class Audit:
         self.captured = []  # Stage 2 user prompts for the current build()
         self.chat_calls = defaultdict(int)
         self.chat = None  # the stub chat client, set by install_stubs
+        self.state = None  # the temporary PipelineState, set by install_stubs
 
     def hit(self, symbol, how):
         self.fired[f"{symbol}: {how}"][self.style] += 1
@@ -246,12 +248,9 @@ def install_stubs(state_dir, cache_styles, control_style):
     lp.open_no_redirect = no_network
     lp.get_api_key = no_network
 
-    lp.STATE_DIR = state_dir
-    lp.HISTORY_FILE = state_dir / "history.json"
-    lp.READINGS_DIR = state_dir / "readings"
-    lp.AMPLIFICATIONS_DIR = state_dir / "amplifications"
-    lp.load_history = lambda: []
-    lp.save_history_entry = no_network
+    # Passed to build() as its state: an empty history, and caches nobody
+    # else reads.
+    AUDIT.state = PipelineState(state_dir)
 
     # The registers are the variable under test, so build() is handed them.
     lp.pick_registers = lambda history, registers, cohesion="collide": AUDIT.registers
@@ -291,10 +290,7 @@ def install_stubs(state_dir, cache_styles, control_style):
 
 
 def seed_stage1_cache(config):
-    lp.READINGS_DIR.mkdir(parents=True, exist_ok=True)
-    entry = dict(STUB_RESPONSES["stage1"], natalHash=lp._natal_hash(config),
-                 schemaVersion=lp.STAGE1_SCHEMA_VERSION)
-    (lp.READINGS_DIR / f"{PERIOD_KEY}.json").write_text(json.dumps(entry))
+    AUDIT.state.store_reading(PERIOD_KEY, lp.stage1_cache_key(config), STUB_RESPONSES["stage1"])
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +320,7 @@ def run_style(style_key, registers, out):
         for primary, secondary in register_pairs(registers):
             # Stage 1.5's cache would otherwise serve one cell's meaning to the
             # next, and its directory feeds the recent-constellation lists.
-            for path in lp.AMPLIFICATIONS_DIR.glob("*.json"):
+            for path in AUDIT.state.meanings_dir.glob("*.json"):
                 path.unlink()
             AUDIT.registers = (primary, secondary)
             AUDIT.captured = []
@@ -334,7 +330,7 @@ def run_style(style_key, registers, out):
                 # build() must refuse it. Recorded in fallbacks.json, not in
                 # prompts.jsonl, which holds only prompts that were sent.
                 try:
-                    lp.build(reading, config, chat=AUDIT.chat)
+                    lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state)
                 except lp.PipelineError:
                     AUDIT.hit("dial_from_texture", "refused a reading with no texture")
                     continue
@@ -343,7 +339,7 @@ def run_style(style_key, registers, out):
                 # Since charter-required, an unchartered style must be refused
                 # before anything is billed. That refusal is the control.
                 try:
-                    lp.build(reading, config, chat=AUDIT.chat)
+                    lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state)
                 except lp.PipelineError as exc:
                     AUDIT.hit("require_charter", "refused the unchartered control")
                     out.write(json.dumps({"style": style_key, "cell": cell_name, "primary": primary,
@@ -351,7 +347,7 @@ def run_style(style_key, registers, out):
                                          sort_keys=True, ensure_ascii=False) + "\n")
                     continue
                 raise SystemExit("the unchartered control was not refused")
-            lp.build(reading, config, chat=AUDIT.chat)
+            lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state)
             if len(AUDIT.captured) != 1:
                 raise SystemExit(f"{style_key} {cell_name}: expected one Stage 2 call, "
                                  f"got {len(AUDIT.captured)}")

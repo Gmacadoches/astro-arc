@@ -16,8 +16,8 @@ that is not under test is pinned:
     input is byte-identical to the run that produced the baseline
   - each day's dial is the one stored in that day's pipeline-meta, so tonal
     direction and object range are the ones that actually applied
-  - cache=False throughout, so the production amplification cache is never
-    read for a hit and never written
+  - no pipeline state passed, so the production amplification cache is
+    never read for a hit and never written
 
 Arms:
   rule     the revised prompt alone, no recency list
@@ -44,10 +44,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
 from sweep import dial_for_day, report_filled  # noqa: E402
-from paths import CONFIG_FILE, PIPELINE_STATE_DIR, STATE_DIR, VERIFY_DIR  # noqa: E402
+from paths import CONFIG_FILE, STATE_DIR, VERIFY_DIR  # noqa: E402
+from pipeline_state import PipelineState  # noqa: E402
 from preflight_actors import archetype_family  # noqa: E402  — one definition, shared
 
-READINGS_DIR = PIPELINE_STATE_DIR / "readings"
 
 
 def load_config():
@@ -66,16 +66,7 @@ def load_days(cell):
     direction it never had, which is the same confound sweep.py pins against.
     """
     days, filled_days = [], []
-    for path in sorted(READINGS_DIR.glob("*.json")):
-        key = path.stem
-        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", key):
-            continue
-        try:
-            reading = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        if not all(reading.get(k) for k in ("reading", "distillation", "narrativePosition")):
-            continue
+    for key, reading in PipelineState().daily_readings():
         dial, source = dial_for_day(STATE_DIR, key, cell)
         filled_days.append((key, source))
         days.append((key, reading, dial))
@@ -90,7 +81,7 @@ def run_arm(arm, days, model, config, out_dir, axis="archetype", seed=0):
     constellation vary. "actor-kind" is B6: where should the actor kind come
     from — chart, dial, or chart-with-veto. Both share this loop because both
     need the same pinning (real cached readings, each day's own stored dial,
-    cache=False) and the same sequential build-up of history.
+    no state) and the same sequential build-up of history.
     """
     rng = random.Random(seed)
     used_constellations, used_kinds, rows, total = [], [], [], 0.0
@@ -111,7 +102,7 @@ def run_arm(arm, days, model, config, out_dir, axis="archetype", seed=0):
             avoid_k = list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW]
         style_key = config.get("artStyle") or "symbolist"
         result, cost = lp.stage15_amplify(
-            reading, model, key, config, cache=False, dial=dial,
+            reading, model, key, config, dial=dial,
             avoid_archetypes=avoid, avoid_kinds=avoid_k,
             style_key=style_key, style_world=lp.load_style_world(style_key),
             # Archetype and actor only: the material half is not what this
@@ -207,7 +198,7 @@ def main():
     out_name = args.out or ("b6-actor-kind" if args.axis == "actor-kind" else "b0-archetype-range")
 
     if not days:
-        print(f"No cached daily readings under {READINGS_DIR}.")
+        print(f"No cached daily readings under {PipelineState().readings_dir}.")
         return 1
 
     calls = len(days) * len(arms)
