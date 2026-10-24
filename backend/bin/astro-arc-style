@@ -69,7 +69,7 @@ from cost_estimate import chat_call_cost  # noqa: E402
 from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 from paths import CONFIG_FILE, STATE_DIR  # noqa: E402
-from replay_days import load_days, replay  # noqa: E402
+from replay_days import STYLE_DRAW_KEYS, load_days, replay  # noqa: E402
 from style_catalog import PREVIEW_PX  # noqa: E402
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[2]
@@ -222,42 +222,29 @@ def require_usable(key):
 # ---- shared: prompts for one real day ------------------------------------
 
 def day_prompts(key, day, registers, config, history):
-    """Stage 1.5 (the day's meaning once, the material per register) and
-    Stage 2 for one real day on theme `key`, as build() runs them. Returns
-    ([record], cost). `history` is the caller's in-memory history; nothing
-    production owns is read or written."""
+    """The day's meaning once, then one composition per register pair, for
+    one real day on theme `key`. Returns ([record], cost). `history` is the
+    caller's in-memory history, and each composition's entry is added to it;
+    nothing production owns is read or written."""
     date, stage1, dial = day
     model1 = config.get("stage1Model") or "gpt-4o-mini"
-    model2 = config.get("stage2Model") or "gpt-4o-mini"
-    world = lp.load_style_world(key)
-    base = {k: v for k, v in dial.items() if k not in ("verbs", "actorVerbs", "activity", "space",
-                                                       "light", "condition", "highlightMode")}
+    base = {k: v for k, v in dial.items() if k not in STYLE_DRAW_KEYS}
     meaning, cost = lp.stage15_meaning(stage1, model1, date, config, cache=False, dial=base,
                                        avoid_archetypes=[], avoid_kinds=[],
-                                       style_key=key, style_world=world)
+                                       style_key=key, style_world=lp.load_style_world(key))
     cost = cost or 0.0
     out = []
     for primary, secondary in registers:
-        d, draws = lp.draw_style_choices(key, base, history, date)
-        material, c = lp.stage15_material(stage1, meaning, model1, config, dial=d, style_key=key,
-                                          style_world=world, register=primary,
-                                          secondary_register=secondary,
-                                          avoid_material=lp.recent_material(history))
-        cost += c or 0.0
-        amp = {**meaning, **material}
-        prompt, tags, has_people, c = lp.stage2_image_prompt(
-            stage1, primary, [], lp.load_cliches(), model2, world,
-            secondary_register=secondary, amplification=amp, dial=d,
-            register_guidance=lp.load_register_line(key, primary),
-            secondary_register_guidance=lp.load_register_line(key, secondary),
-            style_brief=lp.load_style_brief(key), highlight=lp.load_style_highlight(key))
-        cost += c or 0.0
-        history.insert(0, {"artStyle": key, "draws": draws, "register": primary,
-                           "objects": amp.get("objects") or [], "highlight": amp.get("anomaly") or ""})
-        out.append({"day": date, "polarity": d["polarity"], "exposure": d["exposureBand"],
-                    "register": primary, "secondary": secondary, "hasPeople": has_people,
-                    "actorKind": amp.get("actorKind"), "prompt": prompt,
-                    "finalPrompt": lp.final_image_prompt(prompt, key, has_people)})
+        result = lp.compose(stage1, {"periodKey": date, "frequency": "daily"}, base, key, config,
+                            history, caption="skip", registers=(primary, secondary),
+                            meaning=meaning, avoided_concepts=[])
+        cost += (result["materialCost"] or 0.0) + (result["stage2Cost"] or 0.0)
+        history.insert(0, result["historyEntry"])
+        out.append({"day": date, "polarity": result["dial"]["polarity"],
+                    "exposure": result["dial"]["exposureBand"],
+                    "register": primary, "secondary": secondary, "hasPeople": result["hasPeople"],
+                    "actorKind": meaning.get("actorKind"), "prompt": result["imagePrompt"],
+                    "finalPrompt": result["finalPrompt"]})
     return out, cost
 
 
