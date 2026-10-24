@@ -821,23 +821,11 @@ def recent_actor_kinds(window=ACTOR_VETO_WINDOW, exclude=None):
 # — botanical + bodily, architectural + domestic interior — collapses back
 # into the single-material monoculture the pair exists to break, so the
 # secondary is drawn from a different group whenever one is available.
-# The one special family. Registers in it are what put people in an image, they
-# are gated on the PRIMARY register alone, and they are never eligible as a
-# secondary — a human register arriving as the secondary would inject figures
-# into a material-led scene through a side door. Named here rather than
-# hardcoded in three places; membership lives in registers.toml.
 # Backwards-compatible module-level views of registers.toml, for call sites
 # (sweep.py, this file) that read them as plain data. Computed at import, which
 # is fine because every generation is a fresh process — the file is still read
 # fresh on every run.
 REGISTER_FAMILIES = {r: fam for fam, regs in _load_register_families().items() for r in regs}
-
-# Kept as an empty set, deliberately, rather than deleted. sweep.py reads it
-# through getattr with a default, but an older checkout of any caller that
-# reads it directly should get "no register puts people in the image" — which
-# is now true — instead of an AttributeError. The people gate is gone; who
-# appears is actors.toml's business. Remove once nothing references it.
-PEOPLE_REGISTERS = frozenset()
 
 if not REGISTER_FAMILIES:
     print("llm_pipeline: warning — registers.toml has no [families] table; "
@@ -869,7 +857,7 @@ def pick_registers(history, registers, cohesion="collide"):
     if not primary:
         return None, None
 
-    candidates = [r for r in registers if r != primary and r not in PEOPLE_REGISTERS]
+    candidates = [r for r in registers if r != primary]
     if not candidates:
         return primary, None
 

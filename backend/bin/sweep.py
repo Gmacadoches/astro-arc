@@ -10,10 +10,11 @@ three times in a row, and that the one comparison batch that would have
 caught it "was never saved." A sweep needs to be cheap enough to re-run on
 every change and self-archiving, or it doesn't get run.
 
-It deliberately does NOT go through astro-arc-generate or llm_pipeline's
-own build(): it calls the stage functions directly so it can
+It runs llm_pipeline.compose(), the same composition production's build()
+runs, but not build() itself or astro-arc-generate, so it can
   - pin Stage 1 (one reading shared by every sample — otherwise register
-    differences are confounded with reading differences),
+    differences are confounded with reading differences), and pin the
+    registers and the day's meaning,
   - neutralize the avoid_concepts window so register coverage is actually
     even instead of being steered by whatever ran recently,
   - and, most importantly, touch none of the production state:
@@ -220,8 +221,7 @@ def main():
     if args.stage2_model:
         config["stage2Model"] = args.stage2_model
     style_key = args.style or config.get("artStyle") or "symbolist"
-    if hasattr(lp, "require_charter"):
-        lp.require_charter(style_key)
+    lp.require_charter(style_key)
     image_model = args.image_model or config.get("openaiModel") or "gpt-image-1-mini"
     size = args.size or config.get("backgroundSize") or "1600x900"
     width, height = (int(x) for x in size.split("x"))
@@ -238,17 +238,12 @@ def main():
     # --- pin the dial ------------------------------------------------
     # Pinned once and shared by every sample, for the same reason Stage 1 is: otherwise register differences are confounded with dial
     # differences and the sweep proves nothing.
-    dial = None
-    if hasattr(lp, "dial_from_texture"):
-        if args.cell:
-            texture = texture_for_cell(args.cell)
-        else:
-            texture = reading["arc"].get("texture")
-        dial = lp.dial_from_texture(texture)
-        (out_dir / "00_dial.json").write_text(json.dumps(
-            {"cell": args.cell, "rotateCells": list(ROTATION_CELLS) if args.rotate_cells else None,
-             "texture": texture, "dial": dial},
-            indent=2, default=str))
+    texture = texture_for_cell(args.cell) if args.cell else reading["arc"].get("texture")
+    dial = lp.dial_from_texture(texture)
+    (out_dir / "00_dial.json").write_text(json.dumps(
+        {"cell": args.cell, "rotateCells": list(ROTATION_CELLS) if args.rotate_cells else None,
+         "texture": texture, "dial": dial},
+        indent=2, default=str))
 
     # --- pin Stage 1 -------------------------------------------------
     if args.stage1:
@@ -256,46 +251,23 @@ def main():
         stage1_cost = None
     else:
         period_key = reading["arc"]["periodKey"]
-        stage1, stage1_cost = lp.stage1_interpret(reading, stage1_model, period_key, config)
+        stage1, stage1_cost = lp.stage1_interpret(reading, stage1_model, period_key, config,
+                                                  cache=False)
     (out_dir / "00_stage1.json").write_text(json.dumps(stage1, indent=2))
 
 
-    # --- Stage 1.5, if this build of the pipeline has one -------------
-    amplification = None
-    amp_cost = None
+    # --- Stage 1.5's meaning ------------------------------------------
     # As of 2026-09-26 Stage 1.5 is two calls: the MEANING, fixed per day, and
     # the MATERIAL, fresh per register. A sweep mirrors production exactly by
-    # drawing the meaning ONCE (below) and the material per register (in the
-    # loop) -- which is also what isolates the register as the only variable.
-    # Recency lists are off (`[]`): production history must not steer a sweep.
-    split = hasattr(lp, "stage15_material")
-    if split:
-        amplification, amp_cost = lp.stage15_meaning(
-            stage1, stage1_model, reading["arc"]["periodKey"], config, cache=False,
-            dial=dial, avoid_archetypes=[], avoid_kinds=[],
-            style_key=style_key, style_world=lp.load_style_world(style_key))
-        (out_dir / "00_amplification.json").write_text(json.dumps(amplification, indent=2))
-    elif hasattr(lp, "stage15_amplify"):
-        amp_kwargs = {"cache": False}
-        if dial is not None:
-            amp_kwargs["dial"] = dial
-        # The style is a Stage 1.5 input as of 2026-09-20 — objects and the
-        # anomaly are named in the world's terms — so a sweep that omits it
-        # would measure a pipeline production never runs. Guarded by hasattr
-        # so the harness still works against an older checkout.
-        if hasattr(lp, "load_style_world"):
-            amp_kwargs["style_key"] = style_key
-            amp_kwargs["style_world"] = lp.load_style_world(style_key)
-        try:
-            amplification, amp_cost = lp.stage15_amplify(
-                stage1, stage1_model, reading["arc"]["periodKey"], config, **amp_kwargs
-            )
-        except TypeError:
-            # Pre-dial pipeline — still produce a baseline.
-            amplification, amp_cost = lp.stage15_amplify(
-                stage1, stage1_model, reading["arc"]["periodKey"], config, cache=False
-            )
-        (out_dir / "00_amplification.json").write_text(json.dumps(amplification, indent=2))
+    # drawing the meaning ONCE (below) and pinning it, so compose() draws only
+    # the material per register -- which is also what isolates the register
+    # as the only variable. Recency lists are off (`[]`): production history
+    # must not steer a sweep.
+    amplification, amp_cost = lp.stage15_meaning(
+        stage1, stage1_model, reading["arc"]["periodKey"], config, cache=False,
+        dial=dial, avoid_archetypes=[], avoid_kinds=[],
+        style_key=style_key, style_world=lp.load_style_world(style_key))
+    (out_dir / "00_amplification.json").write_text(json.dumps(amplification, indent=2))
 
     registers = lp.load_registers()
     if args.registers != "all":
@@ -309,25 +281,21 @@ def main():
 
     if args.pairs:
         # Mirror production's pairing rules (llm_pipeline.pick_registers)
-        # rather than pairing naively: the secondary must never be a people
-        # register (people are gated on the primary alone) and should come
+        # rather than pairing naively: the secondary should come
         # from a different material family, or the pair collapses back into
         # one material. Deterministic offset-walk instead of a random pick
         # so a sweep is reproducible.
-        people = getattr(lp, "PEOPLE_REGISTERS", set())
-        families = getattr(lp, "REGISTER_FAMILIES", {})
+        families = lp.REGISTER_FAMILIES
         # Honor the dial's cohesion, or a cohere cell would be tested with
         # colliding pairs and prove nothing about the mode it claims to test.
         jobs = []
         for i, primary in enumerate(registers):
-            cohesion = (job_dials[i] or {}).get("registerCohesion", "collide")
-            pool = [r for r in registers if r != primary and r not in people]
+            cohesion = job_dials[i].get("registerCohesion", "collide")
+            pool = [r for r in registers if r != primary]
             if cohesion == "cohere":
                 # Same family, and genuinely no partner where a family has no
                 # other member — matching production, where that correctly
-                # yields no secondary at all. Since the 2026-09-13 expansion
-                # that is only the human registers, which are excluded from the
-                # pool above anyway.
+                # yields no secondary at all.
                 pool = [r for r in pool if families.get(r) == families.get(primary)]
             else:
                 distant = [r for r in pool if families.get(r) != families.get(primary)]
@@ -336,85 +304,29 @@ def main():
     else:
         jobs = [(r, None) for r in registers]
 
-    cliches = lp.load_cliches()
-    style_world = lp.load_style_world(style_key)
-
     results = []
     total_cost = 0.0
-    # The sweep's own history, for the per-style draws: each sample sees the
-    # draws of the samples before it, exactly as consecutive production runs
-    # do, and production's history.json is never read or written.
+    # The sweep's own history: each sample sees the draws and material of the
+    # samples before it, exactly as consecutive production runs do, and
+    # production's history.json is never read or written.
     sweep_history = []
-    period_key = reading["arc"]["periodKey"]
     for i, (primary, secondary) in enumerate(jobs, start=1):
-        dial = job_dials[i - 1]
-        draws = {}
-        history_entry = {"artStyle": style_key}
-        if dial is not None and hasattr(lp, "draw_style_choices"):
-            dial, draws = lp.draw_style_choices(style_key, dial, sweep_history, period_key)
-            history_entry["draws"] = draws
         name = slug(primary) + ("__" + slug(secondary) if secondary else "")
         stem = f"{i:02d}_{name}"
         print(f"[{i}/{len(jobs)}] {primary}" + (f" + {secondary}" if secondary else ""), file=sys.stderr)
 
-        kwargs = {}
-        if secondary is not None:
-            kwargs["secondary_register"] = secondary
-        sample_amp = amplification
-        material_cost = None
-        if split and amplification is not None:
-            material_kwargs = {}
-            if hasattr(lp, "recent_material"):
-                material_kwargs["avoid_material"] = lp.recent_material(sweep_history)
-            material, material_cost = lp.stage15_material(
-                stage1, amplification, stage1_model, config, dial=dial,
-                style_key=style_key, style_world=lp.load_style_world(style_key),
-                register=primary, secondary_register=secondary, **material_kwargs)
-            sample_amp = {**amplification, **material}
-            history_entry["objects"] = material.get("objects") or []
-            history_entry["highlight"] = material.get("anomaly") or ""
-            total_cost += material_cost or 0.0
-        if sample_amp is not None:
-            kwargs["amplification"] = sample_amp
-        if dial is not None:
-            kwargs["dial"] = dial
-        # Production passes these (see llm_pipeline.build); without them a
-        # sweep measures a prompt production never sends. Guarded by hasattr
-        # so the harness still runs against an older build of the pipeline,
-        # same as the kwargs above.
-        if hasattr(lp, "load_register_line"):
-            guidance = lp.load_register_line(style_key, primary)
-            sec_guidance = lp.load_register_line(style_key, secondary)
-            if sec_guidance:
-                kwargs["secondary_register_guidance"] = sec_guidance
-        elif hasattr(lp, "load_register_guidance"):
-            guidance = lp.load_register_guidance(primary)
-        else:
-            guidance = ""
-        if guidance:
-            kwargs["register_guidance"] = guidance
-        if hasattr(lp, "load_style_brief"):
-            # Production passes the style's own brief rules (see build());
-            # stage2_image_prompt refuses to run without them.
-            kwargs["style_brief"] = lp.load_style_brief(style_key)
-        if hasattr(lp, "load_style_highlight"):
-            kwargs["highlight"] = lp.load_style_highlight(style_key)
-
-        try:
-            prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
-                stage1, primary, [], cliches, stage2_model,
-                style_world, **kwargs
-            )
-        except TypeError:
-            # Older pipeline signature (pre-Task 3/4) — fall back so the
-            # harness can still produce a baseline on unmodified code.
-            prompt, tags, has_people, s2cost = lp.stage2_image_prompt(
-                stage1, primary, [], cliches, stage2_model,
-                style_world,
-            )
-
-        # Production's own join, so a sweep renders what a real run would.
-        final_prompt = lp.final_image_prompt(prompt, style_key, has_people)
+        # Record-only caption check: production resamples Stage 2 on a failure
+        # (see build()), but a sweep records the verdict on the first draw so
+        # it measures how often production WOULD resample, instead of hiding it.
+        result = lp.compose(
+            stage1, reading["arc"], job_dials[i - 1], style_key, config, sweep_history,
+            caption="record", registers=(primary, secondary), meaning=amplification,
+            avoided_concepts=[])
+        prompt = result["imagePrompt"]
+        final_prompt = result["finalPrompt"]
+        material_cost = result["materialCost"]
+        s2cost = result["stage2Cost"]
+        total_cost += material_cost or 0.0
 
         # One tier for every sample, the same one production uses. This used to
         # bump figures to "high" and default everything else to "medium", on the
@@ -431,42 +343,34 @@ def main():
             "style": style_key,
             "imagePrompt": prompt,
             "finalPrompt": final_prompt,
-            "conceptTags": tags,
-            "hasPeople": has_people,
+            "conceptTags": result["conceptTags"],
+            "hasPeople": result["hasPeople"],
             "promptWords": len(prompt.split()),
             "cell": job_cells[i - 1] or args.cell,
-            "draws": draws,
+            "draws": result["draws"],
             "stage2Cost": s2cost,
             "quality": quality,
         }
-        if hasattr(lp, "caption_check"):
-            # Record-only: production resamples Stage 2 on a failure (see
-            # build()), but a sweep records the verdict on the first draw so it
-            # measures how often production WOULD resample, instead of hiding it.
-            caption, hits, passed = lp.caption_check(
-                prompt, config.get("captionModel") or getattr(lp, "CAPTION_MODEL", "gpt-4o-mini"))
-            record["caption"] = caption
-            record["captionHits"] = hits
-            record["captionPassed"] = passed
-        if sample_amp is not None:
-            # Per sample, because the objects and the anomaly now differ per
-            # register; the constellation is recorded too so a sweep shows it.
-            record["constellation"] = sample_amp.get("constellation")
-            record["actorKind"] = sample_amp.get("actorKind")
-            record["objects"] = sample_amp.get("objects")
-            record["anomaly"] = sample_amp.get("anomaly")
-            record["materialCost"] = material_cost
+        check = result["captionCheck"]["attempts"][0]
+        record["caption"] = check["caption"]
+        record["captionHits"] = check["hits"]
+        record["captionPassed"] = check["passed"]
+        # Per sample, because the objects and the anomaly now differ per
+        # register; the constellation is recorded too so a sweep shows it.
+        record["constellation"] = result["constellation"]
+        record["actorKind"] = result["meaning"].get("actorKind")
+        record["objects"] = result["amplificationObjects"]
+        record["anomaly"] = result["anomaly"]
+        record["materialCost"] = material_cost
 
         # Did the mandatory anomaly actually reach the prompt? Stage 2 is told
         # it is mandatory and also told not to flag it with any of the words
         # that would make it obvious, and both pressures push toward dropping
         # it quietly. Recorded per sample so a sweep can show the rate.
-        if sample_amp is not None:
-            hits, total_tokens, survived = anomaly_survival(
-                sample_amp.get("anomaly"), prompt)
-            record["anomalyTokenHits"] = hits
-            record["anomalyTokens"] = total_tokens
-            record["anomalySurvived"] = survived
+        hits, total_tokens, survived = anomaly_survival(result["anomaly"], prompt)
+        record["anomalyTokenHits"] = hits
+        record["anomalyTokens"] = total_tokens
+        record["anomalySurvived"] = survived
         total_cost += s2cost or 0.0
 
         if not args.no_image:
@@ -485,7 +389,7 @@ def main():
 
         (out_dir / f"{stem}.json").write_text(json.dumps(record, indent=2))
         results.append(record)
-        sweep_history.insert(0, history_entry)
+        sweep_history.insert(0, result["historyEntry"])
 
     summary = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
