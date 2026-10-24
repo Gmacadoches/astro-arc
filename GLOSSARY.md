@@ -27,3 +27,7 @@ _Avoid_: cache (it is one part of the state), state dir
 **Cache key**:
 The inputs a cached reading or meaning was produced from: the birth data and prompt version, and for a meaning the style and its charter too. A cached result is reused only for a run whose inputs match it.
 _Avoid_: cache validity, natal hash (one input among several)
+
+**Catalog**:
+The styles, registers, actor kinds and clichés as read at the start of a run. Every choice in a composition is made from one catalog, and whether a style is usable is a question about the whole catalog, since its rules name the registers and its advice compares it with the other styles.
+_Avoid_: style list, config, loaders
