@@ -2728,6 +2728,17 @@ def build(reading, config, chat=None, state=None):
     return result["finalPrompt"], result
 
 
+def next_run_cached(config, period_key, state=None):
+    """(Stage 1 cached, Stage 1.5's meaning cached) for a run of `config` in
+    `period_key`: the question the cost estimate asks before a run, answered
+    with the keys build() would look up. `state` defaults to production's."""
+    state = state or PipelineState()
+    style_key = resolve_style_key(config.get("artStyle"))
+    meaning_key = meaning_cache_key(config, style_key, load_style_world(style_key))
+    return (state.cached_reading(period_key, stage1_cache_key(config)) is not None,
+            state.cached_meaning(period_key, meaning_key) is not None)
+
+
 def commit_history(metadata_path, state=None):
     """Append the history entry build() left in a run's metadata. Called by
     astro-arc-generate only after the image has rendered, so a refused or
