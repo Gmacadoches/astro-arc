@@ -25,9 +25,9 @@ Output, under ~/.local/state/omarchy/astro-arc/verification/<out>/:
 build() is given a PipelineState in a temporary directory (history, the
 Stage 1 and 1.5 caches), so the real state is neither read nor written.
 
-load_styles() and _load_actors() are cached for the run by default. Both
-re-parse their TOML on every call (actors.toml about 24 times per build()),
-and uncached a single style takes over two minutes. --no-cache turns it off.
+Every build() is handed the same Catalog by default, so the theme files are
+read once for the whole audit. --no-cache hands each build() a fresh one, as
+production reads them once per run.
 
     fallback_audit.py --out baseline
 """
@@ -80,7 +80,8 @@ class Audit:
         self.chat_calls = defaultdict(int)
         self.chat = None  # the stub chat client, set by install_stubs
         self.state = None  # the temporary PipelineState, set by install_stubs
-        self.catalog = None  # the run's Catalog, set by install_stubs
+        self.catalog = None  # the Catalog, set by install_stubs
+        self.catalog_for_run = None  # what each build() is handed, set by install_stubs
 
     def hit(self, symbol, how):
         self.fired[f"{symbol}: {how}"][self.style] += 1
@@ -112,47 +113,11 @@ def _style(style_key):
 
 
 def install_detectors():
-    # --- load_style_brief: the unchartered branch and the default signature.
-    # _default_signature is only ever called from load_style_brief, so which
-    # branch called it follows from whether the style has a [brief] table.
-    def after_brief(result, style_key):
-        if not isinstance(_style(style_key).get("brief"), dict):
-            AUDIT.hit("DEFAULT_STAGE2_BRIEF", "load_style_brief, style has no [brief]")
-        if _space_skip_active(style_key):
-            AUDIT.hit("SPACE_REPLACES_BRIEF", "load_style_brief skipped openness/depth (style has [space])")
-    _wrap("load_style_brief", after_brief)
-
-    def after_sig(result, style_key):
-        brief = _style(style_key).get("brief")
-        how = ("load_style_brief, unchartered branch" if not isinstance(brief, dict)
-               else "load_style_brief, [brief] has no key in SIGNATURE_KEYS")
-        AUDIT.hit("DEFAULT_SIGNATURE/_default_signature", how)
-    _wrap("_default_signature", after_sig)
-
-    # --- the highlight
-    def after_highlight(result, style_key):
-        if result is getattr(lp, "DEFAULT_HIGHLIGHT", object()):
-            AUDIT.hit("DEFAULT_HIGHLIGHT", "load_style_highlight, charter has no highlight")
-    _wrap("load_style_highlight", after_highlight)
-
-    # --- verbs, conditions, world, info
-    _wrap("_global_verbs", lambda result: AUDIT.hit(
-        "_global_verbs", "draw_style_choices, style has no [verbs]"))
-
-    def after_conditions(result, style_key):
-        if result is None:
-            AUDIT.hit("CONDITIONS", "draw_style_choices, style has no `conditions` (global wear scale)")
-    _wrap("load_style_conditions", after_conditions)
-
-    def after_world(result, style_key):
-        if not result:
-            AUDIT.hit("load_style_world", 'returned "" (no [world] charter)')
-    _wrap("load_style_world", after_world)
-
-    def after_suffix(result, style_key, has_people=False):
-        if style_key not in lp.load_styles():
-            AUDIT.hit("load_style_suffix", "unknown key, fell back to symbolist")
-    _wrap("load_style_suffix", after_suffix)
+    # The loader detectors (load_style_brief, _default_signature,
+    # load_style_highlight, _global_verbs, load_style_conditions,
+    # load_style_world, load_style_suffix) went with the functions they
+    # watched: charter-required removed their fallbacks, and the catalog
+    # (2026-10-24) the functions themselves.
 
     # --- the dial
     def after_dial(result, texture):
@@ -225,12 +190,6 @@ def install_detectors():
     lp.stage2_image_prompt = stage2
 
 
-def _space_skip_active(style_key):
-    brief = _style(style_key).get("brief")
-    return (isinstance(brief, dict) and bool(lp.load_style_space(style_key))
-            and any(k in brief for k in getattr(lp, "SPACE_REPLACES_BRIEF", ())))
-
-
 # ---------------------------------------------------------------------------
 # Isolation: no network, no real state, no bill
 # ---------------------------------------------------------------------------
@@ -261,23 +220,19 @@ def install_stubs(state_dir, cache_styles, control_style):
     # The registers are the variable under test, so build() is handed them.
     lp.pick_registers = lambda history, registers, cohesion="collide": AUDIT.registers
 
-    # One catalog for every build() unless --no-cache, with the control style
-    # added: a plain table with no file and no preview, so the only thing it
-    # can show is the charter refusal.
-    original_load = lp.Catalog.load
-    cached = {}
-
-    def load(*args, **kwargs):
-        if cache_styles and "catalog" in cached:
-            return cached["catalog"]
-        catalog = original_load(*args, **kwargs)
-        if control_style:
-            catalog.styles[CONTROL_STYLE] = {"label": "Unchartered Control", "suffix": "control suffix"}
-        cached["catalog"] = catalog
-        AUDIT.catalog = AUDIT.catalog or catalog
-        return catalog
-    lp.Catalog.load = load
-    lp.Catalog.load()
+    # The catalog build() is handed: one for every run, or with --no-cache a
+    # fresh one per run as production reads it. The control style is a draft
+    # theme file with a label, a suffix and a preview and nothing else, so the
+    # only thing it can show is the charter refusal.
+    drafts = []
+    if control_style:
+        control = state_dir / f"{CONTROL_STYLE}.toml"
+        control.write_text('label = "Unchartered Control"\nsuffix = "control suffix"\n')
+        control.with_suffix(".jpg").write_bytes(b"")
+        drafts.append(control)
+    AUDIT.catalog = lp.Catalog.load(drafts=drafts)
+    AUDIT.catalog_for_run = ((lambda: AUDIT.catalog) if cache_styles
+                             else (lambda: lp.Catalog.load(drafts=drafts)))
 
 
 def seed_stage1_cache(config):
@@ -321,7 +276,7 @@ def run_style(style_key, registers, out):
                 # build() must refuse it. Recorded in fallbacks.json, not in
                 # prompts.jsonl, which holds only prompts that were sent.
                 try:
-                    lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state)
+                    lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state, catalog=AUDIT.catalog_for_run())
                 except lp.PipelineError:
                     AUDIT.hit("dial_from_texture", "refused a reading with no texture")
                     continue
@@ -330,7 +285,7 @@ def run_style(style_key, registers, out):
                 # Since charter-required, an unchartered style must be refused
                 # before anything is billed. That refusal is the control.
                 try:
-                    lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state)
+                    lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state, catalog=AUDIT.catalog_for_run())
                 except lp.PipelineError as exc:
                     AUDIT.hit("require_charter", "refused the unchartered control")
                     out.write(json.dumps({"style": style_key, "cell": cell_name, "primary": primary,
@@ -338,7 +293,7 @@ def run_style(style_key, registers, out):
                                          sort_keys=True, ensure_ascii=False) + "\n")
                     continue
                 raise SystemExit("the unchartered control was not refused")
-            lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state)
+            lp.build(reading, config, chat=AUDIT.chat, state=AUDIT.state, catalog=AUDIT.catalog_for_run())
             if len(AUDIT.captured) != 1:
                 raise SystemExit(f"{style_key} {cell_name}: expected one Stage 2 call, "
                                  f"got {len(AUDIT.captured)}")
@@ -352,7 +307,7 @@ def main():
     parser.add_argument("--out", required=True, help="name of the verification folder")
     parser.add_argument("--styles", nargs="*", help="only these style keys (default: all shipped)")
     parser.add_argument("--no-cache", action="store_true",
-                        help="re-read the theme files and actors.toml on every call, as production does")
+                        help="load a fresh catalog for every build(), as production does once per run")
     parser.add_argument("--no-control", action="store_true", help="skip the unchartered control style")
     args = parser.parse_args()
 
