@@ -32,12 +32,22 @@
 set -euo pipefail
 
 SERVICE="astro-arc"
+CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
+
+provider="${ASTRO_ARC_PROVIDER:-}"
+if [[ -z $provider ]]; then
+  provider=$(jq -r '.provider // "openai"' "$CONFIG_FILE" 2>/dev/null || echo openai)
+fi
+case "$provider" in
+  openrouter) prefix="openrouter-api-key"; label_provider="OpenRouter" ;;
+  *) prefix="openai-api-key"; label_provider="OpenAI" ;;
+esac
 
 account_for_slot() {
   case "$1" in
-    stage1) echo "openai-api-key-stage1" ;;
-    stage2) echo "openai-api-key-stage2" ;;
-    image) echo "openai-api-key" ;;  # kept as the original name for continuity
+    stage1) echo "$prefix-stage1" ;;
+    stage2) echo "$prefix-stage2" ;;
+    image) echo "$prefix" ;;  # kept as the original name for continuity
     *) echo "Unknown slot: $1 (expected stage1, stage2, or image)" >&2; exit 1 ;;
   esac
 }
@@ -55,7 +65,7 @@ action="${1:-}"
 # below, which the other three actions all require.
 if [[ $action == store-all ]]; then
   require_secret_tool
-  label="Astro-Arc API Key"
+  label="Astro-Arc $label_provider API Key"
   # tee fans the same stdin into three stores. The key streams through pipes and
   # is never assigned to a variable, which is the same guarantee the per-slot
   # path gives (see the header). `wait` is what makes the exit status meaningful:

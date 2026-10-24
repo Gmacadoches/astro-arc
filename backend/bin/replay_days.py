@@ -183,7 +183,7 @@ def projected_cost(config, render, quality):
     `unknown` names each model with no rate; the totals are None then."""
     model1 = config.get("stage1Model") or "gpt-4o-mini"
     model2 = config.get("stage2Model") or "gpt-4o-mini"
-    caption_model = config.get("captionModel") or lp.CAPTION_MODEL
+    caption_model = config.get("captionModel") or lp.caption_model_for()
     stage15, _ = mc.stage_cost("stage15", model1)
     stage2, _ = mc.stage_cost("stage2", model2)
     caption, _ = mc.stage_cost("caption", caption_model)

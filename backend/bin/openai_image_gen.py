@@ -32,8 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from cost_estimate import image_call_cost  # noqa: E402
 from http_limits import b64_image_bytes, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
 from image_fit import ImageError, closest_supported_size, fit_cover  # noqa: E402
-
-API_BASE = "https://api.openai.com/v1"
+from providers import PROVIDERS, api_base, current_provider, extra_headers  # noqa: E402
 
 # The sizes OpenAI's image models actually accept — arbitrary desktop
 # resolutions aren't among them, so generate() picks whichever of these is
@@ -204,32 +203,35 @@ def get_api_key(slot="image"):
     except FileNotFoundError:
         raise ApiKeyError(f"{apikey_bin} not found.")
     if result.returncode != 0 or not result.stdout.strip():
-        raise ApiKeyError(f"No OpenAI API key stored for '{slot}' yet — set one in Astro-Arc's settings.")
+        label = PROVIDERS[current_provider()]["label"]
+        raise ApiKeyError(f"No {label} API key stored for '{slot}' yet — set one in Astro-Arc's settings.")
     return result.stdout.strip()
 
 
-def _request(path, payload=None, method="GET", slot="image"):
-    """One HTTP call. The Authorization header is built inline from
-    get_api_key()'s return value — never stored en route."""
-    url = f"{API_BASE}{path}"
+def _request(path, payload=None, method="GET", slot="image", auth=True, timeout=60):
+    """One HTTP call to the current provider. The Authorization header is
+    built inline from get_api_key()'s return value — never stored en route.
+
+    auth=False is for OpenRouter's public model listings, which need no key;
+    leaving it off there means browsing models never touches the keyring."""
+    provider = current_provider()
+    url = f"{api_base(provider)}{path}"
     data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(
-        url, data=data, method=method,
-        headers={
-            "Authorization": f"Bearer {get_api_key(slot)}",
-            "Content-Type": "application/json",
-        },
-    )
+    headers = {"Content-Type": "application/json", **extra_headers(provider)}
+    if auth:
+        headers["Authorization"] = f"Bearer {get_api_key(slot)}"
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    label = PROVIDERS[provider]["label"]
     try:
         # Bounded read: see http_limits. The 60s timeout stays — it covers a
         # stalled peer, while the cap covers one that keeps talking forever.
         # Redirects are refused unread: following one drains it uncapped.
-        with open_no_redirect(req, timeout=60) as resp:
+        with open_no_redirect(req, timeout=timeout) as resp:
             return read_json_capped(resp)
     except urllib.error.HTTPError as exc:
         body = read_error_capped(exc)
         # Never include headers (which carried the key) in an error dump.
-        raise RuntimeError(f"OpenAI API error {exc.code}: {body[:300]}") from None
+        raise RuntimeError(f"{label} API error {exc.code}: {body[:300]}") from None
 
 
 def validate_key(slot="image"):
@@ -237,7 +239,9 @@ def validate_key(slot="image"):
     saving a key: GET /models costs nothing and just confirms the key
     authenticates. Returns (ok, message); message never contains the key."""
     try:
-        _request("/models", slot=slot)
+        # OpenRouter's /models is public and would pass any key at all, so it
+        # checks /key instead, which is also free and does need a real one.
+        _request("/key" if current_provider() == "openrouter" else "/models", slot=slot)
         return True, "Key works."
     except ApiKeyError as exc:
         return False, str(exc)
@@ -249,6 +253,13 @@ def validate_key(slot="image"):
 
 
 def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", target_width=1024, target_height=1024):
+    if current_provider() == "openrouter":
+        # Imported here: it imports this module for _request and the safety
+        # retry, so a top-level import would be circular.
+        from openrouter_image_gen import generate as openrouter_generate  # noqa: PLC0415
+
+        return openrouter_generate(prompt, output_path, model, quality, target_width, target_height)
+
     # OpenAI can only render at OPENAI_IMAGE_SIZES, not the arbitrary
     # target the background is actually supposed to end up at — render at
     # the closest-matching aspect ratio, then crop/scale to the exact
@@ -327,7 +338,7 @@ def generate(prompt, output_path, model="gpt-image-1-mini", quality="medium", ta
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate one Astro-Arc image via the OpenAI API.")
+    parser = argparse.ArgumentParser(description="Generate one Astro-Arc image via the OpenAI or OpenRouter API.")
     parser.add_argument("prompt")
     parser.add_argument("output_path")
     parser.add_argument("--model", default="gpt-image-1-mini")

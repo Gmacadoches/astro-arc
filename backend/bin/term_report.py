@@ -221,7 +221,7 @@ def classify_activity(path, samples):
     config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
     # The writing model, not the caption judge: gpt-4o-mini returned "none" for
     # 5 of 12 prompts that plainly had a nurse in them (2026-10-10).
-    model = config.get("stage2Model") or config.get("captionModel") or lp.CAPTION_MODEL
+    model = config.get("stage2Model") or config.get("captionModel") or lp.caption_model_for()
     changed = False
     out = []
     for s in samples:

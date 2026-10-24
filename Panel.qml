@@ -757,8 +757,11 @@ Panel {
     else root.imageDraft = ""
   }
 
+  // Keys are scoped to the provider, matching astro-arc-apikey: switching
+  // provider never overwrites the other provider's stored key.
   function accountForSlot(slot) {
-    return slot === "stage1" ? "openai-api-key-stage1" : slot === "stage2" ? "openai-api-key-stage2" : "openai-api-key"
+    var prefix = root.configState.provider === "openrouter" ? "openrouter-api-key" : "openai-api-key"
+    return slot === "stage1" ? prefix + "-stage1" : slot === "stage2" ? prefix + "-stage2" : prefix
   }
 
   function saveApiKey(slot) {
@@ -781,7 +784,7 @@ Panel {
     // guarantee the per-slot path gives. See astro-arc-apikey's header.
     apiKeyStoreProc.command = root.storeAllSlots
       ? [root.apiKeyBin, "store-all"]
-      : ["secret-tool", "store", "--label=Astro-Arc OpenAI API Key (" + slot + ")", "service", "astro-arc", "account", root.accountForSlot(slot)]
+      : ["secret-tool", "store", "--label=Astro-Arc " + Model.providerLabel(root.configState.provider) + " API Key (" + slot + ")", "service", "astro-arc", "account", root.accountForSlot(slot)]
     apiKeyStoreProc.running = true
   }
 
@@ -931,7 +934,17 @@ Panel {
 
   Process {
     id: providerWriteProc
-    onExited: function(exitCode) { if (exitCode === 0) root.configFile.reload() }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) return
+      root.configFile.reload()
+      // Everything the panel shows is scoped to the provider: its key, its
+      // model list and its prices. astro-arc-config has already moved the
+      // models to the new provider's recommended preset.
+      root.refreshApiKeyStatus("stage1")
+      root.refreshApiKeyStatus("stage2")
+      root.refreshApiKeyStatus("image")
+      root.loadModelCatalog(false)
+    }
   }
 
   // ---- The popout. The panel's settings view holds only what a reading
@@ -966,7 +979,7 @@ Panel {
     // through intermediate states that match no preset, so the picker would
     // flicker through "Custom" on its way to the tier just chosen.
     presetWriteProc.command = [root.configBin, "--set-models",
-      preset.chat, preset.chat, preset.image, preset.quality]
+      preset.chat, preset.chat, preset.image, preset.quality, preset.reasoning || "default"]
     presetWriteProc.running = true
   }
 

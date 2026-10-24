@@ -65,6 +65,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from openai_image_gen import ApiKeyError, get_api_key  # noqa: E402
 from cost_estimate import chat_call_cost  # noqa: E402
 from http_limits import ResponseTooLarge, open_no_redirect, read_error_capped, read_json_capped  # noqa: E402
+from providers import (  # noqa: E402
+    PROVIDERS, api_base, chat_reasoning, current_provider, default_for, extra_headers, reasoning_for,
+)
 
 import urllib.error
 import urllib.request
@@ -93,7 +96,10 @@ REGISTER_LOOKBACK_DAYS = 5
 # turning a hard failure into a silent 10-minute hang.
 CHAT_MAX_ATTEMPTS = 5
 CHAT_BACKOFF_BASE = 2.0
-CHAT_API_URL = "https://api.openai.com/v1/chat/completions"
+# OpenAI and OpenRouter take the same /chat/completions request, so only the
+# base URL differs. Resolved per call: see providers.py.
+def chat_api_url():
+    return api_base() + "/chat/completions"
 
 
 class PipelineError(Exception):
@@ -105,10 +111,11 @@ class PipelineError(Exception):
 # secret-tool subprocess call) and used only inline in this one header dict;
 # nothing here stores it, logs it, or returns it.
 #
-# This is the OpenAI adapter at the chat seam. Every stage takes `chat=`, any
-# callable with _chat_json's signature returning (json_dict, usage), and falls
-# back to this one when it is None. fallback_audit.py passes a stub there, so a
-# prompts-only run makes no call and writes no usage or capability state.
+# This is the provider adapter (OpenAI or OpenRouter) at the chat seam. Every
+# stage takes `chat=`, any callable with _chat_json's signature returning
+# (json_dict, usage), and falls back to this one when it is None.
+# fallback_audit.py passes a stub there, so a prompts-only run makes no call
+# and writes no usage or capability state.
 # ---------------------------------------------------------------------------
 
 def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=None):
@@ -123,6 +130,8 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
     lets the widget price a model that has never been run: measured tokens for
     the stage times that model's published rate. See model_catalog.stage_cost.
     """
+    provider = current_provider()
+    label = PROVIDERS[provider]["label"]
     payload = {
         "model": model,
         "messages": [
@@ -145,10 +154,20 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
     # slightly looser than configured. That beats failing the generation, but it
     # is the reason the widget marks such a model rather than hiding the fact.
     try:
-        from model_catalog import get_capability  # noqa: PLC0415
+        from model_catalog import get_capability, load_availability  # noqa: PLC0415
 
         if get_capability(model, "temperature") is False:
             payload.pop("temperature", None)
+        # OpenRouter's listing says up front which models take it, so there
+        # is no wasted first attempt to discover it.
+        if provider == "openrouter":
+            listed = ((load_availability("openrouter") or {}).get("chatModels") or {}).get(model)
+            if listed and listed.get("temperature") is False:
+                payload.pop("temperature", None)
+            # See providers.REASONING_EFFORTS for why this exists at all.
+            reasoning = reasoning_for(listed, chat_reasoning())
+            if reasoning:
+                payload["reasoning"] = reasoning
     except Exception:  # noqa: BLE001
         pass
     # Retry on 429 and 5xx with backoff (added 2026-09-12). Without this a single
@@ -172,13 +191,14 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
     attempt = 0
     while attempt < CHAT_MAX_ATTEMPTS:
         req = urllib.request.Request(
-            CHAT_API_URL,
+            chat_api_url(),
             data=json.dumps(payload).encode(),
             method="POST",
             headers={
                 # Rebuilt per attempt so the key is never held across a sleep.
                 "Authorization": f"Bearer {get_api_key(slot)}",
                 "Content-Type": "application/json",
+                **extra_headers(provider),
             },
         )
         try:
@@ -191,10 +211,10 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
         except ResponseTooLarge as exc:
             # Not congestion and not transient: a reply this size is broken,
             # and retrying only invites it again. Fail the stage outright.
-            raise PipelineError(f"OpenAI chat API: {exc}") from None
+            raise PipelineError(f"{label} chat API: {exc}") from None
         except urllib.error.HTTPError as exc:
             detail = read_error_capped(exc)[:300]
-            last_detail = f"OpenAI chat API error {exc.code}: {detail}"
+            last_detail = f"{label} chat API error {exc.code}: {detail}"
 
             # A rejected temperature is a capability mismatch, not congestion:
             # retry immediately without it and remember. Deliberately does NOT
@@ -228,7 +248,7 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
             time.sleep(wait)
             attempt += 1
     else:  # pragma: no cover — loop always breaks or raises
-        raise PipelineError(last_detail or "OpenAI chat API call failed")
+        raise PipelineError(last_detail or f"{label} chat API call failed")
 
     # Bookkeeping only — never allowed to break a call that has already been paid
     # for, hence the guard and the placement after the response is in hand.
@@ -236,7 +256,11 @@ def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=N
         try:
             from model_catalog import record_stage_usage  # noqa: PLC0415
 
-            record_stage_usage(stage, model, body.get("usage"))
+            # Filed under the effort actually sent, so a reasoning-off run
+            # never prices the same model's default (model_catalog.stage_model_key).
+            sent = payload.get("reasoning")
+            key = f"{model}@{sent['effort']}" if sent else model
+            record_stage_usage(stage, key, body.get("usage"))
         except Exception:  # noqa: BLE001
             pass
 
@@ -2337,6 +2361,14 @@ CAPTION_MODEL = "gpt-4o-mini"
 CAPTION_RESAMPLES = 2
 
 
+def caption_model_for(provider=None):
+    """CAPTION_MODEL under the current provider's naming, so the judge is the
+    same model the calibration was scored on either way."""
+    if (provider or current_provider()) == "openrouter":
+        return "openai/" + CAPTION_MODEL
+    return CAPTION_MODEL
+
+
 def caption_check(prompt, model, chat=None):
     """(caption, hits, passed) — would this image be filed under a feeling?
 
@@ -2589,7 +2621,7 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
                   the returned historyEntry to move recency on.
 
     Keywords:
-      chat        the chat client (see _chat_json); None means OpenAI.
+      chat        the chat client (see _chat_json); None means the configured provider.
       caption     the melodrama check: "resample" (production: a failure
                   re-runs Stage 2 up to CAPTION_RESAMPLES times), "record"
                   (check once, never resample) or "skip" (no check).
@@ -2610,8 +2642,8 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     is never saved here (see build)."""
     if caption not in CAPTION_POLICIES:
         raise PipelineError(f"compose: caption must be one of {CAPTION_POLICIES}, not {caption!r}")
-    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
-    stage2_model = config.get("stage2Model") or "gpt-4o-mini"
+    stage1_model = config.get("stage1Model") or default_for("Chat")
+    stage2_model = config.get("stage2Model") or default_for("Chat")
     period_key = arc["periodKey"]
 
     cliches = load_cliches()
@@ -2654,7 +2686,7 @@ def compose(stage1, arc, dial, style_key, config, history, *, chat=None,
     # failure is recorded: a strict judge must never cost the day its image.
     # passed=None (the judge errored) counts as "not checked", per
     # caption_check's own contract.
-    caption_model = config.get("captionModel") or CAPTION_MODEL
+    caption_model = config.get("captionModel") or caption_model_for()
     caption_attempts = []
     stage2_cost = 0.0
     for _attempt in range(1 + (CAPTION_RESAMPLES if caption == "resample" else 0)):
@@ -2765,7 +2797,7 @@ def build(reading, config, chat=None):
     """Production's composition: Stage 1, the real history and the real
     Stage 1.5 recency and cache, the melodrama resample. Returns
     (final_prompt, metadata), the metadata astro-arc-generate writes."""
-    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
+    stage1_model = config.get("stage1Model") or default_for("Chat")
     style_key = resolve_style_key(config.get("artStyle"))
     require_charter(style_key)
     period_key = reading["arc"]["periodKey"]

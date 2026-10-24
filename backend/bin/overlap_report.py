@@ -59,7 +59,7 @@ def main():
         sys.exit(1)
     prefix, styles = sys.argv[1], sys.argv[2:]
     config = json.loads(CONFIG_PATH.read_text()) if CONFIG_PATH.exists() else {}
-    model = config.get("captionModel") or lp.CAPTION_MODEL
+    model = config.get("captionModel") or lp.caption_model_for()
     by_style = {}
     for st in styles:
         path = VERIFY_ROOT / f"{prefix}-{st}"
