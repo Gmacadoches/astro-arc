@@ -11,13 +11,17 @@ So: the same question the user actually has. Will tomorrow's wallpaper look
 different from today's?
 
 Everything that moves in production moves here, in date order, accumulating the
-same recency pressure a real run would:
+same recency pressure a real run would. Each day is one llm_pipeline.compose(),
+the composition production runs:
 
   - the reading and its stored dial, per day, from cache
   - the amplification, fresh, with the archetype and actor-kind avoid lists
-    built up day by day
+    built up day by day, and the material avoiding recent days' objects
   - the register pair, from the real rotation against an accumulating history
+  - the style's draws, avoiding what recent days drew (unless a day's stored
+    draws are reused, see replay)
   - the avoided concept tags, from that same history
+  - the melodrama check, resampling Stage 2 on a failure
 
 Nothing production owns is written. cache=False on every stage, output goes to
 verification/<name>/, and history is synthetic and in-memory.
@@ -34,7 +38,6 @@ import csv
 import json
 import re
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -81,22 +84,33 @@ def load_days(limit, cell, textured_only=False):
 STYLE_DRAW_KEYS = ("verbs", "actorVerbs", "activity", "space", "light", "condition", "highlightMode")
 
 
+def stored_draws(dial):
+    """The draws a day's stored dial carries, as compose()'s `draws` pin, or
+    None to draw fresh from the style. Only dials stored since per-style
+    draws (2026-10-10) carry a full set; an older day's verbs came from the
+    global tables, which no longer exist, so it draws like a new run."""
+    if not all(k in dial for k in ("verbs", "actorVerbs", "activity", "condition")):
+        return None
+    draws = {"processVerbs": dial["verbs"].split(", "),
+             "activity": dial["activity"],
+             "actorVerbs": dial["actorVerbs"].split(", "),
+             "condition": dial["condition"]}
+    for key in ("space", "highlightMode"):
+        if key in dial:
+            draws[key] = dial[key]
+    return draws
+
+
 def replay(style_key, days, config, out_dir=None, render=False, quality="medium",
            redraw=False, log=print):
     """Replay `days` (load_days) on `style_key` in date order, with the
     recency pressure accumulating as it would in production. Returns
     (rows, spent). Writes one JSON per day (and the render) under `out_dir`
     when it is given; nothing production owns is ever written."""
-    stage1_model = config.get("stage1Model") or "gpt-4o-mini"
-    stage2_model = config.get("stage2Model") or "gpt-4o-mini"
     image_model = config.get("openaiModel") or "gpt-image-1-mini"
     width, height = (int(x) for x in (config.get("backgroundSize") or "1600x900").split("x"))
     if out_dir is not None:
         out_dir.mkdir(parents=True, exist_ok=True)
-
-    registers = lp.load_registers()
-    style_world = lp.load_style_world(style_key)
-    cliches = lp.load_cliches()
 
     history, rows, total = [], [], 0.0
     used_constellations, used_kinds = [], []
@@ -104,64 +118,44 @@ def replay(style_key, days, config, out_dir=None, render=False, quality="medium"
     for i, (key, stage1, dial) in enumerate(days, start=1):
         if redraw:
             dial = {k: v for k, v in dial.items() if k not in STYLE_DRAW_KEYS}
-        if "verbs" not in dial:
-            # A day with no stored dial: draw from the style's own charter,
-            # as build() does for every run.
-            dial, _ = lp.draw_style_choices(style_key, dial, history, key)
-        avoid_arch = list(reversed(used_constellations))[:lp.AMPLIFY_AVOID_WINDOW]
-        avoid_kind = list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW]
-        # Registers first: as of 2026-09-26 they are a Stage 1.5 input.
-        primary, secondary = lp.pick_registers(
-            history, registers, dial.get("registerCohesion", "collide"))
-        amp, c1 = lp.stage15_amplify(
-            stage1, stage1_model, key, config, cache=False, dial=dial,
-            avoid_archetypes=avoid_arch, avoid_kinds=avoid_kind,
-            style_key=style_key, style_world=style_world,
-            register=primary, secondary_register=secondary,
-        )
-        total += c1 or 0.0
-        used_constellations.append(amp.get("constellation", ""))
-        used_kinds.append(amp.get("actorKind", ""))
-        avoid_tags = lp.avoid_concepts(history)
-
-        kwargs = {"amplification": amp, "dial": dial,
-                  "register_guidance": lp.load_register_line(style_key, primary),
-                  "secondary_register_guidance": lp.load_register_line(style_key, secondary),
-                  "style_brief": lp.load_style_brief(style_key),
-                  "highlight": lp.load_style_highlight(style_key)}
-        if secondary:
-            kwargs["secondary_register"] = secondary
-        prompt, tags, has_people, c2 = lp.stage2_image_prompt(
-            stage1, primary, avoid_tags, cliches, stage2_model,
-            style_world, **kwargs)
-        total += c2 or 0.0
-
-        final = lp.final_image_prompt(prompt, style_key, has_people)
+        result = lp.compose(
+            stage1, {"periodKey": key, "frequency": "daily"}, dial, style_key, config, history,
+            caption="resample", draws=stored_draws(dial),
+            avoid_archetypes=list(reversed(used_constellations))[:lp.AMPLIFY_AVOID_WINDOW],
+            avoid_kinds=list(reversed(used_kinds))[:lp.ACTOR_VETO_WINDOW])
+        meaning = result["meaning"]
+        total += (result["stage15Cost"] or 0.0) + (result["stage2Cost"] or 0.0)
+        used_constellations.append(meaning.get("constellation", ""))
+        used_kinds.append(meaning.get("actorKind", ""))
+        dial = result["dial"]
+        prompt = result["imagePrompt"]
+        final = result["finalPrompt"]
         stem = f"{i:02d}_{key}"
 
         row = {
-            "day": key, "register": primary, "secondary": secondary,
-            "actor": amp.get("actor", ""), "actorKind": amp.get("actorKind", ""),
-            "family": archetype_family(amp.get("constellation", "")),
-            "anomalyType": amp.get("anomalyType", ""),
-            "anomaly": amp.get("anomaly", ""),
+            "day": key, "register": result["register"], "secondary": result["secondaryRegister"],
+            "actor": meaning.get("actor", ""), "actorKind": meaning.get("actorKind", ""),
+            "family": archetype_family(result["constellation"] or ""),
+            "anomalyType": result["anomalyType"],
+            "anomaly": result["anomaly"],
             "polarity": (dial.get("tonalDirection") or "")[:14],
             # The day's real hard/soft, from its stored texture.
             "dialPolarity": dial.get("polarity", ""),
-            "hasPeople": has_people, "promptWords": len(prompt.split()),
-            "conceptTags": "|".join(tags), "imagePrompt": prompt,
+            "hasPeople": result["hasPeople"], "promptWords": len(prompt.split()),
+            "conceptTags": "|".join(result["conceptTags"]), "imagePrompt": prompt,
             # The whole amplification and the final prompt, so a batch can be
             # filed into the archive afterwards without re-rendering. The first
             # run of this harness saved neither, and the renders were good, so
             # those eight entries carry reconstructed metadata with the
             # constellation and object list blank.
             "finalPrompt": final,
-            "constellation": amp.get("constellation", ""),
-            "movement": amp.get("movement", ""),
-            "affect": amp.get("affect", ""),
-            "amplificationObjects": amp.get("objects") or [],
-            "stage1Model": stage1_model, "stage2Model": stage2_model,
+            "constellation": result["constellation"],
+            "movement": result["movement"],
+            "affect": result["affect"],
+            "amplificationObjects": result["amplificationObjects"] or [],
+            "stage1Model": result["stage1Model"], "stage2Model": result["stage2Model"],
             "artStyle": style_key,
+            "captionCheck": result["captionCheck"],
         }
 
         if render:
@@ -176,10 +170,8 @@ def replay(style_key, days, config, out_dir=None, render=False, quality="medium"
         if out_dir is not None:
             (out_dir / f"{stem}.json").write_text(json.dumps(row, indent=2))
         rows.append(row)
-        history.insert(0, {"register": primary, "secondaryRegister": secondary,
-                           "conceptTags": tags,
-                           "timestamp": datetime.now(timezone.utc).isoformat()})
-        log(f"  {key}  {primary[:22]:22} {row['actorKind']:20} {row['family'][:26]}")
+        history.insert(0, result["historyEntry"])
+        log(f"  {key}  {result['register'][:22]:22} {row['actorKind']:20} {row['family'][:26]}")
     return rows, total
 
 
