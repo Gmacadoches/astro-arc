@@ -104,6 +104,11 @@ class PipelineError(Exception):
 # Chat completion helper — every stage goes through this. The key is fetched fresh (via get_api_key(), a single
 # secret-tool subprocess call) and used only inline in this one header dict;
 # nothing here stores it, logs it, or returns it.
+#
+# This is the OpenAI adapter at the chat seam. Every stage takes `chat=`, any
+# callable with _chat_json's signature returning (json_dict, usage), and falls
+# back to this one when it is None. fallback_audit.py passes a stub there, so a
+# prompts-only run makes no call and writes no usage or capability state.
 # ---------------------------------------------------------------------------
 
 def _chat_json(model, system_prompt, user_prompt, slot, temperature=0.8, stage=None):
@@ -1038,7 +1043,7 @@ Respond with a JSON object with exactly these keys:
 STAGE1_SCHEMA_VERSION = 3
 
 
-def stage1_interpret(reading, stage1_model, period_key, config):
+def stage1_interpret(reading, stage1_model, period_key, config, chat=None):
     """Cached per period_key, but keyed to the birth data too (see
     _natal_hash): regenerating the same day/week/month's image (e.g. while
     comparing style variants) shouldn't re-run Stage 1, but editing the
@@ -1063,7 +1068,7 @@ def stage1_interpret(reading, stage1_model, period_key, config):
     arc = reading["arc"]
     user_prompt = f"Natal: {describe_natal(natal)}.\n{describe_arc(arc)}"
 
-    result, usage = _chat_json(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1", temperature=0.7, stage="stage1")
+    result, usage = (chat or _chat_json)(stage1_model, STAGE1_SYSTEM, user_prompt, "stage1", temperature=0.7, stage="stage1")
     for key in ("reading", "distillation", "narrativePosition"):
         if not result.get(key):
             raise PipelineError(f"Stage 1 response missing '{key}': {result!r}")
@@ -1895,7 +1900,7 @@ def style_has_myth(style_key):
 
 def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=None,
                     avoid_archetypes=None, avoid_kinds=None, style_key=None,
-                    style_world=""):
+                    style_world="", chat=None):
     """The MEANING half of Stage 1.5: constellation, movement, affect, actor and
     actorKind. Split from the material half on 2026-09-26 (see stage15_amplify)
     so that the day's meaning is fixed while its material is not.
@@ -2012,7 +2017,7 @@ def stage15_meaning(stage1_result, model, period_key, config, cache=True, dial=N
             "the constellation from the rest: " + ", ".join(avoid_kinds)
         )
 
-    result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
+    result, usage = (chat or _chat_json)(model, system_prompt, "\n".join(user_lines), "stage1", temperature=0.95, stage="stage15")
 
     for key in ("constellation", "movement", "affect"):
         if not result.get(key):
@@ -2055,7 +2060,7 @@ def load_register_line(style_key, register):
 
 def stage15_material(stage1_result, meaning, model, config, dial=None, style_key=None,
                      style_world="", register=None, secondary_register=None,
-                     avoid_material=None):
+                     avoid_material=None, chat=None):
     """The MATERIAL half of Stage 1.5: objects and the highlight (key
     `anomaly`, see load_style_highlight), built
     from the day's register. Never cached -- every generation, regenerates
@@ -2121,8 +2126,8 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
             + "\n".join(f"  - {m}" for m in avoid_material)
         )
 
-    result, usage = _chat_json(model, system_prompt, "\n".join(user_lines), "stage1",
-                               temperature=0.95, stage="stage15")
+    result, usage = (chat or _chat_json)(model, system_prompt, "\n".join(user_lines), "stage1",
+                                         temperature=0.95, stage="stage15")
     for key in ("objects", "anomaly"):
         if not result.get(key):
             raise PipelineError(f"Stage 1.5 material response missing '{key}': {result!r}")
@@ -2144,7 +2149,7 @@ def stage15_material(stage1_result, meaning, model, config, dial=None, style_key
 def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=None,
                     avoid_archetypes=None, avoid_kinds=None, style_key=None,
                     style_world="", register=None, secondary_register=None, material=True,
-                    avoid_material=None):
+                    avoid_material=None, chat=None):
     """Stage 1.5, both halves: the day's MEANING (cached per period, see
     stage15_meaning) and fresh MATERIAL for this register (never cached, see
     stage15_material), merged into the one dict Stage 2 and the records have
@@ -2158,13 +2163,13 @@ def stage15_amplify(stage1_result, model, period_key, config, cache=True, dial=N
     meaning, meaning_cost = stage15_meaning(
         stage1_result, model, period_key, config, cache=cache, dial=dial,
         avoid_archetypes=avoid_archetypes, avoid_kinds=avoid_kinds,
-        style_key=style_key, style_world=style_world)
+        style_key=style_key, style_world=style_world, chat=chat)
     if not material:
         return meaning, meaning_cost
     mat, material_cost = stage15_material(
         stage1_result, meaning, model, config, dial=dial, style_key=style_key,
         style_world=style_world, register=register, secondary_register=secondary_register,
-        avoid_material=avoid_material)
+        avoid_material=avoid_material, chat=chat)
     cost = (meaning_cost or 0.0) + (material_cost or 0.0)
     return {**meaning, **mat}, cost
 
@@ -2335,7 +2340,7 @@ CAPTION_MODEL = "gpt-4o-mini"
 CAPTION_RESAMPLES = 2
 
 
-def caption_check(prompt, model):
+def caption_check(prompt, model, chat=None):
     """(caption, hits, passed) — would this image be filed under a feeling?
 
     `hits` lists the matched words with their category, so a failure can be
@@ -2347,8 +2352,8 @@ def caption_check(prompt, model):
     render because the cheap check fell over would be a bad trade.
     """
     try:
-        result, _ = _chat_json(model, CAPTION_CHECK_SYSTEM, prompt, "stage2",
-                               temperature=0.0, stage="caption")
+        result, _ = (chat or _chat_json)(model, CAPTION_CHECK_SYSTEM, prompt, "stage2",
+                                         temperature=0.0, stage="caption")
         caption = (result.get("caption") or "").strip()
     except Exception:  # noqa: BLE001 — a failed check must never fail a generation
         return "", [], None
@@ -2399,7 +2404,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
                          style_world=None, secondary_register=None,
                          amplification=None, dial=None, register_guidance=None,
                          style_brief=None, secondary_register_guidance=None,
-                         highlight=None):
+                         highlight=None, chat=None):
     """`amplification` is Stage 1.5's output (see stage15_amplify). It is
     passed last and defaults to None so the function still works without a
     Stage 1.5 result — sweep.py relies on that to produce a pre-Stage-1.5
@@ -2543,7 +2548,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
         brief.append(f"  Light and concealment: {dial['light']}")
     user_lines += brief
 
-    result, usage = _chat_json(stage2_model, stage2_system(), "\n".join(user_lines), "stage2", temperature=0.95, stage="stage2")
+    result, usage = (chat or _chat_json)(stage2_model, stage2_system(), "\n".join(user_lines), "stage2", temperature=0.95, stage="stage2")
     if not result.get("prompt"):
         raise PipelineError(f"Stage 2 response missing 'prompt': {result!r}")
     concept_tags = result.get("conceptTags") or []
@@ -2561,7 +2566,7 @@ def stage2_image_prompt(stage1_result, register, avoid_tags, cliches, stage2_mod
 # Orchestration
 # ---------------------------------------------------------------------------
 
-def build(reading, config):
+def build(reading, config, chat=None):
     stage1_model = config.get("stage1Model") or "gpt-4o-mini"
     stage2_model = config.get("stage2Model") or "gpt-4o-mini"
     style_key = resolve_style_key(config.get("artStyle"))
@@ -2572,7 +2577,7 @@ def build(reading, config):
     # ask for and gets stored in that stage's cache entry.
     dial = dial_from_texture(reading["arc"].get("texture"))
 
-    stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config)
+    stage1, stage1_cost = stage1_interpret(reading, stage1_model, period_key, config, chat=chat)
     # Registers are picked BEFORE Stage 1.5 as of 2026-09-26, because they are
     # now one of its inputs: the material half builds the objects and the
     # anomaly out of the primary register. Picked after, the register could
@@ -2594,7 +2599,7 @@ def build(reading, config):
         stage1, stage1_model, period_key, config, dial=dial,
         style_key=style_key, style_world=style_world,
         register=register, secondary_register=secondary_register,
-        avoid_material=recent_material(history),
+        avoid_material=recent_material(history), chat=chat,
     )
     avoid = avoid_concepts(history)
 
@@ -2620,9 +2625,10 @@ def build(reading, config):
             secondary_register_guidance=load_register_line(style_key, secondary_register),
             style_brief=load_style_brief(style_key),
             highlight=load_style_highlight(style_key),
+            chat=chat,
         )
         stage2_cost += attempt_cost or 0.0
-        caption, hits, passed = caption_check(image_prompt, caption_model)
+        caption, hits, passed = caption_check(image_prompt, caption_model, chat=chat)
         caption_attempts.append({"caption": caption, "hits": hits, "passed": passed})
         if passed is not False:
             break

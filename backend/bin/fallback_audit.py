@@ -77,6 +77,7 @@ class Audit:
         self.fired = defaultdict(lambda: defaultdict(int))  # "symbol: how" -> style -> count
         self.captured = []  # Stage 2 user prompts for the current build()
         self.chat_calls = defaultdict(int)
+        self.chat = None  # the stub chat client, set by install_stubs
 
     def hit(self, symbol, how):
         self.fired[f"{symbol}: {how}"][self.style] += 1
@@ -233,10 +234,14 @@ def install_stubs(state_dir, cache_styles, control_style):
             AUDIT.captured.append(user_prompt)
             AUDIT.stage2_system = system_prompt
         return json.loads(json.dumps(STUB_RESPONSES[stage])), None
-    lp._chat_json = chat
+    # Passed to build() as its chat client: the stub adapter at the chat seam.
+    AUDIT.chat = chat
 
+    # The safety net: if a call ever bypassed the client, it fails loudly here
+    # rather than reaching the network or the keyring.
     def no_network(*_a, **_k):
         raise RuntimeError("fallback_audit: network access attempted")
+    lp._chat_json = no_network
     lp.urllib.request.urlopen = no_network
     lp.open_no_redirect = no_network
     lp.get_api_key = no_network
@@ -329,7 +334,7 @@ def run_style(style_key, registers, out):
                 # build() must refuse it. Recorded in fallbacks.json, not in
                 # prompts.jsonl, which holds only prompts that were sent.
                 try:
-                    lp.build(reading, config)
+                    lp.build(reading, config, chat=AUDIT.chat)
                 except lp.PipelineError:
                     AUDIT.hit("dial_from_texture", "refused a reading with no texture")
                     continue
@@ -338,7 +343,7 @@ def run_style(style_key, registers, out):
                 # Since charter-required, an unchartered style must be refused
                 # before anything is billed. That refusal is the control.
                 try:
-                    lp.build(reading, config)
+                    lp.build(reading, config, chat=AUDIT.chat)
                 except lp.PipelineError as exc:
                     AUDIT.hit("require_charter", "refused the unchartered control")
                     out.write(json.dumps({"style": style_key, "cell": cell_name, "primary": primary,
@@ -346,7 +351,7 @@ def run_style(style_key, registers, out):
                                          sort_keys=True, ensure_ascii=False) + "\n")
                     continue
                 raise SystemExit("the unchartered control was not refused")
-            lp.build(reading, config)
+            lp.build(reading, config, chat=AUDIT.chat)
             if len(AUDIT.captured) != 1:
                 raise SystemExit(f"{style_key} {cell_name}: expected one Stage 2 call, "
                                  f"got {len(AUDIT.captured)}")
