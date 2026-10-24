@@ -1,312 +1,350 @@
-#!/bin/bash
+#!/usr/bin/env python3
+"""Owns reads/writes of Astro-Arc's user config at
+~/.local/state/omarchy/settings/astro-arc.json. Mirrors the
+omarchy-weather-location convention: a small script is the only writer.
+The panel watches the file and reads it back through this script, so it
+sees what every other reader sees.
 
-# Owns reads/writes of Astro-Arc's user config at
-# ~/.local/state/omarchy/settings/astro-arc.json. Mirrors the
-# omarchy-weather-location convention: a small script is the only writer,
-# the Quickshell panel reads it back via a watched FileView.
-#
-#   (no args)                             print the current config as JSON
-#                                          (defaults filled in for anything unset)
-#   --set-birth <YYYY-MM-DD> <HH:MM|unknown>
-#                                          set birth date, and either a 24h
-#                                          birth time or the literal "unknown"
-#   --set-location <name> [lat,lon] [tz]  store a location; coordinates are
-#                                          optional but required for house/
-#                                          ascendant precision later. tz is the
-#                                          IANA zone of the place (e.g.
-#                                          America/Chicago), which the location
-#                                          picker gets from the geocoder; the
-#                                          birth time is local to it
-#   --set-timezone <tz>                   set only the birth place's IANA zone
-#                                          (astro-arc-generate fills it in once
-#                                          for configs saved before it existed)
-#   --clear-location                      unset the location
-#   --set-frequency <hourly|daily|weekly|monthly|manual>
-#                                          "manual" means never generate on a
-#                                          schedule; the Regenerate button still
-#                                          works. Nothing else changes — a manual
-#                                          run is keyed by local date, same as daily.
-#   --set-interval-hours <1|2|3|4|6|8|12>  hours between runs when the frequency
-#                                          is hourly; ignored otherwise. Divisors
-#                                          of 24 only, see period_key.py
-#   --set-image-backend <local|openai>    which generator astro-arc-generate uses
-#   --set-openai-model <model> <quality>  IMAGE model id + quality tier ("" if n/a)
-#   --set-stage1-model <model>            chat model for Stage 1 (llm_pipeline.py's
-#                                          chart -> psychological reading)
-#   --set-stage2-model <model>            chat model for Stage 2 (llm_pipeline.py's
-#                                          reading -> image prompt + concept tags)
-#   --set-background-size <auto|WxH>      target background resolution; "auto"
-#                                          detects the focused monitor at
-#                                          generation time (see
-#                                          astro-arc-detect-resolution)
-#   --set-art-style <key>                 which theme (pipeline/styles/<key>.toml or a user theme)
-#                                          Stage 2's prompt is suffixed with
-#   --set-provider <openai|openrouter>     which AI provider everything else is
-#                                          scoped to — the key you paste, which
-#                                          models are offered, what they cost.
-#                                          Changing it also moves all four model
-#                                          settings to the new provider's
-#                                          recommended preset, since a model id
-#                                          from one ("gpt-4.1") is not a valid
-#                                          id on the other ("openai/gpt-4.1").
-#                                          Supersedes imageBackend, which is kept
-#                                          only so an existing config that says
-#                                          "local" still reaches the local
-#                                          Stable Diffusion path (no longer
-#                                          offered in the UI).
-#   --set-models <stage1> <stage2> <image-model> <image-quality> [reasoning]
-#                                          all four model settings in ONE write,
-#                                          plus the chat reasoning effort when
-#                                          the preset names one (OpenRouter).
-#                                          Used by the widget's quality-preset
-#                                          picker: writing them separately would
-#                                          leave the config in states that match
-#                                          no preset, so the picker would flicker
-#                                          through "Custom" on its way to the
-#                                          tier you actually chose.
-#   --set-max-cost-per-image <N>           most this install will spend on ONE
-#                                          image render, in dollars. 0 means no
-#                                          ceiling. Hides models above it from
-#                                          the image picker; only compares
-#                                          against MEASURED costs, so a model
-#                                          that has never been rendered has no
-#                                          cost to check and is never silently
-#                                          blocked.
-#   --set-background-only <true|false>    true: each generation changes only the
-#                                          wallpaper (omarchy-theme-bg-set) and
-#                                          leaves the current theme's colors
-#                                          alone. false: it also applies the
-#                                          derived palette as the astro-arc
-#                                          theme. Default true — most people
-#                                          already have a theme they chose.
-#   --set-animated-background <true|false>
-#                                          whether the solar system behind the
-#                                          panel moves (true, the default) or is
-#                                          drawn still. The panel's look only;
-#                                          nothing in the pipeline reads it.
-#   --set-theme-generator <built-in|aether>
-#                                          how colors.toml/icons.theme get
-#                                          derived from the rendered image:
-#                                          "built-in" is palette_extract.py
-#                                          (default, no external dependency);
-#                                          "aether" shells out to Omarchy's
-#                                          own Aether theme generator for a
-#                                          richer output, falling back to
-#                                          built-in automatically if aether
-#                                          is missing or fails
-#   --set-history-retention-days <N>      how many days of "Themes Generated"
-#                                          entries astro-arc-generate keeps
-#                                          before astro-arc-prune-history
-#                                          deletes them (default 30). Never
-#                                          affects a theme saved via
-#                                          astro-arc-save-theme — that's a
-#                                          separate, permanent copy.
-#
-# Stage 1 and Stage 2 are separately configurable — and use separately
-# stored API keys, see astro-arc-apikey — since they're different tasks
-# that may call for different models/accounts. Neither is the same
-# setting as the image-rendering model above: that one picks which OpenAI
-# image model paints the final picture; these two pick which chat model
-# does the interpretation and the prompt-writing that precede it.
-#
-# The OpenAI API keys themselves are NEVER stored here or anywhere in this
-# file — see astro-arc-apikey, which stores them only via secret-tool
-# (libsecret), one per stage.
+What each key is, its default and what it may hold live in
+backend/pipeline/settings.toml (see settings.py); this script adds the
+flags that set them. It was a shell script until 2026-10-24 and keeps that
+script's flags, messages, exit codes and output byte for byte.
 
-set -euo pipefail
+  (no args)                             print the current config as JSON
+                                         (defaults filled in for anything unset,
+                                         and for anything that does not fit
+                                         its key, with a warning)
+  --resolved                            the same, as a run uses it: "" image
+                                         model and quality resolved to the
+                                         provider's (settings.load)
+  --set-birth <YYYY-MM-DD> <HH:MM|unknown>
+                                         set birth date, and either a 24h
+                                         birth time or the literal "unknown"
+  --set-location <name> [lat,lon] [tz]  store a location; coordinates are
+                                         optional but required for house/
+                                         ascendant precision later. tz is the
+                                         IANA zone of the place (e.g.
+                                         America/Chicago), which the location
+                                         picker gets from the geocoder; the
+                                         birth time is local to it
+  --set-timezone <tz>                   set only the birth place's IANA zone
+                                         (astro-arc-generate fills it in once
+                                         for configs saved before it existed)
+  --clear-location                      unset the location
+  --set-frequency <hourly|daily|weekly|monthly|manual>
+                                         "manual" means never generate on a
+                                         schedule; the Regenerate button still
+                                         works. Nothing else changes — a manual
+                                         run is keyed by local date, same as daily.
+  --set-interval-hours <1|2|3|4|6|8|12>  hours between runs when the frequency
+                                         is hourly; ignored otherwise. Divisors
+                                         of 24 only, see period_key.py
+  --set-image-backend <local|openai>    which generator astro-arc-generate uses
+  --set-openai-model <model> <quality>  IMAGE model id + quality tier ("" if n/a)
+  --set-stage1-model <model>            chat model for Stage 1 (llm_pipeline.py's
+                                         chart -> psychological reading)
+  --set-stage2-model <model>            chat model for Stage 2 (llm_pipeline.py's
+                                         reading -> image prompt + concept tags)
+  --set-background-size <auto|WxH>      target background resolution; "auto"
+                                         detects the focused monitor at
+                                         generation time (see
+                                         astro-arc-detect-resolution)
+  --set-art-style <key>                 which theme (pipeline/styles/<key>.toml or a user theme)
+                                         Stage 2's prompt is suffixed with
+  --set-provider <openai|openrouter>     which AI provider everything else is
+                                         scoped to — the key you paste, which
+                                         models are offered, what they cost.
+                                         Changing it also moves all four model
+                                         settings to the new provider's
+                                         recommended preset, since a model id
+                                         from one ("gpt-4.1") is not a valid
+                                         id on the other ("openai/gpt-4.1").
+                                         Supersedes imageBackend, which is kept
+                                         only so an existing config that says
+                                         "local" still reaches the local
+                                         Stable Diffusion path (no longer
+                                         offered in the UI).
+  --set-models <stage1> <stage2> <image-model> <image-quality> [reasoning]
+                                         all four model settings in ONE write,
+                                         plus the chat reasoning effort when
+                                         the preset names one (OpenRouter).
+                                         Used by the widget's quality-preset
+                                         picker: writing them separately would
+                                         leave the config in states that match
+                                         no preset, so the picker would flicker
+                                         through "Custom" on its way to the
+                                         tier you actually chose.
+  --set-max-cost-per-image <N>           most this install will spend on ONE
+                                         image render, in dollars. 0 means no
+                                         ceiling. Hides models above it from
+                                         the image picker; only compares
+                                         against MEASURED costs, so a model
+                                         that has never been rendered has no
+                                         cost to check and is never silently
+                                         blocked.
+  --set-background-only <true|false>    true: each generation changes only the
+                                         wallpaper (omarchy-theme-bg-set) and
+                                         leaves the current theme's colors
+                                         alone. false: it also applies the
+                                         derived palette as the astro-arc
+                                         theme. Default true — most people
+                                         already have a theme they chose.
+  --set-animated-background <true|false>
+                                         whether the solar system behind the
+                                         panel moves (true, the default) or is
+                                         drawn still. The panel's look only;
+                                         nothing in the pipeline reads it.
+  --set-theme-generator <built-in|aether>
+                                         how colors.toml/icons.theme get
+                                         derived from the rendered image:
+                                         "built-in" is palette_extract.py
+                                         (default, no external dependency);
+                                         "aether" shells out to Omarchy's
+                                         own Aether theme generator for a
+                                         richer output, falling back to
+                                         built-in automatically if aether
+                                         is missing or fails
+  --set-history-retention-days <N>      how many days of "Themes Generated"
+                                         entries astro-arc-generate keeps
+                                         before astro-arc-prune-history
+                                         deletes them (default 30). Never
+                                         affects a theme saved via
+                                         astro-arc-save-theme — that's a
+                                         separate, permanent copy.
 
-BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=astro-arc-paths.sh
-source "$BIN_DIR/astro-arc-paths.sh"   # CONFIG_FILE
-# frequency defaults to "manual": a fresh install generates nothing until it is
-# asked to. Every generation spends real money on an image API, so the cadence
-# that costs nothing is the only one safe to choose on a new user's behalf.
-# A frequency already written to CONFIG_FILE still wins — these are only the
-# values a missing key falls back to (see the jq merge in read_config).
-DEFAULTS='{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,"longitude":null,"timezone":"","frequency":"manual","intervalHours":1,"imageBackend":"openai","openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini","backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","backgroundOnly":true,"animatedBackground":true,"historyRetentionDays":30,"maxCostPerImage":0,"provider":"openai","chatReasoning":"default"}'
-COORDS_PATTERN='^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$'
+Stage 1 and Stage 2 are separately configurable — and use separately
+stored API keys, see astro-arc-apikey — since they're different tasks
+that may call for different models/accounts. Neither is the same
+setting as the image-rendering model above: that one picks which OpenAI
+image model paints the final picture; these two pick which chat model
+does the interpretation and the prompt-writing that precede it.
+
+The OpenAI API keys themselves are NEVER stored here or anywhere in this
+file — see astro-arc-apikey, which stores them only via secret-tool
+(libsecret), one per stage.
+"""
+
+import sys
+from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import settings  # noqa: E402
+from paths import CONFIG_FILE  # noqa: E402
+
+import re  # noqa: E402
+
+COORDS_PATTERN = re.compile(r"^-?[0-9]+(\.[0-9]+)?,-?[0-9]+(\.[0-9]+)?$")
 # IANA zone names: Area/Location[/Sub], plus the bare ones like UTC. Letters,
-# digits, _ + - only, so nothing a shell or jq could read as syntax.
-TZ_PATTERN='^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
-TIME_PATTERN='^([01][0-9]|2[0-3]):[0-5][0-9]$'
-DATE_PATTERN='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
-SIZE_PATTERN='^[0-9]{2,5}x[0-9]{2,5}$'
-REASONING_PATTERN='^(default|none|minimal|low|medium|high)$'
+# digits, _ + - only.
+TZ_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$")
+TIME_PATTERN = re.compile(r"^([01][0-9]|2[0-3]):[0-5][0-9]$")
+DATE_PATTERN = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+REASONING = ("default", "none", "minimal", "low", "medium", "high")
 
-read_config() {
-  if [[ -f $CONFIG_FILE ]]; then
-    jq -s '.[0] * .[1]' <(echo "$DEFAULTS") "$CONFIG_FILE" 2>/dev/null || echo "$DEFAULTS"
-  else
-    echo "$DEFAULTS"
-  fi
-}
+USAGE = ("Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon] [timezone]"
+         "|--set-timezone <tz>|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>"
+         "|--set-interval-hours <1|2|3|4|6|8|12>|--set-image-backend <local|openai>"
+         "|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>"
+         "|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>"
+         "|--set-background-only <true|false>|--set-animated-background <true|false>"
+         "|--set-history-retention-days <N>]")
 
-write_config() {
-  mkdir -p "$(dirname "$CONFIG_FILE")"
-  echo "$1" >"$CONFIG_FILE"
-}
 
-case "${1:-}" in
-"")
-  read_config
-  ;;
---set-birth)
-  [[ -n ${2:-} && -n ${3:-} ]] || { echo "Usage: astro-arc-config --set-birth <YYYY-MM-DD> <HH:MM|unknown>" >&2; exit 1; }
-  [[ $2 =~ $DATE_PATTERN ]] || { echo "Invalid date: $2 (expected YYYY-MM-DD)" >&2; exit 1; }
-  date -d "$2" >/dev/null 2>&1 || { echo "Invalid date: $2 (not a real calendar date)" >&2; exit 1; }
-  current=$(read_config)
-  if [[ $3 == "unknown" ]]; then
-    updated=$(jq --arg d "$2" '.birthDate=$d | .birthTime="" | .birthTimeUnknown=true' <<<"$current")
-  else
-    [[ $3 =~ $TIME_PATTERN ]] || { echo "Invalid time: $3 (expected HH:MM, 24h, or \"unknown\")" >&2; exit 1; }
-    updated=$(jq --arg d "$2" --arg t "$3" '.birthDate=$d | .birthTime=$t | .birthTimeUnknown=false' <<<"$current")
-  fi
-  write_config "$updated"
-  ;;
---set-location)
-  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-location <name> [lat,lon] [timezone]" >&2; exit 1; }
-  [[ -z ${4:-} || ${4:-} =~ $TZ_PATTERN ]] || { echo "Invalid timezone: $4 (expected an IANA name like America/Chicago)" >&2; exit 1; }
-  current=$(read_config)
-  if [[ -n ${3:-} ]]; then
-    [[ $3 =~ $COORDS_PATTERN ]] || { echo "Invalid coordinates: $3 (expected lat,lon)" >&2; exit 1; }
-    lat=${3%,*}; lon=${3#*,}
-    updated=$(jq --arg n "$2" --argjson lat "$lat" --argjson lon "$lon" --arg tz "${4:-}" \
-      '.locationName=$n | .latitude=$lat | .longitude=$lon | .timezone=$tz' <<<"$current")
-  else
-    updated=$(jq --arg n "$2" '.locationName=$n | .latitude=null | .longitude=null | .timezone=""' <<<"$current")
-  fi
-  write_config "$updated"
-  ;;
---set-timezone)
-  [[ ${2:-} =~ $TZ_PATTERN ]] || { echo "Usage: astro-arc-config --set-timezone <IANA name, e.g. America/Chicago>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg tz "$2" '.timezone=$tz' <<<"$current")
-  write_config "$updated"
-  ;;
---clear-location)
-  current=$(read_config)
-  updated=$(jq '.locationName="" | .latitude=null | .longitude=null | .timezone=""' <<<"$current")
-  write_config "$updated"
-  ;;
---set-frequency)
-  [[ ${2:-} =~ ^(hourly|daily|weekly|monthly|manual)$ ]] || { echo "Usage: astro-arc-config --set-frequency <hourly|daily|weekly|monthly|manual>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg f "$2" '.frequency=$f' <<<"$current")
-  write_config "$updated"
-  ;;
---set-interval-hours)
-  [[ ${2:-} =~ ^(1|2|3|4|6|8|12)$ ]] || { echo "Usage: astro-arc-config --set-interval-hours <1|2|3|4|6|8|12>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --argjson n "$2" '.intervalHours=$n' <<<"$current")
-  write_config "$updated"
-  ;;
---set-image-backend)
-  [[ ${2:-} =~ ^(local|openai)$ ]] || { echo "Usage: astro-arc-config --set-image-backend <local|openai>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg b "$2" '.imageBackend=$b' <<<"$current")
-  write_config "$updated"
-  ;;
---set-openai-model)
-  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-openai-model <model> [quality]" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg m "$2" --arg q "${3:-}" '.openaiModel=$m | .openaiQuality=$q' <<<"$current")
-  write_config "$updated"
-  ;;
---set-stage1-model)
-  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-stage1-model <model>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg m "$2" '.stage1Model=$m' <<<"$current")
-  write_config "$updated"
-  ;;
---set-stage2-model)
-  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-stage2-model <model>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg m "$2" '.stage2Model=$m' <<<"$current")
-  write_config "$updated"
-  ;;
---set-background-size)
-  [[ ${2:-} == "auto" || ${2:-} =~ $SIZE_PATTERN ]] || { echo "Usage: astro-arc-config --set-background-size <auto|WIDTHxHEIGHT>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg s "$2" '.backgroundSize=$s' <<<"$current")
-  write_config "$updated"
-  ;;
---set-art-style)
-  [[ -n ${2:-} ]] || { echo "Usage: astro-arc-config --set-art-style <key>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg s "$2" '.artStyle=$s' <<<"$current")
-  write_config "$updated"
-  ;;
---set-provider)
-  [[ ${2:-} =~ ^(openai|openrouter)$ ]] || { echo "Usage: astro-arc-config --set-provider <openai|openrouter>" >&2; exit 1; }
-  current=$(read_config)
-  if [[ $(jq -r '.provider // "openai"' <<<"$current") == "$2" ]]; then
-    exit 0
-  fi
-  # The outgoing provider's four models are parked under providerModels and
-  # the incoming one's restored, so a round trip lands where it started. A
-  # provider never used before gets its recommended preset, read from
-  # model-rates.toml so the tiers live in one place. If that fails the models
-  # are blanked, and every reader falls back to the provider's own default
-  # (providers.py).
-  preset=$(ASTRO_ARC_PROVIDER="$2" python3 "$(dirname "$0")/model_catalog.py" --preset high 2>/dev/null || echo '{}')
-  updated=$(jq --arg p "$2" --argjson preset "$preset" \
-    '(.provider // "openai") as $old
-     | .providerModels[$old] = {stage1Model, stage2Model, openaiModel, openaiQuality, chatReasoning}
-     | (.providerModels[$p] // {
-         stage1Model: ($preset.chat // ""), stage2Model: ($preset.chat // ""),
-         openaiModel: ($preset.image // ""), openaiQuality: ($preset.quality // ""),
-         chatReasoning: ($preset.reasoning // "default")
-       }) as $next
-     | .provider=$p | . * $next' <<<"$current")
-  write_config "$updated"
-  ;;
---set-models)
-  [[ -n ${2:-} && -n ${3:-} && -n ${4:-} && -n ${5:-} ]] || { echo "Usage: astro-arc-config --set-models <stage1> <stage2> <image-model> <image-quality> [reasoning]" >&2; exit 1; }
-  [[ ${6:-default} =~ $REASONING_PATTERN ]] || { echo "Invalid reasoning effort: $6" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg a "$2" --arg b "$3" --arg c "$4" --arg d "$5" --arg r "${6:-default}" \
-    '.stage1Model=$a | .stage2Model=$b | .openaiModel=$c | .openaiQuality=$d | .chatReasoning=$r' <<<"$current")
-  write_config "$updated"
-  ;;
-# How hard OpenRouter's thinking models think. See providers.py.
---set-chat-reasoning)
-  [[ ${2:-} =~ $REASONING_PATTERN ]] || { echo "Usage: astro-arc-config --set-chat-reasoning <default|none|minimal|low|medium|high>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg r "$2" '.chatReasoning=$r' <<<"$current")
-  write_config "$updated"
-  ;;
---set-max-cost-per-image)
-  [[ ${2:-} =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "Usage: astro-arc-config --set-max-cost-per-image <N> (dollars, 0 = no ceiling)" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --argjson c "$2" '.maxCostPerImage=$c' <<<"$current")
-  write_config "$updated"
-  ;;
---set-theme-generator)
-  [[ ${2:-} =~ ^(built-in|aether)$ ]] || { echo "Usage: astro-arc-config --set-theme-generator <built-in|aether>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --arg g "$2" '.themeGenerator=$g' <<<"$current")
-  write_config "$updated"
-  ;;
---set-background-only)
-  [[ ${2:-} =~ ^(true|false)$ ]] || { echo "Usage: astro-arc-config --set-background-only <true|false>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --argjson b "$2" '.backgroundOnly=$b' <<<"$current")
-  write_config "$updated"
-  ;;
---set-animated-background)
-  [[ ${2:-} =~ ^(true|false)$ ]] || { echo "Usage: astro-arc-config --set-animated-background <true|false>" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --argjson b "$2" '.animatedBackground=$b' <<<"$current")
-  write_config "$updated"
-  ;;
---set-history-retention-days)
-  [[ ${2:-} =~ ^[0-9]+$ && ${2:-0} -ge 1 && ${2:-0} -le 3650 ]] || { echo "Usage: astro-arc-config --set-history-retention-days <N> (1-3650)" >&2; exit 1; }
-  current=$(read_config)
-  updated=$(jq --argjson d "$2" '.historyRetentionDays=$d' <<<"$current")
-  write_config "$updated"
-  ;;
-*)
-  echo "Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-location <name> [lat,lon] [timezone]|--set-timezone <tz>|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>|--set-interval-hours <1|2|3|4|6|8|12>|--set-image-backend <local|openai>|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>|--set-background-only <true|false>|--set-animated-background <true|false>|--set-history-retention-days <N>]" >&2
-  exit 1
-  ;;
-esac
+class Refused(Exception):
+    """A message for stderr and exit status 1, written exactly as the shell
+    script wrote it."""
+
+
+def need(ok, message):
+    if not ok:
+        raise Refused(message)
+
+
+def current():
+    """The config every write starts from: the stored one, defaulted and
+    cleaned, numbers kept as written."""
+    return settings.read(keep_numbers=True)
+
+
+def write(config):
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_FILE.write_text(settings.dumps(config) + "\n")
+
+
+def show():
+    """The config as the shell script printed it: jq's pretty output for a
+    readable file, the defaults on one line for a missing or unreadable one."""
+    try:
+        data = settings.parse(CONFIG_FILE.read_text(), keep_numbers=True)
+    except OSError:
+        data = None
+    if data is None:
+        return settings.dumps(settings.defaults(), indent=None)
+    return settings.dumps(settings.clean(data))
+
+
+def real_date(text):
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+        return True
+    except ValueError:
+        return False
+
+
+def high_preset(provider):
+    """The provider's High preset from model-rates.toml, as the shell
+    script's `model_catalog.py --preset high` printed it; {} if unreadable."""
+    try:
+        import model_catalog  # noqa: PLC0415
+
+        row = (model_catalog.load_rates(provider).get("presets") or {}).get("high") or {}
+        return {k: row[k] for k in ("chat", "image", "quality", "reasoning") if row.get(k)}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def run(args):
+    flag = args[0] if args else ""
+    arg = lambda i: args[i] if len(args) > i else ""  # noqa: E731
+
+    if flag == "":
+        print(show())
+        return
+    if flag == "--resolved":
+        print(settings.dumps(settings.load()))
+        return
+
+    config = None
+    if flag == "--set-birth":
+        need(arg(1) and arg(2), "Usage: astro-arc-config --set-birth <YYYY-MM-DD> <HH:MM|unknown>")
+        need(DATE_PATTERN.match(arg(1)), f"Invalid date: {arg(1)} (expected YYYY-MM-DD)")
+        need(real_date(arg(1)), f"Invalid date: {arg(1)} (not a real calendar date)")
+        config = current()
+        if arg(2) == "unknown":
+            config.update(birthDate=arg(1), birthTime="", birthTimeUnknown=True)
+        else:
+            need(TIME_PATTERN.match(arg(2)), f'Invalid time: {arg(2)} (expected HH:MM, 24h, or "unknown")')
+            config.update(birthDate=arg(1), birthTime=arg(2), birthTimeUnknown=False)
+    elif flag == "--set-location":
+        need(arg(1), "Usage: astro-arc-config --set-location <name> [lat,lon] [timezone]")
+        need(not arg(3) or TZ_PATTERN.match(arg(3)),
+             f"Invalid timezone: {arg(3)} (expected an IANA name like America/Chicago)")
+        config = current()
+        if arg(2):
+            need(COORDS_PATTERN.match(arg(2)), f"Invalid coordinates: {arg(2)} (expected lat,lon)")
+            lat, lon = arg(2).rsplit(",", 1)[0], arg(2).split(",", 1)[1]
+            config.update(locationName=arg(1), latitude=settings.Number(lat),
+                          longitude=settings.Number(lon), timezone=arg(3))
+        else:
+            config.update(locationName=arg(1), latitude=None, longitude=None, timezone="")
+    elif flag == "--set-timezone":
+        need(TZ_PATTERN.match(arg(1)), "Usage: astro-arc-config --set-timezone <IANA name, e.g. America/Chicago>")
+        config = current()
+        config["timezone"] = arg(1)
+    elif flag == "--clear-location":
+        config = current()
+        config.update(locationName="", latitude=None, longitude=None, timezone="")
+    elif flag == "--set-frequency":
+        need(arg(1) in ("hourly", "daily", "weekly", "monthly", "manual"),
+             "Usage: astro-arc-config --set-frequency <hourly|daily|weekly|monthly|manual>")
+        config = current()
+        config["frequency"] = arg(1)
+    elif flag == "--set-interval-hours":
+        need(arg(1) in ("1", "2", "3", "4", "6", "8", "12"),
+             "Usage: astro-arc-config --set-interval-hours <1|2|3|4|6|8|12>")
+        config = current()
+        config["intervalHours"] = settings.Number(arg(1))
+    elif flag == "--set-image-backend":
+        need(arg(1) in ("local", "openai"), "Usage: astro-arc-config --set-image-backend <local|openai>")
+        config = current()
+        config["imageBackend"] = arg(1)
+    elif flag == "--set-openai-model":
+        need(arg(1), "Usage: astro-arc-config --set-openai-model <model> [quality]")
+        config = current()
+        config.update(openaiModel=arg(1), openaiQuality=arg(2))
+    elif flag in ("--set-stage1-model", "--set-stage2-model"):
+        need(arg(1), f"Usage: astro-arc-config {flag} <model>")
+        config = current()
+        config["stage1Model" if flag == "--set-stage1-model" else "stage2Model"] = arg(1)
+    elif flag == "--set-background-size":
+        need(arg(1) == "auto" or settings.SIZE_PATTERN.match(arg(1)),
+             "Usage: astro-arc-config --set-background-size <auto|WIDTHxHEIGHT>")
+        config = current()
+        config["backgroundSize"] = arg(1)
+    elif flag == "--set-art-style":
+        need(arg(1), "Usage: astro-arc-config --set-art-style <key>")
+        config = current()
+        config["artStyle"] = arg(1)
+    elif flag == "--set-provider":
+        need(arg(1) in ("openai", "openrouter"), "Usage: astro-arc-config --set-provider <openai|openrouter>")
+        config = current()
+        old = config.get("provider") or "openai"
+        if old == arg(1):
+            return
+        # The outgoing provider's four models are parked under providerModels
+        # and the incoming one's restored, so a round trip lands where it
+        # started. A provider never used before gets its recommended preset,
+        # read from model-rates.toml so the tiers live in one place. If that
+        # fails the models are blanked, and every reader falls back to the
+        # provider's own default (settings.toml's [providers]).
+        parked = config.get("providerModels")
+        parked = dict(parked) if isinstance(parked, dict) else {}
+        parked[old] = {k: config.get(k) for k in
+                       ("stage1Model", "stage2Model", "openaiModel", "openaiQuality", "chatReasoning")}
+        config["providerModels"] = parked
+        incoming = parked.get(arg(1))
+        if incoming is None or incoming is False:
+            preset = high_preset(arg(1))
+            incoming = {"stage1Model": preset.get("chat") or "", "stage2Model": preset.get("chat") or "",
+                        "openaiModel": preset.get("image") or "", "openaiQuality": preset.get("quality") or "",
+                        "chatReasoning": preset.get("reasoning") or "default"}
+        config["provider"] = arg(1)
+        config = settings._merge(config, incoming) if isinstance(incoming, dict) else config
+    elif flag == "--set-models":
+        need(arg(1) and arg(2) and arg(3) and arg(4),
+             "Usage: astro-arc-config --set-models <stage1> <stage2> <image-model> <image-quality> [reasoning]")
+        reasoning = arg(5) or "default"
+        need(reasoning in REASONING, f"Invalid reasoning effort: {arg(5)}")
+        config = current()
+        config.update(stage1Model=arg(1), stage2Model=arg(2), openaiModel=arg(3), openaiQuality=arg(4),
+                      chatReasoning=reasoning)
+    # How hard OpenRouter's thinking models think. See providers.py.
+    elif flag == "--set-chat-reasoning":
+        need(arg(1) in REASONING,
+             "Usage: astro-arc-config --set-chat-reasoning <default|none|minimal|low|medium|high>")
+        config = current()
+        config["chatReasoning"] = arg(1)
+    elif flag == "--set-max-cost-per-image":
+        need(re.fullmatch(r"[0-9]+(\.[0-9]+)?", arg(1)),
+             "Usage: astro-arc-config --set-max-cost-per-image <N> (dollars, 0 = no ceiling)")
+        config = current()
+        config["maxCostPerImage"] = settings.Number(arg(1))
+    elif flag == "--set-theme-generator":
+        need(arg(1) in ("built-in", "aether"), "Usage: astro-arc-config --set-theme-generator <built-in|aether>")
+        config = current()
+        config["themeGenerator"] = arg(1)
+    elif flag in ("--set-background-only", "--set-animated-background"):
+        need(arg(1) in ("true", "false"), f"Usage: astro-arc-config {flag} <true|false>")
+        config = current()
+        config["backgroundOnly" if flag == "--set-background-only" else "animatedBackground"] = arg(1) == "true"
+    elif flag == "--set-history-retention-days":
+        need(re.fullmatch(r"[0-9]+", arg(1)) and 1 <= int(arg(1)) <= 3650,
+             "Usage: astro-arc-config --set-history-retention-days <N> (1-3650)")
+        config = current()
+        config["historyRetentionDays"] = settings.Number(str(int(arg(1))))
+    else:
+        raise Refused(USAGE)
+    write(config)
+
+
+def main():
+    try:
+        run(sys.argv[1:])
+    except Refused as exc:
+        print(exc, file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

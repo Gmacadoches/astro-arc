@@ -1,0 +1,171 @@
+# Every Astro-Arc setting, once: its type, its default, what it may hold.
+#
+# settings.py reads this and is the only thing that does. astro-arc-config
+# (the one writer of the settings file) prints the config through it, the
+# panel reads astro-arc-config's output, and the pipeline calls
+# settings.load(). Adding a setting is one table here, plus its
+# `--set-...` flag in astro-arc-config.
+#
+# Reading the file, a missing key takes its default and a value that does not
+# fit its type takes its default too, with a warning, the same way for every
+# reader. Keys this file does not name (providerModels, captionModel) pass
+# through untouched.
+#
+# Types:
+#   string     any text
+#   nonempty   any text but "" ("" means the default)
+#   bool       true or false
+#   enum       one of `values`
+#   int        a whole number from `min` to `max`
+#   number     a number, at least `min`
+#   coordinate a number, or null when unset (its default; TOML has no null)
+#   size       "auto" or WIDTHxHEIGHT
+#
+# A default of "provider.chat", "provider.image" or "provider.quality" is the
+# [providers.<name>] value for the config's provider. `empty` names what ""
+# means for a key that may be left empty: settings.load() puts it in, while
+# the stored and printed config keeps the "".
+#
+# The table order is the order astro-arc-config prints the keys in.
+
+[providers.openai]
+chat = "gpt-4o-mini"
+image = "gpt-image-1-mini"
+quality = "medium"
+
+[providers.openrouter]
+chat = "openai/gpt-4o-mini"
+image = "openai/gpt-image-1-mini"
+quality = "medium"
+
+[keys.birthDate]
+type = "string"
+default = ""
+description = "Birth date, YYYY-MM-DD"
+
+[keys.birthTime]
+type = "string"
+default = ""
+description = "Birth time, 24h HH:MM local to the birth place, or \"\" when unknown"
+
+[keys.birthTimeUnknown]
+type = "bool"
+default = false
+description = "The birth time is not known"
+
+[keys.locationName]
+type = "string"
+default = ""
+description = "Birth place, as named"
+
+[keys.latitude]
+type = "coordinate"
+description = "Birth place latitude"
+
+[keys.longitude]
+type = "coordinate"
+description = "Birth place longitude"
+
+[keys.timezone]
+type = "string"
+default = ""
+description = "The birth place's IANA zone; the birth time is local to it"
+
+# "manual": a fresh install generates nothing until it is asked to. Every
+# generation spends real money on an image API, so the cadence that costs
+# nothing is the only one safe to choose on a new user's behalf.
+[keys.frequency]
+type = "enum"
+values = ["hourly", "daily", "weekly", "monthly", "manual"]
+default = "manual"
+description = "How often a new wallpaper is generated"
+
+[keys.intervalHours]
+type = "enum"
+values = [1, 2, 3, 4, 6, 8, 12]
+default = 1
+description = "Hours between runs when the frequency is hourly; divisors of 24 only"
+
+# The legacy key `provider` superseded. Kept so a config that still says
+# "local" is refused with a clear message by astro-arc-generate.
+[keys.imageBackend]
+type = "enum"
+values = ["openai", "local"]
+default = "openai"
+description = "Legacy image backend"
+
+[keys.openaiModel]
+type = "string"
+default = ""
+empty = "provider.image"
+description = "Image model id; \"\" is the provider's default"
+
+[keys.openaiQuality]
+type = "string"
+default = ""
+empty = "provider.quality"
+description = "Image quality tier; \"\" is the provider's default"
+
+[keys.stage1Model]
+type = "nonempty"
+default = "provider.chat"
+description = "Chat model for Stage 1 and Stage 1.5"
+
+[keys.stage2Model]
+type = "nonempty"
+default = "provider.chat"
+description = "Chat model for Stage 2"
+
+[keys.backgroundSize]
+type = "size"
+default = "auto"
+description = "Wallpaper size; \"auto\" detects the focused monitor at generation time"
+
+[keys.artStyle]
+type = "nonempty"
+default = "symbolist"
+description = "Theme key (pipeline/styles/<key>.toml or a user theme)"
+
+[keys.themeGenerator]
+type = "enum"
+values = ["built-in", "aether"]
+default = "built-in"
+description = "How the theme's colors are derived from the image"
+
+# true: change only the wallpaper. Most people already run a theme they chose;
+# repainting all of it every day is the opt-in, not the default.
+[keys.backgroundOnly]
+type = "bool"
+default = true
+description = "Change only the wallpaper, not the theme's colors"
+
+[keys.animatedBackground]
+type = "bool"
+default = true
+description = "Whether the solar system behind the panel moves"
+
+[keys.historyRetentionDays]
+type = "int"
+min = 1
+max = 3650
+default = 30
+description = "Days of Themes Generated entries kept"
+
+[keys.maxCostPerImage]
+type = "number"
+min = 0
+default = 0
+description = "Most one image render may cost, in dollars; 0 is no ceiling"
+
+[keys.provider]
+type = "enum"
+values = ["openai", "openrouter"]
+default = "openai"
+description = "Which AI provider every call goes to"
+
+# How hard OpenRouter's thinking models think (see providers.py).
+[keys.chatReasoning]
+type = "enum"
+values = ["default", "none", "minimal", "low", "medium", "high"]
+default = "default"
+description = "Chat reasoning effort, sent only on OpenRouter"
