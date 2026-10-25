@@ -1597,6 +1597,23 @@ Panel {
     root.writeConfig(["--set-animated-background", value ? "true" : "false"])
   }
 
+  // ---- Moving background (default off): depth parallax over the wallpaper,
+  // drawn by Motion.qml. Turning it on also makes the depth map for the
+  // wallpaper already on screen, so it starts moving without waiting for the
+  // next generation; that fetches the 99 MB model the first time. -----------
+  readonly property string motionBin: binDir + "/astro-arc-motion"
+
+  function commitMotion(value) {
+    root.writeConfig(["--set-motion", value ? "true" : "false"], function(exitCode) {
+      if (exitCode === 0 && value && !motionBackfillProc.running) motionBackfillProc.running = true
+    })
+  }
+
+  Process {
+    id: motionBackfillProc
+    command: [root.motionBin, "backfill"]
+  }
+
   // ---- History retention: how many days of "Themes Generated" entries
   // astro-arc-generate keeps before astro-arc-prune-history deletes them,
   // every run. Never affects a theme already exported via Save Selected

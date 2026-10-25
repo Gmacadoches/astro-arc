@@ -17,3 +17,4 @@ CONFIG_FILE = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 USER_STYLES_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "astro-arc" / "styles"
 OMARCHY_THEMES_DIR = Path.home() / ".config/omarchy/themes"
+OMARCHY_CURRENT_DIR = Path.home() / ".local/state/omarchy/current"

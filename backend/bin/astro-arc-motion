@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# The moving background's backend: depth maps for wallpapers, and the lookup
+# Motion.qml uses to find the one for whatever is on screen.
+#
+# A depth map is keyed by the SHA-256 of the image's bytes, not by its path.
+# One wallpaper exists as several copies (history/<period>.png, the archive's
+# theme snapshot, the theme dir, Omarchy's own current/theme copy) and the one
+# on screen can be any of them. The maps live in STATE_DIR/motion/depth: they
+# are cheap to remake, so they are state, not archive.
+#
+# The depth model needs numpy, pillow and onnxruntime, which no other part of
+# Astro-Arc does. The system python3 is used when it has them (Arch: the
+# python-onnxruntime-cpu package, from extra); otherwise a venv at
+# STATE_DIR/motion/venv, which `setup --venv` creates. Neither present means no
+# depth map and a still wallpaper. Nothing here ever needs root.
+#
+# Usage:
+#   astro-arc-motion depth <image>   make the image's depth map; prints its path
+#   astro-arc-motion lookup [image]  prints "<image>\t<depth map or empty>";
+#                                    the image defaults to the current background
+#   astro-arc-motion backfill        depth for the current background
+#   astro-arc-motion setup [--venv]  fetch the model (99 MB, once); --venv also
+#                                    installs onnxruntime into a private venv
+#   astro-arc-motion prune <days>    delete depth maps not used in <days> days
+#   astro-arc-motion status          one line per requirement, exit 0 if all met
+
+set -euo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"
+
+MOTION_DIR="$STATE_DIR/motion"
+DEPTH_DIR="$MOTION_DIR/depth"
+VENV_DIR="$MOTION_DIR/venv"
+MODEL_FILE="$MOTION_DIR/depth-anything-v2-small.onnx"
+CURRENT_BACKGROUND_LINK="$OMARCHY_CURRENT_DIR/background"
+
+# Hugging Face's onnx-community export of depth-anything/Depth-Anything-V2-Small
+# (Apache-2.0), pinned to one commit and checked against its hash, so a changed
+# upstream file fails the download instead of being run.
+MODEL_URL="https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/4472b7362082ad9968fee890ca0f1e5aca36b93d/onnx/model.onnx"
+MODEL_SHA256="afb6a5c28f3b6bf1618c6e43f02073ef9dfdc70e937502d51603e57b0a1df10c"
+MODEL_BYTES=99060839
+
+# Prints the interpreter that can run depth_map.py, or nothing.
+depth_python() {
+  local py
+  for py in python3 "$VENV_DIR/bin/python"; do
+    if [[ $py == python3 || -x $py ]] && "$py" -c 'import numpy, onnxruntime, PIL' >/dev/null 2>&1; then
+      echo "$py"
+      return
+    fi
+  done
+}
+
+fetch_model() {
+  [[ -f $MODEL_FILE ]] && return 0
+  mkdir -p "$MOTION_DIR"
+  local tmp="$MODEL_FILE.part"
+  curl -fsSL --max-filesize $((MODEL_BYTES + 1024)) -o "$tmp" "$MODEL_URL" || { rm -f "$tmp"; return 1; }
+  if [[ $(sha256sum "$tmp" | cut -d' ' -f1) != "$MODEL_SHA256" ]]; then
+    echo "astro-arc-motion: the downloaded model does not match its pinned hash; discarded" >&2
+    rm -f "$tmp"
+    return 1
+  fi
+  mv -f "$tmp" "$MODEL_FILE"
+}
+
+depth_path_for() {
+  echo "$DEPTH_DIR/$(sha256sum "$1" | cut -d' ' -f1).png"
+}
+
+make_depth() {
+  local image out py
+  image="$(realpath "$1")"
+  out="$(depth_path_for "$image")"
+  if [[ -f $out ]]; then
+    touch "$out"
+    echo "$out"
+    return 0
+  fi
+  py="$(depth_python)"
+  if [[ -z $py ]]; then
+    echo "astro-arc-motion: no Python with numpy, pillow and onnxruntime (install python-onnxruntime-cpu, or run astro-arc-motion setup --venv)" >&2
+    return 3
+  fi
+  fetch_model || { echo "astro-arc-motion: could not fetch the depth model" >&2; return 1; }
+  mkdir -p "$DEPTH_DIR"
+  PYTHONDONTWRITEBYTECODE=1 nice -n 10 "$py" "$BIN_DIR/depth_map.py" "$MODEL_FILE" "$image" "$out"
+  echo "$out"
+}
+
+case "${1:-}" in
+  depth)
+    [[ -f ${2:-} ]] || { echo "Usage: astro-arc-motion depth <image>" >&2; exit 1; }
+    make_depth "$2"
+    ;;
+  lookup)
+    image="${2:-$CURRENT_BACKGROUND_LINK}"
+    image="$(realpath -e "$image" 2>/dev/null)" || exit 0
+    depth=""
+    if [[ -d $DEPTH_DIR ]]; then
+      candidate="$(depth_path_for "$image")"
+      # Touched on every lookup, so prune never takes the one on screen.
+      if [[ -f $candidate ]]; then
+        depth="$candidate"
+        touch "$depth"
+      fi
+    fi
+    printf '%s\t%s\n' "$image" "$depth"
+    ;;
+  backfill)
+    make_depth "$CURRENT_BACKGROUND_LINK"
+    ;;
+  setup)
+    if [[ ${2:-} == "--venv" && -z $(depth_python) ]]; then
+      python3 -m venv --system-site-packages "$VENV_DIR"
+      PYTHONDONTWRITEBYTECODE=1 "$VENV_DIR/bin/pip" install --quiet --disable-pip-version-check onnxruntime pillow
+    fi
+    fetch_model
+    exec "$0" status
+    ;;
+  prune)
+    [[ ${2:-} =~ ^[0-9]+$ ]] || { echo "Usage: astro-arc-motion prune <days>" >&2; exit 1; }
+    [[ -d $DEPTH_DIR ]] && find "$DEPTH_DIR" -maxdepth 1 -name '*.png' -mtime +"$2" -delete
+    exit 0
+    ;;
+  status)
+    ok=0
+    py="$(depth_python)"
+    if [[ -n $py ]]; then echo "python: $py"; else echo "python: missing numpy, pillow or onnxruntime"; ok=1; fi
+    if [[ -f $MODEL_FILE ]]; then echo "model: $MODEL_FILE"; else echo "model: not downloaded"; ok=1; fi
+    exit "$ok"
+    ;;
+  *)
+    echo "Usage: astro-arc-motion (depth <image> | lookup [image] | backfill | setup [--venv] | prune <days> | status)" >&2
+    exit 1
+    ;;
+esac

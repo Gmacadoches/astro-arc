@@ -437,6 +437,15 @@ else
   review_path=""  # astro-arc-archive-run said why
 fi
 
+# The moving background's depth map, before the wallpaper goes live so
+# Motion.qml finds it on its first look. Opt-in (motion, default false) and
+# best-effort: without onnxruntime or the model this logs one line and the
+# wallpaper is a still, as it always was. About a second of CPU.
+if [[ $(cfg '.motion == true') == true ]]; then
+  "$BIN_DIR/astro-arc-motion" depth "$bg_file" >/dev/null \
+    || echo "Astro-Arc: warning — no depth map, so this background will not move" >&2
+fi
+
 # Now the desktop. After the archive entry, so the wallpaper can be the
 # archived file itself: a stable path per generation that the retention prune
 # never deletes while it is the newest (see astro-arc-prune-history).
@@ -465,6 +474,8 @@ fi
 history_retention_days=$(cfg '.historyRetentionDays')
 "$BIN_DIR/astro-arc-prune-history" --older-than-days "$history_retention_days" >/dev/null 2>&1 \
   || echo "Astro-Arc: warning — history pruning failed" >&2
+# Depth maps go on the same clock, counted from when they were last on screen.
+"$BIN_DIR/astro-arc-motion" prune "$history_retention_days" 2>/dev/null || true
 
 # Surface the distillation — the one-line psychological core of this run's
 # reading, same text the widget shows under its narrative-position badge

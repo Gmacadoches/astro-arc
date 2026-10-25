@@ -85,4 +85,16 @@ Column {
       ? "Nothing generates on its own — Regenerate is the only trigger."
       : "Runs while you're logged in (a locked screen counts). Missed runs catch up when you're back."
   }
+
+  Toggle {
+    width: parent.width
+    label: panel.configState.motion ? "Moving background (on)" : "Moving background (off)"
+    description: panel.configState.motion
+      ? "Near things drift against far ones; pauses on battery and under fullscreen"
+      : "Keep the wallpaper still"
+    checked: panel.configState.motion
+    foreground: panel.bar.foreground
+    fontFamily: panel.bar.fontFamily
+    onClicked: panel.commitMotion(!panel.configState.motion)
+  }
 }

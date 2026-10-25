@@ -14,8 +14,8 @@
 #   CONFIG_FILE  the one settings file, where Omarchy keeps every plugin's.
 #   USER_STYLES_DIR  the user's own styles; OMARCHY_THEMES_DIR is Omarchy's.
 #
-# Panel.qml keeps a third copy in its property block, since QML can source
-# neither file.
+# Panel.qml and Motion.qml keep further copies in their property blocks, since
+# QML can source neither file.
 #
 # Before 2026-09-19 the archive lived in STATE_DIR/reviews, where tools that
 # treat state as disposable could clear it.
@@ -35,3 +35,5 @@ CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
 
 USER_STYLES_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/astro-arc/styles"
 OMARCHY_THEMES_DIR="$HOME/.config/omarchy/themes"
+# Omarchy's links to what is on screen now (current/background, current/theme).
+OMARCHY_CURRENT_DIR="$HOME/.local/state/omarchy/current"

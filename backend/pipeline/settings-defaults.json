@@ -18,6 +18,7 @@
   "themeGenerator": "built-in",
   "backgroundOnly": true,
   "animatedBackground": true,
+  "motion": false,
   "historyRetentionDays": 30,
   "maxCostPerImage": 0,
   "provider": "openai",

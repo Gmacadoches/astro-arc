@@ -148,7 +148,7 @@ USAGE = ("Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-locat
          "|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>"
          "|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>"
          "|--set-background-only <true|false>|--set-animated-background <true|false>"
-         "|--set-history-retention-days <N>]")
+         "|--set-motion <true|false>|--set-history-retention-days <N>]")
 
 
 class Refused(Exception):
@@ -324,6 +324,10 @@ def run(args):
         need(arg(1) in ("built-in", "aether"), "Usage: astro-arc-config --set-theme-generator <built-in|aether>")
         config = current()
         config["themeGenerator"] = arg(1)
+    elif flag == "--set-motion":
+        need(arg(1) in ("true", "false"), "Usage: astro-arc-config --set-motion <true|false>")
+        config = current()
+        config["motion"] = arg(1) == "true"
     elif flag in ("--set-background-only", "--set-animated-background"):
         need(arg(1) in ("true", "false"), f"Usage: astro-arc-config {flag} <true|false>")
         config = current()

@@ -24,15 +24,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import settings  # noqa: E402
 from throwaway import throwaway_home  # noqa: E402
 
-# What astro-arc-config's DEFAULTS string said before the schema; the schema
-# must keep saying it, in this order.
+# What astro-arc-config's DEFAULTS string said before the schema, plus the
+# keys added since (motion); the schema must keep saying it, in this order.
 SHELL_DEFAULTS = (
     '{"birthDate":"","birthTime":"","birthTimeUnknown":false,"locationName":"","latitude":null,'
     '"longitude":null,"timezone":"","frequency":"manual","intervalHours":1,"imageBackend":"openai",'
     '"openaiModel":"","openaiQuality":"","stage1Model":"gpt-4o-mini","stage2Model":"gpt-4o-mini",'
     '"backgroundSize":"auto","artStyle":"symbolist","themeGenerator":"built-in","backgroundOnly":true,'
-    '"animatedBackground":true,"historyRetentionDays":30,"maxCostPerImage":0,"provider":"openai",'
-    '"chatReasoning":"default"}')
+    '"animatedBackground":true,"motion":false,"historyRetentionDays":30,"maxCostPerImage":0,'
+    '"provider":"openai","chatReasoning":"default"}')
 
 
 def quietly(fn, *args, **kwargs):

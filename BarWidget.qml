@@ -57,6 +57,15 @@ BarWidget {
     }
   }
 
+  // The moving background. It loads with the bar widget because that is the
+  // one part of the plugin alive for the whole session; it draws nothing
+  // until motion is turned on in the panel.
+  Loader {
+    active: true
+    source: Qt.resolvedUrl("Motion.qml")
+    visible: false
+  }
+
   BarIconButton {
     id: button
     anchors.fill: parent

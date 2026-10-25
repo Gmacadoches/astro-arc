@@ -144,6 +144,13 @@ type = "bool"
 default = true
 description = "Whether the solar system behind the panel moves"
 
+# Off until asked for: a moving desktop needs a 99 MB depth model and
+# onnxruntime, and not everyone wants their wallpaper to move.
+[keys.motion]
+type = "bool"
+default = false
+description = "Depth parallax over the wallpaper (Motion.qml)"
+
 [keys.historyRetentionDays]
 type = "int"
 min = 1

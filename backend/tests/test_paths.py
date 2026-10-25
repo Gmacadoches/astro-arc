@@ -1,7 +1,8 @@
 """Every location is spelled in one place: backend/bin/paths.py for Python,
-astro-arc-paths.sh for shell, and Panel.qml's property block for QML. This
-fails on code anywhere else that builds a path from the home directory, so a
-new harness imports the location instead of copying it.
+astro-arc-paths.sh for shell, and the property blocks of Panel.qml and
+Motion.qml for QML. This fails on code anywhere else that builds a path from
+the home directory, so a new harness imports the location instead of copying
+it.
 
     python3 -m unittest discover backend/tests
 """
@@ -20,9 +21,10 @@ HOME_ANCHORED = re.compile(
     r'Path\.home\(\)|\$HOME\b|\$\{HOME\b|XDG_[A-Z]+_HOME|env\("HOME"\)|\broot\.home\b|\bhome \+')
 COMMENT = re.compile(r"^\s*(#|//)")
 
-# The files that define locations, and the lines of Panel.qml that do.
+# The files that define locations, and the lines of Panel.qml and Motion.qml
+# that do.
 DEFINERS = {BIN / "paths.py", BIN / "astro-arc-paths.sh"}
-PANEL_DEFINITION = re.compile(r"readonly property string (home|archiveDir|stateDir|configPath):")
+PANEL_DEFINITION = re.compile(r"readonly property string (home|archiveDir|stateDir|configPath|omarchyCurrentDir):")
 
 # Home-anchored code that names somewhere that is not Astro-Arc's: (file, a
 # snippet of the line).
@@ -55,7 +57,7 @@ class PathsTest(unittest.TestCase):
             for n, line in enumerate(path.read_text(errors="ignore").splitlines(), 1):
                 if COMMENT.match(line) or not HOME_ANCHORED.search(line):
                     continue
-                if path.name == "Panel.qml" and PANEL_DEFINITION.search(line):
+                if path.name in ("Panel.qml", "Motion.qml") and PANEL_DEFINITION.search(line):
                     continue
                 if any(path == where and snippet in line for where, snippet in NOT_OURS):
                     continue
@@ -66,7 +68,7 @@ class PathsTest(unittest.TestCase):
         home = "/nonexistent-home"
         env = {"HOME": home, "PATH": os.environ.get("PATH", "")}
         names = ["ARCHIVE_DIR", "GENERATIONS_DIR", "GENERATIONS_INDEX", "GALLERY_FILE", "STATE_DIR",
-                 "PIPELINE_STATE_DIR", "VERIFY_DIR", "CONFIG_FILE", "USER_STYLES_DIR", "OMARCHY_THEMES_DIR"]
+                 "PIPELINE_STATE_DIR", "VERIFY_DIR", "CONFIG_FILE", "USER_STYLES_DIR", "OMARCHY_THEMES_DIR", "OMARCHY_CURRENT_DIR"]
         shell = subprocess.run(
             ["bash", "-c", f'source "{BIN}/astro-arc-paths.sh"; '
              + "; ".join(f'echo "${n}"' for n in names)],
