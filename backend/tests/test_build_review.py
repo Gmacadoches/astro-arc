@@ -61,6 +61,9 @@ class BuildReviewTest(unittest.TestCase):
         self.assertTrue(index[0]["artStyleLabel"])
 
     def test_a_run_filed_late_keeps_its_time_and_its_place(self):
+        # createdAt is written in local time, so the zone is pinned to the
+        # offsets below (POSIX signs run backwards: Etc/GMT+6 is UTC-6).
+        self.env["TZ"] = "Etc/GMT+6"
         for key, at in [("2026-10-24T18", "2026-10-24T18:04:10-06:00"),
                         ("2026-10-24T20", "2026-10-24T20:01:06-06:00"),
                         ("2026-10-24T19", "2026-10-24T19:07:53-06:00")]:
