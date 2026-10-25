@@ -59,6 +59,7 @@ Panel {
     loadModelCatalogIfStale()
     loadStyleCatalog()
     defaultAgentProc.running = true
+    if (root.configState.motion) checkMotion()
   }
 
   function openFromHotkey() {
@@ -1598,20 +1599,57 @@ Panel {
   }
 
   // ---- Moving background (default off): depth parallax over the wallpaper,
-  // drawn by Motion.qml. Turning it on also makes the depth map for the
-  // wallpaper already on screen, so it starts moving without waiting for the
-  // next generation; that fetches the 99 MB model the first time. -----------
+  // drawn by Motion.qml, which makes the depth map for whatever is on screen
+  // itself. What it needs is an optional install (onnxruntime, numpy and
+  // pillow in a private venv, plus the 99 MB model: about 270 MB), so with
+  // motion on the panel asks astro-arc-motion status whether it is there and,
+  // if not, offers Install under the toggle. -------------------------------
   readonly property string motionBin: binDir + "/astro-arc-motion"
+  // "" not checked yet, "ready", or "missing".
+  property string motionStatus: ""
+  property string motionInstallError: ""
+  readonly property bool motionInstalling: motionSetupProc.running
 
   function commitMotion(value) {
     root.writeConfig(["--set-motion", value ? "true" : "false"], function(exitCode) {
-      if (exitCode === 0 && value && !motionBackfillProc.running) motionBackfillProc.running = true
+      if (exitCode === 0 && value) root.checkMotion()
     })
   }
 
+  function checkMotion() {
+    if (!motionStatusProc.running && !motionSetupProc.running) motionStatusProc.running = true
+  }
+
+  function installMotion() {
+    if (motionSetupProc.running) return
+    root.motionInstallError = ""
+    motionSetupProc.running = true
+  }
+
   Process {
-    id: motionBackfillProc
-    command: [root.motionBin, "backfill"]
+    id: motionStatusProc
+    command: [root.motionBin, "status"]
+    onExited: function(exitCode) { root.motionStatus = exitCode === 0 ? "ready" : "missing" }
+  }
+
+  Process {
+    id: motionSetupProc
+    command: [root.motionBin, "setup", "--venv"]
+    stderr: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.motionInstallError = String(text || "").trim().split("\n").pop()
+    }
+    // setup ends by running status, so its exit code is the verdict. Ready,
+    // Motion.qml looks at the wallpaper again and makes its depth map.
+    onExited: function(exitCode) {
+      root.motionStatus = exitCode === 0 ? "ready" : "missing"
+      if (exitCode === 0) {
+        root.motionInstallError = ""
+        if (root.hostWidget && root.hostWidget.refreshMotion) root.hostWidget.refreshMotion()
+      } else if (root.motionInstallError === "") {
+        root.motionInstallError = "The install did not finish."
+      }
+    }
   }
 
   // ---- History retention: how many days of "Themes Generated" entries

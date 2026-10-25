@@ -136,7 +136,9 @@ That is all. There is no install step: nothing is compiled, nothing is
 downloaded, no service is registered. The backend runs on the Python and
 ImageMagick every Omarchy install already has, using the standard library only,
 and the chart maths is [Astronomy Engine](https://github.com/cosinekitty/astronomy),
-vendored in this repository as a single file.
+vendored in this repository as a single file. The one exception is optional:
+the [moving background](#moving-background), which downloads what it needs
+when you ask for it.
 
 ## Install
 
@@ -241,6 +243,37 @@ omarchy theme install https://github.com/you/omarchy-your-theme.git
 
 Exports deliberately contain no personal content: the palette, the image and the
 image prompt, never the reading that produced them.
+
+## Moving background
+
+Turn on **Moving background** under Schedule in Settings and the wallpaper
+moves: near things drift slowly against far ones, as if the picture had depth.
+It works from a depth map of the image, which a small model ([Depth Anything V2
+Small](https://huggingface.co/depth-anything/Depth-Anything-V2-Small),
+Apache-2.0) makes in a few seconds on the CPU. Each new generation gets its
+own map, and so does any wallpaper you put on screen yourself.
+
+It is off by default, and it needs a one-time install. The first time you turn
+it on, the panel offers **Install (about 270 MB)**. That puts the model (95 MB,
+from Hugging Face, pinned to one version and checked against its hash) and a
+private Python environment with onnxruntime, numpy and pillow (about 175 MB,
+from PyPI) in `~/.local/state/omarchy/astro-arc/motion/`. It needs no root and
+touches nothing outside that folder. From a terminal, the same install is:
+
+```sh
+~/.config/omarchy/plugins/astro-arc/backend/bin/astro-arc-motion setup --venv
+```
+
+`astro-arc-motion status` says what is in place. Without the install, turning
+it on changes nothing: the wallpaper stays still.
+
+It costs little while it runs, and it stops when it would be wasted: on
+battery, on the power-saver profile, after two minutes idle, under tiled or
+fullscreen windows, while a game runs, and while the screen is locked or off.
+Depth maps are deleted on the same schedule as your history. To remove motion
+entirely, turn it off and delete the `motion/` folder.
+
+Thanks to [Jampick](https://github.com/jampick), who built it.
 
 ## Your data
 

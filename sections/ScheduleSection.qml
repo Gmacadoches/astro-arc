@@ -97,4 +97,38 @@ Column {
     fontFamily: panel.bar.fontFamily
     onClicked: panel.commitMotion(!panel.configState.motion)
   }
+
+  // On, but the depth model or the Python that runs it is missing: say so
+  // and offer the one-time install, instead of a toggle that does nothing.
+  InfoNote {
+    width: parent.width
+    visible: panel.configState.motion && (panel.motionStatus === "missing" || panel.motionInstalling)
+    foreground: panel.bar.foreground
+    fontFamily: panel.bar.fontFamily
+    text: panel.motionInstalling
+      ? "Installing — this downloads about 270 MB and takes a few minutes."
+      : "Needs a one-time install to move: the depth model and the Python packages that run it, about 270 MB, kept in ~/.local/state. Until then the wallpaper stays still."
+  }
+
+  Text {
+    width: parent.width
+    visible: panel.configState.motion && panel.motionStatus === "missing" && !panel.motionInstalling
+      && panel.motionInstallError !== ""
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    text: panel.motionInstallError
+    color: panel.bar.urgent || Color.urgent
+    font.family: panel.bar.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+
+  PanelButton {
+    visible: panel.configState.motion && (panel.motionStatus === "missing" || panel.motionInstalling)
+    text: panel.motionInstalling ? "Installing…" : "Install (about 270 MB)"
+    bordered: true
+    fontSize: Style.font.caption
+    foreground: panel.bar.foreground
+    enabled: !panel.motionInstalling
+    onClicked: panel.installMotion()
+  }
 }

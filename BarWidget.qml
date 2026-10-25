@@ -36,6 +36,12 @@ BarWidget {
 
   readonly property bool popoutSwitchClosing: panelLoader.item ? panelLoader.item.popoutSwitchClosing === true : false
 
+  // The panel's Install for the moving background: once it lands, the
+  // wallpaper on screen gets looked at again.
+  function refreshMotion() {
+    if (motionLoader.item) motionLoader.item.refresh()
+  }
+
   function closeForPopoutSwitch() {
     if (panelLoader.item) panelLoader.item.closeForPopoutSwitch()
   }
@@ -61,6 +67,7 @@ BarWidget {
   // one part of the plugin alive for the whole session; it draws nothing
   // until motion is turned on in the panel.
   Loader {
+    id: motionLoader
     active: true
     source: Qt.resolvedUrl("Motion.qml")
     visible: false
