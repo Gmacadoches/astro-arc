@@ -89,8 +89,8 @@ def _style_label(style_key):
     gone or can't be read, rather than hiding the art style entirely."""
     if not style_key:
         return None
-    from llm_pipeline import load_styles  # noqa: PLC0415 - only when a page names a style
-    theme = load_styles().get(style_key)
+    from llm_pipeline import Catalog  # noqa: PLC0415 - only when a page names a style
+    theme = Catalog.load().styles.get(style_key)
     return theme.label if theme else style_key
 
 
