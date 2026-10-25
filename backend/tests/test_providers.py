@@ -77,6 +77,16 @@ class ProvidersTest(unittest.TestCase):
         self.assertEqual(providers.reasoning_of({"chatReasoning": "none"}), "default")
         self.assertEqual(providers.reasoning_of(OPENROUTER), "none")
 
+    def test_an_effort_moves_to_one_the_model_offers_but_keeps_thinking(self):
+        listed = {"reasoning": {"supported_efforts": ["none", "low", "high"]}}
+        self.assertEqual(providers.reasoning_for(listed, "minimal"), {"effort": "low"})
+        self.assertEqual(providers.reasoning_for(listed, "medium"), {"effort": "low"})
+        self.assertEqual(providers.reasoning_for(listed, "none"), {"effort": "none"})
+        mandatory = {"reasoning": {"supported_efforts": ["none", "medium"], "mandatory": True}}
+        self.assertEqual(providers.reasoning_for(mandatory, "none"), {"effort": "medium"})
+        self.assertIsNone(providers.reasoning_for(listed, "default"))
+        self.assertIsNone(providers.reasoning_for({}, "low"))
+
     def test_an_openai_run_uses_the_openai_adapter_itself(self):
         self.assertIs(lp.chat_client({}), lp.openai_chat)
 

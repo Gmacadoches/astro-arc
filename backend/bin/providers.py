@@ -78,7 +78,8 @@ def reasoning_for(listed, effort):
     doesn't list reasoning never gets the field. One whose reasoning is
     mandatory rejects "none", so it gets the lowest effort it does take.
     An effort the model doesn't offer is moved to the nearest one below it,
-    then above it, so "minimal" on a model without it becomes "low"."""
+    then above it, but never down to "none": an effort that asks for some
+    thinking keeps some, so "minimal" on a model without it becomes "low"."""
     info = (listed or {}).get("reasoning")
     if effort == "default" or not info:
         return None
@@ -91,7 +92,8 @@ def reasoning_for(listed, effort):
     if effort in offered:
         return {"effort": effort}
     i = ladder.index(effort)
-    for candidate in ladder[i::-1] + ladder[i + 1:]:
+    below = ladder[i::-1] if effort == "none" else ladder[i:0:-1]
+    for candidate in below + ladder[i + 1:]:
         if candidate in offered:
             return {"effort": candidate}
     return None
