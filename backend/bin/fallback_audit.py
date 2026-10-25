@@ -30,6 +30,12 @@ read once for the whole audit. --no-cache hands each build() a fresh one, as
 production reads them once per run.
 
     fallback_audit.py --out baseline
+
+The hash a change must leave alone is pinned in backend/tests/prompts.sha256,
+and backend/tests/test_prompts.py fails when the audit no longer gives it. A
+change to the prompts you mean to make re-pins it in the same commit:
+
+    fallback_audit.py --out <name> --pin
 """
 
 import argparse
@@ -53,6 +59,7 @@ CONFIG = {"stage1Model": "stub-model", "stage2Model": "stub-model", "captionMode
 POLARITIES = ("hard", "soft", "none")
 BANDS = ("lo", "mid", "hi")
 CONTROL_STYLE = "__unchartered__"
+PINNED = Path(__file__).resolve().parents[1] / "tests" / "prompts.sha256"
 
 # Fixed fake responses by pipeline stage. Stage 1.5's meaning and material
 # halves both run as stage="stage15", so one response carries both halves' keys.
@@ -309,7 +316,11 @@ def main():
     parser.add_argument("--no-cache", action="store_true",
                         help="load a fresh catalog for every build(), as production does once per run")
     parser.add_argument("--no-control", action="store_true", help="skip the unchartered control style")
+    parser.add_argument("--pin", action="store_true",
+                        help=f"write the hash to {PINNED.relative_to(PINNED.parents[2])} (a full run only)")
     args = parser.parse_args()
+    if args.pin and args.styles:
+        parser.error("--pin needs every shipped style: drop --styles")
 
     out_dir = VERIFY_DIR / args.out
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -357,6 +368,9 @@ def main():
 
     print(f"{runs} Stage 2 prompts -> {prompts_path}")
     print(f"sha256 {digest}")
+    if args.pin:
+        PINNED.write_text(f"{digest}\n")
+        print(f"pinned in {PINNED}")
     print(f"{summary['seconds']}s, catalog cache {'on' if summary['styleCache'] else 'off'}")
     print("\nFIRED FOR SHIPPED STYLES")
     for key in sorted(shipped_fired):
