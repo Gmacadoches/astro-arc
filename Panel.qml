@@ -2075,6 +2075,9 @@ Panel {
       // switch to the neighbouring bar panel).
       onTabRequested: function(direction) { root.navTab(direction) }
       onMoveRequested: function(dx, dy) { root.navMove(dx, dy) }
+      // Browsing the generations with ←→ (nothing focused), Enter puts the
+      // one showing on the desktop, as Set wallpaper does.
+      onReturnRequested: if (root.view === "main" && !root.navCurrentItem()) root.setSelectedTheme()
 
       // ---- Hero: ✦ · Astro-Arc · status, or back · the view's title ------
       HeroSection {

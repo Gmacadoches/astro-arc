@@ -83,8 +83,8 @@ Column {
     border.color: activeFocus ? panel.bar.foreground
       : Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.25)
 
-    // Focused, it is the browser: ←→ page, Enter opens the image. At either
-    // end the key goes on to the panel's navigation.
+    // Focused, it is the browser: ←→ page, Enter sets it as the wallpaper,
+    // Space opens the image. At either end ←→ go on to the panel's navigation.
     activeFocusOnTab: section.count > 0
     // The strip runs newest-first from the left, so ← is newer, → older.
     Keys.onLeftPressed: function(event) {
@@ -93,8 +93,8 @@ Column {
     Keys.onRightPressed: function(event) {
       if (section.index < section.count - 1) panel.showOlder(); else event.accepted = false
     }
-    Keys.onReturnPressed: panel.openSelectedImage()
-    Keys.onEnterPressed: panel.openSelectedImage()
+    Keys.onReturnPressed: panel.setSelectedTheme()
+    Keys.onEnterPressed: panel.setSelectedTheme()
     Keys.onSpacePressed: panel.openSelectedImage()
 
     Image {
