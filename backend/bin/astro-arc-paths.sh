@@ -9,7 +9,8 @@
 #                exactly where they are.
 #   STATE_DIR    ~/.local/state/omarchy/astro-arc — disposable. Caches, cost
 #                logs, the rotation memory, the last run. Deleting it costs a
-#                few cents of re-computed readings and nothing else.
+#                few cents of re-computed readings, and any run still waiting
+#                in PENDING_ARCHIVE_DIR (only there if filing it failed).
 #   CONFIG_FILE  the one settings file, where Omarchy keeps every plugin's.
 #   USER_STYLES_DIR  the user's own styles; OMARCHY_THEMES_DIR is Omarchy's.
 #
@@ -26,6 +27,9 @@ GALLERY_FILE="$ARCHIVE_DIR/index.html"
 
 STATE_DIR="$HOME/.local/state/omarchy/astro-arc"
 PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
+# Runs that could not be filed in the archive, kept until the next run files
+# them (astro-arc-archive-run).
+PENDING_ARCHIVE_DIR="$STATE_DIR/pending-archive"
 VERIFY_DIR="$STATE_DIR/verification"
 CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
 

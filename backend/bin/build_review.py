@@ -324,8 +324,25 @@ def _fmt_cost(value):
     return f"${value:.4f}" if value >= 0.0001 else f"${value:.6f}"
 
 
+def _naive_local(value):
+    """A datetime in local time without a zone: how createdAt is written."""
+    return value.astimezone().replace(tzinfo=None) if value.tzinfo else value
+
+
+def _newest_first_position(index, created_at):
+    """Where an entry made at created_at goes in the newest-first index: the
+    front, unless it is a late-filed run older than entries already there."""
+    for i, entry in enumerate(index):
+        try:
+            if _naive_local(datetime.datetime.fromisoformat(entry.get("createdAt") or "")) <= created_at:
+                return i
+        except ValueError:
+            return i
+    return len(index)
+
+
 def build(reading_path, meta_path, image_path, label, cost=None, footer_text=None,
-          theme_dir=None, period_key=None):
+          theme_dir=None, period_key=None, created_at=None):
     reading = json.loads(Path(reading_path).read_text())
     meta = json.loads(Path(meta_path).read_text())
     natal_chips, arc_chips = natal_and_arc_chips(reading)
@@ -335,7 +352,9 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
     avoided = meta.get("avoidedConcepts") or []
     theme_vars = _theme_css_vars(theme_dir)
 
-    created_at = datetime.datetime.now()
+    # A run filed late (astro-arc-archive-run's pending folder) keeps the time
+    # it was generated, so its id, page and place in the list are its own.
+    created_at = created_at or datetime.datetime.now()
     review_id = f"{created_at.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
 
     html = PAGE_TEMPLATE.format(
@@ -417,7 +436,7 @@ def build(reading_path, meta_path, image_path, label, cost=None, footer_text=Non
         pass  # the gallery shows a plain tile; never lose the entry over a thumbnail
 
     index = json.loads(GENERATIONS_INDEX.read_text()) if GENERATIONS_INDEX.exists() else []
-    index.insert(0, {
+    index.insert(_newest_first_position(index, created_at), {
         "id": review_id,
         "label": label,
         "createdAt": created_at.isoformat(),
@@ -454,11 +473,14 @@ def main():
     parser.add_argument("--footer")
     parser.add_argument("--theme-dir", help="the live theme dir to snapshot (colors.toml, icons.theme, backgrounds/, ...) for later Save Selected Theme")
     parser.add_argument("--period-key", help="this generation's periodKey, recorded in generations.json")
+    parser.add_argument("--created-at", type=datetime.datetime.fromisoformat,
+                        help="ISO time the generation ran, for one filed late (default: now)")
     args = parser.parse_args()
 
     cost = json.loads(args.cost_json) if args.cost_json else None
     out_path = build(args.reading, args.meta, args.image, args.label, cost, args.footer,
-                      theme_dir=args.theme_dir, period_key=args.period_key)
+                      theme_dir=args.theme_dir, period_key=args.period_key,
+                      created_at=args.created_at and _naive_local(args.created_at))
     print(out_path)
 
 

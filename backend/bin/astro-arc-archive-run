@@ -1,0 +1,98 @@
+#!/bin/bash
+
+# Files one generation in the archive (build_review.py), and never loses it.
+#
+#   astro-arc-archive-run --reading R --meta M --image I --label L
+#       [--cost-json C] [--theme-dir T] [--period-key P]
+#
+# Takes build_review.py's arguments. First files every run still waiting in
+# PENDING_ARCHIVE_DIR, oldest first, each with the time it was generated. Then
+# files this one and prints its page's path. If that fails, this run's inputs
+# (reading, metadata, image, theme dir) are copied into PENDING_ARCHIVE_DIR and
+# the exit status is 1: the next run files it.
+#
+# Why: the reading, metadata and image live in the state dir under the run's
+# periodKey, so a second run in the same period overwrites them. On 2026-10-24
+# build_review.py crashed on every run for five hours; astro-arc-generate only
+# warned, and the 19:07 run was overwritten at 19:58 before anything could file
+# it. Kept here, a failed run waits for a fix instead of vanishing.
+#
+# Bash, not Python, so it keeps a run even when build_review.py cannot import.
+
+set -uo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=astro-arc-paths.sh
+source "$BIN_DIR/astro-arc-paths.sh"
+PY=python3
+
+reading="" meta="" image="" label="" cost_json="" theme_dir="" period_key=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --reading) reading=$2 ;;
+    --meta) meta=$2 ;;
+    --image) image=$2 ;;
+    --label) label=$2 ;;
+    --cost-json) cost_json=$2 ;;
+    --theme-dir) theme_dir=$2 ;;
+    --period-key) period_key=$2 ;;
+    *) echo "astro-arc-archive-run: unknown argument $1" >&2; exit 2 ;;
+  esac
+  shift 2
+done
+
+# build_review.py, given a run's own arguments plus any extra (--created-at).
+file_run() {
+  local args=(--reading "$1" --meta "$2" --image "$3" --label "$4")
+  [[ -n $5 ]] && args+=(--cost-json "$5")
+  [[ -n $6 && -d $6 ]] && args+=(--theme-dir "$6")
+  [[ -n $7 ]] && args+=(--period-key "$7")
+  shift 7
+  "$PY" "$BIN_DIR/build_review.py" "${args[@]}" "$@"
+}
+
+# Whether the index already has the run made at $1: build_review.py can fail
+# after writing it (rewriting the gallery, say), and filing again would list
+# the run twice. createdAt is written in local time to the second.
+already_filed() {
+  local at
+  at=$(date -d "$1" '+%Y-%m-%dT%H:%M:%S') || return 1
+  [[ -f $GENERATIONS_INDEX ]] && jq -e --arg at "$at" 'any(.[]; .createdAt == $at)' "$GENERATIONS_INDEX" >/dev/null 2>&1
+}
+
+# The waiting runs. Directory names start with the run's time, so a plain sort
+# is oldest first, and build_review.py places each by its time.
+if [[ -d $PENDING_ARCHIVE_DIR ]]; then
+  for run in "$PENDING_ARCHIVE_DIR"/*/; do
+    [[ -f $run/run.json ]] || continue
+    run=${run%/}
+    at=$(jq -r '.createdAt' "$run/run.json")
+    if already_filed "$at" || file_run "$run/reading.json" "$run/meta.json" "$run/image.png" \
+      "$(jq -r '.label' "$run/run.json")" "$(jq -c '.cost // empty' "$run/run.json")" \
+      "$run/theme" "$(jq -r '.periodKey // empty' "$run/run.json")" \
+      --created-at "$at" >/dev/null; then
+      rm -rf "$run"
+      echo "Astro-Arc: filed $(basename "$run"), which had been waiting for the archive" >&2
+    else
+      echo "Astro-Arc: warning — $(basename "$run") is still waiting for the archive" >&2
+    fi
+  done
+fi
+
+created_at=$(date -Is)
+if file_run "$reading" "$meta" "$image" "$label" "$cost_json" "$theme_dir" "$period_key" \
+  --created-at "$created_at"; then
+  exit 0
+fi
+already_filed "$created_at" && exit 1  # filed, but the page path was not printed
+
+run="$PENDING_ARCHIVE_DIR/$(date -d "$created_at" '+%Y%m%d-%H%M%S')-${period_key:-run}"
+mkdir -p "$run"
+cp -f "$reading" "$run/reading.json" && cp -f "$meta" "$run/meta.json" && cp -f "$image" "$run/image.png" \
+  && { [[ -z $theme_dir || ! -d $theme_dir ]] || cp -r "$theme_dir" "$run/theme"; } \
+  && jq -n --arg label "$label" --arg createdAt "$created_at" --arg periodKey "$period_key" \
+    --argjson cost "${cost_json:-null}" \
+    '{label: $label, createdAt: $createdAt, periodKey: $periodKey, cost: $cost}' >"$run/run.json" \
+  && echo "Astro-Arc: warning — could not add this generation to the archive; kept in $run for the next run" >&2 \
+  || echo "Astro-Arc: warning — could not add this generation to the archive, nor keep it for later" >&2
+exit 1
