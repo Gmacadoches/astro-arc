@@ -1,0 +1,18 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # jq and flock (for astro-arc-generate) and node (for the widget's
+      # static checks) are on the runner image already; qmlformat is not, so
+      # that one check reports a skip.
+      - run: backend/bin/astro-arc-check

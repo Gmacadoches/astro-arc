@@ -1,8 +1,10 @@
 # Astro-Arc
 
-Project context lives in `CONTEXT.md`. Changes go on the `development` branch, not `master`.
+Changes go on the `development` branch, not `master`.
 
-Tests: `python3 -m unittest discover backend/tests` (stubbed, free). Prompts unchanged: `python3 backend/bin/fallback_audit.py --out <name>` and compare its sha256.
+Checks: `backend/bin/astro-arc-check` (free; the pre-commit hook and CI run it). It pins the Stage 2 prompts and the HTTP requests; a failing pin names the command that re-pins it, for a change you meant.
+
+Architecture dossier: `CONTEXT.md`, on this machine only (gitignored). Read the section for what you're changing: the pipeline stages, theme generation, history and saving, the settings UI, key storage, data files.
 
 ## Agent skills
 

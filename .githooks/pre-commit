@@ -1,0 +1,11 @@
+#!/bin/bash
+# Runs every free check before a commit (about 10 s), quiet unless one fails.
+# Enabled per clone with
+#   git config core.hooksPath .githooks
+# It checks the working tree, not only what is staged. On the motion test
+# bench, whose two known failures would block every commit, commit with
+# --no-verify.
+out=$("$(git rev-parse --show-toplevel)/backend/bin/astro-arc-check" 2>&1) && exit 0
+echo "$out" >&2
+echo "pre-commit: a check failed (above); fix it, or commit with --no-verify to skip" >&2
+exit 1

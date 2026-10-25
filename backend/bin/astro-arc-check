@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Every free check, in one command. The pre-commit hook (.githooks/pre-commit)
+# and CI (.github/workflows/check.yml) run exactly this.
+#
+#   astro-arc-check          the unit tests, which include the pinned Stage 2
+#                            prompts (test_prompts) and the pinned HTTP
+#                            requests (test_requests); the widget's static
+#                            checks; the secrets scan
+#   astro-arc-check --live   all of that, then restart the shell and check the
+#                            running panel (astro-arc-check-widget --live).
+#                            The deploy check; not for CI.
+#
+# Nothing here is billed or touches the real desktop, except --live.
+
+set -uo pipefail
+
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$BIN_DIR/../.." && pwd)"
+failed=()
+
+run() {
+  local name=$1; shift
+  echo "== $name"
+  if "$@"; then
+    echo
+  else
+    failed+=("$name")
+    echo
+  fi
+}
+
+run "unit tests" python3 -m unittest discover -s "$REPO_DIR/backend/tests" -t "$REPO_DIR/backend/tests"
+if [[ ${1:-} == --live ]]; then
+  run "widget" "$BIN_DIR/astro-arc-check-widget" --live
+else
+  run "widget" "$BIN_DIR/astro-arc-check-widget"
+fi
+run "secrets" "$BIN_DIR/astro-arc-check-secrets"
+
+if [[ ${#failed[@]} -gt 0 ]]; then
+  echo "FAILED: ${failed[*]}" >&2
+  exit 1
+fi
+echo "All checks passed."
