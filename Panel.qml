@@ -1592,7 +1592,7 @@ Panel {
     root.writeConfig(["--set-background-only", value ? "true" : "false"])
   }
 
-  // ---- Animated background: whether the orbits behind the panel move.
+  // ---- Panel animation: whether the orbits behind the panel move.
   function commitAnimatedBackground(value) {
     root.writeConfig(["--set-animated-background", value ? "true" : "false"])
   }
