@@ -1,0 +1,224 @@
+{
+  "chat openai": [
+    {
+      "body": {
+        "messages": [
+          {
+            "content": "SYSTEM",
+            "role": "system"
+          },
+          {
+            "content": "USER",
+            "role": "user"
+          }
+        ],
+        "model": "a-model",
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.95
+      },
+      "headers": {
+        "Authorization": "Bearer key-stage2-openai",
+        "Content-type": "application/json"
+      },
+      "method": "POST",
+      "timeout": 60,
+      "url": "https://api.openai.com/v1/chat/completions"
+    }
+  ],
+  "chat openrouter, reasoning default": [
+    {
+      "body": {
+        "messages": [
+          {
+            "content": "SYSTEM",
+            "role": "system"
+          },
+          {
+            "content": "USER",
+            "role": "user"
+          }
+        ],
+        "model": "a-model",
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.95
+      },
+      "headers": {
+        "Authorization": "Bearer key-stage2-openrouter",
+        "Content-type": "application/json",
+        "Http-referer": "https://github.com/Gmacadoches/astro-arc",
+        "X-title": "Astro-Arc"
+      },
+      "method": "POST",
+      "timeout": 60,
+      "url": "https://openrouter.ai/api/v1/chat/completions"
+    }
+  ],
+  "chat openrouter, reasoning low": [
+    {
+      "body": {
+        "messages": [
+          {
+            "content": "SYSTEM",
+            "role": "system"
+          },
+          {
+            "content": "USER",
+            "role": "user"
+          }
+        ],
+        "model": "a-model",
+        "reasoning": {
+          "effort": "low"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.95
+      },
+      "headers": {
+        "Authorization": "Bearer key-stage2-openrouter",
+        "Content-type": "application/json",
+        "Http-referer": "https://github.com/Gmacadoches/astro-arc",
+        "X-title": "Astro-Arc"
+      },
+      "method": "POST",
+      "timeout": 60,
+      "url": "https://openrouter.ai/api/v1/chat/completions"
+    }
+  ],
+  "chat openrouter, reasoning minimal": [
+    {
+      "body": {
+        "messages": [
+          {
+            "content": "SYSTEM",
+            "role": "system"
+          },
+          {
+            "content": "USER",
+            "role": "user"
+          }
+        ],
+        "model": "a-model",
+        "reasoning": {
+          "effort": "none"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.95
+      },
+      "headers": {
+        "Authorization": "Bearer key-stage2-openrouter",
+        "Content-type": "application/json",
+        "Http-referer": "https://github.com/Gmacadoches/astro-arc",
+        "X-title": "Astro-Arc"
+      },
+      "method": "POST",
+      "timeout": 60,
+      "url": "https://openrouter.ai/api/v1/chat/completions"
+    }
+  ],
+  "chat openrouter, reasoning none": [
+    {
+      "body": {
+        "messages": [
+          {
+            "content": "SYSTEM",
+            "role": "system"
+          },
+          {
+            "content": "USER",
+            "role": "user"
+          }
+        ],
+        "model": "a-model",
+        "reasoning": {
+          "effort": "none"
+        },
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.95
+      },
+      "headers": {
+        "Authorization": "Bearer key-stage2-openrouter",
+        "Content-type": "application/json",
+        "Http-referer": "https://github.com/Gmacadoches/astro-arc",
+        "X-title": "Astro-Arc"
+      },
+      "method": "POST",
+      "timeout": 60,
+      "url": "https://openrouter.ai/api/v1/chat/completions"
+    }
+  ],
+  "render openai gpt-image-1-mini": [
+    {
+      "body": {
+        "model": "gpt-image-1-mini",
+        "moderation": "low",
+        "n": 1,
+        "prompt": "A PROMPT",
+        "quality": "medium",
+        "size": "1536x1024"
+      },
+      "headers": {
+        "Authorization": "Bearer key-image-openai",
+        "Content-type": "application/json"
+      },
+      "method": "POST",
+      "timeout": 60,
+      "url": "https://api.openai.com/v1/images/generations"
+    }
+  ],
+  "render openai gpt-image-2": [
+    {
+      "body": {
+        "model": "gpt-image-2",
+        "moderation": "low",
+        "n": 1,
+        "prompt": "A PROMPT",
+        "quality": "high",
+        "size": "1536x1024"
+      },
+      "headers": {
+        "Authorization": "Bearer key-image-openai",
+        "Content-type": "application/json"
+      },
+      "method": "POST",
+      "timeout": 60,
+      "url": "https://api.openai.com/v1/images/generations"
+    }
+  ],
+  "render openrouter": [
+    {
+      "body": {
+        "aspect_ratio": "16:9",
+        "model": "openai/gpt-image-1-mini",
+        "n": 1,
+        "prompt": "A PROMPT",
+        "provider": {
+          "options": {
+            "openai": {
+              "moderation": "low"
+            }
+          }
+        },
+        "quality": "medium"
+      },
+      "headers": {
+        "Authorization": "Bearer key-image-openrouter",
+        "Content-type": "application/json",
+        "Http-referer": "https://github.com/Gmacadoches/astro-arc",
+        "X-title": "Astro-Arc"
+      },
+      "method": "POST",
+      "timeout": 180,
+      "url": "https://openrouter.ai/api/v1/images"
+    }
+  ]
+}
