@@ -641,9 +641,10 @@ Panel {
     var c = navCandidates()
     var cur = navCurrentItem()
     if (!cur) {
-      // Nothing focused yet: ←→ browse the generations on the main view,
-      // ↑↓ start at the top or the bottom.
-      if (dx !== 0 && view === "main") { if (dx < 0) showOlder(); else showNewer(); return }
+      // Nothing focused yet: ←→ browse the generations on the main view, the
+      // way the newest-first thumbnail strip runs (← newer, → older); ↑↓
+      // start at the top or the bottom.
+      if (dx !== 0 && view === "main") { if (dx < 0) showNewer(); else showOlder(); return }
       if (c.length > 0) navFocus(dy < 0 ? c[c.length - 1] : c[0])
       return
     }
