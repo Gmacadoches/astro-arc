@@ -18,7 +18,7 @@
 # What this cannot check: whether a property exists on a Quickshell type. That
 # needs qmllint's full type resolution, which currently times out on Panel.qml.
 # The honest last line of defence remains `omarchy-restart-shell` followed by
-# reading the journal, which is what --journal below does.
+# reading the journal, which is what --live below does.
 
 set -uo pipefail
 
@@ -110,7 +110,36 @@ NODE
 fi
 
 # --- 4. The only check that catches a bad property on a Quickshell type ---
-if [[ ${1:-} == --journal ]]; then
+#   --journal  read the running shell's complaints
+#   --live     restart the shell first, then open and close the panel over
+#              IPC so its bindings evaluate, then read them. The deploy check.
+mode=${1:-}
+if [[ $mode == --live ]]; then
+  echo
+  echo "Restarting the shell and opening the panel:"
+  old_pid=$(pgrep -x quickshell | tail -1)
+  omarchy-restart-shell >/dev/null 2>&1
+  shell_pid=""
+  for _ in $(seq 1 40); do
+    shell_pid=$(pgrep -x quickshell | tail -1)
+    [[ -n $shell_pid && $shell_pid != "$old_pid" ]] && break
+    sleep 0.5
+  done
+  if [[ -z $shell_pid || $shell_pid == "$old_pid" ]]; then
+    fail "the shell did not come back after omarchy-restart-shell"
+  else
+    sleep 4   # the shell loads its plugins after the process starts
+    target=$(sed -n 's/.*ipcTarget: "\([^"]*\)".*/\1/p' "$PLUGIN_DIR/Panel.qml" | head -1)
+    if qs ipc --pid "$shell_pid" call "$target" open >/dev/null 2>&1 && sleep 2 \
+        && qs ipc --pid "$shell_pid" call "$target" close >/dev/null 2>&1; then
+      pass "the panel opened and closed over IPC ($target)"
+    else
+      fail "the panel did not answer IPC ($target)"
+    fi
+    sleep 1
+  fi
+fi
+if [[ $mode == --journal || $mode == --live ]]; then
   echo
   echo "Recent astro-arc QML complaints from the running shell:"
   # Scoped to the RUNNING shell's pid, not a time window. A window catches
@@ -123,8 +152,12 @@ if [[ ${1:-} == --journal ]]; then
     found=""
   else
     echo "  (shell pid $shell_pid)"
+    # The qmlscanner's "outside of the config folder" lines are logged for
+    # every symlinked plugin on every start and are harmless, so they are not
+    # complaints; left in, this check failed on every run.
     found=$(journalctl --user --no-pager _PID="$shell_pid" 2>/dev/null \
-      | grep -i "plugins/astro-arc" | grep -iE "WARN|ERROR|Cannot|TypeError" | tail -20)
+      | grep -i "plugins/astro-arc" | grep -iE "WARN|ERROR|Cannot|TypeError|Unable" \
+      | grep -v "is outside of the config folder" | tail -20)
   fi
   if [[ -n $found ]]; then
     echo "$found" | sed 's/^/  /'
@@ -134,8 +167,8 @@ if [[ ${1:-} == --journal ]]; then
   fi
 else
   echo
-  echo "  note: run with --journal AFTER omarchy-restart-shell to catch"
-  echo "        bad-property errors, which no static check here can see."
+  echo "  note: run with --live to restart the shell, open the panel and read"
+  echo "        the journal: bad-property errors show only at runtime."
 fi
 
 echo
