@@ -86,11 +86,12 @@ Column {
     // Focused, it is the browser: ←→ page, Enter opens the image. At either
     // end the key goes on to the panel's navigation.
     activeFocusOnTab: section.count > 0
+    // The strip runs newest-first from the left, so ← is newer, → older.
     Keys.onLeftPressed: function(event) {
-      if (section.index < section.count - 1) panel.showOlder(); else event.accepted = false
+      if (section.index > 0) panel.showNewer(); else event.accepted = false
     }
     Keys.onRightPressed: function(event) {
-      if (section.index > 0) panel.showNewer(); else event.accepted = false
+      if (section.index < section.count - 1) panel.showOlder(); else event.accepted = false
     }
     Keys.onReturnPressed: panel.openSelectedImage()
     Keys.onEnterPressed: panel.openSelectedImage()
@@ -127,7 +128,7 @@ Column {
       onClicked: panel.openSelectedImage()
     }
 
-    // ‹ older, › newer. Mouse targets on the image; from the keyboard the
+    // ‹ newer, › older, as the strip runs. Mouse targets on the image; from the keyboard the
     // focused image takes ←→ itself.
     Repeater {
       model: [{ older: true }, { older: false }]
@@ -137,7 +138,7 @@ Column {
         readonly property bool live: modelData.older ? section.index < section.count - 1 : section.index > 0
         visible: section.count > 1
         anchors.verticalCenter: parent.verticalCenter
-        x: modelData.older ? Style.space(8) : parent.width - width - Style.space(8)
+        x: modelData.older ? parent.width - width - Style.space(8) : Style.space(8)
         width: Style.space(34)
         height: Style.space(42)
         radius: Style.cornerRadius
@@ -147,7 +148,7 @@ Column {
         Text {
           textFormat: Text.PlainText
           anchors.centerIn: parent
-          text: parent.modelData.older ? "󰅁" : "󰅂"
+          text: parent.modelData.older ? "󰅂" : "󰅁"
           color: panel.bar.foreground
           font.family: panel.bar.fontFamily
           font.pixelSize: Style.font.body
