@@ -19,8 +19,10 @@ from unittest import mock
 
 BIN = Path(__file__).resolve().parents[1] / "bin"
 sys.path.insert(0, str(BIN))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import settings  # noqa: E402
+from throwaway import throwaway_home  # noqa: E402
 
 # What astro-arc-config's DEFAULTS string said before the schema; the schema
 # must keep saying it, in this order.
@@ -126,10 +128,8 @@ class CommandLineTest(unittest.TestCase):
     """astro-arc-config and astro-arc-generate --check-due, as processes."""
 
     def setUp(self):
-        self.home = Path(tempfile.mkdtemp())
+        self.home, self.env = throwaway_home(self)
         self.state = self.home / ".local/state/omarchy/astro-arc"
-        self.env = {**{k: v for k, v in os.environ.items() if not k.startswith(("ASTRO_ARC_", "XDG_"))},
-                    "HOME": str(self.home), "XDG_DATA_HOME": str(self.home / "share")}
 
     def run_bin(self, name, *args):
         return subprocess.run([str(BIN / name), *args], env=self.env, capture_output=True, text=True, timeout=60)
