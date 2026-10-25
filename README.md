@@ -254,11 +254,18 @@ Apache-2.0) makes in a few seconds on the CPU. Each new generation gets its
 own map, and so does any wallpaper you put on screen yourself.
 
 It is off by default, and it needs a one-time install. The first time you turn
-it on, the panel offers **Install (about 270 MB)**. That puts the model (95 MB,
-from Hugging Face, pinned to one version and checked against its hash) and a
-private Python environment with onnxruntime, numpy and pillow (about 175 MB,
-from PyPI) in `~/.local/state/omarchy/astro-arc/motion/`. It needs no root and
-touches nothing outside that folder. From a terminal, the same install is:
+it on, the panel lists what it would download and offers **Install (about
+270 MB)**. Nothing is downloaded until you press it. It puts two things in
+`~/.local/state/omarchy/astro-arc/motion/`:
+
+- the depth model (99 MB), from Hugging Face, pinned to one commit and checked
+  against its hash;
+- a private Python environment with exactly three packages from PyPI, pinned
+  and installed as prebuilt wheels only: onnxruntime 1.31.0, numpy 2.5.4 and
+  pillow 13.0.0 (about 170 MB).
+
+It needs no root and touches nothing outside that folder. From a terminal,
+`astro-arc-motion plan --venv` shows the same list, and the install is:
 
 ```sh
 ~/.config/omarchy/plugins/astro-arc/backend/bin/astro-arc-motion setup --venv

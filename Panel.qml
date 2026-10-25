@@ -1603,10 +1603,14 @@ Panel {
   // itself. What it needs is an optional install (onnxruntime, numpy and
   // pillow in a private venv, plus the 99 MB model: about 270 MB), so with
   // motion on the panel asks astro-arc-motion status whether it is there and,
-  // if not, offers Install under the toggle. -------------------------------
+  // if not, lists what Install would download (astro-arc-motion plan, every
+  // package with its pinned version) and offers Install under the toggle.
+  // Nothing is downloaded until that button is pressed. ---------------------
   readonly property string motionBin: binDir + "/astro-arc-motion"
   // "" not checked yet, "ready", or "missing".
   property string motionStatus: ""
+  // What Install would fetch: [{ kind: "package"|"model", name, version, size }].
+  property var motionPlan: []
   property string motionInstallError: ""
   readonly property bool motionInstalling: motionSetupProc.running
 
@@ -1629,7 +1633,27 @@ Panel {
   Process {
     id: motionStatusProc
     command: [root.motionBin, "status"]
-    onExited: function(exitCode) { root.motionStatus = exitCode === 0 ? "ready" : "missing" }
+    onExited: function(exitCode) {
+      root.motionStatus = exitCode === 0 ? "ready" : "missing"
+      if (exitCode !== 0 && !motionPlanProc.running) motionPlanProc.running = true
+    }
+  }
+
+  Process {
+    id: motionPlanProc
+    command: [root.motionBin, "plan", "--venv"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var plan = []
+        String(text || "").split("\n").forEach(function(line) {
+          var f = line.split("\t")
+          if (f[0] === "package" && f.length === 3) plan.push({ kind: "package", name: f[1], version: f[2] })
+          else if (f[0] === "model" && f.length === 4) plan.push({ kind: "model", name: f[1], version: f[2], size: f[3] })
+        })
+        root.motionPlan = plan
+      }
+    }
   }
 
   Process {

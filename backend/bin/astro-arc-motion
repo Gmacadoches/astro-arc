@@ -15,13 +15,20 @@
 # STATE_DIR/motion/venv, which `setup --venv` creates. Neither present means no
 # depth map and a still wallpaper. Nothing here ever needs root.
 #
+# Only `setup` downloads anything, and only when the user asks: the panel's
+# Install button, or the command run by hand. `plan` prints what it would
+# fetch, pinned, so the panel can show it before the click.
+#
 # Usage:
 #   astro-arc-motion depth <image>   make the image's depth map; prints its path
 #   astro-arc-motion lookup [image]  prints "<image>\t<depth map or empty>";
 #                                    the image defaults to the current background
 #   astro-arc-motion backfill        depth for the current background
-#   astro-arc-motion setup [--venv]  fetch the model (99 MB, once); --venv also
-#                                    installs onnxruntime into a private venv
+#   astro-arc-motion plan [--venv]   what setup would download, one per line:
+#                                    "package\t<name>\t<version>" (PyPI) and
+#                                    "model\t<name>\t<commit>\t<size>" (Hugging Face)
+#   astro-arc-motion setup [--venv]  fetch the model (95 MB, once); --venv also
+#                                    installs PACKAGES into a private venv
 #   astro-arc-motion prune <days>    delete depth maps not used in <days> days
 #   astro-arc-motion status          one line per requirement, exit 0 if all met
 
@@ -40,9 +47,16 @@ CURRENT_BACKGROUND_LINK="$OMARCHY_CURRENT_DIR/background"
 # Hugging Face's onnx-community export of depth-anything/Depth-Anything-V2-Small
 # (Apache-2.0), pinned to one commit and checked against its hash, so a changed
 # upstream file fails the download instead of being run.
-MODEL_URL="https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/4472b7362082ad9968fee890ca0f1e5aca36b93d/onnx/model.onnx"
+MODEL_COMMIT=4472b7362082ad9968fee890ca0f1e5aca36b93d
+MODEL_URL="https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/$MODEL_COMMIT/onnx/model.onnx"
 MODEL_SHA256="afb6a5c28f3b6bf1618c6e43f02073ef9dfdc70e937502d51603e57b0a1df10c"
 MODEL_BYTES=99060839
+
+# What the private venv gets, exactly: pinned versions, prebuilt wheels only
+# (a source build would run the package's own build code), and --no-deps, so
+# this list is everything pip installs. onnxruntime's other declared deps
+# (flatbuffers, protobuf, packaging) are not needed to run a model.
+PACKAGES=(onnxruntime==1.31.0 numpy==2.5.4 pillow==13.0.0)
 
 # Prints the interpreter that can run depth_map.py, or nothing.
 depth_python() {
@@ -59,7 +73,11 @@ fetch_model() {
   [[ -f $MODEL_FILE ]] && return 0
   mkdir -p "$MOTION_DIR"
   local tmp="$MODEL_FILE.part"
-  curl -fsSL --max-filesize $((MODEL_BYTES + 1024)) -o "$tmp" "$MODEL_URL" || { rm -f "$tmp"; return 1; }
+  # HTTPS only, redirects included (Hugging Face hands the file to its CDN);
+  # a connection that stalls below 10 kB/s for a minute is given up.
+  curl -fsSL --proto '=https' --proto-redir '=https' --connect-timeout 20 \
+    --speed-limit 10240 --speed-time 60 \
+    --max-filesize $((MODEL_BYTES + 1024)) -o "$tmp" "$MODEL_URL" || { rm -f "$tmp"; return 1; }
   if [[ $(sha256sum "$tmp" | cut -d' ' -f1) != "$MODEL_SHA256" ]]; then
     echo "astro-arc-motion: the downloaded model does not match its pinned hash; discarded" >&2
     rm -f "$tmp"
@@ -83,10 +101,13 @@ make_depth() {
   fi
   py="$(depth_python)"
   if [[ -z $py ]]; then
-    echo "astro-arc-motion: no Python with numpy, pillow and onnxruntime (install python-onnxruntime-cpu, or run astro-arc-motion setup --venv)" >&2
+    echo "astro-arc-motion: no Python with numpy, pillow and onnxruntime (Install in the panel, or astro-arc-motion setup --venv)" >&2
     return 3
   fi
-  fetch_model || { echo "astro-arc-motion: could not fetch the depth model" >&2; return 1; }
+  if [[ ! -f $MODEL_FILE ]]; then
+    echo "astro-arc-motion: the depth model is not installed (Install in the panel, or astro-arc-motion setup)" >&2
+    return 3
+  fi
   mkdir -p "$DEPTH_DIR"
   PYTHONDONTWRITEBYTECODE=1 nice -n 10 "$py" "$BIN_DIR/depth_map.py" "$MODEL_FILE" "$image" "$out"
   echo "$out"
@@ -114,10 +135,17 @@ case "${1:-}" in
   backfill)
     make_depth "$CURRENT_BACKGROUND_LINK"
     ;;
+  plan)
+    if [[ ${2:-} == "--venv" && -z $(depth_python) ]]; then
+      for pkg in "${PACKAGES[@]}"; do printf 'package\t%s\t%s\n' "${pkg%%==*}" "${pkg#*==}"; done
+    fi
+    [[ -f $MODEL_FILE ]] || printf 'model\tDepth Anything V2 Small\t%s\t%s MB\n' "${MODEL_COMMIT:0:7}" $((MODEL_BYTES / 1000000))
+    ;;
   setup)
     if [[ ${2:-} == "--venv" && -z $(depth_python) ]]; then
-      python3 -m venv --system-site-packages "$VENV_DIR"
-      PYTHONDONTWRITEBYTECODE=1 "$VENV_DIR/bin/pip" install --quiet --disable-pip-version-check onnxruntime pillow
+      python3 -m venv "$VENV_DIR"
+      PYTHONDONTWRITEBYTECODE=1 "$VENV_DIR/bin/pip" install --quiet --disable-pip-version-check \
+        --no-deps --only-binary=:all: --timeout 30 "${PACKAGES[@]}"
     fi
     fetch_model
     exec "$0" status
@@ -135,7 +163,7 @@ case "${1:-}" in
     exit "$ok"
     ;;
   *)
-    echo "Usage: astro-arc-motion (depth <image> | lookup [image] | backfill | setup [--venv] | prune <days> | status)" >&2
+    echo "Usage: astro-arc-motion (depth <image> | lookup [image] | backfill | plan [--venv] | setup [--venv] | prune <days> | status)" >&2
     exit 1
     ;;
 esac

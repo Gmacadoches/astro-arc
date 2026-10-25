@@ -107,7 +107,34 @@ Column {
     fontFamily: panel.bar.fontFamily
     text: panel.motionInstalling
       ? "Installing — this downloads about 270 MB and takes a few minutes."
-      : "Needs a one-time install to move: the depth model and the Python packages that run it, about 270 MB, kept in ~/.local/state. Until then the wallpaper stays still."
+      : "Needs a one-time install to move. Install downloads exactly these, about 270 MB in all, into ~/.local/state/omarchy/astro-arc/motion. Until then the wallpaper stays still."
+  }
+
+  // What Install fetches, every item with its pinned version, shown before
+  // the click (astro-arc-motion plan).
+  Column {
+    width: parent.width
+    visible: panel.configState.motion && panel.motionStatus === "missing" && panel.motionPlan.length > 0
+    spacing: Style.space(2)
+
+    Repeater {
+      model: panel.motionPlan
+
+      Text {
+        required property var modelData
+        width: parent.width
+        leftPadding: Style.space(14)
+        textFormat: Text.PlainText
+        wrapMode: Text.WordWrap
+        text: "• " + (modelData.kind === "package"
+          ? modelData.name + " " + modelData.version + " · Python package from PyPI"
+          : modelData.name + " model, " + modelData.size + " · from Hugging Face, commit "
+            + modelData.version + ", checked against its hash")
+        color: Qt.darker(panel.bar.foreground, 1.3)
+        font.family: panel.bar.fontFamily
+        font.pixelSize: Style.font.caption
+      }
+    }
   }
 
   Text {
