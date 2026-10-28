@@ -52,7 +52,8 @@ class CatalogTest(unittest.TestCase):
         self.assertIn(MARKER, meaning_prompt)
         self.assertEqual(result["artStyle"], KEY)
         self.assertEqual(result["artStyleLabel"], "Fixture World")
-        self.assertTrue(result["finalPrompt"].endswith(style.suffix_for(result["hasPeople"])))
+        self.assertTrue(result["finalPrompt"].endswith(
+            f"{style.suffix_for(result['hasPeople'])}; {lp.LETTERING_RULE}"))
 
     def test_a_missing_register_line_is_an_error(self):
         register = self.load().registers[0]

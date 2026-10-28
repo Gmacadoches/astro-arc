@@ -722,12 +722,26 @@ class Theme(dict):
         return str(self["light"][exposure_band]).strip()
 
 
+# The image model letters whatever Stage 2 names: "a roadside oracle kiosk"
+# came back with ROADSIDE ORACLE painted on it, receipts and call buttons
+# carried invented slogans, and none of that text was in the prompt. A batch of
+# 30 styles on 2026-10-27 had readable English signage in most frames, and it
+# spoiled them. Stage 2 can't prevent it, so the rule rides on what the image
+# model itself is sent, after the suffix, for every style. Another script is
+# allowed where the world itself would write it (kanji on an Edo shop curtain).
+LETTERING_RULE = ("almost no lettering anywhere in the image: at most one short English word in the whole frame, "
+                  "and signs, labels, screens, papers, packaging and banners are blank or carry only abstract marks; "
+                  "writing in another script appears only where this world's own people would write it, "
+                  "and stays to a few characters")
+
+
 def final_image_prompt(image_prompt, style, has_people):
-    """Stage 2's prompt joined with the style suffix: exactly what the image
-    model is sent. build() and the sweep/replay harnesses all call this, so a
-    sweep renders the prompt production would."""
+    """Stage 2's prompt joined with the style suffix and LETTERING_RULE:
+    exactly what the image model is sent. build() and the sweep/replay
+    harnesses all call this, so a sweep renders the prompt production would."""
     style_suffix = style.suffix_for(has_people)
-    return f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
+    joined = f"{image_prompt}, {style_suffix}" if style_suffix else image_prompt
+    return f"{joined}; {LETTERING_RULE}"
 
 
 HIGHLIGHT_MODES_LEN = (4, 6)
