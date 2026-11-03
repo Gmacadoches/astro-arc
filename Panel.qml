@@ -1480,6 +1480,15 @@ Panel {
     return tweakExampleChoices.mine.length > 0 ? tweakExampleChoices.mine[0] : null
   }
   readonly property string tweakExampleImage: tweakExample ? tweakExample.imagePath : ""
+  readonly property int tweakExampleIndex: tweakExample ? tweakExampleChoices.all.indexOf(tweakExample) : -1
+
+  // Picking an example means sending it.
+  function pickTweakExample(i) {
+    var all = tweakExampleChoices.all
+    if (i < 0 || i >= all.length) return
+    tweakExampleId = all[i].id
+    tweakIncludeExample = true
+  }
   // The backup's manifest, when there is one: {key, files, savedAt}.
   property var tweakBackup: null
 
