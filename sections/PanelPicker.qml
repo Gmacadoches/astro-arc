@@ -17,7 +17,7 @@ Item {
   id: picker
 
   property string value: ""
-  // [{ value, label, tag }] — tag is a short dim note on the right ("custom").
+  // [{ value, label, tag }] — tag is a short dim note on the right ("★").
   property var options: []
   property string footerText: ""
   // The item the list must stay inside: the panel's content area.

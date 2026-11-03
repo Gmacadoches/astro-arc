@@ -1,0 +1,77 @@
+label = "1960s Psychedelic Concert Poster"
+suffix = "1960s psychedelic concert poster art, vibrating complementary colours of orange against blue and magenta against green, swirling melting organic shapes, bold black outlines, flat screen-printed colour, op-art patterns radiating outward, decorative borders of flowing curves, figures drawn with flowing hair and stylised features, main subject below the top edge, no lettering"
+space = [
+  "a figure in the centre with swirling patterns radiating to the edges",
+  "a sun rising over melting hills",
+  "a field of flowers rolling to a rainbow horizon",
+  "a cosmic eye opening over a landscape",
+  "a road winding to a glowing mountain",
+  "waves curling into spirals toward the horizon",
+  "a crowd at a festival under a vast sky",
+]
+
+[world]
+era = "A late-1960s dream of festivals, communes and cosmic consciousness, with technology of guitars, vans, light shows and record players."
+materials = "Flowers, paint and flowing fabric lead; beads, guitars, vans, sunlight, mirrors and smoke are the common stuff."
+physics = "Shapes melt and flow into each other; colours vibrate; patterns radiate. Suns, eyes and lights glow. Nothing stays still."
+society = "Festivals, communes, beaches and concert halls. People dance, play music, garden, paint, travel in vans and gather in circles."
+weather = "Rainbows, a storm with spiralling clouds, a blazing sun, a starry night, a warm haze. Pick what the day calls for."
+inhabitants = "Musicians, dancers, wanderers, children, butterflies, peacocks, horses, cosmic beings and giant flowers with faces."
+strangeness = "Consciousness made visible: a figure whose hair becomes a river, a face in the sun. Everyone grooves along."
+numinous = "The sacred is the cosmic eye and the sun: radiating mandalas, a third eye, the universe as a single flower."
+dread = "On hard days the trip turns: colours curdling into mud, a storm over the festival, faces melting, patterns closing in."
+favoured_actors = "Crowds, figures in relation, animals and presences. A single guitarist on stage is the most worn image here and should not be the default."
+myth = "Eastern mysticism as the sixties saw it, Art Nouveau revival, and the counterculture's cosmic tales."
+highlight = "The thing the eye finds first is a form that melts or radiates into the patterns around it. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a figure dissolving into a pattern",
+  "a celestial body with a face and eyes",
+  "a flower or creature at cosmic scale",
+  "a landscape bending like liquid",
+  "a mandala opening in the sky",
+]
+
+[brief]
+signature = "SIGNATURE — at least one pair of vibrating complementary colours is named, and swirling or radiating pattern is in frame. A calm realistic scene is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the frame is deep purple and black, lit by light show colours and stars. A frame that is mostly bright is a failed response."
+mid = "Colour radiates from one point, bright near it and darker toward the edges. A frame with no centre of light is a failed response."
+hi = "Full blazing colour across the whole poster. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["curdling", "melting", "closing in", "storming", "dripping", "twisting", "warping", "darkening", "clashing", "crumbling", "screaming", "smearing", "spiralling down", "collapsing", "burning", "fracturing", "swallowing", "tangling", "bleeding colour", "grinding", "souring"]
+process_soft = ["radiating", "swirling", "blooming", "melting gently", "flowing", "vibrating", "rippling", "unfolding", "pulsing", "sparkling", "glowing", "dancing", "rising", "spiralling", "shimmering", "opening", "humming", "streaming", "flowering", "waving", "twinkling"]
+actor_hard.work = ["holding together", "dragging", "rescuing from", "bailing out", "patching", "sheltering others from"]
+actor_hard.rest = ["sheltering under", "huddling at", "lost in", "waiting at"]
+actor_hard.play = ["dancing wildly at", "racing", "spinning through", "leaping"]
+actor_hard.ritual = ["chanting at", "drumming at", "holding hands around"]
+actor_hard.travel = ["fleeing", "driving through", "wandering lost through", "climbing"]
+actor_soft.work = ["painting", "playing music at", "gardening at", "making beads at", "building"]
+actor_soft.rest = ["lying in", "resting at", "dozing at", "meditating at"]
+actor_soft.play = ["dancing at", "playing guitar at", "swimming at", "blowing bubbles at", "spinning at"]
+actor_soft.ritual = ["gathering in a circle at", "garlanding", "celebrating at"]
+actor_soft.travel = ["driving a van to", "walking to", "drifting to", "arriving at"]
+
+[registers]
+"botanical" = "Plants as giant flowers, vines and mushrooms in flowing shapes."
+"bodily and anatomical" = "Bodies as flowing figures with streaming hair, never gore."
+"fungal and decaying" = "Decay as melting colour and strange mushrooms."
+"animal and creaturely" = "Animals as butterflies, peacocks and horses."
+"geological" = "Rock as rolling, melting hills and mountains."
+"metallic and ore" = "Metal as guitars and van chrome."
+"glass and ceramic" = "Glass as mirrors, beads and prisms."
+"architectural" = "Buildings as domes, stages and painted houses."
+"domestic interior" = "A painted room with a window onto a swirling sky."
+"mechanical" = "Machines as vans, record players and projectors."
+"industrial and infrastructural" = "Works as stages, roads and bridges."
+"agricultural and cultivated" = "Farming as commune gardens and fields."
+"aquatic" = "Water as swirling waves and rivers."
+"atmospheric" = "Sky as rainbow, sun and cosmic swirl."
+"glacial and frozen" = "Ice as crystal patterns and a cool blue palette."
+"fire and ember" = "Fire as flowing orange flames and a radiant sun."
+"textile and fiber" = "Fabric as tie-dye, fringe and flowing robes."
+"ritual object" = "Ritual objects as mandalas, beads and incense."
+"paper and inscription" = "Paper as posters and records, never a sentence."
+"instrument and measure" = "Measure as oscillating patterns and op-art rings."

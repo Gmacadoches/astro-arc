@@ -1,0 +1,77 @@
+label = "16-Bit Pixel Art"
+suffix = "16-bit pixel art, crisp hard pixels with no anti-aliasing, limited palette with careful dithering for gradients, parallax-layered background, clean one-pixel outlines on sprites, sprites drawn as small readable characters with expressive poses, main subject kept below the top edge"
+space = [
+  "a side-on scene with layered parallax hills running back to a far castle",
+  "a top-down town square opening onto roads in four directions",
+  "down a dungeon corridor lit by torches toward a far door",
+  "across a harbour of moored ships to a lighthouse",
+  "up a cliffside path of ledges toward a shrine",
+  "through a forest of tall tree trunks with layers of canopy behind",
+  "across an overworld map of tiles toward a distant mountain",
+]
+
+[world]
+era = "A fantasy world from the age of cartridges: swords and spells, airships and clockwork, villages with an inn and a shop, and a hero's road running through all of it."
+materials = "Stone tiles, wood planks and grass tiles lead; brick, water tiles, crystal, chests, banners and lava are the common stuff. Every material is a repeating tile."
+physics = "The world is built on a grid; things can be pushed one tile at a time. Crystals, save points, magic and lava glow. Spells are bursts of a few bright colours."
+society = "Villages, castles, guild halls, inns and fairs. People adventure, but just as often trade, fish, cook, dance at festivals and sleep at the inn."
+weather = "Weather in tiles: falling pixel rain, snow flurries, a dithered fog, lightning flashes, clear blue skies. Pick what the day calls for."
+inhabitants = "Heroes, shopkeepers, knights, mages, slimes, dragons, talking animals, robots and ghosts, and villagers who repeat their lines."
+strangeness = "Game logic as nature: a chest in the middle of a field, a door to nowhere, a monster waiting politely in a corridor. Everyone accepts it."
+numinous = "The sacred is the crystal and the shrine: an elemental crystal shining in a temple, a goddess statue that heals, a great tree at the world's centre."
+dread = "On hard days the world is in its dark chapter: a castle overrun, a town on fire, the sky turned red, a corrupted area with glitched tiles."
+favoured_actors = "A party of figures in relation, crowds at festivals, creatures, and townsfolk at handwork. A lone hero with a raised sword is the most worn image here and should not be the default."
+myth = "European and Japanese fantasy, elemental crystal cosmologies, and the epic quest."
+highlight = "The thing the eye finds first is a sprite, object or tile that is out of place in the game's world. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a boss-sized creature somewhere it should not be",
+  "a world tile glitched into the wrong place",
+  "an item drawn huge and important",
+  "a sprite from a different part of the world entirely",
+  "a structure that should be in the sky set on the ground",
+]
+
+[brief]
+signature = "SIGNATURE — at least one game-world element is named in frame: a treasure chest, a save crystal, a health potion, or a spell effect. A scene that could be any pixel landscape is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night or a dungeon. At least two thirds of the frame is dark, with torches, crystals or windows as the only light. A frame that is mostly bright is a failed response."
+mid = "The light falls from one side, with dithered shadows filling a good part of the frame. A frame lit evenly from everywhere is a failed response."
+hi = "It is bright day, flat and clear, every tile fully visible. A frame that is mostly dark or lit by a setting sun is a failed response."
+
+[verbs]
+process_hard = ["burning", "glitching", "being overrun", "crumbling tile by tile", "flooding with lava", "cracking", "corrupting", "quaking", "flickering", "collapsing", "spawning monsters", "falling dark", "sinking", "smouldering", "breaching", "raining fire", "tearing open", "freezing over", "rotting", "draining its colour", "shaking"]
+process_soft = ["sparkling", "respawning", "levelling up", "twinkling", "spinning", "bobbing", "healing", "growing a new tile", "shining", "bouncing", "flowing in tiles", "fluttering", "unlocking", "opening", "dawning", "chiming", "wafting", "restoring", "saving", "looping its tune", "flapping"]
+actor_hard.work = ["barricading", "hammering at", "dragging the wounded from", "digging through", "sealing", "repairing"]
+actor_hard.rest = ["catching breath behind", "huddling in the inn by", "sitting out the night at", "nursing wounds at"]
+actor_hard.play = ["dodging through", "dashing across", "jumping the gaps of", "sliding under"]
+actor_hard.ritual = ["chanting a seal over", "carrying the crystal from", "keeping watch at"]
+actor_hard.travel = ["fleeing through", "climbing toward", "sailing out from", "running along"]
+actor_soft.work = ["forging", "fishing at", "cooking at", "selling potions at", "tending"]
+actor_soft.rest = ["sleeping at the inn by", "sitting at", "resting at the save point by", "reading in"]
+actor_soft.play = ["dancing at the festival in", "playing cards at", "racing riding birds across", "fishing for fun off", "kicking a ball across"]
+actor_soft.ritual = ["praying at", "lighting candles at", "offering a flower to"]
+actor_soft.travel = ["walking the road to", "riding an airship over", "sailing to", "crossing the bridge to"]
+
+[registers]
+"botanical" = "Plants as tiles and sprites: grass tufts, round trees, healing herbs that sparkle."
+"bodily and anatomical" = "Bodies as small expressive sprites: a knight's armour, a mage's robe. Hit is shown as a flash, never gore."
+"fungal and decaying" = "Decay as a poison swamp or giant mushrooms: purple bog tiles, toadstool houses."
+"animal and creaturely" = "Creatures as monsters and companions: a slime, a dragon, a loyal dog. Every creature has a readable silhouette."
+"geological" = "Rock as caves and cliffs: crystal caverns, stepped cliff ledges. Stone is where dungeons hide."
+"metallic and ore" = "Metal as weapons, armour and ore: a sword in an anvil, glittering ore veins."
+"glass and ceramic" = "Glass and clay as potions and pots: rows of potions, breakable jars in a dungeon."
+"architectural" = "Buildings as castles, inns and towers: a castle gate, a wizard's tower. Every building has a door you could enter."
+"domestic interior" = "An inn or a home: a hearth, a bed, a table of food. Always with a window or door to the world."
+"mechanical" = "Machines as clockwork and airship parts: gears in a tower, a propeller."
+"industrial and infrastructural" = "Works as mines and bridges: a mine cart track, a drawbridge. Simple and tile-built."
+"agricultural and cultivated" = "Farming as tile fields: rows of crops, a windmill. Seasons change the tiles."
+"aquatic" = "Water as animated tiles: a sparkling river, a harbour. Fish jump in two frames."
+"atmospheric" = "Sky as parallax layers: drifting clouds, a sunset gradient in dithered bands."
+"glacial and frozen" = "Ice as a frozen level: slippery ice tiles, icicles, snowy pines."
+"fire and ember" = "Fire as torches, lava and spells: lava tiles, a fireball."
+"textile and fiber" = "Fabric as banners and capes: guild banners, a hero's cape. Cloth is two or three colours."
+"ritual object" = "Ritual objects are crystals, relics and altars: an elemental crystal, a sacred sword."
+"paper and inscription" = "Paper as scrolls, maps and signs: a quest scroll, a wooden signpost. Lettering is tiny glyphs, never a sentence."
+"instrument and measure" = "Measure as the game's own: a compass, a clock tower. Things count and tick."

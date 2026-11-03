@@ -1,0 +1,77 @@
+label = "Byzantine Gold Mosaic"
+suffix = "Byzantine wall mosaic, thousands of small glass and stone tesserae, shimmering gold-leaf tesserae background, deep lapis blue, porphyry red and emerald, tesserae set in curving rows that follow forms, slight unevenness catching light, figures frontal and solemn with large eyes and simple outlines, main subject held below the top edge"
+space = [
+  "figures in a row on a gold ground with a strip of landscape at their feet",
+  "a walled city in the distance on a gold field with a river before it",
+  "a garden of stylised trees receding to a domed building",
+  "a harbour of ships under a gold sky",
+  "a procession moving toward an arched doorway",
+  "a mountain of stepped rocks rising against gold",
+  "a vault of stars curving above a scene",
+]
+
+[world]
+era = "The late-antique Mediterranean of emperors, monks and merchants: domed churches, harbours and gardens, with technology of ships, aqueducts and silk looms."
+materials = "Gold, glass tesserae and marble lead; silk, porphyry, pearls, bronze, parchment and olive wood are the common stuff."
+physics = "The background is gold and timeless; figures stand outside of ordinary space. Gold shimmers and halos shine; nothing else glows."
+society = "Cities of domes, markets, harbours and monasteries. People trade, pray, feast, race chariots, weave silk and gather for processions."
+weather = "Weather set in stone: storm waves in rows of tesserae, rain as blue lines, snow on mountains, a still golden day. Pick what the day calls for."
+inhabitants = "Emperors, monks, sailors, shepherds, peacocks, lambs, deer, dolphins, angels and saints."
+strangeness = "The eternal in the everyday: an angel at a market stall, a peacock as tall as a church. Onlookers stand calmly."
+numinous = "The sacred is gold itself and the great figure in the dome: a vast face looking down, a hand from the sky, haloed beings."
+dread = "On hard days the empire falters: a city besieged, a ship lost in a storm, plague, tesserae falling away to bare plaster."
+favoured_actors = "Processions and rows of figures, animals, presences and crowds. A single enthroned figure is the most worn image here and should not be the default."
+myth = "Byzantine Christian iconography, late Greco-Roman myth and the Mediterranean sea trade's legends."
+highlight = "The thing the eye finds first is a creature or figure given gold and sacred weight. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "an ordinary animal given a halo and a throne",
+  "a city carried in someone's hands",
+  "a hand or face reaching in from the gold",
+  "a section of mosaic missing to reveal another scene beneath",
+  "a sea creature in the sky",
+]
+
+[brief]
+signature = "SIGNATURE — gold tesserae fill at least part of the background, and the tesserae themselves are mentioned. A scene that could be a painting is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is a dim church: two thirds of the mosaic is in deep blue and shadow, with gold catching only candlelight. A frame that is mostly bright is a failed response."
+mid = "Light from one window rakes across, making gold flash on one side. A frame lit evenly is a failed response."
+hi = "Bright daylight across the whole mosaic, gold gleaming everywhere. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["crumbling", "falling away", "besieging", "burning", "cracking", "sinking", "drowning", "plaguing", "darkening", "toppling", "shattering", "splitting", "storming", "tarnishing", "fading", "collapsing", "looting", "rotting", "flooding", "scattering", "breaking"]
+process_soft = ["gleaming", "shimmering", "blessing", "radiating", "flowering", "rising", "processing", "crowning", "glittering", "flowing", "ripening", "nesting", "spreading wings", "shining", "unfolding", "pouring", "fruiting", "twinkling", "sparkling", "dawning", "unfurling"]
+actor_hard.work = ["defending", "repairing", "hauling", "carrying water to", "rowing hard at", "rebuilding"]
+actor_hard.rest = ["sheltering in", "waiting at", "kneeling at", "collapsed by"]
+actor_hard.play = ["racing chariots at", "wrestling at", "fencing at", "riding hard past"]
+actor_hard.ritual = ["praying at", "carrying icons past", "mourning at"]
+actor_hard.travel = ["fleeing", "sailing through", "marching to", "climbing"]
+actor_soft.work = ["weaving silk at", "harvesting olives at", "shepherding", "trading at", "building"]
+actor_soft.rest = ["feasting at", "resting by", "sitting at", "sleeping at"]
+actor_soft.play = ["racing chariots for sport at", "playing music at", "dancing at", "hunting at", "fishing at"]
+actor_soft.ritual = ["processing to", "crowning", "offering gifts at"]
+actor_soft.travel = ["sailing to", "riding to", "walking to", "arriving at"]
+
+[registers]
+"botanical" = "Plants as vines, palms and trees of life in tesserae."
+"bodily and anatomical" = "Bodies as frontal robed figures, never gore."
+"fungal and decaying" = "Decay as missing tesserae and cracked plaster."
+"animal and creaturely" = "Animals as peacocks, lambs, deer and dolphins."
+"geological" = "Rock as stepped mountains in tesserae."
+"metallic and ore" = "Metal as gold, bronze doors and crowns."
+"glass and ceramic" = "Glass as the tesserae themselves, and lamps."
+"architectural" = "Buildings as domes, arches and walled cities."
+"domestic interior" = "A villa room with a mosaic floor and a window onto the sea."
+"mechanical" = "Machines as water mills, looms and ship oars."
+"industrial and infrastructural" = "Works as aqueducts, harbours and walls."
+"agricultural and cultivated" = "Farming as vineyards, olive groves and harvests."
+"aquatic" = "Water as waves in rows of tesserae with fish."
+"atmospheric" = "Sky as gold or starry blue vault."
+"glacial and frozen" = "Snow on stepped mountains in white tesserae."
+"fire and ember" = "Fire as lamps and a burning city."
+"textile and fiber" = "Fabric as silk robes with pearl borders."
+"ritual object" = "Ritual objects as chalices, censers and icons."
+"paper and inscription" = "Paper as scrolls and codices, never a sentence."
+"instrument and measure" = "Measure as the sundial and the zodiac ring."

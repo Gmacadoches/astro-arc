@@ -4,11 +4,12 @@
 // the same way weather/Model.js is.
 
 // The Style dropdown is built from the theme files themselves
-// (backend/bin/style_catalog.py): shipped themes in backend/pipeline/styles/,
-// the user's own in ~/.config/astro-arc/styles/. Only the default key is
-// known here; it is what a config with no style, or with a key whose theme is
-// gone, falls back to (llm_pipeline.DEFAULT_STYLE says the same).
-var DEFAULT_ART_STYLE = "symbolist"
+// (backend/bin/style_catalog.py), every one of them the user's own in
+// ~/.config/astro-arc/styles/; the ones that ship are seeded there. Only the
+// default key is known here; it is what a config with no style, or with a key
+// whose theme is gone, falls back to (llm_pipeline.DEFAULT_STYLE says the
+// same).
+var DEFAULT_ART_STYLE = "marbled-paper"
 
 // How many days one "Themes Generated" entry represents, by frequency —
 // used only to estimate how many entries a retention window will hold
@@ -74,24 +75,38 @@ var THEME_GENERATOR_CHOICES = [
   { key: "aether", label: "Aether (Omarchy)" }
 ]
 
-// One catalog row's dropdown label. A user theme says so; a theme that fails
-// validation stays listed, so a broken file is visible rather than missing.
+// One catalog row's dropdown label. A theme that fails validation stays
+// listed, so a broken file is visible rather than missing.
 function styleOptionLabel(row) {
   if (!row) return ""
   var label = row.label || row.key
-  if (row.source === "user") label += " (custom)"
   if (!row.valid) label += " (Failed Validation)"
   return label
 }
 
-// Shipped themes first, then the user's, each alphabetical by label.
-function sortStyleCatalog(rows) {
+// Starred styles first, then the rest, each alphabetical by label.
+function sortStyleCatalog(rows, favorites) {
+  var starred = favorites || []
   return (rows || []).slice().sort(function(a, b) {
-    var sa = a.source === "user" ? 1 : 0
-    var sb = b.source === "user" ? 1 : 0
+    var sa = starred.indexOf(a.key) >= 0 ? 0 : 1
+    var sb = starred.indexOf(b.key) >= 0 ? 0 : 1
     if (sa !== sb) return sa - sb
     return String(a.label).localeCompare(String(b.label))
   })
+}
+
+// The Style picker's rows: the sorted catalog without the hidden styles,
+// except the selected one, which always shows.
+function pickerStyles(rows, favorites, hidden, selected) {
+  var off = hidden || []
+  return sortStyleCatalog(rows, favorites).filter(function(r) {
+    return r.key === selected || off.indexOf(r.key) < 0
+  })
+}
+
+// How many styles a release added that the Styles view has not shown yet.
+function newStyleCount(rows) {
+  return (rows || []).filter(function(r) { return r.isNew === true }).length
 }
 
 function findStyle(rows, key) {
@@ -597,6 +612,8 @@ if (typeof module !== "undefined") {
     DEFAULT_ART_STYLE: DEFAULT_ART_STYLE,
     styleOptionLabel: styleOptionLabel,
     sortStyleCatalog: sortStyleCatalog,
+    pickerStyles: pickerStyles,
+    newStyleCount: newStyleCount,
     findStyle: findStyle,
     reviewStyleKey: reviewStyleKey,
     missingStyleWarning: missingStyleWarning,

@@ -1,0 +1,77 @@
+label = "Isometric Miniature World"
+suffix = "isometric 3D miniature illustration, perfectly parallel 30-degree projection with no perspective, a small self-contained block of world floating on a plain soft-gradient background, crisp clean modelling, soft global illumination and gentle shadows, tiny detailed props, bright cheerful palette, figures tiny and simple, the whole block sits in the middle with clear space above it"
+space = [
+  "a floating island block with a village on top and roots hanging below",
+  "a cut-away building block showing every floor",
+  "a slice of city block with streets and a park",
+  "a block of mountain with a tunnel and a railway",
+  "a harbour block with water on one side",
+  "a stacked tower of rooms each a different world",
+  "a block of forest with a river and a cabin",
+]
+
+[world]
+era = "A cheerful modern miniature world where everything fits on one block: towns, farms, labs and ports, with technology from bicycles to small rockets."
+materials = "Painted wood, plastic and stone lead; glass, brick, grass, water, metal and fabric are the common stuff, all tidy and toy-like."
+physics = "The world is cut into blocks; edges show a cross-section of soil and pipes. Blocks can float. Lamps and screens glow; nothing else does."
+society = "Neighbourhoods, workshops, cafés, farms and launch sites. People work, cook, garden, play sport, fish and hold street parties."
+weather = "Weather confined to the block: a tiny raincloud, snow on the roofs, a gust bending the trees, sunshine. Pick what the day calls for."
+inhabitants = "Townsfolk, workers, kids, cats, dogs, cows, birds, small robots and tiny vehicles."
+strangeness = "Cutaways and impossible stacking: a whale in a swimming pool, a house on top of a lighthouse. Everyone goes about their day."
+numinous = "The sacred is the world-tree or the core: a giant tree at the block's centre, a glowing core seen in the cut-away."
+dread = "On hard days the block is in trouble: the edge crumbling away, a flood filling the streets, a fire in one building, the block tilting."
+favoured_actors = "Crowds of tiny figures, handwork, automata and animals. One person at a laptop is the most worn image here and should not be the default."
+myth = "World-tree myths, the town as a living organism, and the dollhouse and model-railway tradition."
+highlight = "The thing the eye finds first is one part of the block that breaks the miniature's logic. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a creature far too large for the block",
+  "a cut-away revealing something unexpected inside",
+  "two very different worlds stacked on one another",
+  "part of the block floating free",
+  "an everyday object as the size of a building",
+]
+
+[brief]
+signature = "SIGNATURE — the whole scene is one block with a visible cut edge showing what is underneath (soil, pipes, roots or rooms). A scene with a horizon is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: the block is dark blue with lit windows, lamps and screens as the only light, covering two thirds of the frame in shade. A frame that is mostly bright is a failed response."
+mid = "Sunlight from one side casts clear shadows across the block. A frame without shadows is a failed response."
+hi = "Even bright daylight, soft shadows, every detail visible. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["crumbling at the edge", "tilting", "flooding the streets", "catching fire", "cracking", "sliding off", "collapsing", "leaking", "bursting", "overflowing", "shorting out", "sinking", "smoking", "toppling", "jamming", "breaking apart", "rattling", "blacking out", "tumbling", "spilling", "eroding"]
+process_soft = ["humming", "whirring", "growing", "spinning", "blooming", "glowing", "puffing", "trickling", "turning", "chugging along", "sprouting", "blinking", "bobbing", "lighting up", "stacking up", "rolling", "fluttering", "brewing", "opening", "rippling", "ticking"]
+actor_hard.work = ["sandbagging", "repairing", "pumping out", "hosing", "propping up", "rescuing from"]
+actor_hard.rest = ["sheltering in", "waiting on the roof of", "huddling by", "sitting out"]
+actor_hard.play = ["skateboarding away from", "racing", "jumping", "sliding down"]
+actor_hard.ritual = ["sounding the siren at", "gathering at", "keeping watch on"]
+actor_hard.travel = ["evacuating", "driving off", "climbing to", "paddling through"]
+actor_soft.work = ["building", "cooking at", "gardening in", "fixing", "delivering to"]
+actor_soft.rest = ["sunbathing on", "napping in", "sipping coffee at", "reading on"]
+actor_soft.play = ["playing football on", "swimming in", "dancing at", "skateboarding on", "fishing from"]
+actor_soft.ritual = ["throwing a street party at", "launching", "decorating"]
+actor_soft.travel = ["cycling across", "riding the train to", "sailing past", "walking the dog round"]
+
+[registers]
+"botanical" = "Plants as round trees and planters on the block."
+"bodily and anatomical" = "Bodies as tiny simple figures, never gore."
+"fungal and decaying" = "Decay as rusty pipes and mushrooms in the soil layer."
+"animal and creaturely" = "Animals as tiny cows, cats and birds."
+"geological" = "Rock as the block's base layers seen in section."
+"metallic and ore" = "Metal as pipes, rails and machines."
+"glass and ceramic" = "Glass as greenhouse roofs and shop windows."
+"architectural" = "Buildings as tidy little houses, towers and shops."
+"domestic interior" = "Rooms in cut-away with furniture and a window."
+"mechanical" = "Machines as cranes, trains and robots."
+"industrial and infrastructural" = "Works as pipes, roads and power lines through the block."
+"agricultural and cultivated" = "Farms as squares of crops and greenhouses."
+"aquatic" = "Water as pools, rivers and harbours cut at the edge."
+"atmospheric" = "Sky as a soft gradient behind the block, a small cloud."
+"glacial and frozen" = "Ice as a snowy block with a frozen pond."
+"fire and ember" = "Fire as a campfire, a forge, a rocket flame."
+"textile and fiber" = "Fabric as awnings, tents and flags."
+"ritual object" = "Ritual objects as a statue, a bell tower, a shrine."
+"paper and inscription" = "Paper as tiny signs and posters, never a sentence."
+"instrument and measure" = "Measure as a clock tower, a weather vane, a radar dish."

@@ -1,0 +1,23 @@
+# Which of the styles in styles/ a new install starts with in view
+# (decision record 2026-11-styles-owned). Every file in styles/ is a seed:
+# style_seeds.py copies it into the user's own styles folder, and from then
+# on it is the user's file. A seed not named here is copied too, but hidden,
+# so the Styles view's "Show hidden" is how a user finds the rest.
+
+visible = [
+  "needle-felt-diorama",
+  "marbled-paper",
+  "ukiyoe",
+  "engraving",
+  "cosmic",
+  "pixel-art-16bit",
+  "art-nouveau-poster",
+  "claymation-diorama",
+  "ink-wash-mountains",
+  "coral-reef-tapestry",
+]
+
+# Seeds whose key changed: a config that selected, starred or hid the old key
+# follows it to the new one.
+[renamed]
+ghibli = "cel-pastoral"

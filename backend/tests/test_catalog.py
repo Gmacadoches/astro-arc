@@ -29,13 +29,16 @@ class CatalogTest(unittest.TestCase):
         self.user_dir = self.root / "styles"
         self.user_dir.mkdir()
         self.fixture = self.user_dir / f"{KEY}.toml"
-        text = (lp.SHIPPED_STYLES_DIR / "cosmic.toml").read_text()
+        # cosmic too: the fixture's warnings compare it with another theme.
+        for suffix in (".toml", ".jpg"):
+            shutil.copy(lp.SEED_STYLES_DIR / f"cosmic{suffix}", self.user_dir / f"cosmic{suffix}")
+        text = (lp.SEED_STYLES_DIR / "cosmic.toml").read_text()
         text = re.sub(r'(?m)^label = .*$', 'label = "Fixture World"', text, count=1)
         self.fixture.write_text(text.replace("[world]\n", f'[world]\nforbids = "{MARKER}"\n', 1))
-        shutil.copy(lp.SHIPPED_STYLES_DIR / "cosmic.jpg", self.fixture.with_suffix(".jpg"))
+        shutil.copy(lp.SEED_STYLES_DIR / "cosmic.jpg", self.fixture.with_suffix(".jpg"))
 
     def load(self, **kwargs):
-        return lp.Catalog.load(user_dir=self.user_dir, **kwargs)
+        return lp.Catalog.load(self.user_dir, **kwargs)
 
     def edit_fixture(self, old, new):
         text = self.fixture.read_text()
@@ -101,22 +104,20 @@ class CatalogTest(unittest.TestCase):
         self.assertEqual(catalog.style(KEY).label, "Fixture World")
         self.assertEqual(self.load().style(KEY).label, "Renamed World")
 
-    def test_a_draft_is_loaded_and_a_shipped_key_is_refused(self):
+    def test_a_draft_is_loaded_and_takes_its_keys_place(self):
         draft = self.root / "elsewhere" / "draft-world.toml"
         draft.parent.mkdir()
         shutil.copy(self.fixture, draft)
         catalog = self.load(drafts=[draft])
         self.assertEqual(catalog.style("draft-world").source, "draft")
-        shipped_copy = self.root / "elsewhere" / "cosmic.toml"
-        shutil.copy(self.fixture, shipped_copy)
-        with self.assertRaises(ValueError):
-            self.load(drafts=[shipped_copy])
+        other_cosmic = self.root / "elsewhere" / "cosmic.toml"
+        shutil.copy(self.fixture, other_cosmic)
+        self.assertEqual(self.load(drafts=[other_cosmic]).style("cosmic").label, "Fixture World")
 
-    def test_a_user_file_with_a_shipped_key_is_ignored(self):
-        shutil.copy(self.fixture, self.user_dir / "cosmic.toml")
-        with contextlib.redirect_stderr(io.StringIO()):
-            catalog = self.load()
-        self.assertEqual(catalog.style("cosmic").source, "shipped")
+    def test_only_the_folders_themes_are_loaded(self):
+        # Every theme is the user's own file; the seeds beside the code are
+        # not read by a run (decision record 2026-11-styles-owned).
+        self.assertEqual(set(self.load().styles), {"cosmic", KEY})
 
     def test_an_unknown_key_resolves_to_the_default(self):
         catalog = self.load()

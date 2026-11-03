@@ -31,6 +31,7 @@ SCHEMA_FILE = Path(__file__).resolve().parents[1] / "pipeline" / "settings.toml"
 # so it has a whole config before its first astro-arc-config read lands.
 DEFAULTS_FILE = SCHEMA_FILE.with_name("settings-defaults.json")
 SIZE_PATTERN = re.compile(r"^[0-9]{2,5}x[0-9]{2,5}$")
+KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 _schema = None
 
@@ -84,7 +85,8 @@ def default(key, provider="openai"):
     value = spec["default"]
     if isinstance(value, str) and value.startswith("provider."):
         return _provider_value(value.split(".", 1)[1], provider)
-    return value
+    # A copy: the schema's own list must not change when a config's does.
+    return list(value) if isinstance(value, list) else value
 
 
 def defaults(provider="openai"):
@@ -115,6 +117,8 @@ def fits(key, value):
         return n is not None and n >= spec["min"]
     if kind == "coordinate":
         return value is None or _num(value) is not None
+    if kind == "keys":
+        return isinstance(value, list) and all(isinstance(k, str) and KEY_PATTERN.match(k) for k in value)
     if kind == "size":
         return isinstance(value, str) and (value == "auto" or bool(SIZE_PATTERN.match(value)))
     raise ValueError(f"settings.toml: {key} has unknown type {kind!r}")

@@ -275,6 +275,11 @@ if [[ -n $engine_period_key && -n $expected_engine_key && $engine_period_key != 
   echo "Astro-Arc: period key drift — the engine says $engine_period_key, expected $expected_engine_key (clock crossed a period boundary mid-run). Cache and filenames will disagree for this run." >&2
 fi
 
+# The styles a run reads are the user's own files; a release's new or updated
+# starter styles reach them here (and when the panel opens). A failure only
+# warns: the styles already there still work.
+"$PY" "$BIN_DIR/style_seeds.py" || true
+
 prompt=$("$PY" "$BIN_DIR/llm_pipeline.py" "$reading_file" "$pipeline_meta_file")
 
 # Quality is whatever the config says, for every image. There used to be a bump

@@ -569,7 +569,7 @@ Column {
             tooltipText: "Opens the PNG in your image viewer."
             onClicked: { morePopup.done(); panel.openSelectedImage() }
           }
-          // User styles only: a shipped style's preview ships with the code.
+          // The generation's style, while it is still installed.
           MenuItem {
             id: previewItem
             readonly property string styleLabel: panel.selectedPreviewTheme ? panel.selectedPreviewTheme.label : ""

@@ -136,7 +136,12 @@
 # keep out Ghibli's near-realist films. Research:
 # verification/charter-ghibli/research.md.
 
-label = "Studio Ghibli"
+# RENAMED 2026-11-02 from `ghibli` / "Studio Ghibli": no shipped style names
+# a studio, an artist or a film, in its label or in anything sent to a model.
+# The suffix now names the technique the studio is known for instead. The
+# notes in this file keep the studio's name, since they cite what the
+# charter was researched from.
+label = "Hand-Painted Animation"
 # SPACE, 2026-10-10 (STYLE-OVERHAUL Prompt 1). One recipe is drawn per run,
 # never one of this style's last 2, and replaced OPENNESS in the brief together
 # with the WALLPAPER rule every [space] style shares (see
@@ -192,7 +197,7 @@ space = [
 # REVISED again 2026-10-10 (Prompt 4): the Prompt 3 renders showed the model
 # ignoring "shot on 35mm film", "slight film grain" and "softness toward the
 # edges"; the last sentence now states the visible result instead.
-suffix_base = "A frame from a hand-drawn Studio Ghibli feature film of the 1980s and 90s. Backgrounds are hand-painted in opaque poster colour with visible brushwork; colour is natural and daylight-true — leaf greens, sky blues, warm earth, soft greys under overcast — never neon and never chrome. Shadows are coloured and transparent, never black. Light comes from the sun, the sky or a fire, never from glowing objects. Visible grain over flat areas of sky and wall; the whole frame slightly soft, warm and faded, like an old cinema print; no digital crispness, bloom, lens flare or glossy sheen."
+suffix_base = "A frame from a hand-drawn, cel-animated Japanese feature film of the 1980s and 90s. Backgrounds are hand-painted in opaque poster colour with visible brushwork; colour is natural and daylight-true — leaf greens, sky blues, warm earth, soft greys under overcast — never neon and never chrome. Shadows are coloured and transparent, never black. Light comes from the sun, the sky or a fire, never from glowing objects. Visible grain over flat areas of sky and wall; the whole frame slightly soft, warm and faded, like an old cinema print; no digital crispness, bloom, lens flare or glossy sheen."
 suffix_figures = " Figures rendered in flat cel-shaded color with a single hard-edged shadow tone, never soft-blended, clean crisp outlines, large expressive almond eyes, simple minimal features, human-like proportions rather than typical anime stylization; only the one or two nearest figures have fully drawn faces, and any figure further back is drawn the way this style draws background crowds — turned away, in profile, or with features reduced to a few simple strokes and no fine detail"
 # guidance removed 2026-09-20: superseded by [ghibli.world] above. Its
 # world-description became the charter's fields; its prohibitions went to

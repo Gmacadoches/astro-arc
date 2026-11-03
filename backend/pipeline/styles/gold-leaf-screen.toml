@@ -1,0 +1,77 @@
+label = "Gold-Leaf Folding Screen"
+suffix = "Edo-period Japanese folding screen painting, mineral pigments of malachite green, azurite blue and white on a ground of shimmering gold leaf squares, gold clouds dividing the scene, bold simplified forms, visible folds of the screen panels, flat decorative composition, figures small and elegant, main subject below the top edge"
+space = [
+  "a river curving across gold panels from near to far",
+  "pine trees in the foreground with gold clouds parting to show a palace",
+  "waves crashing across the panels toward rocky islands",
+  "a procession along a road between gold clouds",
+  "irises along a winding stream",
+  "a city of rooftops seen from above through gold mist",
+  "a mountain of stylised rocks rising beyond a lake",
+]
+
+[world]
+era = "Feudal Japan's courts, temples and cities, with technology of ox carts, boats, bridges and paper lanterns."
+materials = "Gold leaf, lacquer and mineral pigment lead; pine, silk, cedar, paper, bronze and stone are the common stuff."
+physics = "Gold clouds float in front of the scene and hide parts of it. Gold shimmers; lanterns glow; nothing else does. Seasons can sit side by side."
+society = "Palaces, temples, pleasure quarters and riverside towns. People hold flower-viewing parties, ride in processions, fish, compose poetry and celebrate festivals."
+weather = "Weather in pigment: crashing waves, snow on pines, autumn wind scattering maple leaves, rain in fine lines, a clear spring day. Pick what the day calls for."
+inhabitants = "Courtiers, samurai, monks, fishermen, cranes, tigers, dragons, deer and the wind and thunder gods."
+strangeness = "The divine passes through the court: the thunder god riding a cloud over a palace, a dragon in a temple pond. Courtiers continue their poetry."
+numinous = "The sacred is the gold itself and the nature gods: wind and thunder gods, an ancient pine, a dragon in the clouds."
+dread = "On hard days the screen shows storm and war: a burning palace, waves swallowing boats, a typhoon bending the pines, an army on the road."
+favoured_actors = "Processions and courtly crowds, figures in relation, animals and presences. A single crane standing in water is the most worn image here and should not be the default."
+myth = "Japanese court literature, Shinto nature gods and Buddhist legends."
+highlight = "The thing the eye finds first is a natural or divine element given gold and scale. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a nature god appearing over a human scene",
+  "a tree or wave as large as the whole screen",
+  "an animal in a palace",
+  "two seasons side by side across the panels",
+  "a gold cloud parting to reveal something unexpected",
+]
+
+[brief]
+signature = "SIGNATURE — gold leaf covers at least part of the background, and gold clouds divide the scene. A scene without gold is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: dark blue and black pigment over most of the screen, the gold dimmed, lanterns as the only light. A frame that is mostly bright is a failed response."
+mid = "Light catches the gold from one side, making some panels blaze and others dim. A frame lit evenly is a failed response."
+hi = "Full bright day, gold gleaming across every panel. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["crashing", "burning", "toppling", "swallowing", "bending", "scattering", "storming", "thundering", "cracking", "flooding", "breaking", "smouldering", "sweeping away", "sinking", "tearing", "roaring", "darkening", "wrenching", "uprooting", "shattering", "lashing"]
+process_soft = ["blossoming", "shimmering", "drifting", "parting", "flowing", "flowering", "falling as petals", "curling", "glowing", "rippling", "unfurling", "sparkling", "swaying", "ripening", "settling", "reflecting", "dawning", "gleaming", "spreading", "turning red", "budding"]
+actor_hard.work = ["bailing", "rowing hard at", "defending", "hauling", "pulling", "carrying"]
+actor_hard.rest = ["sheltering in", "waiting in", "huddling at", "kneeling at"]
+actor_hard.play = ["racing horses at", "dueling at", "riding hard past", "archery at"]
+actor_hard.ritual = ["praying at", "beating drums at", "carrying shrines past"]
+actor_hard.travel = ["fleeing", "crossing", "riding through", "sailing through"]
+actor_soft.work = ["fishing at", "painting", "writing poems at", "planting", "boating"]
+actor_soft.rest = ["viewing the blossoms at", "resting at", "sitting at", "drinking tea at"]
+actor_soft.play = ["playing kemari at", "dancing at", "playing the koto at", "boating at", "picnicking at"]
+actor_soft.ritual = ["offering at", "blessing", "celebrating at"]
+actor_soft.travel = ["processing to", "riding an ox cart to", "walking to", "arriving at"]
+
+[registers]
+"botanical" = "Plants as pines, irises, plum and maple in bold shapes."
+"bodily and anatomical" = "Bodies as small elegant figures, never gore."
+"fungal and decaying" = "Decay as an old gnarled pine, moss on stone."
+"animal and creaturely" = "Animals as cranes, tigers, deer and dragons."
+"geological" = "Rock as stylised blue-green mountains and islands."
+"metallic and ore" = "Metal as bronze bells and gilt fittings."
+"glass and ceramic" = "Ceramic as tea bowls and lacquerware."
+"architectural" = "Buildings as palaces, temples and bridges."
+"domestic interior" = "A palace room with screens opening onto a garden."
+"mechanical" = "Machines as ox carts and waterwheels."
+"industrial and infrastructural" = "Works as bridges and harbours."
+"agricultural and cultivated" = "Farming as rice fields and planting."
+"aquatic" = "Water as stylised waves and streams."
+"atmospheric" = "Sky as gold clouds and mist."
+"glacial and frozen" = "Snow on pines and roofs."
+"fire and ember" = "Fire as lanterns and a burning palace."
+"textile and fiber" = "Fabric as silk robes and banners."
+"ritual object" = "Ritual objects as shrines, bells and offerings."
+"paper and inscription" = "Paper as poem slips and scrolls, never a sentence."
+"instrument and measure" = "Measure as a sundial and a water clock."

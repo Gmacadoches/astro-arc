@@ -1,0 +1,77 @@
+label = "Microscope Slide"
+suffix = "scientific light-microscope photomicrograph, glowing translucent forms on a dark-field black background, iridescent polarised-light colours of violet, cyan, gold and magenta, razor-thin focal plane with soft out-of-focus layers, fine crystalline edges and delicate cell walls, figures tiny and translucent like microorganisms, circular vignette at the edges, main subject below the top edge"
+space = [
+  "through a drop of water from a near diatom to faint shapes deep in focus",
+  "across a crystal field to a far fracture line",
+  "along a plant stem cut in section into its chambers",
+  "down a branching tube of cells to a bright opening",
+  "over a colony of cells to a dividing pair",
+  "into a pollen grain landscape of spines and pores",
+  "across a frost crystal from its centre to its branching tips",
+]
+
+[world]
+era = "The hidden world under the microscope, imagined as a living civilisation at the scale of a single drop: diatom cities, crystal palaces and tiny travellers."
+materials = "Silica glass shells, crystal and cell membrane lead; water, pollen, spores, salt, chlorophyll and slime are the common stuff."
+physics = "Everything is translucent and lit from below or the side; colours come from polarised light. Bioluminescent things and crystals glow. Things divide, bud and crystallise."
+society = "Colonies, crystal cities, drifting rafts of algae. Tiny beings build, feed, migrate, gather in blooms and rest on surfaces."
+weather = "Weather as the drop's conditions: a current sweeping through, evaporation leaving salt crystals, a cold snap freezing everything, warm stillness. Pick what the day calls for."
+inhabitants = "Diatoms, rotifers, tardigrades, amoebae, paramecia, algae, spores and tiny glassy beings who live among them."
+strangeness = "The microscopic as monumental: a tardigrade as large as a whale, a diatom shaped like a cathedral. Neighbours drift past."
+numinous = "The sacred is perfect symmetry: a radiolarian like a glass temple, a snowflake as a mandala, a cell dividing as the beginning of all things."
+dread = "On hard days the drop goes wrong: a membrane bursting, crystals shattering, a predator engulfing, the water drying to cracked salt."
+favoured_actors = "Swarms and colonies, creatures, presences and automata-like diatoms. A single cell alone is the most worn image here and should not be the default."
+myth = "Natural history's wonder at the invisible, creation myths of the primordial sea, and the sacred geometry tradition."
+highlight = "The thing the eye finds first is a microscopic form shown at monumental scale doing something strange. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a tiny creature at the scale of architecture",
+  "a crystal grown into a palace",
+  "a cell dividing into something it should not",
+  "a diatom shell shaped like a made object",
+  "a perfect symmetry broken in one place",
+]
+
+[brief]
+signature = "SIGNATURE — at least one translucent microscopic form (a diatom, a crystal, a cell or a tardigrade) is in frame and lit from within or behind. An opaque, daylit scene is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "Dark field: two thirds of the frame is black, with only the forms glowing at their edges. A frame that is mostly bright is a failed response."
+mid = "Polarised light from one side, colours strong on one side of each form and dark on the other. A frame with no shadowed areas is a failed response."
+hi = "Bright field: a pale luminous background with forms visible everywhere. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["bursting", "engulfing", "shattering", "drying out", "cracking", "dissolving", "rupturing", "collapsing", "devouring", "crystallising too fast", "fracturing", "leaking", "poisoning", "shrivelling", "clouding", "splitting apart", "sinking", "fusing", "darkening", "wilting", "breaking down"]
+process_soft = ["dividing", "budding", "glowing", "drifting", "branching", "crystallising", "spiralling", "pulsing", "unfolding", "rotating", "blooming", "streaming", "swimming", "multiplying", "shimmering", "growing", "forming", "flowering", "shining", "ripening", "linking"]
+actor_hard.work = ["sealing", "repairing", "hauling", "rescuing from", "shoring up", "dragging"]
+actor_hard.rest = ["sheltering in", "huddling in", "waiting in", "curled dormant in"]
+actor_hard.play = ["racing", "dodging", "darting through", "spinning past"]
+actor_hard.ritual = ["keeping vigil at", "circling", "mourning at"]
+actor_hard.travel = ["fleeing", "swimming hard through", "escaping", "crossing"]
+actor_soft.work = ["building", "feeding at", "gathering at", "growing", "tending"]
+actor_soft.rest = ["resting on", "drifting by", "sleeping in", "floating by"]
+actor_soft.play = ["spinning around", "dancing through", "racing through", "tumbling past", "swirling around"]
+actor_soft.ritual = ["orbiting", "assembling around", "honouring"]
+actor_soft.travel = ["drifting to", "swimming to", "migrating to", "floating past"]
+
+[registers]
+"botanical" = "Plants as algae, pollen and plant cells in section."
+"bodily and anatomical" = "Bodies as cells and tissues, glowing and calm, never gore."
+"fungal and decaying" = "Decay as spores and hyphae threading through."
+"animal and creaturely" = "Creatures as tardigrades, rotifers and paramecia."
+"geological" = "Rock as mineral crystals in thin section."
+"metallic and ore" = "Metal as crystalline ore and iridescent flakes."
+"glass and ceramic" = "Glass as diatom shells and silica forms."
+"architectural" = "Buildings as radiolarian temples and diatom cities."
+"domestic interior" = "A cell's interior with a window of membrane onto the drop."
+"mechanical" = "Machines as cilia, flagella and rotating structures."
+"industrial and infrastructural" = "Works as networks of tubes and channels."
+"agricultural and cultivated" = "Farming as algae blooms and colonies."
+"aquatic" = "Water as the drop itself, full of particles."
+"atmospheric" = "Sky as the glowing field and out-of-focus layers."
+"glacial and frozen" = "Ice as frost and snowflake crystals."
+"fire and ember" = "Fire as glowing heated crystals."
+"textile and fiber" = "Fibre as cellulose strands and silk under magnification."
+"ritual object" = "Ritual objects as perfect symmetrical shells."
+"paper and inscription" = "Paper fibres magnified, with tiny specimen labels, never a sentence."
+"instrument and measure" = "Measure as a scale bar and a graticule overlay."

@@ -1,0 +1,77 @@
+label = "Infrared Film Photography"
+suffix = "false-colour infrared film photograph, foliage glowing pink, magenta and white, skies deep dark teal or near-black, water black and glassy, soft halation glow around bright edges, fine film grain, slightly dreamlike contrast, figures photographed naturally with pale luminous skin, main subject below the top edge"
+space = [
+  "across a meadow of glowing pink grass to a line of white trees",
+  "down a tree-lined avenue toward a house",
+  "over a dark lake to a forested far shore",
+  "along a river through glowing willows",
+  "up a hillside of pale foliage toward a ridge",
+  "through a garden gate into a glowing orchard",
+  "from a bridge across a valley of pink forest",
+]
+
+[world]
+era = "Our own present world seen through infrared film, where ordinary places become alien and luminous: parks, farms, lakes, towns and roads."
+materials = "Foliage, water and sky lead; stone, wood, asphalt, cloth, glass and metal are the common stuff, all shifted in colour."
+physics = "Living plants glow pink and white; water and sky go dark. Heat glows faintly. Nothing else changes, which is what makes it uncanny."
+society = "Towns, parks, farms and lakeshores. People walk dogs, swim, picnic, farm, commute and gather at fairs."
+weather = "Bright sun making leaves blaze, overcast flattening the glow, mist, rain darkening everything, a hot still day. Pick what the day calls for."
+inhabitants = "Ordinary people, dogs, horses, cows, swans, deer and an occasional figure that seems not quite of this world."
+strangeness = "The familiar made alien: a pink forest, a black lake reflecting white trees, people in a field that seems on another planet. No one notices."
+numinous = "The sacred is the glowing tree and the black water: an old tree blazing white, a still lake like a mirror into another place."
+dread = "On hard days the uncanny becomes threatening: dead trees standing grey among pink, a storm turning the sky black, flood water spreading dark."
+favoured_actors = "Figures in relation, animals, crowds and presences. A lone figure standing in a field is the most worn image here and should not be the default."
+myth = "Otherworld myths of hidden lands, faerie and the green world, and modern folklore of liminal places."
+highlight = "The thing the eye finds first is a living thing glowing more than anything around it. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a tree or plant blazing almost white",
+  "an animal glowing like it is lit from within",
+  "a reflection showing something different from the shore",
+  "a human-made object overgrown with glowing foliage",
+  "a path leading into an impossible pink distance",
+]
+
+[brief]
+signature = "SIGNATURE — foliage in frame is described as glowing pink or white, and the sky or water is dark. A normally coloured scene is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is dusk or deep shade: two thirds of the frame is near-black, with only pale glowing foliage and one light. A frame that is mostly bright is a failed response."
+mid = "Sunlight from one side making some foliage blaze white, the rest in shadow. A frame lit evenly is a failed response."
+hi = "Bright full sun, foliage glowing everywhere, sky dark teal. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["dying back", "flooding", "toppling", "darkening", "storming", "withering", "burning", "wilting", "crashing", "sinking", "blackening", "rotting", "snapping", "uprooting", "drowning", "scorching", "smothering", "splitting", "cracking", "greying", "falling"]
+process_soft = ["glowing", "blazing pink", "shimmering", "swaying", "reflecting", "rippling", "drifting", "blooming", "ripening", "growing", "shining", "rustling", "brightening", "haloing", "sparkling", "unfolding", "settling", "flowering", "greening", "warming", "floating"]
+actor_hard.work = ["sandbagging", "clearing", "hauling", "rescuing", "chopping", "bracing"]
+actor_hard.rest = ["sheltering under", "waiting at", "huddling by", "sitting stunned on"]
+actor_hard.play = ["racing", "running from", "leaping across", "cycling hard past"]
+actor_hard.ritual = ["holding a vigil at", "laying flowers at", "mourning at"]
+actor_hard.travel = ["fleeing", "crossing", "driving through", "wading across"]
+actor_soft.work = ["farming", "fishing at", "gardening at", "photographing", "tending"]
+actor_soft.rest = ["lying in", "picnicking at", "reading under", "napping by"]
+actor_soft.play = ["swimming in", "walking a dog through", "riding horses through", "boating on", "playing in"]
+actor_soft.ritual = ["celebrating at", "marrying at", "gathering at"]
+actor_soft.travel = ["walking to", "cycling through", "driving to", "rowing across"]
+
+[registers]
+"botanical" = "Plants glow pink and white: meadows, orchards and forests."
+"bodily and anatomical" = "Bodies with pale glowing skin, natural, never gore."
+"fungal and decaying" = "Decay as dead grey trees among glowing ones."
+"animal and creaturely" = "Animals as horses, swans and deer in luminous fields."
+"geological" = "Rock as dark cliffs and pale boulders."
+"metallic and ore" = "Metal as old cars, gates and towers."
+"glass and ceramic" = "Glass as greenhouses glowing from the plants inside."
+"architectural" = "Buildings as farmhouses, churches and towns."
+"domestic interior" = "A room with a window onto a glowing garden."
+"mechanical" = "Machines as tractors, bicycles and boats."
+"industrial and infrastructural" = "Works as bridges, power lines and roads."
+"agricultural and cultivated" = "Farming as glowing fields and orchards."
+"aquatic" = "Water as black glassy lakes and rivers."
+"atmospheric" = "Sky as dark teal with white clouds."
+"glacial and frozen" = "Snow as bright white with dark sky."
+"fire and ember" = "Fire as a campfire glowing intensely."
+"textile and fiber" = "Fabric as clothes and tents in shifted colour."
+"ritual object" = "Ritual objects as a wreath, a stone circle, a cross."
+"paper and inscription" = "Paper as signs and posters, never a sentence."
+"instrument and measure" = "Measure as a weather station and a milestone."

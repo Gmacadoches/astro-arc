@@ -1,0 +1,77 @@
+label = "Impressionist Plein Air"
+suffix = "French Impressionist oil painting made outdoors, broken visible brushstrokes, dabs of pure unblended colour, coloured shadows in violet and blue, shimmering light on water and leaves, soft edges, thick impasto highlights, figures suggested with loose strokes rather than detail, main subject sits below the top edge"
+space = [
+  "across a river with boats to the far bank of poplars",
+  "through a garden path of flowerbeds to a house",
+  "along a railway platform under a glass roof toward a train in steam",
+  "over a field of poppies to a line of trees on a hill",
+  "from a café terrace down a sunlit boulevard",
+  "along a beach of bathers to cliffs",
+  "through a haystack field toward a village steeple",
+]
+
+[world]
+era = "France in the late nineteenth century: railways, river outings, cafés and gardens, with technology of steam trains, rowing boats and gas lamps."
+materials = "Water, foliage and light lead; linen, straw hats, iron bridges, steam, stone and canvas parasols are the common stuff."
+physics = "Light is the subject: it changes colour through the day and turns shadows violet. Nothing glows except lamps; everything shimmers."
+society = "Riverside towns, Parisian boulevards, gardens and beaches. People row, picnic, dance at open-air balls, work fields, and ride trains to the coast."
+weather = "The full range as light: morning fog, rain on a boulevard, snow on a village, a bright breezy noon, sunset on haystacks. Pick what the day calls for."
+inhabitants = "Boaters, bathers, laundresses, farmers, railway workers, children, dogs, horses and swans."
+strangeness = "Light doing too much: a figure dissolving into reflection, a cathedral turning into colour. Everyone keeps strolling."
+numinous = "The sacred is light itself: a blazing sun on water, the cathedral front in changing light, the water lilies as an endless pool."
+dread = "On hard days the light fails: smoke over the station, a flood across the village, a storm on the sea, a field burned black."
+favoured_actors = "Figures in relation, crowds at leisure, handwork and animals. A woman with a parasol on a hill is the most worn image here and should not be the default."
+myth = "French folklore of rivers and fields, the cycle of seasons, and the modern city as a new myth."
+highlight = "The thing the eye finds first is a figure or object made almost entirely of light. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a reflection more solid than what it reflects",
+  "a building dissolving into coloured light",
+  "a crowd blurring into a single form",
+  "a natural thing (a haystack, a tree) glowing as if lit from inside",
+  "a train or machine made of steam and colour",
+]
+
+[brief]
+signature = "SIGNATURE — at least one shadow in frame is described as coloured (violet, blue or green), and light on water or leaves is in frame. A scene in brown studio tones is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is dusk or night: at least two thirds of the frame is deep blue and violet strokes, lit by gas lamps or a lit window. A frame that is mostly bright is a failed response."
+mid = "Low sunlight from one side throws long violet shadows across a good part of the frame. A frame with no strong direction is a failed response."
+hi = "It is bright midday, shimmering and even, with pale colour everywhere. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["flooding the meadow", "darkening", "smoking", "lashing", "toppling", "sinking", "burning", "swamping", "freezing", "drowning the light", "blackening", "storming", "smudging", "drenching", "ravaging", "overflowing", "gusting", "crumbling", "fading out", "stripping the trees", "choking"]
+process_soft = ["shimmering", "dappling", "sparkling", "glinting", "rippling", "swaying", "steaming", "blooming", "ripening", "dancing on the water", "dissolving into light", "billowing", "flickering", "glowing", "brightening", "fluttering", "melting", "warming", "glimmering", "gleaming", "drifting downriver"]
+actor_hard.work = ["hauling nets from", "carrying sacks across", "shovelling", "pumping", "dragging the boat up", "harvesting fast before"]
+actor_hard.rest = ["sheltering under", "waiting at", "huddling in", "sitting soaked at"]
+actor_hard.play = ["rowing hard against", "racing", "running in the rain across", "skating on"]
+actor_hard.ritual = ["lighting candles at", "carrying the statue past", "mourning by"]
+actor_hard.travel = ["hurrying across", "catching the last train from", "walking against the wind on", "fleeing"]
+actor_soft.work = ["painting", "washing laundry at", "selling flowers at", "haymaking in", "fishing from"]
+actor_soft.rest = ["lunching on the grass by", "reading on", "napping under", "taking coffee at"]
+actor_soft.play = ["rowing on", "bathing at", "dancing at", "boating on", "kite-flying on"]
+actor_soft.ritual = ["walking the procession past", "celebrating at", "garlanding"]
+actor_soft.travel = ["strolling along", "arriving by train at", "riding a carriage to", "punting along"]
+
+[registers]
+"botanical" = "Plants as masses of dabs: poppies, lilies, willows."
+"bodily and anatomical" = "Bodies as loose strokes, at ease, never gore."
+"fungal and decaying" = "Decay as autumn leaves and old boats, rich colour."
+"animal and creaturely" = "Animals as horses, swans, dogs, quick and alive."
+"geological" = "Rock as sea cliffs and quarries in sunlight."
+"metallic and ore" = "Metal as iron bridges and station roofs."
+"glass and ceramic" = "Glass as station roofs and café windows catching light."
+"architectural" = "Buildings as cathedrals, stations and farmhouses in light."
+"domestic interior" = "A sunlit room with a window open onto a garden."
+"mechanical" = "Machines as steam trains and paddle boats."
+"industrial and infrastructural" = "Works as stations, bridges, factory smoke along the river."
+"agricultural and cultivated" = "Fields, haystacks and orchards through the seasons."
+"aquatic" = "Water as reflective broken colour, the main stage."
+"atmospheric" = "Sky as clouds of dabbed colour, fog and haze."
+"glacial and frozen" = "Snow as blue and pink shadows on a village."
+"fire and ember" = "Fire as gas lamps and a sunset blaze."
+"textile and fiber" = "Fabric as white dresses, parasols and laundry in wind."
+"ritual object" = "Ritual objects as a village cross, a wreath, a church bell."
+"paper and inscription" = "Paper as posters on a kiosk, newspapers, never a sentence."
+"instrument and measure" = "Measure as a station clock and a church bell's hours."

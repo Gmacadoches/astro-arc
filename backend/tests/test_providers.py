@@ -115,7 +115,7 @@ class ProvidersTest(unittest.TestCase):
         def recording(model, *args, **kwargs):
             models.append(model)
             return original(model, *args, **kwargs)
-        result = lp.compose(STAGE1, arc(), lp.dial_from_texture(TEXTURE), lp.Catalog.load().style("cosmic"),
+        result = lp.compose(STAGE1, arc(), lp.dial_from_texture(TEXTURE), lp.Catalog.load(lp.SEED_STYLES_DIR).style("cosmic"),
                             {"provider": "openrouter"}, [], chat=recording)
         self.assertEqual(set(models), {"openai/gpt-4o-mini"})
         self.assertEqual(result["stage2Model"], "openai/gpt-4o-mini")

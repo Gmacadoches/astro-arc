@@ -1,0 +1,77 @@
+label = "Art Nouveau Poster"
+suffix = "Art Nouveau lithograph poster, flowing whiplash curves, bold even outlines, flat areas of muted colour in sage, ochre, rose and cream, ornamental border woven from stems and hair, halo-like circular motif behind the subject, fine decorative patterning, figures drawn with long flowing lines and calm faces, main subject held well below the top edge"
+space = [
+  "a figure framed by a circular motif with a landscape receding through the arch behind",
+  "along a riverside promenade of iron lamps to a bridge",
+  "through a glass-roofed arcade opening onto a boulevard",
+  "across a garden of curling paths to a pavilion",
+  "from a balcony of iron tendrils over rooftops to the sea",
+  "down a staircase of curving rails into a lit hall",
+  "over a lake rimmed with irises to a far shore of poplars",
+]
+
+[world]
+era = "The turn of the twentieth century as its poster artists dreamed it: electric light and railways newly arrived, cafés and exhibitions, and every new machine dressed in leaves and flowers."
+materials = "Wrought iron in plant shapes, stained glass and enamel lead; carved wood, silk, hair, lily petals, mosaic tile and gilt are the common stuff."
+physics = "Lines want to curve: smoke, water, hair and iron all flow into the same whiplash. Electric light and lamps glow; nothing else does. Plants and ornament are the same thing."
+society = "Cities of cafés, theatres, world fairs and seaside resorts. People perform, promenade, drink absinthe-free cordials, ride trams, picnic, and attend the openings of new wonders."
+weather = "The range given as ornament: rain in long silver strands, wind curling through hair, mist on a lake, snow on iron balconies, a still bright noon. Pick what the day calls for."
+inhabitants = "Dancers, actresses, cyclists, bathers, train guards, peacocks, dragonflies, swans, cats and goddesses of the seasons who walk among people."
+strangeness = "The decorative made alive: a lamp-post that is also a lily, a woman whose hair becomes the river. Passers-by admire it as design."
+numinous = "The sacred is the muse: personified seasons, arts and hours with halo-discs behind their heads, carrying symbols of what they rule."
+dread = "On hard days the ornament strangles: vines closing over windows, a glass roof shattered, gaslight failing, a theatre burning, beauty turned to a snare."
+favoured_actors = "Figures in relation, crowds at events, animals, and personified presences. A lone woman with flowing hair facing the viewer is the most worn image here and should not be the default."
+myth = "Greco-Roman allegory as the Belle Époque used it, Slavic and Celtic folk tales, and the language of flowers."
+highlight = "The thing the eye finds first is a figure, creature or object whose outline flows into the ornament around it. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a person or creature merging into the plant forms around them",
+  "a new machine growing like a flower",
+  "a personified season or art present in the street",
+  "an ornamental motif standing up as a solid structure",
+  "a small creature given a halo and a throne",
+]
+
+[brief]
+signature = "SIGNATURE — at least one element in frame is drawn as ornament as well as thing: hair, smoke, water or iron flowing into a decorative border or circular motif. A plain illustration without ornament is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night or a dim interior. At least two thirds of the frame is in deep green, indigo and brown flats, lit only by lamps and lit windows. A frame that is mostly bright is a failed response."
+mid = "The light comes from one side in warm flats, and light and shade are both substantial areas. A frame lit evenly from everywhere is a failed response."
+hi = "It is open day with flat pale colour across the frame; everything is clear and nothing is dramatised by shadow. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["strangling", "wilting at the stem", "shattering its glass", "tarnishing", "tangling", "smouldering", "choking the window", "dripping", "cracking the enamel", "unravelling", "browning", "sagging", "snapping its tendrils", "guttering", "seizing", "fraying", "bleeding colour", "toppling", "drowning in vines", "dimming", "rusting through"]
+process_soft = ["curling", "unfurling", "flowing into ornament", "spiralling", "blossoming", "trailing", "sweeping", "budding", "lacing together", "cascading", "arching", "twining", "garlanding", "rippling outward", "reflecting in the lake", "haloing", "glinting", "sprouting tendrils", "weaving", "streaming", "lighting the arcade"]
+actor_hard.work = ["cutting the vines from", "sweeping glass from", "relighting", "dragging the scenery off", "pumping water at", "bracing"]
+actor_hard.rest = ["sheltering under", "waiting in the dark of", "slumped in a doorway of", "keeping close in"]
+actor_hard.play = ["dancing on despite", "racing bicycles past", "skating hard across", "playing on through"]
+actor_hard.ritual = ["mourning at", "carrying wreaths to", "veiling"]
+actor_hard.travel = ["hurrying across", "boarding the last tram to", "rowing hard across", "climbing to"]
+actor_soft.work = ["designing", "enamelling", "arranging flowers at", "painting a poster for", "weaving silk at"]
+actor_soft.rest = ["sipping cordial at", "lounging by", "reading poetry under", "dozing on"]
+actor_soft.play = ["dancing at", "cycling along", "bathing at", "skating on", "playing a mandolin by"]
+actor_soft.ritual = ["crowning", "laying lilies at", "garlanding"]
+actor_soft.travel = ["promenading along", "riding the tram to", "arriving at", "boating across"]
+
+[registers]
+"botanical" = "Plants as ornament: lilies, irises and poppies curved into borders. Every stem is a line of the design."
+"bodily and anatomical" = "The body as long graceful line: flowing hair, a turned shoulder. Serene, never gore."
+"fungal and decaying" = "Decay as sinuous rot: a fallen lily browning in curls, lichen on a fountain. Even ruin is decorative."
+"animal and creaturely" = "Animals as emblems: a peacock fanning, dragonflies, swans. Each is a pattern as well as a creature."
+"geological" = "Stone as carved and polished: a marble fountain, a grotto of shells. Rock is shaped to flow."
+"metallic and ore" = "Metal as wrought iron and gilt: a balcony of tendrils, a gilded frame. Metal grows like a plant."
+"glass and ceramic" = "Glass and enamel: a stained-glass dragonfly lamp, tiled façades. Colour glows through glass."
+"architectural" = "Buildings with curving façades: a metro entrance of iron stems, a theatre front. Architecture breathes."
+"domestic interior" = "A salon or studio: curved furniture, a screen of irises. Always opening onto a window or garden."
+"mechanical" = "New machines in ornament: a bicycle with floral frame, a gramophone horn like a lily."
+"industrial and infrastructural" = "Works dressed beautifully: a railway station of glass and iron, a decorative water tower."
+"agricultural and cultivated" = "Harvest as allegory: wheat sheaves around a figure, an orchard in flower. Plenty is a pattern."
+"aquatic" = "Water as flowing line: a lake of reflected irises, waves in whiplash curls."
+"atmospheric" = "Sky as flat decorative bands: clouds in swirls, a sun as a halo-disc."
+"glacial and frozen" = "Winter as allegory: frost patterns as lace, a winter muse in white furs."
+"fire and ember" = "Fire as swirling ornament: lamp flames, a hearth of curling tongues."
+"textile and fiber" = "Fabric as drapery and silk: a gown flowing into the border, patterned shawls."
+"ritual object" = "Ritual objects are emblems: a wreath, a lyre, a chalice wrapped in vines."
+"paper and inscription" = "Paper as posters and programmes: a decorative cartouche, flowing lettering, never a sentence."
+"instrument and measure" = "Measure as decorative time: an ornate clock, a zodiac wheel in a border."

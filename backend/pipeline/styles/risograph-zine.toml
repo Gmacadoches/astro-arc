@@ -1,0 +1,77 @@
+label = "Risograph Zine"
+suffix = "risograph print illustration, two or three spot colours of fluorescent pink, teal and yellow overprinting to make new colours, visible grain and slight misregistration between layers, flat shapes with halftone dot gradients, uncoated paper texture, bold simple drawing, figures drawn with friendly chunky shapes, main subject kept below the top edge, no lettering"
+space = [
+  "across a city rooftop of water towers to a skyline",
+  "down a busy street of shopfronts toward a bridge",
+  "through a record shop and out its window onto a square",
+  "along a beach boardwalk to a pier",
+  "over a park of trees to a skate bowl",
+  "from a bedroom window over back gardens",
+  "up a hill of houses to a radio mast",
+]
+
+[world]
+era = "A modern indie city of zines, bands, bikes and plants on windowsills, where technology is phones, cassette players, bikes and buses."
+materials = "Paper, brick and painted wood lead; denim, cardboard, house plants, vinyl, bike frames and spray paint are the common stuff."
+physics = "Colours overlap and mix where layers cross. Signs and screens glow; nothing else does. Things can be slightly misaligned and that is normal."
+society = "Neighbourhoods, cafés, venues, community gardens and markets. People make things, play gigs, skate, cook together, protest and lie in parks."
+weather = "Rain on umbrellas, a heatwave, wind with flying leaves, snow on the bus stop, a clear day. Pick what the day calls for."
+inhabitants = "Friends, musicians, skaters, cats, pigeons, dogs, frogs, ghosts and small odd creatures who live in the walls."
+strangeness = "Everyday oddness: a giant cat napping on a bus, a ghost working in a café. People shrug."
+numinous = "The sacred is the shared: a giant moon over the gig, a community tree, a creature everyone in the neighbourhood feeds."
+dread = "On hard days the city frays: a flood in the basement venue, a power cut, a storm ripping posters away, an eviction."
+favoured_actors = "Friends in relation, crowds, animals and odd creatures. A lone person with headphones is the most worn image here and should not be the default."
+myth = "Urban folklore, neighbourhood legends, and the DIY scene's own tales."
+highlight = "The thing the eye finds first is an odd creature or object going about city life. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "an animal far too large for the street",
+  "a spirit with an ordinary job",
+  "a house plant grown into a building",
+  "a city object come alive",
+  "the moon or sun too close",
+]
+
+[brief]
+signature = "SIGNATURE — at least one area is described where two ink colours overprint to make a third. A scene in full colour is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the frame is the darkest overprint, lit by streetlamps, screens and windows. A frame that is mostly bright is a failed response."
+mid = "Light from one side, shadows as a flat darker ink layer. A frame without shadow shapes is a failed response."
+hi = "Bright daytime, paper showing through, colours light. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["flooding", "ripping", "shorting out", "leaking", "crumbling", "smashing", "peeling", "collapsing", "blowing away", "flickering", "jamming", "overflowing", "cracking", "toppling", "soaking", "burning", "smudging", "breaking", "screeching", "clogging", "fading"]
+process_soft = ["blooming", "humming", "sprouting", "drifting", "bouncing", "glowing", "steaming", "spinning", "growing", "dripping", "fluttering", "swaying", "purring", "twinkling", "rolling", "rising", "buzzing", "trailing", "splashing", "sparkling", "wobbling"]
+actor_hard.work = ["bailing out", "taping up", "hauling", "sweeping", "fixing", "barricading"]
+actor_hard.rest = ["sheltering in", "waiting at", "huddling under", "sitting it out in"]
+actor_hard.play = ["skating hard past", "racing", "jumping", "sprinting through"]
+actor_hard.ritual = ["holding a vigil at", "marching to", "chanting at"]
+actor_hard.travel = ["cycling hard through", "running for", "escaping", "wading through"]
+actor_soft.work = ["printing", "gardening at", "cooking at", "painting", "fixing a bike at"]
+actor_soft.rest = ["napping in", "reading at", "lying in", "drinking coffee at"]
+actor_soft.play = ["skating at", "playing a gig at", "dancing at", "feeding pigeons at", "swimming at"]
+actor_soft.ritual = ["throwing a party at", "decorating", "celebrating at"]
+actor_soft.travel = ["cycling to", "riding the bus to", "walking to", "skating to"]
+
+[registers]
+"botanical" = "Plants as house plants, park trees and window boxes."
+"bodily and anatomical" = "Bodies as chunky friendly figures, never gore."
+"fungal and decaying" = "Decay as damp, peeling posters and mushrooms in cracks."
+"animal and creaturely" = "Animals as cats, pigeons, frogs and dogs."
+"geological" = "Rock as city stone, cliffs at the edge of town."
+"metallic and ore" = "Metal as bikes, fire escapes and bins."
+"glass and ceramic" = "Glass as shop windows, mugs and bottles."
+"architectural" = "Buildings as terraced houses, shops and venues."
+"domestic interior" = "A small flat with plants and a window onto the street."
+"mechanical" = "Machines as presses, bikes and buses."
+"industrial and infrastructural" = "Works as overpasses, bridges and water towers."
+"agricultural and cultivated" = "Farming as community gardens and rooftop beds."
+"aquatic" = "Water as rain, canals and a public pool."
+"atmospheric" = "Sky as flat ink with simple clouds."
+"glacial and frozen" = "Snow on rooftops and an icy street."
+"fire and ember" = "Fire as a barbecue, a candle, a bin fire."
+"textile and fiber" = "Fabric as tote bags, patches and laundry."
+"ritual object" = "Ritual objects as candles, shrines of stickers, a mixtape."
+"paper and inscription" = "Paper as zines and posters, never a sentence."
+"instrument and measure" = "Measure as a bus timetable, a clock, a dial."

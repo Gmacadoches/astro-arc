@@ -73,11 +73,10 @@ def main():
     reading = json.loads(Path(args.reading or newest_reading()).read_text())
     period_key = reading["arc"]["periodKey"]
 
-    catalog = lp.Catalog.load()
+    # The gallery documents the styles that ship, as they ship: the seeds.
+    catalog = lp.Catalog.load(lp.SEED_STYLES_DIR)
     styles = catalog.styles
-    # The gallery documents the shipped set; a user's own themes are named explicitly.
-    shipped = [k for k, t in styles.items() if t.source == "shipped"]
-    wanted = [s.strip() for s in args.styles.split(",")] if args.styles else shipped
+    wanted = [s.strip() for s in args.styles.split(",")] if args.styles else list(styles)
     wanted = [s for s in wanted if s in styles]
     if not wanted:
         raise SystemExit("No matching styles.")

@@ -25,7 +25,7 @@
         One self-contained prompt for a web chat model: the skill, plus the
         idea or the broken file and its errors.
     astro-arc-style tweak-prompt <file> --note TEXT [--example IMAGE] [--copy]
-        The same for changing a working user theme: the file, what is off
+        The same for changing a working theme: the file, what is off
         about it, and the guide. Nothing is backed up yet: importing the
         chat's reply over the theme backs it up first, like agent tweak.
     astro-arc-style agent create <idea> | agent fix <file>
@@ -38,6 +38,17 @@
     astro-arc-style tweak-undo <file>
         Restore the theme's files from the backup the last tweak made, and
         drop that backup. JSON out.
+    astro-arc-style delete <key>
+        Delete a style for good: its files and its tweak backup. A starter
+        style is never seeded again (restore-deleted brings those back).
+        Refuses the selected style. JSON out.
+    astro-arc-style revert <key>
+        A changed starter style back to the version that ships, saving the
+        current files first so Undo last tweak can put them back. JSON out.
+    astro-arc-style restore-deleted
+        Every deleted starter style back. JSON out.
+    astro-arc-style seen-new
+        The Styles view has shown the styles a release added.
     astro-arc-style install-skill | uninstall-skill
         On request only: link the skill into each installed agent's skills
         folder so any session can use it, or remove those links again.
@@ -69,6 +80,7 @@ from cost_estimate import chat_call_cost  # noqa: E402
 from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
 from openai_image_gen import generate as openai_generate  # noqa: E402
 import settings  # noqa: E402
+import style_seeds  # noqa: E402
 from paths import STATE_DIR, USER_STYLES_DIR, VERIFY_DIR  # noqa: E402
 from providers import provider_of  # noqa: E402
 from replay_days import STYLE_DRAW_KEYS, load_days, projected_cost, replay  # noqa: E402
@@ -111,6 +123,9 @@ ASKING_MODE = {
     "gemini": lambda brief: ["gemini", "--approval-mode", "default", "--prompt-interactive", brief],
     "grok": lambda brief: ["grok", "--permission-mode", "default", "--", brief],
 }
+
+# Commands whose output, errors included, is one JSON document for the panel.
+JSON_COMMANDS = ("import", "agent", "tweak-undo", "delete", "revert", "restore-deleted", "seen-new")
 
 MEANING_DAYS = 8
 MEANING_PASS = {"polarity": 6, "duplicates": 1, "favourite": 2}
@@ -205,12 +220,10 @@ def cmd_validate(args):
         for line in warnings:
             print(f"  - {strip(line)}")
     if not errors and theme.source == "user":
-        print(f"\nValid. It shows in the style list as \"{theme.label}\", tagged custom.")
-    elif not errors and theme.source == "shipped":
-        print("\nValid (a shipped theme).")
+        print(f"\nValid. It shows in the style list as \"{theme.label}\".")
     elif not errors:
         print(f"\nValid. Copy it into {USER_STYLES_DIR}/ to use it; "
-              f"it then shows in the style list as \"{theme.label}\", tagged custom.")
+              f"it then shows in the style list as \"{theme.label}\".")
     return 1 if errors else 0
 
 
@@ -609,9 +622,6 @@ def cmd_import(args):
     key = slug(name) if name else ""
     if not key or key in ("theme", "style", "untitled"):
         key = slug(str(table.get("label", ""))) or "my-style"
-    shipped = {p.stem for p in lp.SHIPPED_STYLES_DIR.glob("*.toml")}
-    if key in shipped:
-        key += "-custom"
     folder = USER_STYLES_DIR
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{key}.toml"
@@ -684,9 +694,8 @@ def tweak_prompt(file, note, example):
 # ---- tweak backups -------------------------------------------------------
 
 def user_theme(file):
-    """FILE as a user theme: (its key, its path). A shipped theme is read-only
-    to a tweak — its files are the plugin's, and an update would put them
-    back anyway."""
+    """FILE as a theme in the styles folder: (its key, its path). A draft
+    elsewhere is not one of the user's styles yet."""
     path = Path(file).expanduser().resolve()
     key = open_theme(path).key
     if path.parent != USER_STYLES_DIR.resolve():
@@ -745,6 +754,60 @@ def cmd_tweak_undo(args):
             target.unlink(missing_ok=True)
     shutil.rmtree(folder)
     print(json.dumps({"ok": True, "key": key, "restoredFrom": manifest.get("savedAt", "")}))
+    return 0
+
+
+# ---- the Styles view: delete, revert, restore ---------------------------
+
+def style_path(key):
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", key):
+        raise StyleError(f"'{key}' is not a style key")
+    return USER_STYLES_DIR / f"{key}.toml"
+
+
+def run_config(*args):
+    result = subprocess.run([sys.executable, str(THIS.with_name("astro-arc-config")), *args],
+                            capture_output=True, text=True)
+    if result.returncode != 0:
+        raise StyleError(result.stderr.strip() or "couldn't update the settings")
+
+
+def cmd_delete(args):
+    path = style_path(args.key)
+    if not path.exists():
+        raise StyleError(f"there is no style '{args.key}'")
+    if load_config()["artStyle"] == args.key:
+        raise StyleError("that is the selected style; pick another before deleting it")
+    label = open_theme(path).label
+    for suffix in THEME_SUFFIXES:
+        path.with_suffix(suffix).unlink(missing_ok=True)
+    shutil.rmtree(TWEAK_BACKUP_ROOT / args.key, ignore_errors=True)
+    run_config("--forget-style", args.key)
+    print(json.dumps({"ok": True, "key": args.key, "label": label}))
+    return 0
+
+
+def cmd_revert(args):
+    path = style_path(args.key)
+    if path.exists():
+        backup_files(args.key, path)
+    try:
+        style_seeds.revert(args.key)
+    except style_seeds.SeedError as e:
+        raise StyleError(str(e)) from None
+    print(json.dumps({"ok": True, "key": args.key, "label": open_theme(path).label}))
+    return 0
+
+
+def cmd_restore_deleted(args):
+    keys = style_seeds.restore_deleted()
+    print(json.dumps({"ok": True, "keys": keys}))
+    return 0
+
+
+def cmd_seen_new(args):
+    style_seeds.seen_new()
+    print(json.dumps({"ok": True}))
     return 0
 
 
@@ -950,6 +1013,11 @@ def main():
     p.add_argument("--example", help="tweak: an image the theme made, for the agent to look at")
     p = sub.add_parser("tweak-undo")
     p.add_argument("file")
+    for name in ("delete", "revert"):
+        p = sub.add_parser(name)
+        p.add_argument("key")
+    sub.add_parser("restore-deleted")
+    sub.add_parser("seen-new")
     sub.add_parser("install-skill")
     sub.add_parser("uninstall-skill")
     args = ap.parse_args()
@@ -958,19 +1026,21 @@ def main():
                "render": cmd_render, "choose": cmd_choose, "import": cmd_import,
                "create-prompt": cmd_create_prompt, "fix-prompt": cmd_fix_prompt,
                "tweak-prompt": cmd_tweak_prompt, "tweak-undo": cmd_tweak_undo,
-               "agent": cmd_agent, "install-skill": cmd_install_skill,
+               "agent": cmd_agent, "delete": cmd_delete, "revert": cmd_revert,
+               "restore-deleted": cmd_restore_deleted, "seen-new": cmd_seen_new,
+               "install-skill": cmd_install_skill,
                "uninstall-skill": cmd_uninstall_skill}[args.cmd]
     try:
         return handler(args)
     except (OSError, TimeoutError) as e:  # a stalled or dropped API connection
         e = StyleError(f"the API connection failed ({e}); nothing after it ran, so re-run the command")
-        if getattr(args, "json", False) or args.cmd in ("import", "agent", "tweak-undo"):
+        if getattr(args, "json", False) or args.cmd in JSON_COMMANDS:
             print(json.dumps({"ok": False, "error": str(e)}))
         else:
             print(f"astro-arc-style: {e}", file=sys.stderr)
         return 1
     except (StyleError, lp.PipelineError) as e:
-        if (getattr(args, "json", False) or args.cmd in ("import", "agent", "tweak-undo")
+        if (getattr(args, "json", False) or args.cmd in JSON_COMMANDS
                 or getattr(args, "copy", False)):
             print(json.dumps({"ok": False, "error": str(e)}))
         else:

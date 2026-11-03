@@ -51,6 +51,15 @@ script's flags, messages, exit codes and output byte for byte.
                                          astro-arc-detect-resolution)
   --set-art-style <key>                 which theme (pipeline/styles/<key>.toml or a user theme)
                                          Stage 2's prompt is suffixed with
+  --favorite-style <key> <true|false>   star or unstar a style; starred ones
+                                         are listed first
+  --hide-styles <true|false> <key>...   hide styles from the Style picker, or
+                                         show them again. The selected style
+                                         is never hidden
+  --forget-style <key>                  drop a deleted style from the starred
+                                         and hidden lists
+  --rename-style <old> <new>            a style whose key changed: the
+                                         selection and both lists follow it
   --set-provider <openai|openrouter>     which AI provider everything else is
                                          scoped to — the key you paste, which
                                          models are offered, what they cost.
@@ -146,7 +155,9 @@ USAGE = ("Usage: astro-arc-config [--set-birth <date> <time|unknown>|--set-locat
          "|--set-timezone <tz>|--clear-location|--set-frequency <hourly|daily|weekly|monthly|manual>"
          "|--set-interval-hours <1|2|3|4|6|8|12>|--set-image-backend <local|openai>"
          "|--set-openai-model <model> [quality]|--set-stage1-model <model>|--set-stage2-model <model>"
-         "|--set-background-size <auto|WxH>|--set-art-style <key>|--set-theme-generator <built-in|aether>"
+         "|--set-background-size <auto|WxH>|--set-art-style <key>"
+         "|--favorite-style <key> <true|false>|--hide-styles <true|false> <key>...|--forget-style <key>"
+         "|--rename-style <old> <new>|--set-theme-generator <built-in|aether>"
          "|--set-background-only <true|false>|--set-animated-background <true|false>"
          "|--set-motion <true|false>|--set-history-retention-days <N>]")
 
@@ -182,6 +193,16 @@ def show():
     if data is None:
         return settings.dumps(settings.defaults(), indent=None)
     return settings.dumps(settings.clean(data))
+
+
+def is_key(text):
+    return bool(settings.KEY_PATTERN.match(text))
+
+
+def with_key(keys, key, present):
+    """`keys` with `key` in it (appended) or out of it, order otherwise kept."""
+    keys = [k for k in keys if k != key]
+    return keys + [key] if present else keys
 
 
 def real_date(text):
@@ -276,6 +297,35 @@ def run(args):
         need(arg(1), "Usage: astro-arc-config --set-art-style <key>")
         config = current()
         config["artStyle"] = arg(1)
+    elif flag == "--favorite-style":
+        need(is_key(arg(1)) and arg(2) in ("true", "false"),
+             "Usage: astro-arc-config --favorite-style <key> <true|false>")
+        config = current()
+        config["favoriteStyles"] = with_key(config["favoriteStyles"], arg(1), arg(2) == "true")
+    elif flag == "--hide-styles":
+        keys = args[2:]
+        need(arg(1) in ("true", "false") and keys and all(is_key(k) for k in keys),
+             "Usage: astro-arc-config --hide-styles <true|false> <key>...")
+        config = current()
+        hidden = config["hiddenStyles"]
+        for key in keys:
+            need(not (arg(1) == "true" and key == config["artStyle"]),
+                 f"'{key}' is the selected style; pick another before hiding it")
+            hidden = with_key(hidden, key, arg(1) == "true")
+        config["hiddenStyles"] = hidden
+    elif flag == "--forget-style":
+        need(is_key(arg(1)), "Usage: astro-arc-config --forget-style <key>")
+        config = current()
+        for name in ("favoriteStyles", "hiddenStyles"):
+            config[name] = with_key(config[name], arg(1), False)
+    elif flag == "--rename-style":
+        need(is_key(arg(1)) and is_key(arg(2)), "Usage: astro-arc-config --rename-style <old> <new>")
+        config = current()
+        if config["artStyle"] == arg(1):
+            config["artStyle"] = arg(2)
+        for name in ("favoriteStyles", "hiddenStyles"):
+            if arg(1) in config[name]:
+                config[name] = with_key(with_key(config[name], arg(1), False), arg(2), True)
     elif flag == "--set-provider":
         need(arg(1) in ("openai", "openrouter"), "Usage: astro-arc-config --set-provider <openai|openrouter>")
         config = current()

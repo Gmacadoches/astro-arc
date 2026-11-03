@@ -1,0 +1,77 @@
+label = "Topographic Contour Map"
+suffix = "elegant topographic map art, fine concentric contour lines tracing every rise and hollow, layered hypsometric tints from deep sea blue through green to buff and white peaks, subtle hillshading from the northwest, delicate grid and survey marks, matte paper texture, figures tiny as map symbols or little drawn travellers, main subject below the top edge, no legible lettering"
+space = [
+  "a mountain range seen from above, contours tightening to its peaks",
+  "a coastline with bathymetric lines descending into the sea",
+  "a river valley winding between ridges",
+  "a volcano island ringed by contours",
+  "a glacier flowing down between peaks",
+  "a canyon cutting through a plateau",
+  "a lake district of many basins",
+]
+
+[world]
+era = "A world as surveyors see it from above, where travellers, villages and creatures move across terrain drawn in contours, with technology of compasses, trains and boats."
+materials = "Contour lines and tinted terrain lead; rivers, glaciers, roads, forests as stippled symbols and towns as small blocks are the common stuff."
+physics = "Height is colour and line; the land can rise from the paper as relief. Nothing glows. Creatures and travellers are drawn as small symbols moving over the map."
+society = "Villages, railways, trails and harbours. Travellers walk routes, villages farm valleys, ships cross bays, festivals gather on summits."
+weather = "Weather as overlays: isobar swirls, a storm front line, snow tinting the peaks, fog filling a valley, a clear map. Pick what the day calls for."
+inhabitants = "Surveyors, hikers, villagers, caravans, migrating birds, whales in the bathymetry, and terrain spirits as giant forms in the contours."
+strangeness = "The map and the land merging: a mountain rising off the paper in relief, a creature shaped by the contour lines. Surveyors keep measuring."
+numinous = "The sacred is the summit and the source: the highest peak drawn with reverence, the spring where a river begins, a giant figure hidden in the terrain."
+dread = "On hard days the terrain turns: a flood spreading blue over the valley, a landslide erasing contours, an eruption, a storm front across the map."
+favoured_actors = "Caravans and crowds, animals migrating, presences in the terrain, figures in relation. A lone hiker on a summit is the most worn image here and should not be the default."
+myth = "Sacred mountains and rivers across cultures, giant-in-the-landscape myths, and the explorers' tales."
+highlight = "The thing the eye finds first is a terrain feature behaving like a creature or a creature shaped like terrain. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a figure formed by the contour lines themselves",
+  "part of the map lifted into real relief",
+  "a creature migrating at the scale of a range",
+  "a river flowing uphill",
+  "a summit with something unexpected on it",
+]
+
+[brief]
+signature = "SIGNATURE — contour lines cover at least half the frame, and hypsometric colour bands are named. A scene that could be a landscape painting is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "Night shading: two thirds of the map in deep blues and dark tints, with small lights as town symbols. A frame that is mostly pale is a failed response."
+mid = "Strong hillshading from one direction, slopes away from it in shadow. A frame without hillshade is a failed response."
+hi = "Light, pale tints everywhere and soft hillshade, all terrain clear. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["flooding", "eroding", "sliding", "erupting", "collapsing", "breaching", "submerging", "crumbling", "splitting", "storming", "shifting", "sinking", "faulting", "washing out", "quaking", "drowning", "burying", "fracturing", "overflowing", "receding", "cutting through"]
+process_soft = ["rising", "winding", "branching", "meandering", "terracing", "rolling", "ascending", "spreading", "flowing", "settling", "greening", "nesting", "curving", "climbing", "draining", "deepening", "joining", "unfolding", "layering", "tracing", "ringing"]
+actor_hard.work = ["surveying the damage at", "building a levee at", "clearing", "hauling", "rescuing at", "bracing"]
+actor_hard.rest = ["sheltering at", "camping out at", "waiting at", "stranded at"]
+actor_hard.play = ["racing", "climbing hard up", "scrambling across", "leaping"]
+actor_hard.ritual = ["lighting beacons on", "gathering on", "praying at"]
+actor_hard.travel = ["fleeing", "crossing", "fording", "trekking through"]
+actor_soft.work = ["surveying", "farming", "mapping", "building", "fishing at"]
+actor_soft.rest = ["camping at", "resting at", "picnicking at", "sitting on"]
+actor_soft.play = ["hiking up", "sailing across", "skiing down", "swimming at", "kayaking along"]
+actor_soft.ritual = ["celebrating on", "placing a cairn on", "honouring"]
+actor_soft.travel = ["walking to", "riding the train to", "sailing to", "migrating over"]
+
+[registers]
+"botanical" = "Plants as stippled forest and grassland symbols."
+"bodily and anatomical" = "Bodies as tiny traveller symbols, or a giant figure formed by terrain, never gore."
+"fungal and decaying" = "Decay as marsh symbols and eroded slopes."
+"animal and creaturely" = "Animals as migration paths and whales in the deep."
+"geological" = "Rock is the heart: peaks, ridges and faults."
+"metallic and ore" = "Metal as mine symbols and ore veins."
+"glass and ceramic" = "Glass as lakes drawn like lenses."
+"architectural" = "Buildings as town blocks and summit huts."
+"domestic interior" = "A map room with a window onto the terrain."
+"mechanical" = "Machines as railway lines and dams."
+"industrial and infrastructural" = "Works as roads, tunnels and bridges."
+"agricultural and cultivated" = "Farming as field patterns in valleys."
+"aquatic" = "Water as rivers, lakes and bathymetric lines."
+"atmospheric" = "Sky as weather overlays and isobars."
+"glacial and frozen" = "Ice as glaciers and white peaks."
+"fire and ember" = "Fire as volcano symbols and lava flows."
+"textile and fiber" = "Fibre as trails like threads across the map."
+"ritual object" = "Ritual objects as cairns and summit markers."
+"paper and inscription" = "Paper as the map itself, cartouches without legible words."
+"instrument and measure" = "Measure as grid lines, compass roses and scale bars."

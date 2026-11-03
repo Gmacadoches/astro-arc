@@ -5,17 +5,17 @@ for the model dropdowns.
 
     style_catalog.py                      JSON array, one row per theme
     style_catalog.py --set-preview KEY IMAGE
-                                          IMAGE becomes the user theme KEY's
+                                          IMAGE becomes the theme KEY's
                                           preview (<key>.jpg beside its .toml)
     style_catalog.py --change-preview KEY same, choosing IMAGE in a file dialog
 
-Each row is {key, label, source, valid, errors, warnings, preview, path}.
-`source` is "shipped" or "user". A theme that fails validate_charter is still
-listed, with valid false and its errors, so the panel can show what is wrong
-with it instead of the theme silently vanishing.
-
-Previews are written for user themes only. A shipped theme's preview ships
-with the code and is read-only from here.
+Listing seeds first (style_seeds.py), so a release's new styles are there.
+Each row is {key, label, valid, errors, warnings, preview, path, starter,
+changed, isNew}: `starter` for a style that came from a seed, `changed` when
+its files are no longer that seed's (a tweak, a new preview), `isNew` for one
+a release added that the Styles view has not shown yet. A theme that fails
+validate_charter is still listed, with valid false and its errors, so the
+panel can show what is wrong with it instead of the theme silently vanishing.
 """
 
 import json
@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import llm_pipeline as lp  # noqa: E402
+import style_seeds  # noqa: E402
 from image_fit import ImageError, thumbnail_jpeg  # noqa: E402
 
 # Matches the shipped previews (docs/images/styles/, 1200x675).
@@ -33,17 +34,22 @@ PREVIEW_PX = 1200
 
 
 def catalog():
+    # Quietly: the panel shows this script's stderr as a warning.
+    style_seeds.seed_or_warn(report=False)
+    seeds = style_seeds.Seeds()
     rows = []
     for key, theme in lp.Catalog.load().styles.items():
         rows.append({
             "key": key,
             "label": theme.label,
-            "source": theme.source,
             "valid": theme.valid,
             "errors": theme.errors,
             "warnings": theme.warnings,
             "preview": str(theme.preview) if theme.preview.is_file() else "",
             "path": str(theme.path),
+            "starter": seeds.is_starter(key),
+            "changed": seeds.is_starter(key) and seeds.changed(key),
+            "isNew": key in seeds.new,
         })
     return rows
 
@@ -56,8 +62,6 @@ def set_preview(key, image):
     theme = lp.Catalog.load().styles.get(key)
     if theme is None:
         raise PreviewError(f"No theme '{key}'.")
-    if theme.source != "user":
-        raise PreviewError(f"'{theme.label}' is a shipped theme; its preview is read-only.")
     image = Path(image)
     if not image.is_file():
         raise PreviewError(f"{image} is not a file.")

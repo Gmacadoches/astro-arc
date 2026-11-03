@@ -1,0 +1,77 @@
+label = "Layered Paper-Cut Diorama"
+suffix = "layered paper-cut art photographed as a shadow box, many stacked layers of coloured card with crisp cut edges, soft drop shadows between layers creating depth, gentle backlight glowing through the gaps, matte paper texture, limited harmonious palette, figures as flat cut silhouettes, main subject placed below the top edge"
+space = [
+  "layer after layer of hills receding into a glowing backlit sky",
+  "through a frame of cut leaves into a forest clearing",
+  "down a cut-paper street of houses to a tower",
+  "across layered waves of the sea to an island",
+  "into a cave whose layered walls open on a lake",
+  "up a valley of layered mountains toward a moon",
+  "through tiers of clouds to a floating city",
+]
+
+[world]
+era = "A fairy-tale world folded from paper, with castles, villages and forests, and technology of windmills, lanterns and sailboats."
+materials = "Card, tissue and cut paper lead; thread, vellum, foil, tracing paper and folded origami are the common stuff."
+physics = "Everything is flat but layered; depth is distance between sheets. Light shines through gaps and thin paper. Lanterns glow; nothing else does. Things can unfold and refold."
+society = "Villages, castles, mills and harbours. People bake, sail, dance, travel and celebrate festivals with lanterns."
+weather = "Weather in paper: cut snowflakes, tissue clouds, a storm of torn grey layers, rain as fine threads, a clear glowing sky. Pick what the day calls for."
+inhabitants = "Villagers, travellers, foxes, deer, whales, birds, folded creatures and fairy-tale beings."
+strangeness = "Paper behaving like paper: a bird unfolding from a letter, a bridge made of a folded map. Nobody is surprised."
+numinous = "The sacred is the light behind the layers: a glowing moon or sun shining through everything, a great folded creature, a lantern that never goes out."
+dread = "On hard days the paper fails: torn layers, water soaking through, fire curling the edges, a forest crumpled flat."
+favoured_actors = "Animals, travellers in relation, crowds and folded presences. A child silhouette under a moon is the most worn image here and should not be the default."
+myth = "European fairy tales, Japanese origami folklore and the shadow-puppet tradition."
+highlight = "The thing the eye finds first is a cut or folded form that stands out from the layers. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a creature unfolding from a flat object",
+  "a cut silhouette casting a shadow of something else",
+  "a hole cut right through all the layers",
+  "a structure folded impossibly",
+  "one layer lit far brighter than all the rest",
+]
+
+[brief]
+signature = "SIGNATURE — at least four distinct paper layers are named, from foreground to background. A flat single-layer image is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: at least two thirds of the frame is dark layers, with light only glowing from behind through gaps or lanterns. A frame that is mostly bright is a failed response."
+mid = "Light comes from behind and one side, so layers cast clear shadows on each other. A frame with no shadows between layers is a failed response."
+hi = "Bright even light across all layers, colours fully visible. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["tearing", "crumpling", "soaking through", "curling in flame", "ripping", "folding in on itself", "collapsing flat", "scattering", "fraying", "creasing", "blackening at the edges", "blowing away", "falling apart", "sagging wet", "splitting", "shredding", "dissolving", "smouldering", "tumbling", "flattening", "darkening"]
+process_soft = ["unfolding", "glowing through", "layering", "fluttering", "folding into a bird", "drifting", "rising", "opening", "casting shadows", "lighting up", "tessellating", "spinning", "floating", "budding", "rustling", "spreading", "unrolling", "framing", "stacking", "peeking through", "blooming"]
+actor_hard.work = ["taping together", "patching", "dragging", "rescuing from", "folding back", "holding up"]
+actor_hard.rest = ["sheltering under", "hiding behind", "waiting in", "huddling by"]
+actor_hard.play = ["racing", "leaping across", "dodging", "scrambling over"]
+actor_hard.ritual = ["carrying a lantern through", "sealing", "keeping vigil at"]
+actor_hard.travel = ["fleeing across", "sailing hard past", "climbing", "running through"]
+actor_soft.work = ["cutting", "folding", "baking at", "fishing off", "tending"]
+actor_soft.rest = ["sitting under", "napping by", "reading at", "watching the stars from"]
+actor_soft.play = ["flying a paper kite over", "dancing at", "sailing paper boats on", "playing in", "chasing birds across"]
+actor_soft.ritual = ["releasing lanterns at", "hanging garlands on", "lighting"]
+actor_soft.travel = ["walking to", "sailing to", "riding to", "crossing"]
+
+[registers]
+"botanical" = "Plants as cut leaves and flowers in layers: a forest of cut trees, a garland."
+"bodily and anatomical" = "Bodies as silhouettes, graceful, never gore."
+"fungal and decaying" = "Decay as torn edges and toadstools of red card."
+"animal and creaturely" = "Animals as cut or folded shapes: foxes, cranes, whales."
+"geological" = "Rock as layered card mountains and caves."
+"metallic and ore" = "Metal as foil: a crown, a weathervane."
+"glass and ceramic" = "Glass as vellum and tracing paper: a window, a lantern."
+"architectural" = "Buildings as cut-out houses and castles with lit windows."
+"domestic interior" = "A cut-paper room with a window open onto layers outside."
+"mechanical" = "Machines as paper windmills, waterwheels and clocks."
+"industrial and infrastructural" = "Works as bridges, lighthouses and harbours in card."
+"agricultural and cultivated" = "Fields as stripes of coloured card, orchards of round trees."
+"aquatic" = "Water as layered waves of blue card."
+"atmospheric" = "Sky as tissue layers, glowing from behind."
+"glacial and frozen" = "Snow as cut snowflakes and white layers."
+"fire and ember" = "Fire as orange and red cut flames, glowing."
+"textile and fiber" = "Fabric as thread and paper cloth: a tent, a sail."
+"ritual object" = "Ritual objects are paper lanterns, charms and folded cranes."
+"paper and inscription" = "Paper is everything; letters and maps fold into things, never a sentence."
+"instrument and measure" = "Measure as a paper compass, a sundial, a star chart in layers."

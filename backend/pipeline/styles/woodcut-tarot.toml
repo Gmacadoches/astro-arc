@@ -1,0 +1,77 @@
+label = "Woodcut Tarot"
+suffix = "hand-coloured woodcut print in the style of an old tarot card, bold black carved lines with gouge marks, simple flat stencilled colour in red, yellow, sky blue and flesh, aged cream paper with foxing, symmetrical decorative framing, figures stiff and symbolic with clear gestures, main subject held below the top edge, no lettering"
+space = [
+  "a figure in the foreground with rolling hills and a tower behind",
+  "two pillars with a landscape between them",
+  "a road winding to a city on a hill",
+  "a river running from a cliff into a valley",
+  "a garden behind a low wall with mountains beyond",
+  "a sky of sun, moon and stars over a plain",
+  "a tower struck in the distance across a field",
+]
+
+[world]
+era = "The world of the old tarot: kings, fools, hermits and lovers in a medieval and Renaissance land, with technology of carts, swords, cups and wheels."
+materials = "Carved wood line and stencil colour lead; gold coins, cups, swords, staves, stone, cloth and wheat are the common stuff."
+physics = "Every object is also a symbol; the sun and moon have faces. Stars and the sun glow; nothing else does. The world arranges itself in meaningful patterns."
+society = "Courts, crossroads, gardens and villages. People travel, work, love, feast, gamble, wander and seek."
+weather = "Symbolic weather: a lightning bolt, drops falling from the moon, a rainbow, snow on a hermit's path, a blazing sun. Pick what the day calls for."
+inhabitants = "Kings, queens, fools, pilgrims, lovers, dogs, lions, wolves, crayfish, angels and devils."
+strangeness = "Symbols acting as things: a wheel turning in the sky, a hand emerging from a cloud holding a cup. Figures accept it."
+numinous = "The sacred is the great symbol: the sun with a face, the star pouring water, the angel with a trumpet."
+dread = "On hard days the cards turn: the tower struck, a figure bound, swords piercing, a wheel turning downward."
+favoured_actors = "Figures in relation, animals, presences and travellers. A solitary hermit with a lantern is the most worn image here and should not be the default."
+myth = "Tarot and Renaissance allegory, alchemy and European folklore."
+highlight = "The thing the eye finds first is a symbol made physical and acting in the scene. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a celestial body with a face, close to the ground",
+  "a hand reaching from a cloud with an object",
+  "an object (cup, sword, coin, staff) at the scale of a tower",
+  "an animal standing in for a person",
+  "a wheel or pattern turning in the sky",
+]
+
+[brief]
+signature = "SIGNATURE — at least one tarot symbol is named in frame: a cup, a sword, a coin, a staff, or a sun or moon with a face. A scene without symbols is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the card is dark hatching and deep blue, with only stars, moon or a lantern. A frame that is mostly bright is a failed response."
+mid = "Light from one side, carved hatching shading the other side. A frame without shading is a failed response."
+hi = "Full day, flat colour across the card, everything visible. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["striking", "falling", "binding", "piercing", "toppling", "burning", "crumbling", "turning downward", "breaking", "cracking", "sinking", "wilting", "storming", "shattering", "plunging", "severing", "darkening", "chaining", "smouldering", "tumbling", "rending"]
+process_soft = ["shining", "pouring", "blooming", "turning upward", "rising", "ripening", "dawning", "flowing", "glowing", "balancing", "crowning", "unfolding", "blessing", "uniting", "growing", "radiating", "harvesting", "flowering", "circling", "trumpeting", "rejoicing"]
+actor_hard.work = ["hauling", "carrying ten staves past", "digging", "defending", "binding", "bracing"]
+actor_hard.rest = ["lying beneath", "slumped at", "waiting at", "sheltering in"]
+actor_hard.play = ["dueling at", "gambling at", "racing past", "wrestling at"]
+actor_hard.ritual = ["mourning at", "praying at", "keeping vigil at"]
+actor_hard.travel = ["fleeing", "rowing away from", "walking away from", "riding hard from"]
+actor_soft.work = ["sowing", "carving", "weighing coins at", "planting", "building"]
+actor_soft.rest = ["resting at", "sitting at", "feasting at", "dozing by"]
+actor_soft.play = ["dancing at", "juggling at", "playing at", "toasting with cups at", "walking a dog past"]
+actor_soft.ritual = ["pouring water at", "crowning", "blessing"]
+actor_soft.travel = ["setting out from", "riding to", "sailing to", "wandering past"]
+
+[registers]
+"botanical" = "Plants as roses, lilies and wheat in bold cut shapes."
+"bodily and anatomical" = "Bodies as stiff symbolic figures, never gore."
+"fungal and decaying" = "Decay as a withered tree and a ruined wall."
+"animal and creaturely" = "Animals as lions, dogs, wolves, crayfish and horses."
+"geological" = "Rock as mountains and crags in carved lines."
+"metallic and ore" = "Metal as swords, coins and crowns."
+"glass and ceramic" = "Glass and clay as cups and vessels."
+"architectural" = "Buildings as towers, castles and pillars."
+"domestic interior" = "A throne room with a window onto the land."
+"mechanical" = "Machines as wheels and chariots."
+"industrial and infrastructural" = "Works as walls, bridges and gates."
+"agricultural and cultivated" = "Farming as sowing, reaping and gardens."
+"aquatic" = "Water as rivers, pools and seas with ships."
+"atmospheric" = "Sky as sun, moon and stars with faces."
+"glacial and frozen" = "Snow on a hermit's mountain path."
+"fire and ember" = "Fire as lightning, torches and salamanders."
+"textile and fiber" = "Fabric as robes, banners and veils."
+"ritual object" = "Ritual objects as cups, staves and wands."
+"paper and inscription" = "Paper as scrolls and banners, never a sentence."
+"instrument and measure" = "Measure as scales, a wheel and an hourglass."

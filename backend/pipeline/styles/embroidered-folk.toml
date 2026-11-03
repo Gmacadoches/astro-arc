@@ -1,0 +1,77 @@
+label = "Embroidered Folk Tapestry"
+suffix = "hand embroidery on natural linen photographed flat, visible satin stitch, chain stitch and French knots in wool and cotton threads, raised textured stitching catching soft light, folk palette of madder red, indigo, mustard and leaf green on unbleached linen, figures stitched as simple flat folk shapes, main subject below the top edge"
+space = [
+  "a village of stitched houses on a hill with fields below",
+  "a river of blue stitches winding to a mill",
+  "a forest of stitched trees around a clearing",
+  "a road of running stitches to a church on a far hill",
+  "a lake with boats under a stitched sky",
+  "a garden of flowers around a cottage",
+  "a mountain pass with a caravan crossing",
+]
+
+[world]
+era = "A folk countryside from Eastern Europe to Scandinavia: villages, farms, fairs and forests, with technology of spinning wheels, mills and horse carts."
+materials = "Linen, wool thread and wood lead; straw, clay, painted eggs, leather, beeswax and iron are the common stuff."
+physics = "Everything is made of stitches; patterns repeat. Nothing glows except candles and the stitched sun. Plants and birds are symbols of luck."
+society = "Villages of fairs, weddings, harvests and markets. People spin, plant, herd, dance, marry, sing and gather around stoves."
+weather = "Stitched weather: rain in blue dashes, snow in white knots, a red sun, wind as curls, a calm day. Pick what the day calls for."
+inhabitants = "Villagers, shepherds, brides, musicians, roosters, storks, horses, wolves, bears and forest spirits."
+strangeness = "The folk tale come true: a bear dancing at a wedding, a firebird on the roof. Villagers nod."
+numinous = "The sacred is the tree of life and the firebird: a great stitched tree with birds, a sun with rays, a bird of fire."
+dread = "On hard days the tale turns dark: wolves at the edge of the village, a fire at the mill, a flood across fields, a winter that will not end."
+favoured_actors = "Crowds at fairs, figures in relation, animals and presences. A girl in a red headscarf alone is the most worn image here and should not be the default."
+myth = "Slavic and Nordic folk tales, the tree of life, and the firebird legends."
+highlight = "The thing the eye finds first is a folk creature or symbol living in the village. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a bird far larger than a house",
+  "the tree of life growing through a building",
+  "an animal at a human celebration",
+  "a forest spirit at the edge of a field",
+  "a sun or moon walking the road",
+]
+
+[brief]
+signature = "SIGNATURE — the stitches are named: at least one element is described with a stitch type and thread. A scene that could be a painting is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the linen is stitched in dark indigo and black, lit only by stitched candles or moon. A frame that is mostly bright is a failed response."
+mid = "Light from one side, stitched shading on one side of things. A frame lit evenly is a failed response."
+hi = "Bright day, the linen pale and every stitch visible. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["burning", "flooding", "howling", "freezing", "unravelling", "fraying", "toppling", "rotting", "stalking", "storming", "blighting", "tearing", "drifting snow over", "starving", "cracking", "smoking", "darkening", "snapping", "sinking", "collapsing", "creeping"]
+process_soft = ["blossoming", "sprouting", "ripening", "nesting", "singing", "spinning", "flowering", "twining", "dancing", "swirling", "budding", "fruiting", "warming", "rising", "shining", "fluttering", "weaving", "brewing", "gathering", "circling", "greening"]
+actor_hard.work = ["chasing off", "carrying water to", "digging out", "patching", "herding home from", "barring"]
+actor_hard.rest = ["sheltering in", "huddling by", "waiting at", "praying in"]
+actor_hard.play = ["racing horses past", "leaping", "wrestling at", "running from"]
+actor_hard.ritual = ["lighting bonfires at", "ringing bells at", "chanting at"]
+actor_hard.travel = ["fleeing", "crossing", "trudging through", "riding hard through"]
+actor_soft.work = ["spinning at", "embroidering at", "planting", "herding", "baking at"]
+actor_soft.rest = ["resting at", "sitting at", "napping by", "warming at"]
+actor_soft.play = ["dancing at", "playing fiddle at", "swinging at", "singing at", "riding at"]
+actor_soft.ritual = ["marrying at", "painting eggs at", "garlanding"]
+actor_soft.travel = ["riding a cart to", "walking to", "sailing to", "arriving at"]
+
+[registers]
+"botanical" = "Plants as stitched flowers, vines and the tree of life."
+"bodily and anatomical" = "Bodies as simple folk figures, never gore."
+"fungal and decaying" = "Decay as mushrooms in the forest and frayed threads."
+"animal and creaturely" = "Animals as roosters, storks, horses, bears and wolves."
+"geological" = "Rock as hills and mountains in stitched rows."
+"metallic and ore" = "Metal as horseshoes, bells and iron stoves."
+"glass and ceramic" = "Clay as painted pottery and jugs."
+"architectural" = "Buildings as wooden houses, churches and mills."
+"domestic interior" = "A cottage room with a stove and a window onto the village."
+"mechanical" = "Machines as spinning wheels, mills and looms."
+"industrial and infrastructural" = "Works as bridges, wells and mills."
+"agricultural and cultivated" = "Farming as fields, sheaves and orchards."
+"aquatic" = "Water as rivers and lakes of blue stitches."
+"atmospheric" = "Sky as stitched sun, moon, stars and clouds."
+"glacial and frozen" = "Snow as white knots on roofs."
+"fire and ember" = "Fire as a stove, a bonfire, a firebird."
+"textile and fiber" = "Fabric is everything: shawls, aprons and banners."
+"ritual object" = "Ritual objects as painted eggs, wreaths and candles."
+"paper and inscription" = "Paper as stitched borders and samplers, never a sentence."
+"instrument and measure" = "Measure as a spinning wheel's count and a church clock."

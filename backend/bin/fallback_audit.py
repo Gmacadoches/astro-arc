@@ -237,9 +237,11 @@ def install_stubs(state_dir, cache_styles, control_style):
         control.write_text('label = "Unchartered Control"\nsuffix = "control suffix"\n')
         control.with_suffix(".jpg").write_bytes(b"")
         drafts.append(control)
-    AUDIT.catalog = lp.Catalog.load(drafts=drafts)
+    # The seeds, never the user's folder: what a machine's user changed would
+    # change the baseline.
+    AUDIT.catalog = lp.Catalog.load(lp.SEED_STYLES_DIR, drafts=drafts)
     AUDIT.catalog_for_run = ((lambda: AUDIT.catalog) if cache_styles
-                             else (lambda: lp.Catalog.load(drafts=drafts)))
+                             else (lambda: lp.Catalog.load(lp.SEED_STYLES_DIR, drafts=drafts)))
 
 
 def seed_stage1_cache(config):
@@ -331,8 +333,7 @@ def main():
         install_detectors()
         seed_stage1_cache(CONFIG)
 
-        # Shipped themes only: a user's own themes would change the baseline.
-        shipped = [k for k, t in AUDIT.catalog.styles.items() if getattr(t, "source", None) == "shipped"]
+        shipped = [k for k, t in AUDIT.catalog.styles.items() if t.source != "draft"]
         styles = args.styles or shipped
         registers = AUDIT.catalog.registers
 

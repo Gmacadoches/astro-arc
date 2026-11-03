@@ -20,6 +20,7 @@
 #   number     a number, at least `min`
 #   coordinate a number, or null when unset (its default; TOML has no null)
 #   size       "auto" or WIDTHxHEIGHT
+#   keys       a list of style keys (lowercase letters, digits, hyphens)
 #
 # A default of "provider.chat", "provider.image" or "provider.quality" is the
 # [providers.<name>] value for the config's provider. `empty` names what ""
@@ -123,8 +124,21 @@ description = "Wallpaper size; \"auto\" detects the focused monitor at generatio
 
 [keys.artStyle]
 type = "nonempty"
-default = "symbolist"
-description = "Theme key (pipeline/styles/<key>.toml or a user theme)"
+default = "marbled-paper"
+description = "Style key: ~/.config/astro-arc/styles/<key>.toml"
+
+# The Styles view's star and hide. The user's, not the style's, so they live
+# here rather than in the style file, and a tweak or an update to the file
+# never loses them.
+[keys.favoriteStyles]
+type = "keys"
+default = []
+description = "Starred styles, listed first"
+
+[keys.hiddenStyles]
+type = "keys"
+default = []
+description = "Styles left out of the Style picker"
 
 [keys.themeGenerator]
 type = "enum"

@@ -1,0 +1,77 @@
+label = "Needle-Felt Wool Diorama"
+suffix = "needle-felted wool miniature diorama photographed with a macro lens, soft fuzzy wool fibres with visible stray hairs, rounded plump forms, gentle pastel and earthy wool colours, tiny glass bead eyes, warm soft window light, shallow depth of field with creamy background blur, figures small round and cuddly, main subject kept clear of the top edge"
+space = [
+  "across a wool meadow to a mushroom house and soft hills",
+  "down a felted forest path toward a burrow",
+  "over a felt pond with lily pads to a reed bank",
+  "through a hollow log onto a mossy clearing",
+  "along a woolly river to a little stone bridge",
+  "up a hill of felted flowers to a windmill",
+  "into a cosy den and out of its round door",
+]
+
+[world]
+era = "A tiny woodland world of animals living cosy lives, with technology of acorn cups, teapots, wheelbarrows and lanterns."
+materials = "Felted wool leads; moss, twigs, acorns, pebbles, buttons, thread and tiny ceramic cups are the common stuff."
+physics = "Everything is soft and rounded; falls bounce. Lanterns and fireflies glow; nothing else does. Seasons arrive gently."
+society = "Burrows, tree-hollows, little markets and gardens. Animals garden, bake, knit, hold picnics, tell stories and celebrate the seasons."
+weather = "Woolly weather: fluffy cloud, felt raindrops, snow of white wool, a breezy autumn, a sunny meadow. Pick what the day calls for."
+inhabitants = "Hedgehogs, mice, rabbits, foxes, owls, frogs, badgers, bees and snails, all dressed or undressed as they like."
+strangeness = "The small as grand: a mouse riding a snail, a frog's tea party in a teacup. Neighbours bring cake."
+numinous = "The sacred is the old tree and the moon: a vast felted oak with a door, a moon made of wool that animals visit."
+dread = "On hard days the woodland is threatened: a flood through the burrow, a storm toppling the oak, a fox at the door, a cold snap."
+favoured_actors = "Animals in relation, crowds of creatures, handwork and presences. A single bunny in a field is the most worn image here and should not be the default."
+myth = "English woodland tales, European animal fables and seasonal folklore."
+highlight = "The thing the eye finds first is a small animal doing something grand or a small object at a big scale. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a tiny animal riding a much larger one",
+  "a household object as a building",
+  "the moon or sun come down to the meadow",
+  "a plant as tall as a tower",
+  "an animal of the wrong habitat at home here",
+]
+
+[brief]
+signature = "SIGNATURE — wool fibres are named on the main subject, and at least one felted animal is in frame. A scene that could be any 3D render is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the frame is soft dark blue wool, lit by lanterns, fireflies or a wool moon. A frame that is mostly bright is a failed response."
+mid = "Warm window light from one side, soft shadows on the other. A frame lit evenly is a failed response."
+hi = "Bright soft daylight all over the diorama, every fibre visible. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["flooding", "toppling", "tearing", "matting", "soaking", "unravelling", "freezing", "collapsing", "blowing over", "squashing", "sagging", "tangling", "burying", "drowning", "cracking", "splitting", "storming", "fraying", "bending", "crushing", "dripping"]
+process_soft = ["fluffing up", "blooming", "steaming", "glowing", "budding", "rolling", "sprouting", "ripening", "twinkling", "dozing", "nesting", "puffing", "fluttering", "bobbing", "curling", "warming", "growing", "settling", "drifting", "humming", "swaying"]
+actor_hard.work = ["bailing out", "propping up", "rescuing", "patching", "dragging", "barricading"]
+actor_hard.rest = ["huddling in", "sheltering under", "waiting in", "curled up in"]
+actor_hard.play = ["racing", "scurrying through", "leaping across", "tumbling down"]
+actor_hard.ritual = ["keeping watch at", "lighting a lantern at", "gathering at"]
+actor_hard.travel = ["fleeing", "crossing", "climbing", "wading through"]
+actor_soft.work = ["baking at", "knitting at", "gardening at", "gathering acorns at", "fishing at"]
+actor_soft.rest = ["napping in", "having tea at", "reading at", "snoozing by"]
+actor_soft.play = ["having a picnic at", "playing tag in", "rolling down", "swinging at", "boating on"]
+actor_soft.ritual = ["celebrating at", "decorating", "singing at"]
+actor_soft.travel = ["walking to", "riding a snail to", "rowing to", "visiting"]
+
+[registers]
+"botanical" = "Plants as felt flowers, moss and mushrooms."
+"bodily and anatomical" = "Bodies as round soft animals, never gore."
+"fungal and decaying" = "Decay as felt toadstools and old logs."
+"animal and creaturely" = "Animals are the people of this world."
+"geological" = "Rock as felted pebbles and soft hills."
+"metallic and ore" = "Metal as a tiny bell, a thimble, a key."
+"glass and ceramic" = "Ceramic as tiny teacups and jam jars."
+"architectural" = "Buildings as burrows, mushroom houses and tree hollows."
+"domestic interior" = "A cosy den with a round window onto the meadow."
+"mechanical" = "Machines as wheelbarrows and windmills."
+"industrial and infrastructural" = "Works as little bridges and wells."
+"agricultural and cultivated" = "Farming as tiny vegetable patches."
+"aquatic" = "Water as felt ponds and streams."
+"atmospheric" = "Sky as fluffy wool clouds."
+"glacial and frozen" = "Snow as white wool drifts."
+"fire and ember" = "Fire as a felt hearth and lanterns."
+"textile and fiber" = "Fabric as knitted scarves and quilts."
+"ritual object" = "Ritual objects as acorn crowns and lanterns."
+"paper and inscription" = "Paper as tiny letters and signs, never a sentence."
+"instrument and measure" = "Measure as a pocket watch and a ruler of twigs."

@@ -1,0 +1,78 @@
+label = "Brutalist Concrete Dreamscape"
+suffix = "surreal dreamlike matte painting of impossible brutalist architecture, raw board-marked concrete with soft weathered texture, colossal monoliths and cantilevers defying gravity, long metaphysical shadows, luminous haze and atmospheric perspective, a calm pastel sky of peach, lilac and pale teal against grey concrete, painterly softness, figures tiny and solitary-looking even in groups, the main mass sits low enough that its top is clear of the frame's upper edge"
+space = [
+  "across an endless plaza of long shadows to a monolith hovering above the horizon",
+  "up a staircase that climbs out of still water into a bank of cloud",
+  "through a square void cut in a vast wall onto a sea of floating blocks",
+  "along a cantilevered walkway that runs out over open sky",
+  "down into a flooded atrium where pillars stand in their own reflections",
+  "between two towers joined by bridges at impossible heights",
+  "across a desert of concrete dunes toward a hollow cube big as a mountain",
+  "from inside a ring-shaped building looking out through its centre to the sky",
+]
+
+[world]
+era = "A silent, timeless dream of the twentieth century's grandest concrete visions completed at an impossible scale: megastructures as big as weather, built by no one anyone remembers, inhabited calmly by people who find it ordinary. Technology is invisible; the buildings simply work."
+materials = "Board-marked concrete leads, in blocks the size of hills; still water, pale sky, low cloud, moss, bronze doors and small warm windows are the common stuff."
+physics = "Gravity is a suggestion for architecture only: blocks hover, stairs continue into cloud, a building can stand upside down in its own reflection. People still fall and walk normally. Shadows are longer than the sun allows. Nothing glows except small warm windows and lamps."
+society = "Communities living in and on the structures: rooftop gardens, libraries in voids, pools in atriums, markets on bridges. People read, swim, picnic on ledges, fly kites from terraces and gather at dusk on the plazas."
+weather = "Weather as atmosphere at a vast scale: clouds drifting through the buildings, rain falling from one floating block onto another, snow on cantilevers, fog filling a void like water, a still clear evening. Pick what the day calls for."
+inhabitants = "Walkers, readers, swimmers, children with kites, birds nesting in the slots, deer grazing on terraces, a few patient maintenance machines, and giant still statues half built into the walls."
+strangeness = "The architecture is the strangeness: a monolith hanging above a picnic, a doorway in an empty wall that opens onto the sea, a staircase that loops back on itself. People stroll past without looking up."
+numinous = "The sacred is the void and the light: a shaft of sun through a square hole into a cathedral-sized room, a monolith no one has entered, a reflecting pool holding a second sky."
+dread = "On hard days the dream turns against its sleepers: a hovering block beginning to fall, water pouring through a breach into a void, a stair that ends in mid-air, fog swallowing the upper floors, the plaza too vast to cross before dark."
+favoured_actors = "Tiny crowds and pairs dwarfed by scale, animals on the terraces, presences in the walls, and automata. A single red-coated figure on a staircase is the most worn image here and should not be the default."
+myth = "The Tower of Babel and labyrinth myths, utopian city dreams, and metaphysical painting's empty arcades."
+highlight = "The thing the eye finds first is one architectural impossibility, shown at a scale that dwarfs everything else. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a colossal block or monolith hovering with nothing holding it",
+  "a structure continuing somewhere it cannot go (into cloud, into water, back into itself)",
+  "an opening framing a landscape that cannot be behind it",
+  "nature filling a sealed concrete interior",
+  "a building mirrored upside down as a real second building",
+]
+
+[brief]
+signature = "SIGNATURE — at least one piece of architecture in frame is physically impossible (floating, endless, inverted or opening onto the wrong place), and it is at least ten times the height of the nearest figure. A plausible real building is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night or deep inside a void: at least two thirds of the frame is blue-grey dark, lit only by small warm windows, lamps or a moon in a square opening. A frame that is mostly bright is a failed response."
+mid = "A low sun from one side throws shadows far longer than the buildings that cast them, and lit and shadowed areas are both large. A frame without long shadows is a failed response."
+hi = "Soft even daylight in a pale pastel sky, concrete luminous grey, every mass visible. A frame that is mostly dark or lit by a setting sun is a failed response."
+
+[verbs]
+process_hard = ["beginning to fall", "breaching", "pouring through the void", "spalling", "subsiding", "shearing off", "tilting out of true", "swallowing the upper floors", "flooding the atrium", "cracking along its formwork lines", "losing its footing", "crumbling at the cantilever", "streaming rainwater", "dropping a block", "groaning", "collapsing inward", "eroding", "pressing down", "darkening the plaza", "splitting", "sinking into its reflection"]
+process_soft = ["hovering", "stepping up into cloud", "mirroring", "pooling", "drifting through the towers", "greening on the terraces", "framing the sky", "catching the last light", "stacking", "receding", "looping back", "levitating", "rippling", "opening", "brightening", "settling into fog", "echoing", "balancing on a corner", "lengthening its shadow", "mossing over", "dawning in the void"]
+actor_hard.work = ["sandbagging the stair of", "pumping out", "bracing", "roping off", "clearing rubble from", "hauling a ladder up"]
+actor_hard.rest = ["sheltering under", "waiting out the fall below", "huddling in", "stranded on"]
+actor_hard.play = ["running the length of", "scaling", "leaping the gap in", "racing the shadow across"]
+actor_hard.ritual = ["gathering in silence at", "lighting a lamp in", "mourning at"]
+actor_hard.travel = ["fleeing down", "climbing toward", "searching through", "crossing"]
+actor_soft.work = ["gardening on", "sweeping", "repairing", "tending the pool in", "painting"]
+actor_soft.rest = ["reading in", "lying by", "picnicking on", "napping on"]
+actor_soft.play = ["swimming in", "skateboarding across", "dancing in", "playing ball in", "flying a kite from"]
+actor_soft.ritual = ["gathering at", "lighting lanterns at", "meditating in"]
+actor_soft.travel = ["walking along", "climbing", "cycling across", "arriving at"]
+
+[registers]
+"botanical" = "Plants as moss, ivy and whole trees growing in concrete courts and on terraces high in the air."
+"bodily and anatomical" = "Bodies as tiny figures for scale, or vast calm statues built into walls, never gore."
+"fungal and decaying" = "Decay as water stains, lichen and spalling on enormous surfaces."
+"animal and creaturely" = "Animals as birds in the slots and deer grazing on terraces."
+"geological" = "Rock as quarried blocks and concrete laid down like strata."
+"metallic and ore" = "Metal as bronze doors and rusted rebar in broken edges."
+"glass and ceramic" = "Glass as narrow window slots and skylights in vast roofs."
+"architectural" = "Architecture is everything: monoliths, voids, plazas and stairs."
+"domestic interior" = "A small warm room in an immense wall, its slot window looking out on the megastructure."
+"mechanical" = "Machines as slow lifts and patient maintenance robots."
+"industrial and infrastructural" = "Works as dams, reservoirs, sluices and ducts at the scale of valleys."
+"agricultural and cultivated" = "Farming as terraced gardens on rooftops and ledges."
+"aquatic" = "Water as reflecting pools, flooded atriums and falls from floating blocks."
+"atmospheric" = "Sky as pale haze and clouds drifting between towers."
+"glacial and frozen" = "Snow on cantilevers and icicles from floating blocks."
+"fire and ember" = "Fire as a single lamp or brazier in an immense void."
+"textile and fiber" = "Fabric as long banners and awnings moving in a high wind."
+"ritual object" = "Ritual objects as a monolith or a single lamp on a vast plaza."
+"paper and inscription" = "Paper as library books in a void and kites over a plaza; nothing written is ever legible."
+"instrument and measure" = "Measure as level markers, plumb lines and grid lines cast in the concrete."

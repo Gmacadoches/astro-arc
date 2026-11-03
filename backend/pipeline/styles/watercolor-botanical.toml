@@ -1,0 +1,77 @@
+label = "Watercolor Botanical"
+suffix = "loose transparent watercolour on cold-press paper, soft wet-in-wet blooms and hard dried edges, visible paper grain and white paper left for highlights, delicate graphite underdrawing showing in places, gentle granulating pigments, figures painted in a few confident washes, main subject kept clear of the top edge"
+space = [
+  "across a kitchen garden of raised beds to a hedge and an open gate",
+  "down a glasshouse aisle toward a misted far wall",
+  "along a riverbank meadow to a line of willows",
+  "from a potting bench through an open window onto rolling allotments",
+  "up a terraced hillside garden to a ridge of wild scrub",
+  "through an arch of climbing plants into a walled orchard",
+  "over a pond of lily pads to a far boathouse",
+]
+
+[world]
+era = "A gentle, timeless countryside of gardeners, herbalists and botanical illustrators, where plants are studied, grown and loved, and the most advanced tools are a magnifying glass, a hand pump and a seed drill."
+materials = "Leaf, petal, stem and root lead; terracotta, wicker, linen, weathered wood, garden wire, rainwater and seed paper are the common stuff."
+physics = "Plants grow faster when watched with care and slower when neglected; seasons can sit side by side in one garden. Nothing glows; light is the white of the paper showing through the washes."
+society = "Villages of gardens, seed libraries, market stalls and herbal shops. People garden, swap cuttings, picnic, paint in the field, hold harvest fairs and sit out long evenings."
+weather = "The full range: April showers, a heavy summer storm, fog in the hollows, frost on cabbages, a clear morning. Pick what the day calls for."
+inhabitants = "Gardeners, children, herbalists, painters with easels, bees, hedgehogs, snails, songbirds and the occasional plant that is a little more aware than it should be."
+strangeness = "A plant behaving like a person or a building: a sunflower turning to follow a visitor, a pumpkin grown into a room. Gardeners take it in their stride."
+numinous = "The sacred is the old growing thing: a vast ancient tree with offerings tied to it, a seed that holds a whole meadow, the green man's face appearing in foliage."
+dread = "On hard days the garden turns: blight blackening the leaves, a hailstorm shredding the beds, a flood carrying off the seedlings, roots cracking a wall. The washes run muddy."
+favoured_actors = "Handwork, small groups in relation, animals and insects, and the plants themselves. A lone woman in a sunhat among flowers is the most worn image here and should not be the default."
+myth = "European herbal and flower lore, the green man and harvest traditions, and the folk belief that plants listen."
+highlight = "The thing the eye finds first is a plant or growing thing shown with a botanist's care that is doing something it should not. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a plant grown to the size of a building",
+  "a plant with a face or a gesture",
+  "a specimen shown root, flower and seed at once while still alive",
+  "every season present on one branch",
+  "a garden structure overtaken and reshaped by growth",
+]
+
+[brief]
+signature = "SIGNATURE — at least one plant in frame is drawn as a specimen a botanist could identify, with its leaves, flowers or roots described, and it is the highlight or touched by the actor. A scene with only generic greenery is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is evening or night, or a shaded interior. At least two thirds of the frame is in deep blue and violet washes, and the only light is a lamp, a window or moonlight on leaves. A frame that is mostly bright is a failed response."
+mid = "The light comes from one side, and lit and shadowed areas are both substantial, shadows painted in cool transparent washes. A frame lit evenly from everywhere is a failed response."
+hi = "It is full open daylight and the light is even, with lots of white paper showing. Everything is visible and soft. A frame that is mostly dark or lit by a low sun is a failed response."
+
+[verbs]
+process_hard = ["wilting", "blackening with blight", "bolting", "rotting at the root", "toppling", "lashing in the wind", "washing out", "splitting its pot", "strangling", "going to seed too soon", "browning at the edges", "being shredded by hail", "drowning", "scorching", "choking with weeds", "snapping at the stem", "leaning over", "cracking the path", "drooping", "frosting black", "running muddy"]
+process_soft = ["unfurling", "budding", "flowering", "ripening", "climbing", "tendrilling", "seeding the bed", "greening", "leafing out", "fruiting", "spreading", "self-sowing", "dripping after rain", "turning to the sun", "twining", "swelling", "germinating in rows", "filling the trellis", "nodding", "opening at dawn", "trailing over the wall"]
+actor_hard.work = ["digging out", "staking up", "dragging tarps over", "bailing water from", "cutting back", "propping up"]
+actor_hard.rest = ["sheltering in the shed by", "waiting out the storm beside", "slumped against", "sitting on the step of"]
+actor_hard.play = ["chasing the hens through", "running the hail gauntlet past", "racing the storm across", "splashing through"]
+actor_hard.ritual = ["burying the blighted plants by", "tying rags to", "lighting smudge fires in"]
+actor_hard.travel = ["wading through", "hurrying up", "carrying seedlings across", "pushing a barrow through"]
+actor_soft.work = ["pricking out", "grafting", "pressing flowers from", "watering", "sketching"]
+actor_soft.rest = ["napping under", "picnicking by", "reading beside", "drinking tea in"]
+actor_soft.play = ["blowing dandelion clocks over", "making daisy chains in", "hiding in", "swinging from", "painting at an easel by"]
+actor_soft.ritual = ["hanging a garland on", "sharing the first harvest at", "blessing the seed at"]
+actor_soft.travel = ["cycling past", "wandering through", "punting along", "carrying a basket across"]
+
+[registers]
+"botanical" = "Plants are the heart of this world, drawn as specimens with every vein: a climbing rose with labelled parts, a cut cabbage showing its layers."
+"bodily and anatomical" = "The body as gardeners see it: muddy hands, a sunburnt neck. Bodies are tender and at work, never gore."
+"fungal and decaying" = "Rot as compost and mushroom: a log furred with brackets, a heap steaming in the cold. Decay feeds the next season."
+"animal and creaturely" = "Garden creatures in close-up: a hedgehog under a leaf, a bee half inside a foxglove. Small animals are as carefully drawn as plants."
+"geological" = "Stone as garden bones: a dry-stone wall covered in moss, a rockery of alpine flowers. Rock is a place for things to grow."
+"metallic and ore" = "Metal as old tools: a rusted watering can, a brass tap on a water butt. Worn, useful and loved."
+"glass and ceramic" = "Glass and clay as the glasshouse and the pot: a cloche over a seedling, stacked terracotta. Glass fogs and drips."
+"architectural" = "Buildings as garden structures: a greenhouse with flaking paint, a pergola heavy with vines. Built things are half taken over."
+"domestic interior" = "A cottage kitchen or herbalist's room: herbs drying from beams, jars on shelves. Always opening onto a garden through a door or window."
+"mechanical" = "Simple garden machines: a hand pump, a seed drill. Mechanisms are wood and iron and easy to understand."
+"industrial and infrastructural" = "Infrastructure kept gentle: a canal lock in a meadow, a water tower with ivy. Works are rural and slow."
+"agricultural and cultivated" = "Cultivation as rows and patterns: an allotment patchwork, an orchard in blossom. The order of planting is as beautiful as the plants."
+"aquatic" = "Water as pond, rain and stream: a lily pond with a frog, rain beading on leaves. Water is clear and reflective in washes."
+"atmospheric" = "Sky as wet wash: clouds bleeding into blue, a rainbow over a field. Weather is painted in a single breath."
+"glacial and frozen" = "Frost as delicate crystal: rimed seed heads, a frozen birdbath. Winter is brittle and white."
+"fire and ember" = "Fire as bonfire and stove: a garden bonfire of leaves, a lantern in the shed. Flame is warm and small."
+"textile and fiber" = "Fibre as the plant's own and the gardener's: raffia, linen aprons, flax drying. Cloth is undyed and soft."
+"ritual object" = "Ritual objects are garden things made sacred: a corn dolly, a carved seed box. Simple and handmade."
+"paper and inscription" = "Paper as seed packets, labels and sketchbooks: a plant tag with faded writing, pressed leaves in a book. Writing is a scrawl, never a sentence."
+"instrument and measure" = "Measure as the gardener's tools: a rain gauge, a sundial in a bed. Measuring is how you know the season."

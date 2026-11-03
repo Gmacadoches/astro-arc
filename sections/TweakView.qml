@@ -3,7 +3,7 @@ import qs.Commons
 import qs.Ui
 import "../Model.js" as Model
 
-// Drill-in: Tweak a custom style. What's off about it, optionally with
+// Drill-in: Tweak a style (any of them: every style is the user's file). What's off about it, optionally with
 // today's image as an example, for the default agent (which edits the
 // theme in place) or a web chat (Copy prompt). astro-arc-style backs the
 // theme up first; Undo last tweak restores it. The title row is the hero's.
@@ -202,5 +202,7 @@ Column {
       : Model.agentLabelStart(panel.defaultAgent) + " edits this style in a terminal, one step at a time: it "
         + "asks you before each change and before anything that uses your API key, telling you the cost first. "
         + "It sees your recent readings and the example image. The current version is saved first."
+      + (panel.tweakTheme && panel.tweakTheme.starter && !panel.tweakTheme.changed
+        ? " Once changed, this style stops getting Astro-Arc's updates; Revert in Styles brings them back." : "")
   }
 }

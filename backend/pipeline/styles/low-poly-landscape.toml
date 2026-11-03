@@ -1,0 +1,77 @@
+label = "Low-Poly Landscape"
+suffix = "low-poly 3D render, flat-shaded triangular facets with crisp edges, each facet one solid colour, soft ambient occlusion, gentle gradient sky, clean minimal geometry, tilt-shift depth of field, figures built from a few simple faceted shapes, main subject sits below the top edge"
+space = [
+  "across a faceted valley to stepped mountains under a gradient sky",
+  "along a winding river cut in triangles to a far waterfall",
+  "from a cliff-top lookout down to a patchwork of fields",
+  "through a forest of pyramid trees toward a clearing",
+  "over a lake of flat planes to an island with a tower",
+  "up a switchback road of facets toward a pass",
+  "across a desert of angular dunes to a mesa",
+]
+
+[world]
+era = "A small, tidy world made of geometry, like a game map come to life: villages, mountains and machines all built from simple facets, with technology at the level of windmills, cable cars and little trains."
+materials = "Faceted stone, faceted wood and flat-coloured water lead; snow caps, crystal, felt-like grass, simple metal and paper sails are the common stuff. Every material is known by its colour and how many facets it has."
+physics = "Everything is made of flat planes; more detail means more facets. Mountains can be rearranged, water falls in stepped sheets. Nothing glows except crystals and lanterns."
+society = "Hamlets, lookout towers, ferries and fairs. People farm, fish, ride cable cars, fly kites, race toy boats and gather for lantern nights."
+weather = "Weather as geometry: polygon clouds, triangular rain, a faceted storm, snow in cubes, clear calm skies. Pick what the day calls for."
+inhabitants = "Villagers, herders, foxes, deer, whales in the lakes, faceted birds and simple helpful machines with round heads."
+strangeness = "Geometry misbehaving: a mountain with too few facets, a cloud that is a perfect icosahedron, an island floating one step above the lake. Nobody minds."
+numinous = "The sacred is the perfect shape: a giant crystal at a mountain's heart, a spirit animal made of fewer facets than anything else, a sun as a single polygon."
+dread = "On hard days the world loses its polish: facets cracking apart, a landslide of shards, black planes where terrain has fallen out of the world, a storm of jagged triangles."
+favoured_actors = "Animals, small crowds at fairs, handwork, and gentle machines. A lone hiker on a summit is the most worn image here and should not be the default."
+myth = "Nordic and alpine folklore, Platonic solids as elements, and fairy tales of mountain spirits."
+highlight = "The thing the eye finds first is a shape or creature whose geometry breaks the world's rules. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a creature built from far fewer facets than anything around it",
+  "a piece of landscape lifted and hovering out of place",
+  "a perfect geometric solid at the scale of a mountain",
+  "terrain split open to show solid colour inside",
+  "an object repeated in a perfect grid",
+]
+
+[brief]
+signature = "SIGNATURE — the facets are visible: at least one large surface in frame (a mountain, a body of water, a creature) is described as faceted or built of flat planes. A scene that could be any smooth 3D render is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night or deep shade. At least two thirds of the frame is dark blue and violet facets, lit only by lanterns, crystals or moonlight catching facet edges. A frame that is mostly bright is a failed response."
+mid = "The light comes from one clear low direction, so facets facing it are bright and those facing away are dark. A frame lit evenly from everywhere is a failed response."
+hi = "It is full daylight under a soft gradient sky; facets are all lit and differ only by colour. A frame that is mostly dark or lit by a setting sun is a failed response."
+
+[verbs]
+process_hard = ["shattering into facets", "falling out of the world", "cracking along its edges", "sliding as scree", "splintering", "losing its colour", "tipping", "fracturing", "slumping", "breaking into shards", "caving", "jolting", "grinding", "dropping a plane", "toppling like blocks", "scattering", "jagging", "piercing", "collapsing in steps", "tearing open", "flickering out"]
+process_soft = ["stacking", "tessellating", "rotating on its axis", "unfolding plane by plane", "reflecting facets", "cascading in steps", "sprouting facets", "smoothing", "balancing", "aligning", "orbiting", "nesting", "turning its sails", "settling into place", "growing a new face", "mirroring", "repeating", "wheeling overhead", "levelling", "drifting as cubes", "snapping together"]
+actor_hard.work = ["prying loose", "shoring up", "hauling shards from", "re-stacking", "chipping at", "bracing"]
+actor_hard.rest = ["sheltering under", "waiting it out inside", "crouching behind", "sitting stunned on"]
+actor_hard.play = ["leaping across the gaps in", "racing the rockfall down", "balancing on", "climbing the fallen blocks of"]
+actor_hard.ritual = ["carrying the crystal away from", "ringing the warning bell at", "setting a stone on"]
+actor_hard.travel = ["scrambling up", "fording", "crossing the broken bridge to", "hurrying along"]
+actor_soft.work = ["herding", "planting", "building with", "painting a facet of", "fishing from"]
+actor_soft.rest = ["sitting on", "napping under", "watching the clouds from", "warming by"]
+actor_soft.play = ["flying a kite over", "racing toy boats on", "rolling down", "sledding down", "throwing stones across"]
+actor_soft.ritual = ["lighting lanterns along", "placing a crystal on", "singing to"]
+actor_soft.travel = ["riding the cable car to", "paddling across", "hiking toward", "cycling along"]
+
+[registers]
+"botanical" = "Plants as simple solids: cone pines, sphere bushes. A forest is a pattern of shapes."
+"bodily and anatomical" = "Bodies as simple figures of few facets: a villager built of blocks, a hand of five wedges. Never gore."
+"fungal and decaying" = "Decay as lost facets: a log broken into fewer pieces, toadstools as red hemispheres. Rot simplifies."
+"animal and creaturely" = "Animals as faceted sculptures: a fox in orange triangles, a whale of grey planes. Clear, readable silhouettes."
+"geological" = "Rock as the world's skeleton: stepped cliffs, crystal outcrops. Stone shows its geometry everywhere."
+"metallic and ore" = "Metal as simple bright parts: a copper weathervane, a steel rail. Metal facets catch the light hardest."
+"glass and ceramic" = "Glass as crystal and clear facets: a gem lamp, a glass greenhouse of triangles. Light refracts in simple steps."
+"architectural" = "Buildings as toy-like blocks: a pitched-roof cottage, a stepped tower. Each building is a few honest shapes."
+"domestic interior" = "Interiors as cosy cut-away rooms: a table, a stove, a round window onto the valley. Always opening onto the landscape."
+"mechanical" = "Machines as simple moving shapes: a windmill, a water wheel. You can see how each turns."
+"industrial and infrastructural" = "Works kept small: a cable car line, a little dam. Infrastructure looks like a model railway."
+"agricultural and cultivated" = "Fields as tiles: a patchwork of crops, terraced paddies in steps. Farming draws the world's grid."
+"aquatic" = "Water as flat planes and stepped falls: a lake of shards, a stream in triangles. Water is calm unless the day is not."
+"atmospheric" = "Sky as gradient with faceted clouds: a polygon storm, a rainbow in bands. Weather has edges."
+"glacial and frozen" = "Ice as clear crystal facets: a glacier tongue, snow in cubes. Cold is crisp and blue."
+"fire and ember" = "Fire as stacked orange triangles: a campfire, a forge glow. Flame flickers between few shapes."
+"textile and fiber" = "Fabric as flat-coloured planes: a sail, a striped tent. Cloth folds in hard creases."
+"ritual object" = "Ritual objects are perfect solids: a crystal on a plinth, a carved totem of wedges."
+"paper and inscription" = "Paper as kites, maps and signposts: a folded map, a paper lantern. Lettering is simple glyphs, never a sentence."
+"instrument and measure" = "Measure as the map-maker's world: a survey pole, a compass rose on a hill. The grid underlies everything."

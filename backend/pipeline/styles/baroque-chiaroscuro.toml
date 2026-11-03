@@ -1,0 +1,77 @@
+label = "Baroque Chiaroscuro Oil"
+suffix = "Baroque oil painting, dramatic chiaroscuro with deep near-black shadows and a single strong light source, rich warm palette of umber, crimson and gold, glazed luminous skin tones, visible craquelure and varnish sheen, theatrical diagonal composition, figures painted with naturalistic weight and expressive gesture, heads and main subject kept below the top edge"
+space = [
+  "from a dark foreground of figures back to a lit doorway",
+  "across a tavern table to a window of evening sky",
+  "up a grand staircase into shadowed galleries",
+  "through a colonnade onto a stormy harbour",
+  "down a candlelit nave toward an altar",
+  "across a battlefield of smoke to a distant city",
+  "into a kitchen and out through an open door to a courtyard",
+]
+
+[world]
+era = "Seventeenth-century Europe: taverns, churches, palaces and ports, with technology of ships, cannons, candles and clocks."
+materials = "Velvet, oil-dark wood and candle-flame lead; brass, silver, linen, marble, bread, wine and armour are the common stuff."
+physics = "Light comes from one source and carves things out of darkness. Only candles, lamps and fire glow, and sometimes a holy light. Bodies have weight."
+society = "Taverns, courts, kitchens, markets and churches. People eat, gamble, play music, work, pray, feast and fight."
+weather = "Storms at sea, rain on stone, night, a dark interior, a golden evening. Pick what the day calls for."
+inhabitants = "Card players, cooks, musicians, soldiers, saints, merchants, dogs, horses, and angels."
+strangeness = "The divine entering a tavern: an angel at a card table, a miracle among cooks. Onlookers react with the body, not with surprise on the page."
+numinous = "The sacred is the shaft of light from above, the angel with real heavy wings, the saint caught in the moment of vision."
+dread = "On hard days darkness wins: a plague cart in a street, a ship foundering, a feast overturned, a candle guttering out."
+favoured_actors = "Figures in relation around one light, crowds, animals and presences. A lone saint gazing upward is the most worn image here and should not be the default."
+myth = "Biblical and classical stories as told in the Baroque, and the vanitas tradition."
+highlight = "The thing the eye finds first is what the single light falls on, given dramatic weight. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a supernatural presence in an ordinary room",
+  "a still-life object given the weight of a figure",
+  "a moment frozen at the instant of change",
+  "a body caught mid-fall or mid-turn",
+  "light coming from an impossible source",
+]
+
+[brief]
+signature = "SIGNATURE — one single light source is named, and what it does not reach falls into deep shadow. A scene lit from several directions is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the frame is near-black, a candle or fire is the only light. A frame that is mostly lit is a failed response."
+mid = "A strong beam from one window or opening lights the scene, shadows deep. A frame lit from everywhere is a failed response."
+hi = "A golden daylight scene, still with clear shadows but most of the frame visible. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["guttering", "toppling", "spilling", "foundering", "burning", "rotting", "crashing", "darkening", "splintering", "collapsing", "bleeding wine", "smoking", "shattering", "tipping over", "sinking", "plunging", "cracking", "storming", "wilting", "tarnishing", "overturning"]
+process_soft = ["glowing", "pouring", "ripening", "gleaming", "shining", "rising", "steaming", "flickering", "softening", "warming", "blossoming", "gilding", "radiating", "dripping honey", "unfolding", "sparkling", "spilling light", "illuminating", "blessing", "settling", "brightening"]
+actor_hard.work = ["hauling", "dragging", "bracing", "bailing", "hammering", "binding"]
+actor_hard.rest = ["slumped at", "sheltering in", "waiting by", "collapsed beside"]
+actor_hard.play = ["brawling at", "cheating at", "fencing in", "gambling away"]
+actor_hard.ritual = ["praying desperately at", "mourning over", "carrying the dead from"]
+actor_hard.travel = ["fleeing", "riding hard to", "climbing", "rowing through"]
+actor_soft.work = ["cooking at", "pouring wine at", "weighing gold at", "mending", "carving"]
+actor_soft.rest = ["dozing by", "dining at", "warming by", "reading at"]
+actor_soft.play = ["playing the lute at", "playing cards at", "dancing at", "singing at", "feasting at"]
+actor_soft.ritual = ["blessing", "anointing", "lighting candles at"]
+actor_soft.travel = ["arriving at", "sailing to", "riding to", "processing to"]
+
+[registers]
+"botanical" = "Plants as still-life fruit and flowers on a dark table."
+"bodily and anatomical" = "Bodies as weighty, naturalistic flesh lit dramatically, never gore."
+"fungal and decaying" = "Decay as vanitas: rotting fruit, a skull, a snuffed candle."
+"animal and creaturely" = "Animals as dogs, horses, game birds hanging in a kitchen."
+"geological" = "Rock as cave and grotto, rough stone in shadow."
+"metallic and ore" = "Metal as silver, brass and armour catching the light."
+"glass and ceramic" = "Glass as wine glasses and jugs with bright reflections."
+"architectural" = "Buildings as churches, palaces and taverns in dramatic interiors."
+"domestic interior" = "A kitchen or tavern with a window or door to the outside."
+"mechanical" = "Machines as clocks, cannons and ship rigging."
+"industrial and infrastructural" = "Works as ports, forges and bridges in smoke."
+"agricultural and cultivated" = "Harvest as heaped produce and game."
+"aquatic" = "Water as stormy sea and dark harbour."
+"atmospheric" = "Sky as storm clouds parted by a beam."
+"glacial and frozen" = "Ice as a frozen canal with skaters at dusk."
+"fire and ember" = "Fire as candle, hearth and torch, the main light."
+"textile and fiber" = "Fabric as velvet, silk and linen in heavy folds."
+"ritual object" = "Ritual objects as chalices, crucifixes and reliquaries."
+"paper and inscription" = "Paper as letters, ledgers and maps, never a sentence."
+"instrument and measure" = "Measure as hourglass, globe and scales."

@@ -26,13 +26,14 @@ go. A theme never restates these.
 
 - `~/.config/astro-arc/styles/<key>.toml` (`$XDG_CONFIG_HOME/astro-arc/styles/`
   when that is set). The file name is the key: lowercase letters, digits and
-  hyphens (`art-deco-posters.toml`). These keys are taken by shipped themes:
-  cosmic, cyberpunk, engraving, ghibli, illuminated, symbolist, ukiyoe.
+  hyphens (`art-deco-posters.toml`). Every style the user has is a file in
+  that folder, the ones that shipped with Astro-Arc included, so choose a key
+  that is not already a file there.
 - `<key>.jpg` beside it, the preview, is required. Workflow step 5 makes it.
 - Every field below is required unless it says optional. Strings are TOML
   basic strings in double quotes; escape inner double quotes as `\"`.
-- A valid theme shows in the panel's style list as "<label>", tagged custom; an
-  invalid one as "(Failed Validation)", and it cannot generate.
+- A valid theme shows in the panel's style list as "<label>"; an invalid one as
+  "(Failed Validation)", and it cannot generate.
 
 ## The rules
 
@@ -304,7 +305,7 @@ preview. Never summarise files as "in the renders folder".
    instead give an image they have: `choose` it. Renders are kept in
    `~/.local/state/omarchy/astro-arc/renders/<key>/`.
 7. **Finish.** `astro-arc-style validate <file>` shows 0 errors. Tell the
-   user the theme is in the style list as "<label>", tagged custom, what it
+   user the theme is in the style list as "<label>", what it
    cost, and any warning you left on purpose.
 
 ### When `meaning` fails

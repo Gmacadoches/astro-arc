@@ -1,0 +1,77 @@
+label = "Soviet Space-Race Poster"
+suffix = "1960s Eastern Bloc space-age propaganda poster, bold constructivist diagonals, flat screen-printed colour in red, cream, black and cosmic teal, strong graphic shapes, dynamic upward angles, star motifs, slightly worn paper texture, figures heroic and stylised with simple strong forms and upturned faces, main subject below the top edge, no lettering"
+space = [
+  "from a launch pad up a diagonal rocket trail into a starry sky",
+  "across a factory yard to a towering rocket on its gantry",
+  "from an orbiting station down to a curved blue planet",
+  "over wheat fields to a rocket rising on the horizon",
+  "through an observatory dome opened to the stars",
+  "along a lunar surface toward a lander and a flag",
+  "across a city square under a giant satellite",
+]
+
+[world]
+era = "The heroic space race as the posters imagined it: cosmonauts, rockets, satellites, workers and farmers all reaching for the stars together, with technology big, metal and bold."
+materials = "Steel, red banners and rocket hull lead; wheat, concrete, glass helmets, smoke and starlight are the common stuff."
+physics = "Everything rises: diagonals point up, rockets climb, faces look skyward. Stars and rocket flames glow; nothing else does."
+society = "Factories, collective farms, cosmodromes and city squares. People build, harvest, train, parade, celebrate launches, and rest in parks."
+weather = "Clear starry nights, snow on the launch pad, harvest sun, a storm over the steppe, a dawn sky. Pick what the day calls for."
+inhabitants = "Cosmonauts, engineers, workers, farmers, children, dogs in space helmets, satellites and robots."
+strangeness = "The cosmic made civic: a satellite as large as a monument, a cosmonaut walking in a wheat field. Crowds cheer."
+numinous = "The sacred is the star and the rocket: the cosmos as a promised land, the first satellite as a new star."
+dread = "On hard days the future fails: a launch explodes, a factory is snowed in, a capsule lost, a parade under storm."
+favoured_actors = "Crowds and teams, workers at handwork, animals and automata. A single cosmonaut saluting is the most worn image here and should not be the default."
+myth = "The space race, Slavic folk legend of firebirds, and the worker-hero tradition."
+highlight = "The thing the eye finds first is a cosmic object or hero brought into everyday labour. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a satellite or rocket at the scale of a monument",
+  "a firebird or folk creature in the space age",
+  "a planet or moon hung low over the fields",
+  "an animal cosmonaut honoured like a hero",
+  "a machine shaped like a worker",
+]
+
+[brief]
+signature = "SIGNATURE — at least one strong diagonal (a rocket trail, a beam, a raised arm) crosses the frame, and a star motif is in frame. A static, level composition is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the frame is black and deep teal, lit by rocket flame, stars or searchlights. A frame that is mostly bright is a failed response."
+mid = "Graphic light from one side, with large flat shadow shapes. A frame without shadow shapes is a failed response."
+hi = "Bright flat day in cream and red, everything clear. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["exploding", "toppling", "burning", "freezing", "crashing", "smoking", "failing", "cracking", "collapsing", "rusting", "falling", "storming", "shattering", "stalling", "buckling", "scorching", "sinking", "breaking", "blacking out", "veering", "shuddering"]
+process_soft = ["rising", "launching", "orbiting", "blazing a trail", "climbing", "ripening", "radiating", "soaring", "shining", "unfurling", "beaming", "turning", "ascending", "glinting", "waving", "harvesting", "humming", "growing", "greeting the dawn", "spinning", "twinkling"]
+actor_hard.work = ["welding", "shovelling snow from", "hauling", "rebuilding", "hammering", "shoring up"]
+actor_hard.rest = ["sheltering by", "waiting at", "huddling in", "resting exhausted at"]
+actor_hard.play = ["racing", "skiing hard past", "wrestling at", "leaping"]
+actor_hard.ritual = ["mourning at", "saluting", "keeping vigil at"]
+actor_hard.travel = ["marching through", "climbing", "driving through", "flying through"]
+actor_soft.work = ["building", "harvesting", "assembling", "training at", "piloting"]
+actor_soft.rest = ["picnicking at", "reading at", "resting at", "stargazing from"]
+actor_soft.play = ["dancing at", "skating at", "playing chess at", "swimming at", "flying a model rocket at"]
+actor_soft.ritual = ["parading past", "celebrating at", "honouring"]
+actor_soft.travel = ["launching from", "riding to", "travelling to", "orbiting"]
+
+[registers]
+"botanical" = "Plants as wheat fields and birch groves in bold shapes."
+"bodily and anatomical" = "Bodies as strong stylised workers and cosmonauts, never gore."
+"fungal and decaying" = "Decay as rust on old machines, a rotted fence."
+"animal and creaturely" = "Animals as space dogs, horses, firebirds."
+"geological" = "Rock as steppes, mountains and craters."
+"metallic and ore" = "Metal as steel girders and rocket hulls."
+"glass and ceramic" = "Glass as helmets and observatory domes."
+"architectural" = "Buildings as monuments, towers and factories."
+"domestic interior" = "A small flat with a window onto the cosmodrome."
+"mechanical" = "Machines as rockets, tractors and satellites."
+"industrial and infrastructural" = "Works as dams, factories and launch pads."
+"agricultural and cultivated" = "Fields of wheat with tractors in rows."
+"aquatic" = "Water as rivers, dams and splashdown seas."
+"atmospheric" = "Sky as stars, orbits and rocket trails."
+"glacial and frozen" = "Ice as snowy steppes and frozen rivers."
+"fire and ember" = "Fire as rocket flame and furnace."
+"textile and fiber" = "Fabric as banners, scarves and space suits."
+"ritual object" = "Ritual objects as medals, flags and monuments."
+"paper and inscription" = "Paper as posters and blueprints, never a sentence."
+"instrument and measure" = "Measure as dials, telescopes and orbit diagrams."

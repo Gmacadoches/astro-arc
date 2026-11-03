@@ -1,0 +1,77 @@
+label = "1950s Atomic-Age Pulp"
+suffix = "1950s pulp science-fiction magazine cover painting, bold gouache with saturated primaries, dramatic upward camera angle, glossy chrome reflections, thick confident brushwork, slightly yellowed paper texture and halftone printing grain, figures heroic and dynamic with clear silhouettes, main subject kept below the top edge, no lettering"
+space = [
+  "from a rocky alien foreground up to a rocket on a launch gantry and ringed planets",
+  "across a crater field to a domed colony under two moons",
+  "down a futuristic boulevard of towers and sky-bridges",
+  "from inside a rocket cockpit out through the porthole to a planet",
+  "over a jungle of strange plants to a crashed saucer",
+  "across a lunar plain to Earth rising",
+  "into a laboratory of tubes and coils with a window onto a stormy city",
+]
+
+[world]
+era = "The atomic age's idea of the future: rocket ships with fins, ray guns, robots, domed cities and colonies on the Moon and Mars, all built with rivets and chrome."
+materials = "Chrome, riveted steel and glass domes lead; alien rock, glowing crystal, vacuum tubes, rubber suits and jungle foliage are the common stuff."
+physics = "Rockets land upright on fire; ray beams are visible; planets hang huge in the sky. Rays, tubes, crystals and engines glow; nothing else does."
+society = "Space colonies, rocket ports, labs and frontier outposts. People explore, mine, build, throw dances in the dome, tend hydroponic farms and watch the launches."
+weather = "Alien weather: meteor showers, sandstorms on Mars, acid rain, a calm star-filled sky, the glare of a nearby sun. Pick what the day calls for."
+inhabitants = "Astronauts, scientists, colonists, robots, bug-eyed aliens, giant insects, space dogs and friendly Martians."
+strangeness = "The alien as daily life: a giant insect at the airlock, a robot walking a dog. Colonists are unbothered."
+numinous = "The sacred is the cosmos itself: a vast ringed planet filling the sky, an ancient alien monolith, the first view of Earth from space."
+dread = "On hard days the frontier turns deadly: a dome cracked open, a rocket exploding on the pad, a swarm of giant insects, a radiation storm."
+favoured_actors = "Crews in relation, crowds of colonists, automata, creatures and presences. A lone astronaut with a ray gun is the most worn image here and should not be the default."
+myth = "Golden-age science fiction, the space race, and Cold War futurism."
+highlight = "The thing the eye finds first is a piece of the future or the alien behaving unexpectedly. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "an alien creature larger than the rocket",
+  "a robot doing something tender or human",
+  "a planet or moon impossibly close",
+  "an ancient alien structure among modern machines",
+  "an everyday Earth object found on another world",
+]
+
+[brief]
+signature = "SIGNATURE — at least one atomic-age object is named in frame: a finned rocket, a glass space helmet, a ray gun, or a domed city. A scene that could be modern science fiction is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is space night: two thirds of the frame is black and deep blue, lit by engines, rays, planet glow or lit portholes. A frame that is mostly bright is a failed response."
+mid = "A harsh alien sun from one side throws hard shadows, with lit and shadowed areas both substantial. A frame lit evenly is a failed response."
+hi = "Bright alien day, even and saturated, everything clear. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["exploding", "cracking open", "venting", "crashing", "swarming", "irradiating", "melting", "short-circuiting", "erupting", "depressurising", "tumbling", "burning up", "sparking", "collapsing", "spinning out", "overloading", "breaching", "corroding", "quaking", "blasting", "disintegrating"]
+process_soft = ["orbiting", "launching", "beeping", "rising", "glowing", "landing", "hovering", "whirring", "blooming alien flowers", "sparkling", "rotating", "drifting", "humming", "beaming", "unfolding", "pulsing", "transmitting", "soaring", "docking", "twinkling", "dawning"]
+actor_hard.work = ["sealing", "welding", "hauling", "repairing", "shoring up", "rescuing from"]
+actor_hard.rest = ["sheltering in", "waiting out the storm in", "huddling in", "lying stunned by"]
+actor_hard.play = ["racing", "dodging", "jet-packing past", "leaping across"]
+actor_hard.ritual = ["saluting", "keeping watch at", "signalling from"]
+actor_hard.travel = ["blasting off from", "fleeing", "crash-landing near", "crossing"]
+actor_soft.work = ["building", "mining", "studying", "tending", "programming"]
+actor_soft.rest = ["stargazing from", "relaxing in", "napping in", "sipping coffee in"]
+actor_soft.play = ["dancing in", "playing catch in low gravity on", "riding a rover across", "bouncing across", "swimming in"]
+actor_soft.ritual = ["planting a flag on", "christening", "greeting"]
+actor_soft.travel = ["flying to", "landing on", "exploring", "driving across"]
+
+[registers]
+"botanical" = "Plants as alien jungle: giant fronds, glowing pods, hydroponic rows."
+"bodily and anatomical" = "Bodies as heroic figures in suits, never gore."
+"fungal and decaying" = "Decay as alien fungus and rust on old rockets."
+"animal and creaturely" = "Creatures as aliens, giant insects and space dogs."
+"geological" = "Rock as craters, spires and red alien canyons."
+"metallic and ore" = "Metal as chrome, rivets and rocket hulls."
+"glass and ceramic" = "Glass as domes, helmets and vacuum tubes."
+"architectural" = "Buildings as domed colonies, towers and launch gantries."
+"domestic interior" = "A colony home or ship cabin with a porthole onto space."
+"mechanical" = "Machines as robots, rovers and rocket engines."
+"industrial and infrastructural" = "Works as mines, gantries and space stations."
+"agricultural and cultivated" = "Farming as hydroponic domes and alien crops."
+"aquatic" = "Water as alien seas, ice moons, a colony pool."
+"atmospheric" = "Sky as space with planets, nebulae and meteors."
+"glacial and frozen" = "Ice as frozen moons and cryo-chambers."
+"fire and ember" = "Fire as rocket exhaust and volcanic vents."
+"textile and fiber" = "Fabric as space suits and parachutes."
+"ritual object" = "Ritual objects as flags, plaques and alien artefacts."
+"paper and inscription" = "Paper as star charts and blueprints, never a sentence."
+"instrument and measure" = "Measure as radar screens, dials and Geiger counters."

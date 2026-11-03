@@ -302,10 +302,13 @@ def _parse_json_object(text):
 # ---------------------------------------------------------------------------
 
 # One file per theme (decision 4): styles/<key>.toml plus a required
-# styles/<key>.jpg preview. The key is the file name. Shipped themes sit beside
-# the code; a user's own go in USER_STYLES_DIR.
-SHIPPED_STYLES_DIR = PIPELINE_DIR / "styles"
-DEFAULT_STYLE = "symbolist"
+# styles/<key>.jpg preview. The key is the file name. Every theme a run uses is
+# the user's own, in USER_STYLES_DIR (decision record 2026-11-styles-owned);
+# the ones beside the code are seeds that style_seeds.py copies there. Tests
+# and the prompt audit load the seeds themselves, so they do not depend on
+# what a machine's user has changed.
+SEED_STYLES_DIR = PIPELINE_DIR / "styles"
+DEFAULT_STYLE = "marbled-paper"
 
 _NOTICES = set()
 
@@ -383,44 +386,23 @@ class Catalog:
         self._warned = set()
 
     @classmethod
-    def load(cls, shipped_dir=SHIPPED_STYLES_DIR, user_dir=USER_STYLES_DIR, drafts=(),
-             pipeline_dir=PIPELINE_DIR):
-        """Every theme by key: the shipped ones, then the user's, then
-        `drafts` — theme files outside both folders (astro-arc-style's draft,
-        which may be written anywhere), each taking the place of a user theme
-        with its key.
-
-        A user file or draft whose key is a shipped theme's is not loaded: a
-        shipped key always means the shipped theme. A user file is ignored
-        with a warning; a draft raises ValueError, since its caller asked for
-        it by name. A file that does not parse still loads, empty, so it can
-        be listed as failing validation."""
-        shipped_dir, user_dir = Path(shipped_dir), Path(user_dir)
+    def load(cls, styles_dir=USER_STYLES_DIR, drafts=(), pipeline_dir=PIPELINE_DIR):
+        """Every theme in `styles_dir` by key, then `drafts` — theme files
+        elsewhere (astro-arc-style's draft, which may be written anywhere),
+        each taking the place of the theme with its key. A file that does not
+        parse still loads, empty, so it can be listed as failing validation."""
+        styles_dir = Path(styles_dir)
         catalog = cls(register_families=_read_register_families(pipeline_dir / "registers.toml"),
                       actors=_read_actors(pipeline_dir / "actors.toml"),
                       cliches=_read_cliches(pipeline_dir / "cliches.toml"))
         if not catalog.register_families:
             _notice("llm_pipeline: warning — registers.toml has no [families] table; "
                     "the register rotation will be empty")
-        themes = {path.stem: _read_theme(path, "shipped", catalog)
-                  for path in sorted(shipped_dir.glob("*.toml"))}
-        try:
-            user_dir.mkdir(parents=True, exist_ok=True)
-        except OSError:
-            pass
-        for path in sorted(user_dir.glob("*.toml")):
-            if path.stem in themes:
-                _notice(f"astro-arc: warning: user theme {path} has the key of a shipped theme "
-                        f"('{path.stem}') and is ignored; rename the file to use it")
-                continue
-            themes[path.stem] = _read_theme(path, "user", catalog)
+        themes = {path.stem: _read_theme(path, "user", catalog)
+                  for path in sorted(styles_dir.glob("*.toml"))}
         for path in drafts:
             path = Path(path).resolve()
-            if path.parent == shipped_dir.resolve():
-                continue  # a shipped theme, already loaded as itself
-            if (shipped_dir / f"{path.stem}.toml").exists():
-                raise ValueError(f"'{path.stem}' is the key of a shipped theme; rename {path.name}")
-            source = "user" if path.parent == user_dir.resolve() else "draft"
+            source = "user" if path.parent == styles_dir.resolve() else "draft"
             themes[path.stem] = _read_theme(path, source, catalog)
         catalog.styles = themes
         return catalog

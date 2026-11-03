@@ -1,0 +1,77 @@
+label = "Chinese Ink Wash Mountains"
+suffix = "traditional Chinese ink wash landscape painting on silk, expressive black ink brushstrokes from wet and pale to dry and dark, large areas of untouched pale paper as mist, subtle touches of mineral blue-green and ochre, small red seal stamp in a lower corner, figures tiny and suggested with a few strokes, vertical composition feeling, peaks and figures kept below the top edge"
+space = [
+  "from a riverside pavilion up through layers of mist to towering peaks",
+  "along a mountain path winding past waterfalls into cloud",
+  "across a wide lake to a far shore of low hills fading out",
+  "up a gorge with a boat on the river below and cliffs above",
+  "through a bamboo grove onto a terrace overlooking valleys",
+  "over a stone bridge toward a temple half hidden in pines",
+  "down from a high ridge to a village by a river",
+]
+
+[world]
+era = "The timeless China of the scholar painters: hermits, scholars, fishermen and monks among mountains, with technology of boats, waterwheels, brushes and bridges."
+materials = "Ink, mist and stone lead; pine, bamboo, silk, paper, lacquer, rice straw and water are the common stuff."
+physics = "Mist is the world's main substance; mountains appear and vanish in it. Nothing glows except lanterns and the moon. Distance is shown by fading, not by size alone."
+society = "Mountain monasteries, riverside villages, scholars' retreats and ferry crossings. People fish, gather herbs, paint, play the zither, drink wine with friends and travel to visit each other."
+weather = "Mist, rain on the river, snow on the peaks, wind through pines, a clear autumn moon. Pick what the day calls for."
+inhabitants = "Scholars, fishermen, woodcutters, monks, travellers, cranes, monkeys, tigers, dragons in the clouds, and immortals on the peaks."
+strangeness = "The immortal and the ordinary share the mountain: a dragon's coil in the clouds, a sage riding a crane. Travellers bow and continue."
+numinous = "The sacred is the mountain itself and the Dao in nature: peaks as presences, immortals and dragons as their messengers, a single plum blossom in snow."
+dread = "On hard days the mountain is wild: torrents swollen, a landslide across the path, a boat overturned in rapids, a snowstorm closing a pass."
+favoured_actors = "Tiny figures in relation, travellers, animals and presences. A lone fisherman in a boat is the most worn image here and should not be the default."
+myth = "Daoist immortals and sacred mountains, Chinese dragon lore, and the poetry of recluses."
+highlight = "The thing the eye finds first is a presence emerging from the mist, given more ink than anything around it. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a dragon or immortal half in the clouds",
+  "a peak with the shape of a creature or face",
+  "a building where no one could build it",
+  "a waterfall falling from the sky itself",
+  "an animal acting as a messenger",
+]
+
+[brief]
+signature = "SIGNATURE — at least one third of the frame is empty mist or pale paper, and a mountain or river is in frame. A crowded scene without mist is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night or a storm: at least two thirds of the frame is dark ink washes, with only a lantern or moon making paper show through. A frame that is mostly pale is a failed response."
+mid = "Light comes from one side through mist; one side of each peak is darker ink. A frame with no dark areas is a failed response."
+hi = "It is clear day with pale mist everywhere and light ink; nothing is in deep shadow. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["thundering down the gorge", "swelling the river", "sliding", "toppling pines", "lashing", "overturning", "roaring", "cracking the ice", "burying the path", "smashing the bridge", "battering", "darkening the peaks", "howling through", "eroding", "breaking loose", "sweeping away", "churning", "plunging", "freezing hard", "scattering leaves", "crashing"]
+process_soft = ["drifting as mist", "veiling", "flowing", "trickling", "unveiling the peaks", "rising as cloud", "blossoming", "rustling", "settling as snow", "glinting on water", "curling as smoke", "dissolving", "meandering", "echoing", "dripping", "greening", "floating", "parting", "falling softly", "brightening", "fading into distance"]
+actor_hard.work = ["poling hard against", "hauling the boat from", "clearing the path of", "shoring up", "chopping through", "bailing"]
+actor_hard.rest = ["sheltering in a cave below", "waiting out the storm at", "huddling under", "resting exhausted on"]
+actor_hard.play = ["shooting the rapids of", "racing down", "leaping the stones of", "wrestling by"]
+actor_hard.ritual = ["burning incense to calm", "beating a drum at", "praying on"]
+actor_hard.travel = ["climbing hard up", "crossing the swollen", "leading a mule over", "fleeing down"]
+actor_soft.work = ["gathering herbs on", "fishing on", "painting", "cutting bamboo by", "ferrying across"]
+actor_soft.rest = ["drinking tea at", "napping in", "gazing at", "listening to the rain at"]
+actor_soft.play = ["playing the zither at", "playing go under", "drinking wine with friends on", "flying a kite above", "boating on"]
+actor_soft.ritual = ["bowing at", "burning incense at", "offering wine to"]
+actor_soft.travel = ["walking toward", "riding a donkey to", "rowing across", "visiting a friend at"]
+
+[registers]
+"botanical" = "Plants as brush exercises: pines, bamboo, plum blossom, lotus, each with its own strokes."
+"bodily and anatomical" = "Bodies as tiny robed figures, a few strokes each, calm, never gore."
+"fungal and decaying" = "Decay as old trees and lingzhi mushrooms: a gnarled trunk, moss on stone."
+"animal and creaturely" = "Animals as symbols and companions: cranes, monkeys, fish, a tiger."
+"geological" = "Rock is the heart: peaks, cliffs and boulders built from textured strokes."
+"metallic and ore" = "Metal as bronze vessels and bells in temples, quiet and old."
+"glass and ceramic" = "Ceramic as tea bowls and celadon jars on a scholar's table."
+"architectural" = "Buildings as pavilions, pagodas and bridges set small in nature."
+"domestic interior" = "A scholar's studio with brushes and a round window onto the mountain."
+"mechanical" = "Machines as waterwheels, mills and boats, simple and wooden."
+"industrial and infrastructural" = "Works as plank roads on cliffs, stone bridges, salt pans."
+"agricultural and cultivated" = "Terraced fields and tea gardens on slopes, worked by small figures."
+"aquatic" = "Water as rivers, falls and lakes, shown by the paper left blank."
+"atmospheric" = "Sky as mist and cloud, wet washes and blank paper."
+"glacial and frozen" = "Snow on peaks and a frozen river, white paper with dark branches."
+"fire and ember" = "Fire as a lantern, a cooking fire, incense smoke, small and warm."
+"textile and fiber" = "Fabric as robes and sails, painted in a few flowing lines."
+"ritual object" = "Ritual objects are incense burners, scrolls and temple bells."
+"paper and inscription" = "Paper as calligraphy and seals: a poem column, a red seal, never a legible sentence."
+"instrument and measure" = "Measure as the sundial, the compass and the abacus, old and wooden."

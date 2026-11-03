@@ -1,0 +1,77 @@
+label = "Cyanotype Blueprint"
+suffix = "cyanotype print on watercolour paper, deep Prussian blue ground with white and pale-blue exposed shapes, fine white technical linework and construction lines, soft photographic edges where objects lay on the paper, brushed emulsion edges and slight uneven exposure, figures as pale silhouettes, main subject below the top edge"
+space = [
+  "a cut-away elevation of a building with landscape behind",
+  "a harbour plan tilting into a view of ships",
+  "a long section through a hill, tunnel and town",
+  "a bridge in elevation spanning a river to a far bank",
+  "a botanical sheet of plants laid out above a field",
+  "a lighthouse drawn in section against the sea",
+  "a machine in exploded view floating over a workshop",
+]
+
+[world]
+era = "The age of engineers and botanists around 1900: bridges, airships, lighthouses, ferns pressed on paper, with technology of steam, brass and cast iron."
+materials = "Blueprint paper, cast iron and steel lead; ferns, glass plates, brass, rope, timber and stone are the common stuff."
+physics = "Everything is drawn as plan and as photogram at once: objects leave white shadows. Nothing glows; light is the white of exposed paper."
+society = "Shipyards, drawing offices, greenhouses and towns. People design, build, collect plants, sail, picnic and visit exhibitions."
+weather = "Weather as diagram: wind arrows, rain as dashed lines, fog as soft exposure, a clear sky. Pick what the day calls for."
+inhabitants = "Engineers, botanists, sailors, children, horses, birds, jellyfish and great machines with personality."
+strangeness = "The plan coming true: a drawn bridge half built from its lines, a fern the size of a tree. People take measurements."
+numinous = "The sacred is the perfect design: a lighthouse beam as a line of truth, the golden ratio spiral in a shell, the stars as surveyed points."
+dread = "On hard days the structure fails: a bridge collapsing in section, a ship foundering on a chart, an airship burning, a flood over the plan."
+favoured_actors = "Teams at handwork, crowds, automata and animals. A lone engineer at a drafting table is the most worn image here and should not be the default."
+myth = "The engineering heroes' tales, Victorian natural history and the dream of the perfect machine."
+highlight = "The thing the eye finds first is a design partway between drawing and reality. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a structure half drawn and half built",
+  "a specimen at the scale of architecture",
+  "a machine shown in exploded view while working",
+  "a natural thing given construction lines",
+  "a shadow of something not in the frame",
+]
+
+[brief]
+signature = "SIGNATURE — at least one element has white construction lines or measurements drawn on it, and the ground is blue. A scene in natural colour is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the sheet is the deepest blue, with only small white highlights from lamps. A frame that is mostly pale is a failed response."
+mid = "Shapes are lit from one side, their white edges strong on one side and blue on the other. A frame with no direction is a failed response."
+hi = "Bright, heavily exposed areas, pale blue and white widely, all visible. A frame that is mostly deep blue is a failed response."
+
+[verbs]
+process_hard = ["collapsing", "buckling", "foundering", "shearing", "fracturing", "giving way", "snapping", "flooding", "burning", "sagging", "derailing", "rupturing", "bursting", "cracking", "listing", "toppling", "corroding", "grinding", "failing", "warping", "splitting"]
+process_soft = ["spanning", "rising", "rotating", "unfolding", "aligning", "branching", "measuring out", "unrolling", "tracing", "turning", "floating", "connecting", "fitting together", "radiating", "projecting", "unfurling", "balancing", "levelling", "ascending", "assembling", "spiralling"]
+actor_hard.work = ["shoring up", "riveting", "hauling", "rescuing from", "pumping", "bracing"]
+actor_hard.rest = ["sheltering under", "waiting at", "huddling in", "resting stunned at"]
+actor_hard.play = ["racing", "leaping", "dodging", "sliding down"]
+actor_hard.ritual = ["sounding the alarm at", "signalling from", "keeping watch at"]
+actor_hard.travel = ["fleeing", "crossing", "climbing", "rowing through"]
+actor_soft.work = ["surveying", "drafting", "pressing ferns at", "assembling", "launching"]
+actor_soft.rest = ["picnicking at", "reading at", "resting at", "sitting at"]
+actor_soft.play = ["flying a kite at", "sailing at", "skating at", "swimming at", "boating at"]
+actor_soft.ritual = ["unveiling", "christening", "opening"]
+actor_soft.travel = ["crossing", "sailing to", "riding to", "flying over"]
+
+[registers]
+"botanical" = "Plants as photograms of ferns and seed heads, pale on blue."
+"bodily and anatomical" = "Bodies as pale silhouettes and diagrams, never gore."
+"fungal and decaying" = "Decay as rust patterns and lichen photograms."
+"animal and creaturely" = "Animals as pale silhouettes: jellyfish, birds, horses."
+"geological" = "Rock as strata in section."
+"metallic and ore" = "Metal as girders and rivets in fine lines."
+"glass and ceramic" = "Glass as lenses and plates, edges glowing white."
+"architectural" = "Buildings in plan and elevation."
+"domestic interior" = "A drawing office with a window onto a shipyard."
+"mechanical" = "Machines in exploded view."
+"industrial and infrastructural" = "Works as bridges, dams and lighthouses."
+"agricultural and cultivated" = "Farming as plot plans and greenhouses."
+"aquatic" = "Water as wave diagrams and harbour charts."
+"atmospheric" = "Sky as wind arrows and cloud studies."
+"glacial and frozen" = "Ice as crystal diagrams and an icebound ship."
+"fire and ember" = "Fire as boiler diagrams and furnace sections."
+"textile and fiber" = "Fabric as sails and lace photograms."
+"ritual object" = "Ritual objects as foundation stones and medals."
+"paper and inscription" = "Paper as the sheet itself, with title blocks, never a sentence."
+"instrument and measure" = "Measure as scales, compasses and dimension lines."

@@ -20,7 +20,7 @@ from pipeline_state import PipelineState  # noqa: E402
 STYLE = "cosmic"
 CONFIG = {"stage1Model": "stub", "stage2Model": "stub", "captionModel": "stub"}
 STAGE1 = {"reading": "A reading.", "distillation": "A distillation.", "narrativePosition": "threshold"}
-CATALOG = lp.Catalog.load()
+CATALOG = lp.Catalog.load(lp.SEED_STYLES_DIR)
 TEXTURE = {"polarity": "soft", "intensityBand": "mid", "exposureBand": "mid", "multiplicity": 1}
 
 

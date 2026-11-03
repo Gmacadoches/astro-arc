@@ -1,0 +1,77 @@
+label = "Gothic Dark Fantasy"
+suffix = "dark fantasy oil painting, moody desaturated palette of slate, bone and deep crimson with one warm accent, rich textured brushwork, atmospheric haze and depth, intricate gothic detail, dramatic scale between figures and architecture, figures cloaked and painted with weight and silhouette, main subject held below the top edge"
+space = [
+  "across a misty moor to a cathedral of towering spires",
+  "down a stair into a vast crypt lit by braziers",
+  "along a cliff road to a castle above a storm sea",
+  "through a dead forest toward a lit chapel",
+  "over a bridge of statues spanning a chasm",
+  "into a ruined hall open to the sky",
+  "across a frozen lake to a far black keep",
+]
+
+[world]
+era = "A late medieval world of fallen kingdoms and old cathedrals, where knights, witches and monks live among relics and the dark is old and patient. Technology is iron, stone and candle."
+materials = "Black stone, iron and bone lead; candle wax, velvet, moss, stained glass, leather and old gold are the common stuff."
+physics = "Light is rare and precious; candles, braziers, embers and holy relics glow. Fog is thick. Ancient things wake slowly."
+society = "Cathedral towns, monasteries, ruined keeps and pilgrim roads. People work, travel, keep vigils, trade, celebrate grim feasts and gather around fires."
+weather = "Fog, rain, storm, snowfall, a cold clear night, a grey dawn. Pick what the day calls for."
+inhabitants = "Knights, pilgrims, witches, monks, ravens, wolves, gargoyles that move, wraiths and ancient giants."
+strangeness = "The old powers half-awake: a giant asleep inside a hill, statues that have shifted. Locals lower their voices and carry on."
+numinous = "The sacred is the relic and the old god: a vast statue, a holy light in a ruin, a giant's skeleton revered as a shrine."
+dread = "On hard days the dark comes through: a cathedral in flames, a plague procession, fog with shapes in it, a siege at the gate."
+favoured_actors = "Processions and crowds, figures in relation, beasts and presences. A lone armoured knight facing a castle is the most worn image here and should not be the default."
+myth = "European dark folklore, Arthurian and grail legend, and the danse macabre."
+highlight = "The thing the eye finds first is something ancient and enormous, or something sacred in an unholy place. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a giant or titan as part of the landscape",
+  "a statue that has moved",
+  "a holy light in a place of decay",
+  "a creature from legend in an ordinary street",
+  "architecture that has grown like bone",
+]
+
+[brief]
+signature = "SIGNATURE — at least one gothic structure (a spire, a buttress, a vaulted ruin) is in frame and is far larger than the figures. A scene without gothic architecture is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: two thirds of the frame is near-black, lit only by candles, braziers or a cold moon. A frame that is mostly bright is a failed response."
+mid = "A cold grey light from one side and one warm source, deep shadows substantial. A frame lit evenly is a failed response."
+hi = "An overcast pale day, grey light everywhere and all visible. A frame that is mostly dark or lit by sunset is a failed response."
+
+[verbs]
+process_hard = ["burning", "crumbling", "bleeding", "rotting", "collapsing", "howling", "besieging", "plaguing", "cracking", "falling", "sinking", "smothering", "shattering", "tolling", "festering", "splitting", "wailing", "devouring", "freezing", "darkening", "toppling"]
+process_soft = ["glowing", "tolling softly", "snowing", "flickering", "settling", "mossing over", "dripping wax", "rising as mist", "blooming in the ruin", "healing", "echoing", "lighting", "drifting", "warming", "gleaming", "kindling", "resting", "sleeping", "thawing", "greening", "brightening"]
+actor_hard.work = ["barricading", "dragging", "digging graves at", "forging", "hauling", "bracing"]
+actor_hard.rest = ["sheltering in", "waiting in", "huddling at", "collapsed against"]
+actor_hard.play = ["dueling in", "racing", "leaping", "sparring at"]
+actor_hard.ritual = ["exorcising", "carrying the bones of", "keeping vigil at"]
+actor_hard.travel = ["fleeing", "riding through", "climbing", "crossing"]
+actor_soft.work = ["copying manuscripts in", "brewing at", "carving", "tending", "mending"]
+actor_soft.rest = ["warming by", "dozing in", "eating at", "reading in"]
+actor_soft.play = ["playing a hurdy-gurdy at", "dancing at", "drinking at", "sledding past", "telling stories at"]
+actor_soft.ritual = ["lighting candles at", "blessing", "chanting at"]
+actor_soft.travel = ["walking to", "riding to", "sailing to", "arriving at"]
+
+[registers]
+"botanical" = "Plants as thorns, ivy and black roses grown over stone."
+"bodily and anatomical" = "Bodies as cloaked figures, gaunt and dignified, never gore."
+"fungal and decaying" = "Decay as moss, rot and fungus in old stone."
+"animal and creaturely" = "Animals as ravens, wolves, black horses and gargoyles."
+"geological" = "Rock as crags, cliffs and caverns."
+"metallic and ore" = "Metal as iron gates, armour and bells."
+"glass and ceramic" = "Glass as stained windows, broken and lit."
+"architectural" = "Buildings as cathedrals, crypts and keeps."
+"domestic interior" = "A hall or cell with a hearth and a narrow window."
+"mechanical" = "Machines as winches, portcullises and clocks."
+"industrial and infrastructural" = "Works as bridges, walls and mills."
+"agricultural and cultivated" = "Farming as grim fields and vineyards on slopes."
+"aquatic" = "Water as black lakes and storm seas."
+"atmospheric" = "Sky as storm and fog with a pale moon."
+"glacial and frozen" = "Ice as frozen lakes, snowbound abbeys."
+"fire and ember" = "Fire as candles, braziers and pyres."
+"textile and fiber" = "Fabric as cloaks, banners and shrouds."
+"ritual object" = "Ritual objects as reliquaries, censers and bells."
+"paper and inscription" = "Paper as grimoires and scrolls, never a sentence."
+"instrument and measure" = "Measure as hourglasses and astrolabes."

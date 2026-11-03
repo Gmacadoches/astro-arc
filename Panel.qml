@@ -466,17 +466,20 @@ Panel {
       : "Not generated yet · " + root.scheduleSummary)
 
   // ---- Views. One KeyboardPanel, one fixed height: the main view, or one
-  // drill-in at a time — Settings, Tweak, Create, History (Browse all) and
-  // Fix (a style that failed validation) — each with a back button. Each has
+  // drill-in at a time — Settings, Tweak, Create, History (Browse all),
+  // Styles (every style, to star, hide or delete) and Fix (a style that
+  // failed validation) — each with a back button. Each has
   // its own flag, so the logic that opens and closes them stays where it
   // was; `view` only says which one is showing. -----------------------------
   property bool browseOpen: false
   property bool fixOpen: false
+  property bool stylesOpen: false
   readonly property string view: showSettings ? "settings"
     : tweakOpen ? "tweak"
     : styleCreateMode !== "" ? "create"
     : browseOpen ? "browse"
     : fixOpen ? "fix"
+    : stylesOpen ? "styles"
     : "main"
 
   // Close every drill-in but `keep`, so opening one never leaves another
@@ -487,6 +490,7 @@ Panel {
     if (keep !== "create" && styleCreateMode !== "") { styleCreateMode = ""; styleImportResult = null }
     if (keep !== "browse") browseOpen = false
     if (keep !== "fix") fixOpen = false
+    if (keep !== "styles") { stylesOpen = false; styleDeleteKey = ""; styleRevertKey = "" }
   }
 
   function openView(name) {
@@ -498,6 +502,7 @@ Panel {
     else if (name === "create") { styleNoAgent = false; styleCreateMode = "create" }
     else if (name === "browse") browseOpen = true
     else if (name === "fix") fixOpen = true
+    else if (name === "styles") { stylesOpen = true; markNewStylesSeen() }
     Qt.callLater(navReset)
   }
 
@@ -564,12 +569,14 @@ Panel {
     : view === "tweak" ? tweakView
     : view === "create" ? createView
     : view === "fix" ? fixView
+    : view === "styles" ? stylesView
     : view === "browse" ? browseView
     : mainColumn
   readonly property Item navFlick: view === "settings" ? settingsFlick
     : view === "tweak" ? tweakFlick
     : view === "create" ? createFlick
     : view === "fix" ? fixFlick
+    : view === "styles" ? stylesFlick
     : view === "browse" ? null
     : mainFlick
   // What popups and pickers must stay inside: the area under the hero.
@@ -1218,15 +1225,15 @@ Panel {
   }
 
   // ---- Art style: which theme the run is built for. The dropdown is built
-  // from the theme files themselves (backend/bin/style_catalog.py): shipped
-  // ones in backend/pipeline/styles/, the user's own in
-  // ~/.config/astro-arc/styles/. A theme that fails validation stays listed
-  // but is never written to the config; picking it shows what is wrong. ------
+  // from the theme files themselves (backend/bin/style_catalog.py), all of
+  // them the user's own in ~/.config/astro-arc/styles/; the ones that ship
+  // are seeded there first. A theme that fails validation stays listed but
+  // is never written to the config; picking it shows what is wrong. ---------
   readonly property string styleCatalogBin: binDir + "/style_catalog.py"
   property var styleCatalog: []
   property bool styleCatalogLoaded: false
-  // The loader's own warnings (stderr), e.g. a user file ignored because it
-  // has a shipped theme's key.
+  // The loader's own warnings (stderr), e.g. the starter styles could not be
+  // seeded.
   property string styleCatalogNotice: ""
   // A failed theme picked from the list to see its errors. The config keeps
   // the theme it had.
@@ -1244,6 +1251,15 @@ Panel {
   readonly property string shownStyleKey: root.configuredStyleMissing
     ? Model.DEFAULT_ART_STYLE : root.configState.artStyle
   readonly property var shownStyle: Model.findStyle(root.styleCatalog, root.shownStyleKey)
+  // Starred and hidden: the user's settings, not the style files'.
+  readonly property var favoriteStyles: root.configState.favoriteStyles || []
+  readonly property var hiddenStyles: root.configState.hiddenStyles || []
+  // Every style, starred first: the Styles view. The picker leaves out the
+  // hidden ones, except the selected style.
+  readonly property var sortedStyles: Model.sortStyleCatalog(root.styleCatalog, root.favoriteStyles)
+  readonly property var pickerStyles: Model.pickerStyles(root.styleCatalog, root.favoriteStyles,
+    root.hiddenStyles, root.shownStyleKey)
+  readonly property int newStyleCount: Model.newStyleCount(root.styleCatalog)
   // The failed theme whose errors are on show: the one picked from the list,
   // or the configured one if its file has broken since it was chosen.
   readonly property var failedStyle: {
@@ -1288,6 +1304,81 @@ Panel {
 
   function commitArtStyle(value) {
     root.writeConfig(["--set-art-style", value])
+  }
+
+  // ---- The Styles view: star, hide, delete, revert (decision record
+  // 2026-11-styles-owned). Star and hide are settings; delete and revert
+  // change files, so each waits for its name to be typed first. -------------
+  // The style whose delete (or revert) is asking for "delete" to be typed.
+  property string styleDeleteKey: ""
+  property string styleRevertKey: ""
+
+  function toggleFavoriteStyle(key) {
+    root.writeConfig(["--favorite-style", key, root.favoriteStyles.indexOf(key) >= 0 ? "false" : "true"])
+  }
+
+  function toggleHiddenStyle(key) {
+    var hide = root.hiddenStyles.indexOf(key) < 0
+    if (hide && key === root.shownStyleKey) {
+      setStyleStatus("That's the selected style; pick another before hiding it.", true)
+      return
+    }
+    root.writeConfig(["--hide-styles", hide ? "true" : "false", key])
+  }
+
+  function deleteStyle(key) {
+    root.styleDeleteKey = ""
+    styleManageProc.doneText = function(r) { return "Deleted “" + r.label + "”." }
+    root.runStyle(styleManageProc, ["delete", key])
+  }
+
+  function revertStyle(key) {
+    root.styleRevertKey = ""
+    styleManageProc.doneText = function(r) {
+      return "“" + r.label + "” is the starter version again; Undo last tweak puts yours back."
+    }
+    root.runStyle(styleManageProc, ["revert", key])
+  }
+
+  function restoreDeletedStyles() {
+    styleManageProc.doneText = function(r) {
+      return r.keys.length === 0 ? "No starter styles are deleted."
+        : "Restored " + r.keys.length + " starter style" + (r.keys.length === 1 ? "" : "s") + "."
+    }
+    root.runStyle(styleManageProc, ["restore-deleted"])
+  }
+
+  // The styles a release added, as they were when the view opened: marking
+  // them seen clears them from the catalog, but the view keeps saying "new"
+  // until it is closed.
+  property var stylesNewAtOpen: []
+
+  function markNewStylesSeen() {
+    root.stylesNewAtOpen = root.styleCatalog.filter(function(r) { return r.isNew === true })
+      .map(function(r) { return r.key })
+    if (root.stylesNewAtOpen.length > 0 && !styleSeenProc.running) styleSeenProc.running = true
+  }
+
+  Process {
+    id: styleManageProc
+    property var doneText: null
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var result = root.parseStyleJson(text)
+        if (result && result.ok) root.setStyleStatus(styleManageProc.doneText(result), false)
+        else root.setStyleStatus(result && result.error ? result.error : "That didn't work.", true)
+        root.configFile.reload()
+        root.loadStyleCatalog()
+      }
+    }
+  }
+
+  // Run when the Styles view opens; the "new" marks clear on the next load.
+  Process {
+    id: styleSeenProc
+    command: [root.python, root.styleBin, "seen-new"]
+    onExited: root.loadStyleCatalog()
   }
 
   // ---- Create your own style (decision 9). The plugin never asks a model
@@ -1356,15 +1447,16 @@ Panel {
     root.runStyle(styleCopyProc, ["fix-prompt", row.path, "--copy"])
   }
 
-  // ---- Tweak: change a working user theme by saying what's off about it.
+  // ---- Tweak: change a working theme by saying what's off about it.
   // The agent (or a web chat, via Copy prompt) edits the theme in place;
   // astro-arc-style backs its files up first, and "Undo last tweak" puts
   // them back. ---------------------------------------------------------------
   property bool tweakOpen: false
   property string tweakNoteDraft: ""
   property bool tweakIncludeExample: true
-  // The theme the tweak card acts on: the shown style, when it is the user's.
-  readonly property var tweakTheme: shownStyle && shownStyle.source === "user" ? shownStyle : null
+  // The theme the tweak card acts on: the shown style. Every style is the
+  // user's own file, so any of them can be tweaked.
+  readonly property var tweakTheme: shownStyle
   // "Today's image": the newest generation's background, when it kept one.
   readonly property string tweakExampleImage: reviewsIndex.length > 0 ? reviewsIndex[0].imagePath : ""
   // The backup's manifest, when there is one: {key, files, savedAt}.
@@ -1570,8 +1662,8 @@ Panel {
     }
   }
 
-  // Both write <key>.jpg into a user theme's folder; shipped previews are
-  // read-only and style_catalog.py refuses them.
+  // Both write <key>.jpg beside the theme's file. A starter style's new
+  // preview stops only its preview's updates, not its charter's.
   function setStylePreview(key, imagePath) {
     if (stylePreviewProc.running) return
     root.styleActionStatus = ""
@@ -1595,7 +1687,7 @@ Panel {
         try {
           var rows = JSON.parse(String(text || ""))
           if (Array.isArray(rows)) {
-            root.styleCatalog = Model.sortStyleCatalog(rows)
+            root.styleCatalog = rows
             root.styleCatalogLoaded = true
             return
           }
@@ -1879,13 +1971,13 @@ Panel {
   readonly property var selectedReview: reviewForId(selectedReviewId)
   readonly property bool selectedIsNewest: selectedReviewId !== ""
     && reviewsIndex.length > 0 && reviewsIndex[0].id === selectedReviewId
-  // The selected generation's user theme, when it has one and an image to
-  // offer it as a preview — the condition for "Use as … preview".
+  // The selected generation's theme, when it is still installed and the
+  // entry has an image to offer it as a preview — the condition for "Use as
+  // … preview".
   readonly property var selectedPreviewTheme: {
     var review = selectedReview
     if (!review || review.imagePath === "") return null
-    var theme = Model.findStyle(styleCatalog, Model.reviewStyleKey(review, styleCatalog))
-    return theme && theme.source === "user" ? theme : null
+    return Model.findStyle(styleCatalog, Model.reviewStyleKey(review, styleCatalog))
   }
 
   // The full-size background when the entry kept its theme snapshot, the
@@ -2177,6 +2269,7 @@ Panel {
   readonly property bool styleEstimateRunning: styleEstimateProc.running
   readonly property bool styleRenderRunning: styleRenderProc.running
   readonly property bool stylePreviewRunning: stylePreviewProc.running
+  readonly property bool styleManageRunning: styleManageProc.running
   readonly property bool setThemeRunning: setThemeProc.running
   readonly property bool exportThemeRunning: exportThemeProc.running
   readonly property bool shareRecordRunning: shareRecordProc.running
@@ -2360,6 +2453,18 @@ Panel {
           visible: root.view === "fix"
           contentHeight: fixView.implicitHeight
           FixView { id: fixView; panel: root }
+        }
+
+        Flickable {
+          id: stylesFlick
+          anchors.fill: parent
+          contentWidth: width
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+          visible: root.view === "styles"
+          contentHeight: stylesView.implicitHeight
+          StylesView { id: stylesView; panel: root }
         }
 
         // Scrolls its own grid, so it takes the area as it is.

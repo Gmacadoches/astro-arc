@@ -4,8 +4,9 @@ import qs.Ui
 import "../Model.js" as Model
 
 // Main view, bottom: the style row — the selected theme's preview, the
-// picker (which ends in "+ Create a new style…" and opens upward), and Tweak
-// for your own themes — then one fixed status slot. Everything that used to
+// picker (starred styles first, hidden ones left out; it ends in "+ Create a
+// new style…" and opens upward), Styles (all of them, to star, hide or
+// delete) and Tweak — then one fixed status slot. Everything that used to
 // grow the panel under the picker (an action's result, a broken or missing
 // style) is a line in that slot now, and the long forms are drill-in views.
 Column {
@@ -24,7 +25,7 @@ Column {
     width: parent.width
     height: Math.max(stylePreviewFrame.height, styleDropdown.implicitHeight)
 
-    // A user theme's swatch is also how you change its preview.
+    // The swatch is also how you change the style's preview.
     Rectangle {
       id: stylePreviewFrame
       anchors.left: parent.left
@@ -37,8 +38,7 @@ Column {
       border.color: activeFocus ? panel.bar.foreground
         : Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.25)
 
-      readonly property bool changeable: panel.shownStyle !== null && panel.shownStyle.source === "user"
-        && !panel.stylePreviewRunning
+      readonly property bool changeable: panel.shownStyle !== null && !panel.stylePreviewRunning
       activeFocusOnTab: changeable
       Keys.onReturnPressed: panel.changeStylePreview(panel.shownStyleKey)
       Keys.onEnterPressed: panel.changeStylePreview(panel.shownStyleKey)
@@ -77,17 +77,17 @@ Column {
       id: styleDropdown
       anchors.left: stylePreviewFrame.right
       anchors.leftMargin: Style.space(8)
-      anchors.right: tweakBtn.visible ? tweakBtn.left : parent.right
-      anchors.rightMargin: tweakBtn.visible ? Style.space(8) : 0
+      anchors.right: stylesBtn.left
+      anchors.rightMargin: Style.space(8)
       anchors.verticalCenter: parent.verticalCenter
       bounds: panel.contentArea
       preferUp: true
       value: panel.shownStyleKey
-      options: panel.styleCatalog.map(function(s) {
+      options: panel.pickerStyles.map(function(s) {
         return {
           value: s.key,
-          label: s.label + (s.valid ? "" : " (Failed Validation)"),
-          tag: s.source === "user" ? "custom" : ""
+          label: Model.styleOptionLabel(s),
+          tag: panel.favoriteStyles.indexOf(s.key) >= 0 ? "★" : ""
         }
       })
       footerText: "+ Create a new style…"
@@ -97,7 +97,35 @@ Column {
       onFooterActivated: panel.pickArtStyle(Model.STYLE_CREATE)
     }
 
-    // Your own themes only: a shipped theme's files are the plugin's.
+    // Every style, to star, hide or delete; a dot while a release's new
+    // styles are unseen.
+    PanelIconButton {
+      id: stylesBtn
+      anchors.right: tweakBtn.visible ? tweakBtn.left : parent.right
+      anchors.rightMargin: tweakBtn.visible ? Style.space(8) : 0
+      anchors.verticalCenter: parent.verticalCenter
+      size: styleDropdown.implicitHeight
+      iconText: "󰕰"
+      bordered: true
+      focusable: true
+      fontSize: Style.font.body
+      foreground: panel.bar.foreground
+      tooltipText: panel.newStyleCount > 0
+        ? "Styles: " + panel.newStyleCount + " new" : "Styles: star, hide or delete"
+      onClicked: panel.openView("styles")
+
+      Rectangle {
+        visible: panel.newStyleCount > 0
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: Style.space(4)
+        width: Style.space(7)
+        height: width
+        radius: width / 2
+        color: Color.accent
+      }
+    }
+
     PanelButton {
       id: tweakBtn
       anchors.right: parent.right

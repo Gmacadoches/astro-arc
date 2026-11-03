@@ -56,8 +56,7 @@ Column {
 
     // Missing only its preview: render one, cost shown first.
     PanelButton {
-      visible: panel.failedStyle !== null && panel.failedStyle.source === "user"
-        && Model.styleOnlyNeedsPreview(panel.failedStyle)
+      visible: panel.failedStyle !== null && Model.styleOnlyNeedsPreview(panel.failedStyle)
       text: panel.styleRenderKey === (panel.failedStyle ? panel.failedStyle.key : "") && panel.styleRenderEstimate
         ? panel.styleRenderButtonText() : "Render a preview…"
       bordered: true
@@ -70,10 +69,10 @@ Column {
       }
     }
 
-    // A missing preview is itself a validation error, so a failed user
-    // theme needs this here too.
+    // A missing preview is itself a validation error, so a failed theme
+    // needs this here too.
     PanelButton {
-      visible: panel.failedStyle !== null && panel.failedStyle.source === "user"
+      visible: panel.failedStyle !== null
       text: panel.stylePreviewRunning ? "Choosing…" : "Change preview"
       bordered: true
       fontSize: Style.font.caption

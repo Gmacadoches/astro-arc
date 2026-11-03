@@ -1,0 +1,77 @@
+label = "Coral Reef Tapestry"
+suffix = "large woven wall tapestry photographed flat, visible warp and weft threads, wool and silk yarns with a soft sheen, colour built from hatched woven blends in coral pink, sea teal, deep indigo and sand gold, slightly irregular handwoven edges, figures woven as simple flat shapes with clear outlines, main subject placed below the top edge"
+space = [
+  "down through layers of water from a bright surface to a dim reef floor",
+  "across a reef garden of corals to a drop-off into blue",
+  "through a kelp forest toward a sunlit clearing",
+  "along a sunken ship's deck to its open hold",
+  "into a sea cave that opens onto a lagoon",
+  "over a sandy shallows to a reef wall",
+  "up from the deep toward a ring of light",
+]
+
+[world]
+era = "An undersea civilisation of reef-dwellers and divers, with technology of woven nets, shell tools, glass diving bells and sunken ships repurposed as homes."
+materials = "Coral, shell and woven kelp lead; pearl, sand, sea glass, driftwood, rope and old bronze are the common stuff."
+physics = "Everything floats a little; light falls in shafts from the surface. Bioluminescent creatures and pearls glow; nothing else does."
+society = "Reef villages, kelp farms, pearl markets and wreck towns. People and sea-folk farm, trade, dive, race seahorses and hold tide festivals."
+weather = "Weather as water: a storm surge stirring the sand, warm still currents, a cold upwelling, rain dimpling the surface above, clear calm. Pick what the day calls for."
+inhabitants = "Divers, merfolk, fishers, turtles, rays, octopuses, schools of fish, whales and old sea spirits."
+strangeness = "The sea as a city: an octopus keeping a shop, a whale carrying a town. Residents swim on by."
+numinous = "The sacred is the great creature and the pearl: a whale as a god, a giant clam holding a luminous pearl, the reef itself as a living temple."
+dread = "On hard days the reef suffers: coral bleaching white, a net tearing through, a storm surge burying the village in sand, a dark shape in the deep."
+favoured_actors = "Swarms and schools, creatures, figures in relation and presences. A mermaid sitting on a rock is the most worn image here and should not be the default."
+myth = "Pacific and Mediterranean sea myths, sailors' lore, and tales of drowned cities."
+highlight = "The thing the eye finds first is a sea creature or reef structure acting as part of a civilisation. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a creature carrying a settlement on its body",
+  "coral grown into architecture",
+  "a land object sunk and given a new use",
+  "a school of fish forming a single shape",
+  "a creature glowing far brighter than anything else",
+]
+
+[brief]
+signature = "SIGNATURE — the weave is visible: the main subject is described as woven, with threads or yarn blends named. A scene that could be an underwater photograph is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is the deep or night: two thirds of the tapestry is indigo and black yarn, lit only by glowing creatures or pearls. A frame that is mostly bright is a failed response."
+mid = "Shafts of light fall from one side through the water, with shaded areas substantial. A frame lit evenly is a failed response."
+hi = "Bright shallow water, light everywhere, colours vivid. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["bleaching", "tearing", "silting over", "churning", "crumbling", "choking", "sinking", "tangling", "smothering", "sweeping away", "wrecking", "darkening", "ripping", "rotting", "draining of colour", "fouling", "crushing", "stirring up", "breaking off", "dying back", "storming"]
+process_soft = ["swaying", "shimmering", "schooling", "spawning", "budding", "glowing", "rippling", "pulsing", "unfurling", "drifting", "bubbling", "flowing", "growing", "nesting", "spiralling", "flickering", "billowing", "blooming", "sparkling", "streaming", "curling"]
+actor_hard.work = ["cutting free", "hauling", "patching", "rescuing from", "digging out", "re-anchoring"]
+actor_hard.rest = ["sheltering in", "hiding under", "waiting in", "clinging to"]
+actor_hard.play = ["racing", "dodging", "darting through", "riding the surge past"]
+actor_hard.ritual = ["mourning at", "keeping vigil at", "carrying the pearl from"]
+actor_hard.travel = ["fleeing", "swimming hard against", "diving through", "escaping"]
+actor_soft.work = ["farming kelp at", "weaving", "diving for pearls at", "netting", "building"]
+actor_soft.rest = ["drifting by", "dozing in", "lounging on", "resting in"]
+actor_soft.play = ["racing seahorses around", "dancing in", "playing in", "riding a turtle past", "chasing fish through"]
+actor_soft.ritual = ["offering pearls at", "singing to", "garlanding"]
+actor_soft.travel = ["swimming to", "riding the current past", "sailing over", "diving down to"]
+
+[registers]
+"botanical" = "Plants as kelp, sea grass and anemone gardens."
+"bodily and anatomical" = "Bodies as merfolk and divers in flowing woven shapes, never gore."
+"fungal and decaying" = "Decay as bleached coral and rotting wrecks."
+"animal and creaturely" = "Creatures as fish, turtles, octopuses and whales."
+"geological" = "Rock as reef walls, sea caves and volcanic vents."
+"metallic and ore" = "Metal as bronze diving helmets and sunken anchors."
+"glass and ceramic" = "Glass as sea glass and diving bells."
+"architectural" = "Buildings as coral towers and wreck homes."
+"domestic interior" = "A shell home with a round window onto the reef."
+"mechanical" = "Machines as diving bells and pulley nets."
+"industrial and infrastructural" = "Works as kelp farms, pearl beds and wreck docks."
+"agricultural and cultivated" = "Farming as kelp rows and oyster beds."
+"aquatic" = "Water is everywhere: currents, shafts and bubbles."
+"atmospheric" = "Sky as the bright surface above, rippling."
+"glacial and frozen" = "Ice as polar waters with icebergs above."
+"fire and ember" = "Fire as volcanic vents glowing on the seabed."
+"textile and fiber" = "Fabric as woven nets and kelp cloth."
+"ritual object" = "Ritual objects as pearls, shells and carved coral."
+"paper and inscription" = "Paper as a sunken chart or bottle message, never a sentence."
+"instrument and measure" = "Measure as tide markers and a brass depth gauge."

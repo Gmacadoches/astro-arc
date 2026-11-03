@@ -1,0 +1,77 @@
+label = "Stained Glass"
+suffix = "stained glass window, jewel-toned panes of coloured glass separated by thick dark lead lines, light shining through the glass, subtle painted grisaille details on faces and folds, slight variations and bubbles in the glass, figures drawn with simple bold outlines, main subject placed in the middle of the window, nothing cropped at the top edge"
+space = [
+  "a figure in the foreground with a landscape of hills in coloured panes behind",
+  "a city of towers in glass receding up the window",
+  "a river winding up through fields of coloured panes",
+  "a ship on a sea of blue panes toward a far shore",
+  "a garden of rounded panes opening to a sky of stars",
+  "a procession climbing a road toward a far chapel",
+  "a forest of tall panes with a clearing in the middle",
+]
+
+[world]
+era = "A medieval and later world as the glaziers showed it: pilgrims, saints, guilds and kings, with technology of mills, carts and ships."
+materials = "Glass in ruby, cobalt, emerald and amber leads; lead came, stone tracery, gold, cloth, wood and parchment are the common stuff."
+physics = "Light comes through things rather than falling on them. Colours are pure and flat within each pane. Halos and holy things shine; everything else is lit only through the glass."
+society = "Towns of guilds, cathedrals, markets and farms. People work their trades, keep feast days, go on pilgrimage, hold fairs and gather at the hearth."
+weather = "Weather in coloured glass: a storm of grey panes, rain in streaks of lead, snow in white pieces, a sunny blue sky. Pick what the day calls for."
+inhabitants = "Saints, craftsmen, farmers, pilgrims, kings, angels, lions, doves, dragons and beasts from the bestiary."
+strangeness = "Miracles as everyday: a saint holding a city in their hands, a lion lying with a lamb. Bystanders carry on."
+numinous = "The sacred is light itself: haloed figures, angels with wings of many panes, the great rose-window sun."
+dread = "On hard days the glass shows judgment and plague: flames in red panes, a broken window with a dark gap, a dragon over a town, fallen towers."
+favoured_actors = "Crowds and processions, figures in relation, beasts and presences. A single saint in a niche is the most worn image here and should not be the default."
+myth = "Medieval Christian legend and the lives of the saints, the bestiary, and the labours of the months."
+highlight = "The thing the eye finds first is a figure or object brighter and more jewel-coloured than everything else, doing something miraculous. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a small thing shown holding something far larger",
+  "a bestiary creature in an ordinary place",
+  "a sacred light falling on an everyday task",
+  "a building or city shown carried or lifted",
+  "one pane cracked open to show night behind",
+]
+
+[brief]
+signature = "SIGNATURE — the lead lines are visible: the main subject is described as built of coloured panes held in dark lead. A scene that could be any painting is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: the glass is dim, deep blues and purples dominate at least two thirds of the window, lit only by a candle or moon behind. A frame that is mostly bright is a failed response."
+mid = "Strong light comes through one side of the window, making those panes blaze while the others stay deep. A frame lit evenly is a failed response."
+hi = "Full daylight pours through every pane evenly; all colours are bright. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["cracking", "shattering", "burning", "darkening", "falling", "breaking the lead", "toppling", "plaguing", "flooding", "storming", "splintering", "blackening", "crumbling", "searing", "tumbling", "quaking", "bleeding red", "scattering", "collapsing", "smoking", "sundering"]
+process_soft = ["shining through", "glowing", "radiating", "blessing", "blooming", "rising", "illuminating", "crowning", "sprouting", "descending", "harvesting", "flowering", "ringing", "dawning", "gilding", "glittering", "unfolding", "returning", "flying", "nesting", "ripening"]
+actor_hard.work = ["carrying water to", "dragging timber from", "rebuilding", "digging", "hauling", "binding"]
+actor_hard.rest = ["kneeling exhausted at", "sheltering in", "lying sick by", "waiting at"]
+actor_hard.play = ["jousting at", "wrestling at", "running the race past", "riding hard past"]
+actor_hard.ritual = ["praying for deliverance at", "carrying the relics past", "doing penance at"]
+actor_hard.travel = ["fleeing from", "crossing", "riding out from", "walking barefoot to"]
+actor_soft.work = ["harvesting", "weaving", "carving", "baking at", "tending sheep by"]
+actor_soft.rest = ["feasting at", "sitting by", "sleeping under", "warming by"]
+actor_soft.play = ["dancing at", "playing music by", "hawking over", "playing at dice by", "feasting at the fair of"]
+actor_soft.ritual = ["crowning", "blessing", "lighting candles at"]
+actor_soft.travel = ["going on pilgrimage to", "sailing to", "riding to", "arriving at"]
+
+[registers]
+"botanical" = "Plants as stylised glass leaves and flowers: a vine border, a tree of life."
+"bodily and anatomical" = "Bodies as robed figures with painted faces, solemn and calm, never gore."
+"fungal and decaying" = "Decay as the darker panes: a withered tree, a ruined wall."
+"animal and creaturely" = "Animals from the bestiary: a lion, a pelican, a dove, a dragon."
+"geological" = "Rock as mountains of grey and brown panes, a cave, a quarry."
+"metallic and ore" = "Metal as gold crowns, swords and chalices."
+"glass and ceramic" = "Glass is the world itself: jugs, lamps and windows within the window."
+"architectural" = "Buildings as towers, walls and cathedrals in coloured panes."
+"domestic interior" = "A hall or room with a hearth and a window, always opening outward."
+"mechanical" = "Machines as mills and wheels: a water mill, a cart wheel."
+"industrial and infrastructural" = "Works as bridges, walls and harbours, built by guilds."
+"agricultural and cultivated" = "Labours of the months: ploughing, sowing, reaping, pressing grapes."
+"aquatic" = "Water as wavy blue panes: a river, a sea with fish."
+"atmospheric" = "Sky as panes of blue with stars, clouds, sun and moon."
+"glacial and frozen" = "Winter as white panes: a frozen river, January by the fire."
+"fire and ember" = "Fire as red and gold panes: a forge, a burning bush."
+"textile and fiber" = "Fabric as robes in bold folds: a cloak, a banner."
+"ritual object" = "Ritual objects are chalices, crosses and relic boxes."
+"paper and inscription" = "Paper as scrolls held by figures, lettering as decorative script, never a sentence."
+"instrument and measure" = "Measure as the hourglass, the scale and the wheel of the year."

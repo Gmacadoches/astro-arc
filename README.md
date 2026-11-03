@@ -8,7 +8,7 @@ reading, turns that into a single image, renders it, and derives a matching
 colour palette from the rendered image — so the wallpaper and the theme always
 agree, because the theme is made *from* the wallpaper.
 
-It runs on a cadence you pick, paints in one of seven built-in worlds **or one
+It runs on a cadence you pick, paints in one of 37 worlds **or one
 you make yourself** (your Omarchy agent writes it with you from a one-line
 idea), and every generation is browsable, exportable and shareable.
 
@@ -16,20 +16,24 @@ idea), and every generation is browsable, exportable and shareable.
 
 ---
 
-## Seven worlds, not seven filters
+## 37 worlds, not 37 filters
 
 Every style is a **world** with its own era, materials, physics, inhabitants,
 myths and rules: what lives there, how it goes dark, what the eye should find
-first, and the one thing that marks a picture as unmistakably that world. The
-same day's reading, rendered in each:
+first, and the one thing that marks a picture as unmistakably that world.
+Astro-Arc comes with 37, and every one of them is yours: a file you can tweak,
+hide or delete. These ten start in the style picker, and the rest are a click
+away under **Styles → Show hidden**:
 
-| Studio Ghibli | Cyberpunk | Cosmic |
+| Needle-Felt Wool Diorama | Marbled Paper | Ukiyo-e |
 | --- | --- | --- |
-| ![A river god in work clothes wades past a beached handcart, dragging a net of washbasins and stove lids](docs/images/styles/ghibli.jpg) | ![A carp with a camera lens grown into its skull noses a storm-drain grate while a junction-box spirit receives incense](docs/images/styles/cyberpunk.jpg) | ![The constellation Cancer as a world-sized crab of rock and hull plate over a floating island, its water pouring off the edge into violet space](docs/images/styles/cosmic.jpg) |
-| **Antique Engraving** | **Ukiyo-e** | **Symbolist** |
-| ![A giant horseshoe crab entered as a specimen, with numbered stars and a graticule running from the plate's edge into the harbour](docs/images/styles/engraving.jpg) | ![A huge ghost fishmonger climbs from boat to boat over a river ferry, a warrior watching fireworks beneath a barge canopy](docs/images/styles/ukiyoe.jpg) | ![A household of cloaked women feed white waterbirds beside a wooden chamber that pours like a throat into a moonlit garden](docs/images/styles/symbolist.jpg) |
-| **Illuminated Manuscript** | | |
-| ![A pilgrim leads a mule past a pelican larger than a horse, opening its breast over its young, with a snail-knight from the border in the reeds](docs/images/styles/illuminated.jpg) | | |
+| ![Needle-Felt Wool Diorama, its preview](backend/pipeline/styles/needle-felt-diorama.jpg) | ![Marbled Paper, its preview](backend/pipeline/styles/marbled-paper.jpg) | ![Ukiyo-e, its preview](backend/pipeline/styles/ukiyoe.jpg) |
+| **Antique Engraving** | **Cosmic / Nebula** | **16-Bit Pixel Art** |
+| ![Antique Engraving, its preview](backend/pipeline/styles/engraving.jpg) | ![Cosmic / Nebula, its preview](backend/pipeline/styles/cosmic.jpg) | ![16-Bit Pixel Art, its preview](backend/pipeline/styles/pixel-art-16bit.jpg) |
+| **Art Nouveau Poster** | **Claymation Diorama** | **Chinese Ink Wash Mountains** |
+| ![Art Nouveau Poster, its preview](backend/pipeline/styles/art-nouveau-poster.jpg) | ![Claymation Diorama, its preview](backend/pipeline/styles/claymation-diorama.jpg) | ![Chinese Ink Wash Mountains, its preview](backend/pipeline/styles/ink-wash-mountains.jpg) |
+| **Coral Reef Tapestry** | | |
+| ![Coral Reef Tapestry, its preview](backend/pipeline/styles/coral-reef-tapestry.jpg) | | |
 
 **[What each world is, and how it was built →](docs/styles.md)** ·
 **[Make your own ↓](#make-your-own-world)**
@@ -58,7 +62,7 @@ that asks you before every command and change — never in an auto-approve,
 "yolo" or allow-all mode — and before any step that spends API credit it tells
 you the cost and waits for your yes. Every file it writes, renders included,
 it shows you by its full path. When it is done, the style is in the list as
-**"Your Style · custom"**, and it generates like any built-in one.
+**"Your Style"**, and it generates like any other.
 
 Astro-Arc starts **Claude Code, Codex, Gemini and Grok** this way (Codex in its
 read-only sandbox, so anything it changes needs your approval). An agent that
@@ -69,7 +73,7 @@ so and offers Copy prompt instead.
 clipboard. Paste it into any chat on the web, then bring the file it writes
 back with **Import theme…**, which saves and validates it.
 
-**Not quite right?** With one of your own styles selected, click **Tweak**
+**Not quite right?** With any style selected, click **Tweak**
 beside the picker and say what's off (*fewer landscapes, more character
 close-ups*), optionally with today's image as an example. Your agent edits the
 style in place, or **Copy prompt** does the same through a web chat. The
@@ -80,9 +84,16 @@ dropdown as **(Failed Validation)** and won't generate. **Fix with AI** hands it
 back to your agent together with the exact errors, and **Copy fix prompt** does
 the same for a web chat.
 
-Your styles live in `~/.config/astro-arc/styles/` as `<key>.toml` plus a
-`<key>.jpg` preview. That folder belongs to you, so `omarchy plugin update`
-never touches it. To give a style to a friend, send them the two files.
+**Too many, or not in the right order?** The **Styles** button beside the
+picker lists every style. Star the ones you like and they come first; hide the
+ones you don't and they leave the picker; delete one for good by typing
+*delete*. A style that came with Astro-Arc gets its updates until you change
+it, and **Revert** puts the version that ships back.
+
+Every style lives in `~/.config/astro-arc/styles/` as `<key>.toml` plus a
+`<key>.jpg` preview. That folder belongs to you: `omarchy plugin update` adds
+new styles to it (hidden) and updates the ones you haven't changed, and
+touches nothing else. To give a style to a friend, send them the two files.
 
 ---
 
@@ -196,8 +207,8 @@ full record in your browser. Under **⋯**, grouped by what each acts on:
 
 - **Image**
   - **Open full size** — the wallpaper in your image viewer.
-  - **Use as *Style* preview** — makes it the thumbnail for one of your own
-    styles in the style picker.
+  - **Use as *Style* preview** — makes it the thumbnail for its style in the
+    style picker.
 - **Theme**
   - **Install in Omarchy…** — adds it to Omarchy's theme picker for good,
     under a name you choose. Your desktop doesn't change.
@@ -357,8 +368,8 @@ says which step each one changes:
 
 | File | What it controls |
 | --- | --- |
-| `~/.config/astro-arc/styles/` | **your own styles**, one `<key>.toml` + `<key>.jpg` each, made [with your agent](#make-your-own-world) and kept across updates |
-| `backend/pipeline/styles/` | the seven shipped styles, same format: each one's technique and its world (see [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md)) |
+| `~/.config/astro-arc/styles/` | **every style you use**, one `<key>.toml` + `<key>.jpg` each: the ones Astro-Arc seeded and the ones you made [with your agent](#make-your-own-world), kept across updates |
+| `backend/pipeline/styles/` | the 37 styles that ship, same format, copied into the folder above (see [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md)); `starter-styles.toml` beside it names the ten that start in view |
 | `backend/pipeline/registers.toml` | the 20 material registers a scene is built from |
 | `backend/pipeline/actors.toml` | the kinds of actor a scene can have, from a lone person to a swarm |
 | `backend/pipeline/model-rates.toml` | model prices, quality presets, shortlists |
@@ -374,8 +385,8 @@ says which step each one changes:
   run the script, never edit the HTML.
 - [`RELEASING.md`](RELEASING.md) — how a release is cut (`bin/release`), why
   `master` only ever holds releases, and how updates find them.
-- [`docs/styles.md`](docs/styles.md) — the seven worlds, each rendered from
-  the same reading and register, with what defines each one.
+- [`docs/styles.md`](docs/styles.md) — the first seven worlds, each rendered
+  from the same reading and register, with what defines each one.
 - [`skills/astro-arc-style/SKILL.md`](skills/astro-arc-style/SKILL.md) — every
   field of a style, what it controls, and how to write one well: the agent
   skill behind "Create a new style", readable by people too. The agent's brief

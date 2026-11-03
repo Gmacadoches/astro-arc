@@ -1,0 +1,77 @@
+label = "Claymation Diorama"
+suffix = "stop-motion claymation photograph, handmade plasticine figures with visible fingerprints and tool marks, miniature set built from card, felt and painted wood, soft studio lighting, shallow depth of field like a macro lens, slightly saturated cheerful colours, characters with big expressive eyes and chunky hands, main subject kept clear of the top edge"
+space = [
+  "across a tabletop town of crooked houses to a painted sky backdrop",
+  "down a cluttered workshop bench toward a window",
+  "along a cotton-wool riverbank to a little bridge",
+  "through the door of a cosy burrow onto a hill",
+  "over a felt meadow to a paper-mache mountain",
+  "up a winding stair inside a tower set",
+  "across a harbour of clay boats to a lighthouse",
+]
+
+[world]
+era = "A small handmade world of inventors, villagers and odd creatures, where technology is homemade contraptions with pulleys and springs, and everything was shaped by someone's hands."
+materials = "Plasticine leads; felt, cardboard, painted wood, cotton wool, string, buttons, wire and glossy resin water are the common stuff."
+physics = "Things squash and stretch, then spring back. Contraptions work by chain reaction. Lamps glow softly; nothing else does. Everything moves in tiny jumps."
+society = "Villages, workshops, allotments, cafés and fêtes. People invent, bake, grow giant vegetables, go on picnics, and gather for contests and festivals."
+weather = "Cotton-wool clouds, cellophane rain, glitter snow, a fog of gauze, sunny days. Pick what the day calls for."
+inhabitants = "Inventors, grannies, children, dogs, sheep, penguins, moles, small monsters and contraptions that act like pets."
+strangeness = "Contraptions and creatures doing the improbable: a house on chicken legs of wire, a rocket made of a kettle. Neighbours only sigh."
+numinous = "The sacred is the handmade wonder: a giant clay moon you can visit, a village guardian made of stone and moss, a prize vegetable treated like a relic."
+dread = "On hard days the set is in trouble: clay cracking, a flood of resin water through the workshop, a contraption running wild, a storm tearing the backdrop."
+favoured_actors = "Figures in relation, animals, automata and handwork. An inventor alone at a bench is the most worn image here and should not be the default."
+myth = "British and Eastern European folk tales, village fable, and the inventor's tall tale."
+highlight = "The thing the eye finds first is a handmade creature or contraption doing something improbable. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a homemade machine doing a job far beyond it",
+  "an animal behaving like a person",
+  "an everyday object at the size of a building",
+  "a creature of clay half mid-transformation",
+  "a part of the set coming loose and revealing the studio",
+]
+
+[brief]
+signature = "SIGNATURE — the handmade is visible: at least one figure or object is named as plasticine or felt with fingerprints or seams showing. A scene that could be any 3D render is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night on the set. At least two thirds of the frame is in shadow, lit by small practical lamps, a torch or a moon cut from card. A frame that is mostly bright is a failed response."
+mid = "One studio light from the side gives clear shadows on the clay; lit and shaded areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "Bright, even studio daylight across the set with soft shadows; everything is visible. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["cracking", "squashing flat", "melting", "unravelling", "running amok", "springing loose", "collapsing", "flooding the set", "toppling over", "sagging", "tearing", "exploding in springs", "jamming", "smoking", "rolling away", "sinking", "spinning out of control", "losing its stuffing", "coming unglued", "creaking", "wobbling"]
+process_soft = ["bouncing", "wiggling", "squishing", "puffing steam", "ticking over", "rolling gently", "boinging", "popping up", "spinning slowly", "bobbing", "stretching", "rising like dough", "chugging", "sprouting", "wobbling happily", "twirling", "nodding", "trundling", "inflating", "clicking", "steaming"]
+actor_hard.work = ["chasing down", "stuffing back", "gluing", "bailing out", "wrestling with", "patching"]
+actor_hard.rest = ["hiding under", "cowering behind", "waiting out the storm in", "sitting dazed on"]
+actor_hard.play = ["racing", "riding out of control on", "dodging", "leaping from"]
+actor_hard.ritual = ["keeping vigil over", "carrying the prize away from", "ringing the alarm bell at"]
+actor_hard.travel = ["fleeing across", "rowing hard through", "climbing", "running from"]
+actor_soft.work = ["tinkering with", "baking at", "knitting by", "painting", "watering"]
+actor_soft.rest = ["napping in", "having tea at", "reading the paper in", "toasting crumpets by"]
+actor_soft.play = ["flying in", "playing fetch across", "rolling down", "picnicking at", "building with"]
+actor_soft.ritual = ["judging the prize vegetables at", "decorating", "celebrating at"]
+actor_soft.travel = ["driving a tiny car to", "riding a tandem past", "sailing across", "walking the dog to"]
+
+[registers]
+"botanical" = "Plants as felt and clay: chunky trees, prize marrows with thumbprints."
+"bodily and anatomical" = "Bodies as squashy clay: wide mouths, big noses. Cartoonish, never gore."
+"fungal and decaying" = "Decay as mouldy cheese and clay mushrooms: a spotted toadstool, cotton-wool mould."
+"animal and creaturely" = "Animals as clay characters: a loyal dog, a mischievous penguin. Expressive and silent."
+"geological" = "Rock as painted papier-mache: a cliff, a cave. Lumpy and handmade."
+"metallic and ore" = "Metal as tin foil and wire: a robot of tins, a foil rocket."
+"glass and ceramic" = "Glass as resin and teacups: a teapot, a jar of buttons."
+"architectural" = "Buildings as crooked cardboard houses with painted bricks and wonky chimneys."
+"domestic interior" = "A cosy front room or kitchen with wallpaper and a window onto the set."
+"mechanical" = "Contraptions of springs, pulleys and cogs, each step visible."
+"industrial and infrastructural" = "Works in miniature: a toy railway, a bridge of lolly sticks."
+"agricultural and cultivated" = "Allotments and fields of felt rows; giant vegetables for competition."
+"aquatic" = "Water as glossy resin and cellophane: a pond, a stormy sea."
+"atmospheric" = "Sky as a painted backdrop with cotton-wool clouds."
+"glacial and frozen" = "Snow as glitter and cotton wool: a snowman, an igloo of sugar cubes."
+"fire and ember" = "Fire as orange cellophane flicker: a campfire, a stove."
+"textile and fiber" = "Fabric as felt, knitting and patchwork: a scarf, a tent."
+"ritual object" = "Ritual objects are trophies and rosettes: a winner's cup, a village banner."
+"paper and inscription" = "Paper as tiny signs and letters: a hand-lettered shop sign, never a sentence."
+"instrument and measure" = "Measure as homemade gauges: a dial, a tape measure, a weighing scale."

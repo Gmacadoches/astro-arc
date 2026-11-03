@@ -1,0 +1,77 @@
+label = "Vaporwave Sunset Grid"
+suffix = "retro 1980s digital airbrush illustration, glowing magenta and cyan gradients, chrome highlights with hard specular glints, smooth gradient banding, soft bloom around bright edges, faint scanline texture, clean vector-sharp silhouettes, figures drawn as smooth airbrushed shapes with rim light, main subject kept well below the top edge"
+space = [
+  "across a wireframe plain running in perfect perspective to a banded horizon",
+  "down a colonnade of pastel columns opening onto open water",
+  "from a mall atrium balcony out over terraced fountains to a skylight",
+  "along a coastal highway whose lane markings converge at the horizon",
+  "through a doorway of glass bricks into a tiled pool hall and out its far windows",
+  "over a checkerboard floor that turns into ocean partway to the horizon",
+  "up a stepped pyramid of terraces toward a sky cut into stripes",
+]
+
+[world]
+era = "A permanent late-1980s that never ended and never got older: shopping malls, home computers, cassette decks and leisure resorts treated as monuments. Technology is glossy, beige or chrome, and loved like classical antiquity."
+materials = "Chrome, pastel plastic and polished marble lead; glass block, terrazzo, neon tube, palm trunks, pool tile and sun-faded vinyl are the common stuff. Wireframe grid lines are a material here too, lying on the ground like paving."
+physics = "Light comes in bands and gradients; the sun is striped by horizontal gaps. Wireframe can be stood on. Classical statues and computer hardware age the same way, by fading. Nothing is dirty; things decay by losing colour, glitching or tiling."
+society = "Malls, resorts, arcades, waterparks and empty office atriums, open day and night. People shop, lounge by pools, play arcade cabinets, drive to the coast with nowhere to be, and hold sunset rites in food courts."
+weather = "The whole range in this world's terms: warm haze, a pastel storm with gradient lightning, rain on glass block, a fog of dry ice, a hot clear evening. Pick what the day calls for, not always the sunset."
+inhabitants = "Shoppers, lifeguards, mall-walkers, skaters, dolphins and flamingos, marble statues that move when no one looks, screensaver creatures, and helpful mascot robots. People are as often idling as working."
+strangeness = "The uncanny of a perfect place: an endless corridor, a statue that has turned its head, an ocean with a floor of tiles. Everyone treats it as ordinary leisure."
+numinous = "The sacred is the sun disc and the classical bust: a striped sun that can be approached like a shrine, busts and statues that act as oracles, gods returning as holograms over fountains."
+dread = "On hard days the paradise is closing: shutters half down, a power cut leaving one escalator running, a statue cracked through, a flooded food court, the grid tearing open onto black. Bright colour drains toward grey."
+favoured_actors = "Crowds at leisure, statues and mascots that have come alive, animals in the pools, small groups in relation. A lone figure staring at the sunset is the most worn image here and should not be the default."
+myth = "Greco-Roman myth as gift-shop antiquity, early computing folklore, and the American road-trip and resort dream."
+highlight = "The thing the eye finds first is an artefact of the endless 1980s acting out of turn: a statue, a machine, a creature or a structure doing what it should not, lit in gradient. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a classical statue caught in the middle of an action",
+  "a piece of consumer hardware grown to the scale of architecture",
+  "a creature rendered half in wireframe",
+  "a place that repeats itself one too many times",
+  "a sky object brought down to ground level",
+]
+
+[brief]
+signature = "SIGNATURE — at least one element only this world has is in frame and named: a wireframe grid surface, a striped sun disc, or a classical statue among consumer goods. A scene that could be any retro illustration is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night or an interior after hours. At least two thirds of the frame is deep violet or black, and the light comes only from neon tube, screens, pool lights or the grid itself. A frame that is mostly bright is a failed response."
+mid = "The light is a low warm gradient from one side, magenta into orange, and lit and shadowed areas are both substantial. A frame lit evenly from everywhere is a failed response."
+hi = "It is bright pastel daytime with an even haze of light, pale cyan and pink across the frame; everything is visible and shadows are soft. A frame that is mostly dark or lit mainly by neon is a failed response."
+
+[verbs]
+process_hard = ["glitching", "tearing into static", "shuttering", "short-circuiting", "draining of colour", "flooding the atrium", "cracking down the middle", "losing signal", "tiling into the void", "sparking", "warping", "melting at the edges", "collapsing into pixels", "overheating", "sinking into the grid", "jamming", "smoking", "splitting open", "freezing mid-frame", "going dark in sections", "buckling"]
+process_soft = ["shimmering", "rotating slowly", "reflecting", "gleaming", "humming", "fading in", "looping", "rippling", "sparkling", "unfolding", "drifting on the pool", "blooming", "scrolling", "pulsing softly", "catching the light", "tiling outward", "opening", "rising like a sunrise", "spinning on a plinth", "glowing", "settling into place"]
+actor_hard.work = ["prying open the shutter of", "mopping the flood from", "rewiring", "dragging a cart through", "boarding up", "hauling cables across"]
+actor_hard.rest = ["crouching behind the planters of", "waiting out the blackout by", "sitting tight in", "dozing on the stalled escalator of"]
+actor_hard.play = ["racing through", "skating hard down", "jumping the barrier of", "pinballing through"]
+actor_hard.ritual = ["carrying the bust out of", "lighting flares at", "keeping vigil before"]
+actor_hard.travel = ["fleeing down", "driving fast along", "climbing the stalled escalator of", "wading across"]
+actor_soft.work = ["polishing", "tuning", "restocking", "arranging", "programming"]
+actor_soft.rest = ["lounging beside", "napping on", "sipping a drink at", "floating in"]
+actor_soft.play = ["skating across", "playing a cabinet at", "diving into", "dancing on", "feeding the dolphins at"]
+actor_soft.ritual = ["offering a cassette to", "crowning", "bowing to"]
+actor_soft.travel = ["cruising along", "riding the escalator of", "strolling through", "rowing across"]
+
+[registers]
+"botanical" = "Plants as resort décor: palms in planters, a fern wall in an atrium. Lush, trimmed and slightly too perfect."
+"bodily and anatomical" = "The body as a polished statue or a wireframe model: a marble torso, a rotating 3D head. Smooth and clean, never gore."
+"fungal and decaying" = "Decay as fading and glitching: sun-bleached posters, tiles lifting from a drained pool. Things rot into pastel."
+"animal and creaturely" = "Animals as resort mascots and wild guests: dolphins in a fountain, flamingos on a parking deck. Glossy and tame-looking."
+"geological" = "Rock as a theme-park set: polished granite plinths, a faux grotto behind a waterfall. Stone is always finished."
+"metallic and ore" = "Metal is chrome: a reflective sphere, polished railings. Every metal surface mirrors the gradient sky."
+"glass and ceramic" = "Glass block walls and tiled pools: a translucent wall bending the light, terrazzo floors. Light passes through and wobbles."
+"architectural" = "Malls, atriums and resort hotels: stepped terraces, skylights, columns. Architecture as a monument to leisure."
+"domestic interior" = "A bedroom or den from the era: a glowing monitor, a waterbed. It always opens to a view through blinds or a window."
+"mechanical" = "Consumer machines as relics: a cassette deck, an arcade cabinet. Every machine has a visible button and a glow."
+"industrial and infrastructural" = "Infrastructure dressed as leisure: an escalator bank, a parking deck at dusk. Big, clean and quietly empty."
+"agricultural and cultivated" = "Cultivation as landscaping: a manicured lawn under sprinklers, a citrus grove on a billboard come true. Grown for looking at."
+"aquatic" = "Water as pool, fountain and calm sea: a lit pool at night, a tiled shallows. Water is clear and full of reflected colour."
+"atmospheric" = "The sky as gradient: banded clouds, a haze of pink and cyan. Weather is painted on in stripes."
+"glacial and frozen" = "Cold as the frozen-dessert counter and the ice rink: a rink under a mirrored dome, frost on a vending window. Ice is pastel and smooth."
+"fire and ember" = "Fire as neon heat and sunset glow: a gas fire pit in a lobby, a sun melting into the sea. Flame is pink-orange and clean."
+"textile and fiber" = "Fabric as resort and mall fashion: a windbreaker in colour blocks, beach towels with geometric prints. Bright, synthetic and patterned."
+"ritual object" = "Ritual objects are consumer goods made sacred: a cassette on an altar, a bust wreathed in plastic leis."
+"paper and inscription" = "Paper as signage, receipts and glossy catalogues: a sale banner, a brochure blowing across tile. Lettering is chrome script and never a sentence."
+"instrument and measure" = "Measure as the era's displays: a digital clock, a VU meter bouncing. Numbers glow and count."

@@ -1,0 +1,77 @@
+label = "Marbled Paper"
+suffix = "traditional marbled paper art, ink floated on water and combed into flowing veins, feathered and swirled patterns, layered translucent colours of indigo, ochre, rose and teal on cream paper, crisp fine lines where colours meet, figures and forms emerging from the marbling as flowing silhouettes outlined by the veins, main subject below the top edge"
+space = [
+  "swirls of marbling forming hills that recede to a horizon",
+  "a river of combed lines winding into the distance",
+  "a sky of feathered patterns over a marbled sea",
+  "a forest of vertical veins with a clearing",
+  "a whirlpool of colour drawing the eye to its centre",
+  "waves of marbling breaking against a shore",
+  "a valley formed by two currents of colour meeting",
+]
+
+[world]
+era = "A fluid world formed from floating ink, where landscapes, creatures and people emerge from currents of colour, with technology of boats, bridges and lanterns."
+materials = "Floating ink and paper lead; water, silk, reed, stone, feathers and lantern light are the common stuff."
+physics = "Everything flows; forms are made of currents and can dissolve back into pattern. Nothing glows except lanterns. Patterns repeat and comb into shapes."
+society = "River towns, boats, gardens and festivals. People sail, fish, paint, weave, dance and gather on bridges."
+weather = "Weather as swirl: storms as tight dark spirals, rain as combed lines, mist as pale wash, calm as gentle waves. Pick what the day calls for."
+inhabitants = "Boatmen, painters, dancers, fish, birds, horses, and creatures formed from currents."
+strangeness = "Forms emerging and dissolving: a horse made of a current, a city that is a whorl of colour. Everyone floats along."
+numinous = "The sacred is the source of the flow: a great spiral at the centre, a being made of all colours, a still point in the swirls."
+dread = "On hard days the currents turn violent: colours muddying, a whirlpool pulling things in, a storm tearing the pattern apart."
+favoured_actors = "Presences, animals, crowds and figures in relation. A single bird in flight is the most worn image here and should not be the default."
+myth = "Ottoman and Persian marbling traditions, water myths of creation, and the idea of the world as flowing pattern."
+highlight = "The thing the eye finds first is a figure or creature forming out of the marbling. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a creature formed entirely from a current of colour",
+  "a structure dissolving into swirls",
+  "a whirlpool with something at its centre",
+  "a figure half emerged from the pattern",
+  "two patterns colliding to form a landscape",
+]
+
+[brief]
+signature = "SIGNATURE — the marbling is named: feathered, combed or swirled ink patterns form at least half the frame, and a form emerges from them. A scene painted conventionally is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "Dark inks: two thirds of the frame is indigo and black marbling, with a few bright veins and a lantern. A frame that is mostly pale is a failed response."
+mid = "Colours brighter on one side of the frame, darker on the other. A frame with even colour is a failed response."
+hi = "Pale cream paper showing widely, light colours throughout. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["muddying", "churning", "tearing", "swallowing", "spiralling in", "bleeding", "clouding", "dissolving", "storming", "smearing", "sinking", "tangling", "breaking apart", "darkening", "flooding", "colliding", "drowning", "splitting", "scattering", "crumbling", "seething"]
+process_soft = ["flowing", "feathering", "swirling", "combing", "unfurling", "drifting", "spiralling", "blooming", "rippling", "veining", "floating", "streaming", "curling", "spreading", "merging", "weaving", "billowing", "wavering", "dancing", "emerging", "settling"]
+actor_hard.work = ["rowing hard against", "pulling", "rescuing from", "bailing", "hauling", "holding"]
+actor_hard.rest = ["clinging to", "sheltering in", "waiting at", "adrift by"]
+actor_hard.play = ["racing", "riding the current past", "leaping", "diving through"]
+actor_hard.ritual = ["casting offerings into", "keeping vigil at", "chanting at"]
+actor_hard.travel = ["fleeing", "sailing through", "crossing", "swimming through"]
+actor_soft.work = ["fishing at", "painting", "weaving at", "dyeing silk at", "ferrying"]
+actor_soft.rest = ["floating on", "resting at", "dozing by", "sitting at"]
+actor_soft.play = ["dancing at", "swimming at", "boating on", "playing music at", "flying kites at"]
+actor_soft.ritual = ["floating lanterns on", "blessing", "celebrating at"]
+actor_soft.travel = ["sailing to", "drifting to", "riding to", "crossing to"]
+
+[registers]
+"botanical" = "Plants as feathered patterns forming leaves and flowers."
+"bodily and anatomical" = "Bodies as flowing silhouettes in the veins, never gore."
+"fungal and decaying" = "Decay as muddied colour and broken patterns."
+"animal and creaturely" = "Animals as horses, fish and birds formed by currents."
+"geological" = "Rock as dense combed bands forming cliffs."
+"metallic and ore" = "Metal as gold and bronze veins in the ink."
+"glass and ceramic" = "Glass and clay as glazed bowls echoing the marbling."
+"architectural" = "Buildings as domes and towers emerging from swirls."
+"domestic interior" = "A workshop with a marbling tray and a window to the river."
+"mechanical" = "Machines as waterwheels and boats in flow."
+"industrial and infrastructural" = "Works as bridges and canals."
+"agricultural and cultivated" = "Farming as terraces formed by combed lines."
+"aquatic" = "Water is the medium: rivers, seas and currents."
+"atmospheric" = "Sky as feathered clouds and swirling winds."
+"glacial and frozen" = "Ice as pale crystalline marbling."
+"fire and ember" = "Fire as red and gold swirls."
+"textile and fiber" = "Fabric as silk flowing with marbled pattern."
+"ritual object" = "Ritual objects as lanterns and floating offerings."
+"paper and inscription" = "Paper is the world; calligraphy flourishes without legible words."
+"instrument and measure" = "Measure as a comb, a stylus and a compass of swirls."

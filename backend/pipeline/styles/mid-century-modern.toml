@@ -1,0 +1,77 @@
+label = "Mid-Century Modern"
+suffix = "1950s mid-century modern illustration, flat geometric shapes, limited palette of mustard, teal, tomato red and cream, dry-brush and crayon textures, offset print grain, slightly misregistered colour, stylised figures with simple shapes and stick-like limbs, playful asymmetric composition, main subject kept below the top edge"
+space = [
+  "across a suburban street of flat-roofed houses to boomerang-shaped hills",
+  "through a picture window into a lounge and out to the garden",
+  "along an airport concourse toward a jet on the tarmac",
+  "down a hillside of stylised pines to a lake with a jetty",
+  "from a rooftop terrace over a city of tower blocks",
+  "across a desert motel lot to a starburst sign and mesas",
+  "up a spiral ramp in a modern museum",
+]
+
+[world]
+era = "The optimistic 1950s and 60s: jets, space age gadgets, new suburbs, modern furniture and a belief that tomorrow will be easier, with technology that is sleek, chrome-trimmed and friendly."
+materials = "Teak, chrome and Formica lead; fibreglass, terrazzo, glass walls, wool rugs, linoleum and concrete are the common stuff."
+physics = "Shapes simplify into boomerangs, atoms and starbursts. Light is flat and graphic. Nothing glows except signs and lamps. Space-age gadgets work by cheerful magic."
+society = "Suburbs, airports, motels, cocktail lounges and science fairs. People commute, garden, throw parties, take road trips and watch the skies."
+weather = "Stylised weather: a few dotted raindrops, snow as white circles, wind in curved lines, desert heat, a clear blue day. Pick what the day calls for."
+inhabitants = "Families, commuters, stewardesses, scientists, cats, poodles, birds in flat shapes, friendly robots and the occasional flying saucer."
+strangeness = "Futurism as fact: a family robot vacuuming, a car with fins that flies. Neighbours wave."
+numinous = "The sacred is the atom and the star: the starburst, the nucleus symbol, the night sky full of satellites, the sun as a perfect circle."
+dread = "On hard days the dream cracks: a fallout drill, a rocket crashed in the cul-de-sac, a blackout, a hurricane over the motel, a lawn turned grey."
+favoured_actors = "Figures in relation, crowds, automata and animals. A smiling housewife with an appliance is the most worn image here and should not be the default."
+myth = "Space-age futurism, American road folklore, and atomic-age science fiction."
+highlight = "The thing the eye finds first is a gadget, creature or symbol of the future acting oddly in an everyday place. Today's kind of wrongness is given with this definition."
+highlight_modes = [
+  "a household machine taking on a life of its own",
+  "something from space landed in an ordinary street",
+  "a modern shape (a boomerang, an atom, a starburst) built as a structure",
+  "an animal as stylised as a logo, doing a job",
+  "a building that floats or rotates",
+]
+
+[brief]
+signature = "SIGNATURE — at least one mid-century motif is named in frame: a starburst, an atom symbol, a boomerang shape, or tail-fins. A scene that could be any flat illustration is a failed response."
+temper = "TEMPER — the highlight, and anything numinous in the frame, is in this temper: {wonderTone}"
+
+[light]
+lo = "It is night: at least two thirds of the frame is deep navy and black flats, lit by lamps, signs and lit windows only. A frame that is mostly bright is a failed response."
+mid = "Flat light from one side, shadows as solid darker shapes covering a good part of the frame. A frame without shadow shapes is a failed response."
+hi = "Bright flat daylight, clean colours, shadows small. A frame that is mostly dark is a failed response."
+
+[verbs]
+process_hard = ["sputtering", "crash-landing", "short-circuiting", "rusting", "crumpling", "blacking out", "leaking", "fizzing", "toppling", "burning out", "cracking", "flooding", "stalling", "shaking", "collapsing", "smoking", "going haywire", "fading", "breaking down", "sirening", "scattering"]
+process_soft = ["orbiting", "bouncing", "beeping", "whirring", "spinning", "zooming", "twinkling", "blooming", "popping", "sprinkling", "humming along", "soaring", "radiating", "gliding", "rotating", "chiming", "sparkling", "floating", "unfolding", "lighting up", "jetting"]
+actor_hard.work = ["repairing", "hosing down", "towing", "hammering", "dragging", "taping up"]
+actor_hard.rest = ["sheltering under", "waiting in", "hiding in", "sitting stunned by"]
+actor_hard.play = ["racing past", "dodging", "speeding along", "jumping"]
+actor_hard.ritual = ["running the drill at", "saluting", "keeping watch over"]
+actor_hard.travel = ["driving fast from", "evacuating", "flying through", "hurrying down"]
+actor_soft.work = ["mowing", "designing", "building", "painting", "mixing cocktails at"]
+actor_soft.rest = ["lounging by", "reading on", "napping in", "sunbathing by"]
+actor_soft.play = ["swimming in", "dancing at", "playing croquet on", "skating at", "barbecuing by"]
+actor_soft.ritual = ["toasting", "launching", "unveiling"]
+actor_soft.travel = ["road-tripping to", "flying to", "cruising past", "arriving at"]
+
+[registers]
+"botanical" = "Plants as stylised shapes: a cactus, a rubber plant, a lollipop tree."
+"bodily and anatomical" = "Bodies as simple stylised figures, cheerful, never gore."
+"fungal and decaying" = "Decay as peeling paint and rust, a wilting houseplant."
+"animal and creaturely" = "Animals as graphic shapes: a cat, a poodle, a flamingo."
+"geological" = "Rock as mesas and canyons in flat colour."
+"metallic and ore" = "Metal as chrome trim and steel: a car fender, a toaster."
+"glass and ceramic" = "Glass and ceramic as picture windows and studio pottery."
+"architectural" = "Buildings as modernist homes, motels, airports and diners."
+"domestic interior" = "A modern lounge with a sunken sofa and a picture window onto the yard."
+"mechanical" = "Machines as space-age appliances and robots."
+"industrial and infrastructural" = "Works as highways, dams and launch pads."
+"agricultural and cultivated" = "Farming as orchards and suburban lawns."
+"aquatic" = "Water as a kidney-shaped pool, a lake with a speedboat."
+"atmospheric" = "Sky as flat colour with stylised clouds and stars."
+"glacial and frozen" = "Snow as a ski lodge, a fridge full of ice cubes."
+"fire and ember" = "Fire as a barbecue, a fireplace, a rocket's exhaust."
+"textile and fiber" = "Fabric as patterned curtains and shirts with atomic prints."
+"ritual object" = "Ritual objects are trophies, a ribbon-cutting scissors, a time capsule."
+"paper and inscription" = "Paper as posters, tickets and signs, lettering in script, never a sentence."
+"instrument and measure" = "Measure as dials, gauges, a radar screen and a Geiger counter."
