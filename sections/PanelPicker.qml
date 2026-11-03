@@ -6,8 +6,8 @@ import qs.Ui
 // A single-select picker that stays inside the panel. Looks like the kit's
 // Dropdown, but its list opens upward or downward — whichever side of the
 // trigger has more room inside `bounds` — and scrolls within that room, so
-// it never hangs off the card. An optional footer action ("+ Create a new
-// style…") sits under a separator at the end of the list.
+// it never hangs off the card. An optional action ("+ Create a new style…")
+// heads the list, over a separator.
 //
 // Keyboard: the trigger takes focus (Tab or the panel's arrows) and opens on
 // Enter or Space. Unlike the kit's Dropdown it leaves Down alone, so the
@@ -19,7 +19,7 @@ Item {
   property string value: ""
   // [{ value, label, tag }] — tag is a short dim note on the right ("★").
   property var options: []
-  property string footerText: ""
+  property string actionText: ""
   // The item the list must stay inside: the panel's content area.
   property Item bounds: null
   // Open upward unless only the space below fits the list.
@@ -28,11 +28,13 @@ Item {
   property string fontFamily: Style.font.family
 
   signal changed(string value)
-  signal footerActivated()
+  signal actionActivated()
 
   readonly property bool popupOpen: popup.opened
   readonly property int rowHeight: Style.spacing.popupRowHeight
-  readonly property int rowCount: options.length + (footerText !== "" ? 1 : 0)
+  // The action row, when there is one, comes before the options.
+  readonly property int actionRows: actionText !== "" ? 1 : 0
+  readonly property int rowCount: options.length + actionRows
   readonly property var current: {
     for (var i = 0; i < options.length; i++) if (String(options[i].value) === value) return options[i]
     return null
@@ -150,18 +152,18 @@ Item {
     onOpened: {
       var i = 0
       for (var k = 0; k < picker.options.length; k++) if (String(picker.options[k].value) === picker.value) i = k
-      list.currentIndex = i
-      list.positionViewAtIndex(i, ListView.Contain)
+      list.currentIndex = i + picker.actionRows
+      list.positionViewAtIndex(list.currentIndex, ListView.Contain)
       list.forceActiveFocus()
     }
     onClosed: picker.forceActiveFocus()
 
     contentItem: ListView {
       id: list
-      // Every row, the footer's separator included.
+      // Every row, the action's separator included.
       readonly property real separatorHeight: Style.space(9)
       readonly property real fullHeight: picker.rowCount * picker.rowHeight
-        + (picker.footerText !== "" ? separatorHeight : 0)
+        + picker.actionRows * separatorHeight
       clip: true
       boundsBehavior: Flickable.StopAtBounds
       model: picker.rowCount
@@ -170,11 +172,11 @@ Item {
 
       function activate(i) {
         popup.close()
-        if (i < picker.options.length) {
-          var v = String(picker.options[i].value)
-          if (v !== picker.value) picker.changed(v)
+        if (i < picker.actionRows) {
+          picker.actionActivated()
         } else {
-          picker.footerActivated()
+          var v = String(picker.options[i - picker.actionRows].value)
+          if (v !== picker.value) picker.changed(v)
         }
       }
 
@@ -199,16 +201,16 @@ Item {
       delegate: Item {
         id: row
         required property int index
-        readonly property bool isFooter: index >= picker.options.length
-        readonly property var option: isFooter ? null : picker.options[index]
+        readonly property bool isAction: index < picker.actionRows
+        readonly property var option: isAction ? null : picker.options[index - picker.actionRows]
         width: ListView.view.width
-        height: picker.rowHeight + (isFooter ? list.separatorHeight : 0)
+        height: picker.rowHeight + (isAction ? list.separatorHeight : 0)
 
         Rectangle {
-          visible: row.isFooter
+          visible: row.isAction
           x: Style.space(6)
           width: parent.width - Style.space(12)
-          y: Math.round(list.separatorHeight / 2)
+          y: picker.rowHeight + Math.round(list.separatorHeight / 2)
           height: 1
           color: Qt.rgba(picker.foreground.r, picker.foreground.g, picker.foreground.b, 0.2)
         }
@@ -217,12 +219,12 @@ Item {
           id: rowFill
           anchors.left: parent.left
           anchors.right: parent.right
-          anchors.bottom: parent.bottom
+          anchors.top: parent.top
           height: picker.rowHeight
           radius: Style.cornerRadius
           color: row.index === list.currentIndex || rowMouse.containsMouse
             ? Style.hoverFillFor(picker.foreground, Color.accent)
-            : (!row.isFooter && String(row.option.value) === picker.value
+            : (!row.isAction && String(row.option.value) === picker.value
               ? Style.selectedFillFor(picker.foreground, Color.accent) : "transparent")
 
           Text {
@@ -232,8 +234,8 @@ Item {
             anchors.right: rowTag.left
             anchors.rightMargin: Style.spacing.md
             anchors.verticalCenter: parent.verticalCenter
-            text: row.isFooter ? picker.footerText : row.option.label
-            color: row.isFooter ? Color.accent : picker.foreground
+            text: row.isAction ? picker.actionText : row.option.label
+            color: row.isAction ? Color.accent : picker.foreground
             font.family: picker.fontFamily
             font.pixelSize: Style.font.bodySmall
             elide: Text.ElideRight
@@ -245,7 +247,7 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: Style.spacing.controlPaddingX
             anchors.verticalCenter: parent.verticalCenter
-            text: !row.isFooter && row.option.tag ? row.option.tag : ""
+            text: !row.isAction && row.option.tag ? row.option.tag : ""
             color: Qt.darker(picker.foreground, 1.4)
             font.family: picker.fontFamily
             font.pixelSize: Style.font.caption

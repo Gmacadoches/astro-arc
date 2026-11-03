@@ -72,7 +72,7 @@ Column {
     }
 
     // Options come from the theme files (style_catalog.py); see
-    // loadStyleCatalog. Create sits at the end of the list itself.
+    // loadStyleCatalog. Create heads the list itself.
     PanelPicker {
       id: styleDropdown
       anchors.left: stylePreviewFrame.right
@@ -90,11 +90,11 @@ Column {
           tag: panel.favoriteStyles.indexOf(s.key) >= 0 ? "★" : ""
         }
       })
-      footerText: "+ Create a new style…"
+      actionText: "+ Create a new style…"
       foreground: panel.bar.foreground
       fontFamily: panel.bar.fontFamily
       onChanged: function(value) { panel.pickArtStyle(value) }
-      onFooterActivated: panel.pickArtStyle(Model.STYLE_CREATE)
+      onActionActivated: panel.pickArtStyle(Model.STYLE_CREATE)
     }
 
     // Every style, to star, hide or delete; a dot while a release's new
