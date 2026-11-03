@@ -153,6 +153,12 @@ Each line: what that material means in this world, as a span and a principle
 with two examples (rule 1). The 20 lines must not all pull toward the same
 setting.
 
+The model gets the register's name alongside its line, and the name pulls
+on its own: a "fungal and decaying" line about moss and rust still came back
+as a ring of mushrooms. When the name's obvious reading doesn't belong in
+this world, the line says so ("never rot: no mushrooms, mould or slime") and
+says what the material is here instead.
+
 ## Example: the shipped engraving theme
 
 `engraving.toml`, annotated. Comments (`#`) are allowed in a theme.
@@ -307,6 +313,15 @@ preview. Never summarise files as "in the renders folder".
 7. **Finish.** `astro-arc-style validate <file>` shows 0 errors. Tell the
    user the theme is in the style list as "<label>", what it
    cost, and any warning you left on purpose.
+
+**Tweaking a theme.** Change what the note is about and keep the rest, with
+one exception: if the change reaches `[world]` or `[brief]`, reread all 20
+`[registers]` lines against the new world before validating. A line written
+for the old world keeps steering scenes toward it. Fix any line that
+contradicts a brief rule (a cosy indoor room under a rule that the frame is
+open ground), names something the world no longer has, or shares an example
+noun with a field you just wrote (rule 1), and tell the user which lines you
+changed and why.
 
 ### When `meaning` fails
 
