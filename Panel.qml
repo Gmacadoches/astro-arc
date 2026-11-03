@@ -2379,6 +2379,15 @@ Panel {
       // switch to the neighbouring bar panel).
       onTabRequested: function(direction) { root.navTab(direction) }
       onMoveRequested: function(dx, dy) { root.navMove(dx, dy) }
+      // Backspace goes back a view from any drill-in, as the back arrow
+      // does. A text field keeps it for its own typing, even when empty.
+      Keys.onPressed: function(event) {
+        if (event.key !== Qt.Key_Backspace || keyCatcher.blocked || root.view === "main") return
+        var item = keyCatcher.Window.activeFocusItem
+        if (item && item.cursorPosition !== undefined) return
+        root.goBack()
+        event.accepted = true
+      }
       // Browsing the generations with ←→ (nothing focused), Enter puts the
       // one showing on the desktop, as Apply theme does; browsing the
       // styles, it uses the one showing.
