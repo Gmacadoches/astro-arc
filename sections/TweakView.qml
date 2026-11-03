@@ -35,6 +35,7 @@ Column {
       count: panel.tweakExampleChoices.all.length
       onPrevious: panel.pickTweakExample(index - 1)
       onNext: panel.pickTweakExample(index + 1)
+      onEntered: activated()
       onActivated: if (panel.tweakExample) panel.openReview(panel.tweakExampleImage)
     }
 
@@ -44,6 +45,8 @@ Column {
       tips: panel.tweakExampleChoices.all.map(function(r) { return panel.reviewWhen(r) + " · " + panel.reviewStyleLabel(r) })
       current: panel.tweakExampleIndex
       onPicked: function(i) { panel.pickTweakExample(i) }
+      onEntered: panel.openReview(panel.tweakExampleImage)
+      onActivated: panel.openReview(panel.tweakExampleImage)
     }
 
     // A checkbox the keyboard can reach: focus it, Space or Enter flips it.

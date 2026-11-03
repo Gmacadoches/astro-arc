@@ -41,6 +41,24 @@ Column {
   readonly property bool confirmingRevert: style !== null && panel.styleRevertKey === style.key
 
   onIndexChanged: if (index >= 0) lastIndex = index
+
+  // For the panel's arrows (Panel.navMove), as the main view's: with nothing
+  // focused ←→ page, ↑ goes to the image and ↓ to Use this style (or the
+  // first action that can be pressed); ↑↓ into the strip land on the one
+  // showing.
+  readonly property Item imageItem: frame
+  function selectedThumb() { return strip.currentThumb() }
+  function firstActionItem() {
+    if (useBtn.enabled) return useBtn
+    for (var i = 0; i < actions.children.length; i++) {
+      var b = actions.children[i]
+      if (b.visible && b.enabled) return b
+    }
+    return frame
+  }
+
+  // Enter, from the image or the strip: use the style showing.
+  function useShowing() { if (useBtn.enabled) useBtn.clicked() }
   onVisibleChanged: if (visible) { focusKey = panel.shownStyleKey; showHidden = false }
 
   function show(i) {
@@ -74,6 +92,7 @@ Column {
     spacing: Style.space(6)
 
     PreviewFrame {
+      id: frame
       panel: view.panel
       source: view.style && view.style.preview ? view.style.preview : ""
       version: panel.stylePreviewVersion
@@ -85,16 +104,21 @@ Column {
       opacity: view.hidden && !view.selected ? 0.6 : 1
       onPrevious: view.show(view.index - 1)
       onNext: view.show(view.index + 1)
+      onEntered: view.useShowing()
       onActivated: if (view.style && !panel.stylePreviewRunning) panel.changeStylePreview(view.style.key)
     }
 
     PreviewStrip {
+      id: strip
       panel: view.panel
+      wraps: true
       sources: view.rows.map(function(r) { return r.preview || "" })
       tips: view.rows.map(function(r) { return r.label })
       version: panel.stylePreviewVersion
       current: view.index
       onPicked: function(i) { view.show(i) }
+      onEntered: view.useShowing()
+      onActivated: if (view.style && !panel.stylePreviewRunning) panel.changeStylePreview(view.style.key)
     }
   }
 
@@ -133,6 +157,7 @@ Column {
   // The primary action, filled with the accent like Apply theme. A style
   // that failed validation goes to its Fix view instead.
   PanelButton {
+    id: useBtn
     width: parent.width
     visible: view.style !== null
     text: !view.style ? "" : !view.style.valid ? "Fix…" : view.selected ? "Selected ✓" : "Use this style"

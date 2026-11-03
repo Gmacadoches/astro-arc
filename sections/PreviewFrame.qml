@@ -3,7 +3,9 @@ import qs.Commons
 import qs.Ui
 
 // A big 3:2 picture to page through, drawn like the main view's: ‹ › on it,
-// a caption chip bottom-left and "n of m" bottom-right. Focused, ←→ page.
+// a caption chip bottom-left and "n of m" bottom-right. Focused, ←→ page,
+// Enter is `entered` and Space (or a click) `activated`, as the main view's
+// image applies its theme on Enter and opens on Space.
 // The Tweak and Styles drill-ins use it; the main view keeps its own.
 Rectangle {
   id: frame
@@ -24,6 +26,7 @@ Rectangle {
 
   signal previous()
   signal next()
+  signal entered()
   signal activated()
 
   readonly property bool canPrevious: count > 1 && (wraps || index > 0)
@@ -41,8 +44,8 @@ Rectangle {
   activeFocusOnTab: count > 0
   Keys.onLeftPressed: function(event) { if (frame.canPrevious) frame.previous(); else event.accepted = false }
   Keys.onRightPressed: function(event) { if (frame.canNext) frame.next(); else event.accepted = false }
-  Keys.onReturnPressed: frame.activated()
-  Keys.onEnterPressed: frame.activated()
+  Keys.onReturnPressed: frame.entered()
+  Keys.onEnterPressed: frame.entered()
   Keys.onSpacePressed: frame.activated()
 
   Image {

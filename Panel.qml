@@ -705,11 +705,17 @@ Panel {
       // Nothing focused yet: ←→ browse the generations on the main view, the
       // way the newest-first thumbnail strip runs (← newer, → older); ↑ goes
       // to the big image and ↓ to Apply theme, either side of the strip.
+      // The Styles view pages its styles the same way, ↓ to Use this style.
       // Elsewhere ↑↓ start at the bottom or the top.
       if (view === "main") {
         if (dx < 0) showNewer()
         else if (dx > 0) showOlder()
         else navFocus(dy < 0 ? todaySection.imageItem : todaySection.firstActionItem())
+        return
+      }
+      if (view === "styles") {
+        if (dx !== 0) stylesView.show(stylesView.index + dx)
+        else navFocus(dy < 0 ? stylesView.imageItem : stylesView.firstActionItem())
         return
       }
       if (c.length > 0) navFocus(dy < 0 ? c[c.length - 1] : c[0])
@@ -738,7 +744,9 @@ Panel {
     }
     // Crossing into the thumbnail strip lands on the one showing, not
     // whichever thumbnail happens to sit nearest.
-    if (best && best.isThumb && dy !== 0) best = todaySection.selectedThumb() || best
+    if (best && best.isThumb && dy !== 0)
+      best = (view === "main" ? todaySection.selectedThumb()
+        : navRoot.selectedThumb ? navRoot.selectedThumb() : null) || best
     if (best) navFocus(best)
   }
 
@@ -2372,8 +2380,13 @@ Panel {
       onTabRequested: function(direction) { root.navTab(direction) }
       onMoveRequested: function(dx, dy) { root.navMove(dx, dy) }
       // Browsing the generations with ←→ (nothing focused), Enter puts the
-      // one showing on the desktop, as Apply theme does.
-      onReturnRequested: if (root.view === "main" && !root.navCurrentItem()) root.setSelectedTheme()
+      // one showing on the desktop, as Apply theme does; browsing the
+      // styles, it uses the one showing.
+      onReturnRequested: {
+        if (root.navCurrentItem()) return
+        if (root.view === "main") root.setSelectedTheme()
+        else if (root.view === "styles") stylesView.useShowing()
+      }
 
       // ---- Hero: ✦ · Astro-Arc · status, or back · the view's title ------
       HeroSection {

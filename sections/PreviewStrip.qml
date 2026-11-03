@@ -2,9 +2,11 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 
-// A row of thumbnails under a PreviewFrame, the size of the main view's:
-// the one showing is ringed, a click or Enter shows another, and the row
-// scrolls to keep the one showing in sight.
+// A row of thumbnails under a PreviewFrame, the size of the main view's,
+// and keyed like its strip: the one showing is ringed, a click shows
+// another, and focus is selection — a thumbnail moved to is the one
+// showing, and ←→ go on paging past the ends of the row, which scrolls to
+// follow. Enter and Space are the frame's (entered, activated).
 ListView {
   id: strip
   required property var panel
@@ -17,7 +19,25 @@ ListView {
   // As PreviewFrame's: set for files rewritten in place.
   property int version: -1
 
+  // Past either end ←→ go round to the other, rather than stopping.
+  property bool wraps: false
+
   signal picked(int index)
+  signal entered()
+  signal activated()
+
+  // The thumbnail showing, for the panel's ↑↓ to land on.
+  function currentThumb() { return current >= 0 ? itemAtIndex(current) : null }
+
+  // Page by one from a focused thumbnail and take the focus along.
+  function step(from, by, event) {
+    var to = from + by
+    if (wraps) to = (to + count) % count
+    else if (to < 0 || to >= count) { event.accepted = false; return }
+    picked(to)
+    positionViewAtIndex(to, ListView.Contain)
+    Qt.callLater(function() { var t = strip.itemAtIndex(to); if (t) t.forceActiveFocus() })
+  }
 
   width: parent ? parent.width : 0
   height: Style.space(36)
@@ -33,6 +53,7 @@ ListView {
   delegate: Rectangle {
     id: thumb
     required property int index
+    readonly property bool isThumb: true
     readonly property bool showing: index === strip.current
     width: Math.round(height * 3 / 2)
     height: strip.height
@@ -42,10 +63,15 @@ ListView {
     border.color: activeFocus ? strip.panel.bar.foreground
       : (showing ? Color.accent : Qt.rgba(strip.panel.bar.foreground.r, strip.panel.bar.foreground.g, strip.panel.bar.foreground.b, 0.2))
     activeFocusOnTab: true
-    Keys.onReturnPressed: strip.picked(index)
-    Keys.onEnterPressed: strip.picked(index)
-    Keys.onSpacePressed: strip.picked(index)
-    onActiveFocusChanged: if (activeFocus) strip.positionViewAtIndex(index, ListView.Contain)
+    Keys.onLeftPressed: function(event) { strip.step(index, -1, event) }
+    Keys.onRightPressed: function(event) { strip.step(index, 1, event) }
+    Keys.onReturnPressed: strip.entered()
+    Keys.onEnterPressed: strip.entered()
+    Keys.onSpacePressed: strip.activated()
+    onActiveFocusChanged: if (activeFocus) {
+      strip.positionViewAtIndex(index, ListView.Contain)
+      if (index !== strip.current) strip.picked(index)
+    }
 
     Image {
       anchors.fill: parent
