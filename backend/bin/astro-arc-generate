@@ -462,8 +462,13 @@ if [[ $background_only == true ]]; then
   fi
   omarchy-theme-bg-set "$wallpaper" >/dev/null 2>&1 \
     || echo "Astro-Arc: warning — could not set the background" >&2
+  # Only the wallpaper changed, so no generation's whole theme is on the
+  # desktop any more: Apply theme is live again for every one, this one too.
+  : >"$APPLIED_FILE"
 else
+  : >"$APPLIED_FILE"
   omarchy-theme-set astro-arc >/dev/null 2>&1
+  [[ -z $review_path ]] || basename "$(dirname "$review_path")" >"$APPLIED_FILE"
 fi
 
 # Prune "Themes Generated" entries (and their matching history/*.png) past

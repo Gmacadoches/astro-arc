@@ -176,7 +176,7 @@ Item {
         root.imagePath = image
         root.depthPath = depth
         // A wallpaper with no depth map yet (set by hand, or an older
-        // generation put back with Set wallpaper): make one here, then look
+        // generation put back with Apply theme): make one here, then look
         // again. A failed map does not look again, so it cannot loop.
         if (root.enabled && image !== "" && depth === "" && !autoDepth.running) {
           autoDepth.command = [root.motionBin, "depth", image]

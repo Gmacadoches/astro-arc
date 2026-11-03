@@ -30,8 +30,8 @@ PANEL_DEFINITION = re.compile(r"readonly property string (home|archiveDir|stateD
 # snippet of the line).
 NOT_OURS = {
     # The save dialog's starting folder: the user's Downloads.
-    (BIN / "astro-arc-export-theme", 'out_dir="$HOME/Downloads"'),
-    (BIN / "astro-arc-export-theme", 'out_dir="$HOME"'),
+    (BIN / "astro-arc-export-theme", 'start_dir="$HOME/Downloads"'),
+    (BIN / "astro-arc-export-theme", 'start_dir="$HOME"'),
     (BIN / "astro-arc-share-record", 'start_dir="$HOME/Downloads"'),
     (BIN / "astro-arc-share-record", 'start_dir="$HOME"'),
     # Other agents' skills folders (SKILL_HOMES).
@@ -68,7 +68,7 @@ class PathsTest(unittest.TestCase):
         home = "/nonexistent-home"
         env = {"HOME": home, "PATH": os.environ.get("PATH", "")}
         names = ["ARCHIVE_DIR", "GENERATIONS_DIR", "GENERATIONS_INDEX", "GALLERY_FILE", "STATE_DIR",
-                 "PIPELINE_STATE_DIR", "VERIFY_DIR", "CONFIG_FILE", "USER_STYLES_DIR", "OMARCHY_THEMES_DIR", "OMARCHY_CURRENT_DIR"]
+                 "PIPELINE_STATE_DIR", "VERIFY_DIR", "APPLIED_FILE", "CONFIG_FILE", "USER_STYLES_DIR", "OMARCHY_THEMES_DIR", "OMARCHY_CURRENT_DIR"]
         shell = subprocess.run(
             ["bash", "-c", f'source "{BIN}/astro-arc-paths.sh"; '
              + "; ".join(f'echo "${n}"' for n in names)],

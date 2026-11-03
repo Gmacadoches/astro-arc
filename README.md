@@ -188,17 +188,25 @@ them: **‹ ›** (or ← → from the keyboard), the thumbnail strip under it, 
 **All** for a grid of everything, filterable by style. Each one comes back with
 the reading it was made from.
 
-For the generation showing, **Set wallpaper** puts its colours and wallpaper
+For the generation showing, **Apply theme** puts its colours and wallpaper
 back on the desktop. That is temporary by design: the next generation replaces
-it. Under **⋯**:
+it. While that generation's theme is what the desktop shows, the button reads
+**Applied ✓**. Click the reading under the thumbnails to open the generation's
+full record in your browser. Under **⋯**, grouped by what each acts on:
 
-- **Open image** — the full-size wallpaper.
-- **Save a copy…** — keep it as a permanent Omarchy theme.
-- **Export…** — package the *theme* as a git repo someone can install with
-  `omarchy theme install` (the reading is left out).
-- **Share…** — the image, the reading, the prompt and the costs as one `.html`
-  file that opens anywhere. It asks where to save.
-- **Use as style preview** — for one of your own styles.
+- **Image**
+  - **Open full size** — the wallpaper in your image viewer.
+  - **Use as *Style* preview** — makes it the thumbnail for one of your own
+    styles in the style picker.
+- **Theme**
+  - **Install in Omarchy…** — adds it to Omarchy's theme picker for good,
+    under a name you choose. Your desktop doesn't change.
+  - **Export as git repo…** — a repo anyone can install with
+    `omarchy theme install`. The reading is left out. It asks where to save.
+- **Record** — the reading, chart signs, prompt and costs
+  - **Open in browser** — this generation's page.
+  - **Save as .html file…** — the same, with the image inside, as one file
+    that opens anywhere. No birth data. It asks where to save.
 
 The whole archive is also one page in your browser
 (`~/.local/share/astro-arc/index.html`, newest first — **Open in browser** in

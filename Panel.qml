@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
@@ -41,6 +42,7 @@ Panel {
   readonly property string archiveDir: (Quickshell.env("XDG_DATA_HOME") || (home + "/.local/share")) + "/astro-arc"
   readonly property string galleryFile: archiveDir + "/index.html"
   readonly property string stateDir: home + "/.local/state/omarchy/astro-arc"
+  readonly property string omarchyCurrentDir: home + "/.local/state/omarchy/current"
   readonly property string configPath: home + "/.local/state/omarchy/settings/astro-arc.json"
 
   readonly property string configBin: binDir + "/astro-arc-config"
@@ -622,6 +624,57 @@ Panel {
     }
   }
 
+  // Hand the keys back to the catcher: nothing focused, so ←→ browse the
+  // generations again. Called after an action, so browsing survives using one.
+  function navRelease() {
+    if (root.opened) keyCatcher.forceActiveFocus()
+  }
+
+  // A focused control that is disabled or hidden — Apply turning into
+  // Applied, Regenerate while it runs, the name prompt closing — leaves focus
+  // on no control at all, and then no key reaches the catcher.
+  Connections {
+    target: keyCatcher.Window
+    function onActiveFocusItemChanged() { Qt.callLater(root.navRecover) }
+  }
+
+  // Only while the panel has the keyboard: a window that lost it has no
+  // active focus item either, and that is not a control going away.
+  function navRecover() {
+    var item = keyCatcher.Window.activeFocusItem
+    if (root.opened && keyCatcher.Window.active && (item === null || item === keyCatcher.Window.contentItem))
+      keyCatcher.forceActiveFocus()
+  }
+
+  // Switching workspace (or monitor, or the special workspace) hands
+  // Hyprland's keyboard focus to a window there, and the panel's OnDemand
+  // surface only gets it back on a click. Re-run the panel's open-time focus
+  // prime, Exclusive briefly then OnDemand, once Hyprland has refocused.
+  // Workspace events only: an activewindow event would fire for the prime's
+  // own focus change and loop.
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      if (root.opened && root.workspaceEvents.indexOf(event.name) >= 0)
+        workspaceRefocusTimer.restart()
+    }
+  }
+
+  // Plain and v2 of each, since Hyprland versions differ in which they send;
+  // the timer folds a pair into one prime.
+  readonly property var workspaceEvents: ["workspace", "workspacev2", "focusedmon", "focusedmonv2",
+    "activespecial", "activespecialv2"]
+
+  Timer {
+    id: workspaceRefocusTimer
+    interval: 60
+    onTriggered: {
+      if (!root.opened) return
+      panel.focusPrimed = false
+      panel.beginFocusPrime()
+    }
+  }
+
   // A view just appeared: nothing in it is focused, keys go to the catcher.
   function navReset() {
     if (navFlick) navFlick.contentY = 0
@@ -643,9 +696,15 @@ Panel {
     var cur = navCurrentItem()
     if (!cur) {
       // Nothing focused yet: ←→ browse the generations on the main view, the
-      // way the newest-first thumbnail strip runs (← newer, → older); ↑↓
-      // start at the top or the bottom.
-      if (dx !== 0 && view === "main") { if (dx < 0) showNewer(); else showOlder(); return }
+      // way the newest-first thumbnail strip runs (← newer, → older); ↑ goes
+      // to the big image and ↓ to Apply theme, either side of the strip.
+      // Elsewhere ↑↓ start at the bottom or the top.
+      if (view === "main") {
+        if (dx < 0) showNewer()
+        else if (dx > 0) showOlder()
+        else navFocus(dy < 0 ? todaySection.imageItem : todaySection.firstActionItem())
+        return
+      }
       if (c.length > 0) navFocus(dy < 0 ? c[c.length - 1] : c[0])
       return
     }
@@ -670,6 +729,9 @@ Panel {
       var score = Math.max(0, along) + across * 2
       if (score < bestScore) { bestScore = score; best = c[i] }
     }
+    // Crossing into the thumbnail strip lands on the one showing, not
+    // whichever thumbnail happens to sit nearest.
+    if (best && best.isThumb && dy !== 0) best = todaySection.selectedThumb() || best
     if (best) navFocus(best)
   }
 
@@ -1818,7 +1880,7 @@ Panel {
   readonly property bool selectedIsNewest: selectedReviewId !== ""
     && reviewsIndex.length > 0 && reviewsIndex[0].id === selectedReviewId
   // The selected generation's user theme, when it has one and an image to
-  // offer it as a preview — the condition for "Use as style preview".
+  // offer it as a preview — the condition for "Use as … preview".
   readonly property var selectedPreviewTheme: {
     var review = selectedReview
     if (!review || review.imagePath === "") return null
@@ -1905,10 +1967,10 @@ Panel {
     onExited: function(exitCode) {
       if (exitCode === 0) {
         root.themeNamePromptOpen = false
-        root.themeActionStatus = "Saved as “" + root._saveThemeStdout + "” — pick it from Omarchy's own theme switcher any time."
+        root.themeActionStatus = "Installed as “" + root._saveThemeStdout + "” — pick it from Omarchy's theme switcher any time."
         root.themeActionStatusIsError = false
       } else {
-        root.themeActionStatus = root._saveThemeStderr || "Save failed."
+        root.themeActionStatus = root._saveThemeStderr || "Install failed."
         root.themeActionStatusIsError = true
       }
     }
@@ -1924,8 +1986,35 @@ Panel {
   property string _setThemeStdout: ""
   property string _setThemeStderr: ""
 
+  // Applied: the selected generation's whole theme is what the desktop shows.
+  // astro-arc-set-theme and astro-arc-generate record which generation that
+  // is (empty after a wallpaper-only run); Omarchy's theme.name says whether
+  // you have since switched to another theme. Both must agree.
+  property string appliedReviewId: ""
+  property string omarchyThemeName: ""
+  readonly property bool selectedIsApplied: root.selectedReviewId !== ""
+    && root.selectedReviewId === root.appliedReviewId && root.omarchyThemeName === "astro-arc"
+
+  property FileView appliedFile: FileView {
+    path: root.stateDir + "/applied-generation"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.appliedReviewId = text().trim()
+    onLoadFailed: root.appliedReviewId = ""
+  }
+
+  property FileView omarchyThemeNameFile: FileView {
+    path: root.omarchyCurrentDir + "/theme.name"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.omarchyThemeName = text().trim()
+    onLoadFailed: root.omarchyThemeName = ""
+  }
+
   function setSelectedTheme() {
-    if (!root.selectedReviewId || setThemeProc.running) return
+    if (!root.selectedReviewId || setThemeProc.running || root.selectedIsApplied) return
     root.themeActionStatus = ""
     root._setThemeStdout = ""
     root._setThemeStderr = ""
@@ -1938,6 +2027,8 @@ Panel {
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._setThemeStdout = String(text || "").trim() }
     stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._setThemeStderr = String(text || "").trim() }
     onExited: function(exitCode) {
+      root.appliedFile.reload()
+      root.omarchyThemeNameFile.reload()
       if (exitCode === 0) {
         root.themeActionStatus = "Desktop is now on “" + root._setThemeStdout
           + "”. The next generation replaces it."
@@ -1962,9 +2053,8 @@ Panel {
   function exportSelectedTheme() {
     if (root.selectedReviewId === "" || exportThemeProc.running) return
     var review = root.reviewForId(root.selectedReviewId)
-    // Named from the same concept-tag suggestion Save pre-fills its prompt
-    // with, but without prompting: an export lands in a folder you can rename,
-    // so asking first would add a step to the one-click path for nothing.
+    // Named from the same concept-tag suggestion Install pre-fills its prompt
+    // with; the save dialog the script opens is where you change it.
     var name = review ? Model.suggestThemeName(review.conceptTags) : ""
     root.themeActionStatus = ""
     root._exportStdout = ""
@@ -1980,7 +2070,11 @@ Panel {
     stdout: StdioCollector { waitForEnd: true; onStreamFinished: root._exportStdout = String(text || "").trim() }
     stderr: StdioCollector { waitForEnd: true; onStreamFinished: root._exportStderr = String(text || "").trim() }
     onExited: function(exitCode) {
-      if (exitCode === 0) {
+      // 2 is the save dialog being cancelled, as with Save as .html file.
+      if (exitCode === 2) {
+        root.themeActionStatus = "Export cancelled."
+        root.themeActionStatusIsError = false
+      } else if (exitCode === 0) {
         root.themeActionStatus = "Exported to " + root._exportStdout
           + " — push it to a git host and anyone can install it with \u201comarchy theme install <url>\u201d."
         root.themeActionStatusIsError = false
@@ -2019,7 +2113,7 @@ Panel {
       // 2 is the save dialog being cancelled. Nothing was written and nothing
       // went wrong, so it must not come back red like a failure.
       if (exitCode === 2) {
-        root.themeActionStatus = "Share cancelled."
+        root.themeActionStatus = "Save cancelled."
         root.themeActionStatusIsError = false
       } else if (exitCode === 0) {
         root.themeActionStatus = "Saved to " + root._shareStdout
@@ -2155,7 +2249,7 @@ Panel {
       onTabRequested: function(direction) { root.navTab(direction) }
       onMoveRequested: function(dx, dy) { root.navMove(dx, dy) }
       // Browsing the generations with ←→ (nothing focused), Enter puts the
-      // one showing on the desktop, as Set wallpaper does.
+      // one showing on the desktop, as Apply theme does.
       onReturnRequested: if (root.view === "main" && !root.navCurrentItem()) root.setSelectedTheme()
 
       // ---- Hero: ✦ · Astro-Arc · status, or back · the view's title ------
@@ -2199,7 +2293,7 @@ Panel {
             onVisibleChanged: latch()
             Component.onCompleted: latch()
 
-            TodaySection { panel: root }
+            TodaySection { id: todaySection; panel: root }
             PanelSeparator { foreground: root.bar.foreground }
             StyleSection { id: styleSection; panel: root }
           }

@@ -50,7 +50,7 @@ Column {
       Keys.onEnterPressed: panel.agentCanLaunch ? panel.createStyleWithAgent() : panel.copyCreatePrompt()
     }
 
-    // The primary action, filled with the accent like Set wallpaper.
+    // The primary action, filled with the accent like Apply theme.
     PanelButton {
       width: parent.width
       visible: parent.hasAgent

@@ -134,7 +134,7 @@ Column {
     }
   }
 
-  // The primary action, filled with the accent like Set wallpaper.
+  // The primary action, filled with the accent like Apply theme.
   PanelButton {
     width: parent.width
     visible: panel.agentCanLaunch

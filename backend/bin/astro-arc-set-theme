@@ -65,5 +65,10 @@ fi
 omarchy-theme-set astro-arc >/dev/null 2>&1 \
   || { echo "astro-arc-set-theme: omarchy-theme-set failed" >&2; exit 1; }
 
+# So the panel can show this generation as Applied. Written in place, not
+# swapped in, so the panel's file watch keeps following it.
+mkdir -p "$STATE_DIR"
+printf '%s\n' "$review_id" >"$APPLIED_FILE"
+
 # The label the panel shows back, not the id: the id is machine-facing.
 jq -r --arg id "$review_id" '.[] | select(.id == $id) | .label // $id' "$INDEX_FILE"

@@ -31,6 +31,11 @@ PIPELINE_STATE_DIR="$STATE_DIR/pipeline"
 # them (astro-arc-archive-run).
 PENDING_ARCHIVE_DIR="$STATE_DIR/pending-archive"
 VERIFY_DIR="$STATE_DIR/verification"
+# The id of the generation whose whole theme is on the desktop, or empty when
+# the last thing to touch the desktop changed only the wallpaper. Written by
+# astro-arc-set-theme and astro-arc-generate; the panel compares it with
+# Omarchy's current/theme.name to show Applied.
+APPLIED_FILE="$STATE_DIR/applied-generation"
 CONFIG_FILE="$HOME/.local/state/omarchy/settings/astro-arc.json"
 
 USER_STYLES_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/astro-arc/styles"

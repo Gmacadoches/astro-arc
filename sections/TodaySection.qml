@@ -23,6 +23,18 @@ Column {
   width: parent.width
   spacing: Style.space(14)
 
+  onIndexChanged: strip.follow()
+  onCountChanged: strip.follow()
+
+  function focusSelectedThumb() { strip.focusSelected() }
+
+  // Where ↑↓ land from the panel's navigation (Panel.navMove).
+  readonly property Item imageItem: imageFrame
+  function selectedThumb() { return thumbRepeater.itemAt(index - strip.start) }
+  // Apply theme, or the next button along while it is disabled (Applied ✓,
+  // or Regenerate running).
+  function firstActionItem() { return setBtn.enabled ? setBtn : regenerateBtn.enabled ? regenerateBtn : moreBtn }
+
   // One row of the ⋯ menu.
   component MenuItem: PanelButton {
     width: parent.width
@@ -31,11 +43,29 @@ Column {
     foreground: Color.popups.text
   }
 
+  // A group heading in the ⋯ menu: the thing its items act on, so each item
+  // only needs the verb. Styled like the narrative-position badge. Not
+  // focusable, so ↑↓ step over it.
+  component MenuHeading: Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    leftPadding: Style.spacing.controlPaddingX + Style.normalBorderWidth
+    topPadding: Style.space(4)
+    bottomPadding: Style.space(2)
+    color: Color.accent
+    font.family: Style.font.family
+    font.pixelSize: Math.round(Style.font.caption * 0.85)
+    font.bold: true
+    font.capitalization: Font.AllUppercase
+    font.letterSpacing: 1.5
+  }
+
   // A thumbnail in the strip: the generation's thumb.jpg, ringed when it is
   // the one showing.
   component Thumb: Rectangle {
     id: thumb
     required property var entry
+    readonly property bool isThumb: true
     readonly property bool current: entry.id === section.panel.selectedReviewId
     width: Style.space(36)
     height: width
@@ -45,9 +75,18 @@ Column {
     border.color: activeFocus ? section.panel.bar.foreground
       : (current ? Color.accent : Qt.rgba(section.panel.bar.foreground.r, section.panel.bar.foreground.g, section.panel.bar.foreground.b, 0.2))
     activeFocusOnTab: true
-    Keys.onReturnPressed: section.panel.selectedReviewId = entry.id
-    Keys.onEnterPressed: section.panel.selectedReviewId = entry.id
-    Keys.onSpacePressed: section.panel.selectedReviewId = entry.id
+    // Focus is selection: a thumbnail you move to is the one showing, and
+    // ←→ go on paging past the ends of the strip, which slides to follow.
+    onActiveFocusChanged: if (activeFocus && entry.id !== section.panel.selectedReviewId) section.panel.selectedReviewId = entry.id
+    Keys.onLeftPressed: function(event) {
+      if (section.index > 0) { section.panel.showNewer(); section.focusSelectedThumb() } else event.accepted = false
+    }
+    Keys.onRightPressed: function(event) {
+      if (section.index < section.count - 1) { section.panel.showOlder(); section.focusSelectedThumb() } else event.accepted = false
+    }
+    Keys.onReturnPressed: section.panel.setSelectedTheme()
+    Keys.onEnterPressed: section.panel.setSelectedTheme()
+    Keys.onSpacePressed: section.panel.openSelectedImage()
 
     Image {
       anchors.fill: parent
@@ -83,8 +122,8 @@ Column {
     border.color: activeFocus ? panel.bar.foreground
       : Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.25)
 
-    // Focused, it is the browser: ←→ page, Enter sets it as the wallpaper,
-    // Space opens the image. At either end ←→ go on to the panel's navigation.
+    // Focused, it is the browser: ←→ page, Enter applies its theme, Space
+    // opens the image. At either end ←→ go on to the panel's navigation.
     activeFocusOnTab: section.count > 0
     // The strip runs newest-first from the left, so ← is newer, → older.
     Keys.onLeftPressed: function(event) {
@@ -219,7 +258,8 @@ Column {
   }
 
   // ---- Thumbnail strip: as many recent generations as fit, sliding along
-  // to keep the one showing in view; All opens the whole history. Its height
+  // only when the one showing would leave it, so moving within it stays
+  // put; All opens the whole history. Its height
   // is kept even when there is nothing to show, so the panel doesn't move. --
   Item {
     id: strip
@@ -229,7 +269,24 @@ Column {
     readonly property real gap: Style.space(6)
     readonly property int fits: Math.max(1, Math.floor((width - allBtn.width - gap + gap) / (Style.space(36) + gap)))
     readonly property int shown: Math.min(fits, section.count)
-    readonly property int start: section.index < shown ? 0 : section.index - shown + 1
+    property int start: 0
+
+    function follow() {
+      var s = start
+      if (section.index < s) s = section.index
+      else if (section.index >= s + shown) s = section.index - shown + 1
+      start = Math.max(0, Math.min(s, section.count - shown))
+    }
+
+    function focusSelected() {
+      Qt.callLater(function() {
+        var thumb = thumbRepeater.itemAt(section.index - strip.start)
+        if (thumb) thumb.forceActiveFocus()
+      })
+    }
+
+    onShownChanged: follow()
+    Component.onCompleted: follow()
 
     Row {
       anchors.left: parent.left
@@ -237,6 +294,7 @@ Column {
       spacing: strip.gap
 
       Repeater {
+        id: thumbRepeater
         model: strip.shown
         Thumb {
           required property int index
@@ -257,8 +315,9 @@ Column {
     }
   }
 
-  // ---- The reading saved with this generation, or — while Save a copy asks
-  // for a name — that prompt in its place. A fixed slot: four lines of quote
+  // ---- The reading saved with this generation, or — while Install in
+  // Omarchy asks for a name — that prompt in its place. The reading opens the
+  // generation's full record in the browser. A fixed slot: four lines of quote
   // under the narrative-position badge. ---------------------------------------
   Item {
     width: parent.width
@@ -302,10 +361,25 @@ Column {
         font.pixelSize: panel.selectedReading !== "" ? Style.font.body : Style.font.caption
         lineHeight: 1.25
         color: panel.selectedReading !== "" ? panel.bar.foreground : section.dim
+        font.underline: quoteMouse.containsMouse
+
+        MouseArea {
+          id: quoteMouse
+          anchors.fill: parent
+          enabled: section.review !== null && section.review.path !== ""
+          hoverEnabled: true
+          cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+          onClicked: panel.openSelectedReview()
+        }
+
+        PanelToolTip {
+          visible: quoteMouse.containsMouse
+          text: "Open the full record in your browser"
+        }
       }
     }
 
-    // Name prompt for Save a copy. Pre-filled with Model.suggestThemeName's
+    // Name prompt for Install in Omarchy. Pre-filled with Model.suggestThemeName's
     // guess from that generation's own concept tags.
     Column {
       anchors.fill: parent
@@ -314,7 +388,7 @@ Column {
 
       Text {
         textFormat: Text.PlainText
-        text: "Save a copy as a theme named"
+        text: "Install as an Omarchy theme named"
         color: section.dim
         font.family: panel.bar.fontFamily
         font.pixelSize: Style.font.caption
@@ -351,7 +425,7 @@ Column {
         PanelButton {
           id: confirmSaveThemeBtn
           anchors.right: parent.right
-          text: "Save"
+          text: "Install"
           bordered: true
           fontSize: Style.font.caption
           foreground: panel.bar.foreground
@@ -377,14 +451,16 @@ Column {
       anchors.left: parent.left
       width: actionRow.flexWidth * 0.44
       height: actionRow.rowHeight
-      text: panel.setThemeRunning ? "Setting…" : "Set wallpaper"
+      // Applied: this generation's theme is already the desktop's, so there is
+      // nothing to do and the button says so instead of offering it.
+      text: panel.setThemeRunning ? "Applying…" : panel.selectedIsApplied ? "Applied ✓" : "Apply theme"
       fontSize: Style.font.caption
       foreground: panel.bar.background
       color: hot || activeFocus ? Qt.lighter(Color.accent, 1.12) : Color.accent
       opacity: enabled ? 1 : 0.45
-      enabled: panel.selectedReviewId !== "" && !panel.setThemeRunning
-      tooltipText: "Put this generation's wallpaper and theme on the desktop. The next generation replaces it."
-      onClicked: panel.setSelectedTheme()
+      enabled: panel.selectedReviewId !== "" && !panel.setThemeRunning && !panel.selectedIsApplied
+      tooltipText: "Puts this generation's wallpaper and colours on your desktop. The next generation replaces it."
+      onClicked: { panel.setSelectedTheme(); panel.navRelease() }
     }
 
     // Shows what THIS click will charge, which depends on what is already
@@ -403,7 +479,7 @@ Column {
       foreground: panel.bar.foreground
       enabled: !panel.generating
       iconSpinning: panel.generating
-      onClicked: panel.regenerateNow()
+      onClicked: { panel.regenerateNow(); panel.navRelease() }
     }
 
     PanelButton {
@@ -432,7 +508,9 @@ Column {
         property bool upward: false
         x: moreBtn.width - width
         y: upward ? -height - Style.spacing.xxs : moreBtn.height + Style.spacing.xxs
-        width: Style.space(220)
+        // Grows to fit its longest item, between 220 and 300; a style name
+        // too long for that is cut short (previewItem).
+        width: Math.min(Style.space(300), Math.max(Style.space(220), menuColumn.widest + leftPadding + rightPadding))
         padding: Style.space(4)
         focus: true
         readonly property var borderSpec: Border.localOrSurfaceSpec("popups", "border", Color.popups.border, Color.popups.border, Style.normalBorderWidth)
@@ -443,8 +521,17 @@ Column {
           radius: Style.cornerRadius
         }
 
+        // An item that acts closes the menu with done(), which hands the keys
+        // back to browsing (←→ page again); Escape or a click outside goes
+        // back to ⋯.
+        property bool acted: false
+        function done() { acted = true; close() }
+
         onOpened: Qt.callLater(function() { menuColumn.step(0) })
-        onClosed: moreBtn.forceActiveFocus()
+        onClosed: {
+          if (acted) panel.navRelease(); else moreBtn.forceActiveFocus()
+          acted = false
+        }
 
         contentItem: Column {
           id: menuColumn
@@ -467,41 +554,76 @@ Column {
           Keys.onBacktabPressed: step(-1)
           Keys.onEscapePressed: morePopup.close()
 
-          MenuItem {
-            text: "Open image"
-            onClicked: { morePopup.close(); panel.openSelectedImage() }
+          readonly property real widest: Math.max(openImageItem.implicitWidth, previewItem.implicitWidth,
+            installItem.implicitWidth, exportItem.implicitWidth, openRecordItem.implicitWidth, saveRecordItem.implicitWidth)
+
+          MenuHeading {
+            text: "Image"
+            visible: openImageItem.visible || previewItem.visible
           }
           MenuItem {
-            text: "Save a copy…"
-            tooltipText: "Install it as a permanent Omarchy theme on this machine."
-            onClicked: { morePopup.close(); panel.openSaveThemePrompt() }
+            id: openImageItem
+            // Older generations kept no image of their own; Record has their page.
+            visible: section.review !== null && section.review.imagePath !== ""
+            text: "Open full size"
+            tooltipText: "Opens the PNG in your image viewer."
+            onClicked: { morePopup.done(); panel.openSelectedImage() }
           }
+          // User styles only: a shipped style's preview ships with the code.
           MenuItem {
-            text: panel.exportThemeRunning ? "Exporting…" : "Export…"
-            tooltipText: "Package it as a theme repository anyone can install."
-            enabled: !panel.exportThemeRunning
-            onClicked: { morePopup.close(); panel.exportSelectedTheme() }
-          }
-          MenuItem {
-            text: panel.shareRecordRunning ? "Sharing…" : "Share…"
-            tooltipText: "Save the image and its reading as one file to send."
-            enabled: !panel.shareRecordRunning
-            onClicked: { morePopup.close(); panel.shareSelectedRecord() }
+            id: previewItem
+            readonly property string styleLabel: panel.selectedPreviewTheme ? panel.selectedPreviewTheme.label : ""
+            visible: panel.selectedPreviewTheme !== null
+            text: panel.stylePreviewRunning ? "Setting…" : "Use as " + previewLabel.elidedText + " preview"
+            tooltipText: styleLabel !== "" ? "Replaces “" + styleLabel + "”'s thumbnail in the style picker." : ""
+            enabled: !panel.stylePreviewRunning
+            onClicked: { morePopup.done(); panel.useSelectedAsStylePreview() }
+
+            TextMetrics {
+              id: previewFrame
+              font.family: previewItem.fontFamily
+              font.pixelSize: previewItem.fontSize
+              text: "Use as  preview"
+            }
+            TextMetrics {
+              id: previewLabel
+              font: previewFrame.font
+              text: previewItem.styleLabel
+              elide: Text.ElideRight
+              elideWidth: Style.space(300) - morePopup.leftPadding - morePopup.rightPadding
+                - previewItem.horizontalPadding * 2 - previewItem._reservedBorderLeft - previewItem._reservedBorderRight
+                - previewFrame.advanceWidth
+            }
           }
 
-          // User themes only: a shipped theme's preview ships with the code.
-          PanelSeparator {
-            width: parent.width
-            visible: panel.selectedPreviewTheme !== null
-            foreground: Color.popups.text
+          MenuHeading { text: "Theme" }
+          MenuItem {
+            id: installItem
+            text: "Install in Omarchy…"
+            tooltipText: "Adds it to Omarchy's theme picker for good. Doesn't change your desktop."
+            onClicked: { morePopup.done(); panel.openSaveThemePrompt() }
           }
           MenuItem {
-            visible: panel.selectedPreviewTheme !== null
-            text: panel.stylePreviewRunning ? "Setting…" : "Use as style preview"
-            tooltipText: panel.selectedPreviewTheme
-              ? "Make this image the preview for “" + panel.selectedPreviewTheme.label + "”." : ""
-            enabled: !panel.stylePreviewRunning
-            onClicked: { morePopup.close(); panel.useSelectedAsStylePreview() }
+            id: exportItem
+            text: panel.exportThemeRunning ? "Exporting…" : "Export as git repo…"
+            tooltipText: "A git repo anyone can install with omarchy theme install. Leaves out the reading."
+            enabled: !panel.exportThemeRunning
+            onClicked: { morePopup.done(); panel.exportSelectedTheme() }
+          }
+
+          MenuHeading { text: "Record" }
+          MenuItem {
+            id: openRecordItem
+            text: "Open in browser"
+            tooltipText: "The reading, chart signs, prompt and costs for this generation."
+            onClicked: { morePopup.done(); panel.openSelectedReview() }
+          }
+          MenuItem {
+            id: saveRecordItem
+            text: panel.shareRecordRunning ? "Saving…" : "Save as .html file…"
+            tooltipText: "One file with the image inside, to send. No birth data."
+            enabled: !panel.shareRecordRunning
+            onClicked: { morePopup.done(); panel.shareSelectedRecord() }
           }
         }
       }

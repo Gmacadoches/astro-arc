@@ -60,15 +60,38 @@ sanitize() { echo "$1" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 
 name=$(sanitize "${requested_name:-astro-arc-$review_id}")
 [[ -n $name ]] || name="astro-arc-$review_id"
 
-# Downloads by default: an export is something you are about to hand to someone,
-# not state this program manages.
-if [[ -z $out_dir ]]; then
-  out_dir="$HOME/Downloads"
-  [[ -d $out_dir ]] || out_dir="$HOME"
+# The naming convention Omarchy's own theme repos use.
+repo_name="omarchy-$name-theme"
+
+# An export is something you are about to hand to someone, so it goes where
+# you say: a save dialog starting in Downloads, named for you to change there.
+# --out DIR skips the dialog, for scripts. A cancel exits 2, as
+# astro-arc-share-record's does.
+if [[ -n $out_dir ]]; then
+  repo_dir="$out_dir/$repo_name"
+else
+  if [[ -z ${WAYLAND_DISPLAY:-}${DISPLAY:-} ]] || ! command -v zenity >/dev/null 2>&1; then
+    echo "astro-arc-export-theme: no save dialog available here — pass --out DIR" >&2
+    exit 1
+  fi
+  start_dir="$HOME/Downloads"
+  [[ -d $start_dir ]] || start_dir="$HOME"
+  set +e
+  repo_dir=$(zenity --file-selection --save \
+    --title="Export theme as a git repo" \
+    --filename="$start_dir/$repo_name" 2>/dev/null)
+  picker_status=$?
+  set -e
+  if [[ $picker_status -eq 1 || ( $picker_status -eq 0 && -z $repo_dir ) ]]; then
+    exit 2
+  elif [[ $picker_status -ne 0 ]]; then
+    echo "astro-arc-export-theme: could not open the save dialog (zenity exited $picker_status)" >&2
+    exit 1
+  fi
+  out_dir="$(dirname "$repo_dir")"
+  [[ -d $out_dir ]] || { echo "astro-arc-export-theme: no such folder: $out_dir" >&2; exit 1; }
 fi
 
-# The naming convention Omarchy's own theme repos use.
-repo_dir="$out_dir/omarchy-$name-theme"
 if [[ -e $repo_dir ]]; then
   echo "astro-arc-export-theme: $repo_dir already exists — move or rename it first" >&2
   exit 1

@@ -13,6 +13,7 @@ GALLERY_FILE = ARCHIVE_DIR / "index.html"
 STATE_DIR = Path.home() / ".local/state/omarchy/astro-arc"
 PIPELINE_STATE_DIR = STATE_DIR / "pipeline"
 VERIFY_DIR = STATE_DIR / "verification"
+APPLIED_FILE = STATE_DIR / "applied-generation"
 CONFIG_FILE = Path.home() / ".local/state/omarchy/settings/astro-arc.json"
 
 USER_STYLES_DIR = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "astro-arc" / "styles"
