@@ -498,7 +498,7 @@ Panel {
     closeDrillIns(name)
     styleActionStatus = ""
     if (name === "settings" && !showSettings) toggleSettings()
-    else if (name === "tweak") { tweakOpen = true; tweakBackupFile.reload() }
+    else if (name === "tweak") { tweakExampleId = ""; tweakOpen = true; tweakBackupFile.reload() }
     else if (name === "create") { styleNoAgent = false; styleCreateMode = "create" }
     else if (name === "browse") browseOpen = true
     else if (name === "fix") fixOpen = true
@@ -1458,7 +1458,28 @@ Panel {
   // user's own file, so any of them can be tweaked.
   readonly property var tweakTheme: shownStyle
   // "Today's image": the newest generation's background, when it kept one.
-  readonly property string tweakExampleImage: reviewsIndex.length > 0 ? reviewsIndex[0].imagePath : ""
+  // The generations that kept an image, this style's first (newest first
+  // within each group), for the example picker.
+  readonly property var tweakExampleChoices: {
+    var key = tweakTheme ? tweakTheme.key : ""
+    var mine = [], others = []
+    for (var i = 0; i < reviewsIndex.length; i++) {
+      var r = reviewsIndex[i]
+      if (r.imagePath === "") continue
+      if (key !== "" && Model.reviewStyleKey(r, styleCatalog) === key) mine.push(r)
+      else others.push(r)
+    }
+    return { mine: mine, all: mine.concat(others) }
+  }
+  // The picked example's id; "" means the default, this style's newest
+  // generation. Cleared each time the view opens.
+  property string tweakExampleId: ""
+  readonly property var tweakExample: {
+    var all = tweakExampleChoices.all
+    for (var i = 0; i < all.length; i++) if (all[i].id === tweakExampleId) return all[i]
+    return tweakExampleChoices.mine.length > 0 ? tweakExampleChoices.mine[0] : null
+  }
+  readonly property string tweakExampleImage: tweakExample ? tweakExample.imagePath : ""
   // The backup's manifest, when there is one: {key, files, savedAt}.
   property var tweakBackup: null
 

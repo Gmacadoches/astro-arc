@@ -4,7 +4,7 @@ import qs.Ui
 import "../Model.js" as Model
 
 // Drill-in: Tweak a style (any of them: every style is the user's file). What's off about it, optionally with
-// today's image as an example, for the default agent (which edits the
+// a generation's image as an example (this style's newest unless another is picked), for the default agent (which edits the
 // theme in place) or a web chat (Copy prompt). astro-arc-style backs the
 // theme up first; Undo last tweak restores it. The title row is the hero's.
 Column {
@@ -16,92 +16,162 @@ Column {
   width: parent.width
   spacing: Style.space(14)
 
-  // The example: today's image beside its checkbox. The newest generation's
-  // image, when it kept one — shown even when it was made in another style,
-  // since it can as easily show what to change towards as away from.
+  // The example: a generation's image beside its checkbox, this style's
+  // newest by default. The strip under it picks another — any style's, since
+  // an image can as easily show what to change towards as away from.
   Rectangle {
     width: parent.width
-    visible: panel.tweakExampleImage !== ""
-    height: exampleRow.height + Style.space(16)
+    visible: panel.tweakExampleChoices.all.length > 0
+    height: exampleColumn.height + Style.space(16)
     radius: Style.cornerRadius
     color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.04)
     border.width: 1
     border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.15)
 
-    Item {
-      id: exampleRow
+    Column {
+      id: exampleColumn
       anchors.left: parent.left
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
       anchors.margins: Style.space(8)
-      height: Math.max(exampleImage.height, exampleToggle.height)
+      spacing: Style.space(8)
 
-      Image {
-        id: exampleImage
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        width: Style.space(96)
-        height: Style.space(64)
-        source: panel.tweakExampleImage !== "" ? "file://" + panel.tweakExampleImage : ""
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        sourceSize.width: 240
-      }
-
-      // A checkbox the keyboard can reach: focus it, Space or Enter flips it.
       Item {
-        id: exampleToggle
-        anchors.left: exampleImage.right
-        anchors.leftMargin: Style.space(12)
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        height: Math.max(Style.space(44), exampleLabel.implicitHeight)
-        activeFocusOnTab: true
-        Keys.onSpacePressed: panel.tweakIncludeExample = !panel.tweakIncludeExample
-        Keys.onReturnPressed: panel.tweakIncludeExample = !panel.tweakIncludeExample
-        Keys.onEnterPressed: panel.tweakIncludeExample = !panel.tweakIncludeExample
+        id: exampleRow
+        width: parent.width
+        height: Math.max(exampleImage.height, exampleToggle.height)
 
-        Rectangle {
-          id: exampleBox
+        Image {
+          id: exampleImage
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          width: Style.space(16)
-          height: width
-          radius: Style.space(3)
-          color: panel.tweakIncludeExample ? Color.accent : "transparent"
-          border.width: exampleToggle.activeFocus ? 2 : 1
-          border.color: exampleToggle.activeFocus ? panel.bar.foreground
-            : (panel.tweakIncludeExample ? Color.accent : Qt.darker(panel.bar.foreground, 1.5))
+          width: Style.space(96)
+          height: Style.space(64)
+          source: panel.tweakExampleImage !== "" ? "file://" + panel.tweakExampleImage : ""
+          fillMode: Image.PreserveAspectCrop
+          asynchronous: true
+          sourceSize.width: 240
 
-          Text {
-            textFormat: Text.PlainText
-            anchors.centerIn: parent
-            visible: panel.tweakIncludeExample
-            text: "󰄬"
-            color: panel.bar.background
-            font.family: panel.bar.fontFamily
-            font.pixelSize: Style.font.caption
+          // This style has no generation yet: nothing is picked until one is.
+          Rectangle {
+            anchors.fill: parent
+            visible: panel.tweakExample === null
+            radius: Style.space(4)
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.2)
           }
         }
 
-        Text {
-          id: exampleLabel
-          textFormat: Text.PlainText
-          anchors.left: exampleBox.right
-          anchors.leftMargin: Style.space(8)
+        // A checkbox the keyboard can reach: focus it, Space or Enter flips it.
+        Item {
+          id: exampleToggle
+          anchors.left: exampleImage.right
+          anchors.leftMargin: Style.space(12)
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
-          wrapMode: Text.WordWrap
-          text: "Send this image as an example of what's off"
-          color: panel.bar.foreground
-          font.family: panel.bar.fontFamily
-          font.pixelSize: Style.font.caption
-        }
+          height: Math.max(Style.space(44), exampleLabel.implicitHeight)
+          activeFocusOnTab: true
+          Keys.onSpacePressed: panel.tweakIncludeExample = !panel.tweakIncludeExample
+          Keys.onReturnPressed: panel.tweakIncludeExample = !panel.tweakIncludeExample
+          Keys.onEnterPressed: panel.tweakIncludeExample = !panel.tweakIncludeExample
 
-        MouseArea {
-          anchors.fill: parent
-          cursorShape: Qt.PointingHandCursor
-          onClicked: panel.tweakIncludeExample = !panel.tweakIncludeExample
+          Rectangle {
+            id: exampleBox
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            width: Style.space(16)
+            height: width
+            radius: Style.space(3)
+            color: panel.tweakIncludeExample ? Color.accent : "transparent"
+            border.width: exampleToggle.activeFocus ? 2 : 1
+            border.color: exampleToggle.activeFocus ? panel.bar.foreground
+              : (panel.tweakIncludeExample ? Color.accent : Qt.darker(panel.bar.foreground, 1.5))
+
+            Text {
+              textFormat: Text.PlainText
+              anchors.centerIn: parent
+              visible: panel.tweakIncludeExample
+              text: "󰄬"
+              color: panel.bar.background
+              font.family: panel.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+          }
+
+          Text {
+            id: exampleLabel
+            textFormat: Text.PlainText
+            anchors.left: exampleBox.right
+            anchors.leftMargin: Style.space(8)
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            wrapMode: Text.WordWrap
+            text: panel.tweakExample === null
+              ? "No image in this style yet — pick one below to send as an example"
+              : "Send this image as an example of what's off\n"
+                + panel.reviewWhen(panel.tweakExample) + " · " + panel.reviewStyleLabel(panel.tweakExample)
+            color: panel.bar.foreground
+            font.family: panel.bar.fontFamily
+            font.pixelSize: Style.font.caption
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: panel.tweakIncludeExample = !panel.tweakIncludeExample
+          }
+        }
+      }
+
+      // The picker: every generation with an image, this style's first.
+      ListView {
+        id: exampleStrip
+        width: parent.width
+        height: Style.space(40)
+        orientation: ListView.Horizontal
+        spacing: Style.space(6)
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        model: panel.tweakExampleChoices.all
+
+        delegate: Rectangle {
+          id: choice
+          required property var modelData
+          required property int index
+          readonly property bool current: panel.tweakExample !== null && modelData.id === panel.tweakExample.id
+          width: Math.round(height * 3 / 2)
+          height: exampleStrip.height
+          radius: Style.space(4)
+          color: Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.08)
+          border.width: current || activeFocus ? 2 : 1
+          border.color: activeFocus ? panel.bar.foreground
+            : (current ? Color.accent : Qt.rgba(panel.bar.foreground.r, panel.bar.foreground.g, panel.bar.foreground.b, 0.2))
+          activeFocusOnTab: true
+          Keys.onReturnPressed: choice.pick()
+          Keys.onEnterPressed: choice.pick()
+          Keys.onSpacePressed: choice.pick()
+          onActiveFocusChanged: if (activeFocus) exampleStrip.positionViewAtIndex(index, ListView.Contain)
+
+          function pick() {
+            panel.tweakExampleId = modelData.id
+            panel.tweakIncludeExample = true
+          }
+
+          Image {
+            anchors.fill: parent
+            anchors.margins: 2
+            source: "file://" + (choice.modelData.thumbPath !== "" ? choice.modelData.thumbPath : choice.modelData.imagePath)
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            sourceSize.width: 120
+          }
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: choice.pick()
+          }
         }
       }
     }
