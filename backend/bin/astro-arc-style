@@ -687,7 +687,7 @@ def tweak_prompt(file, note, example):
         example_line = ""
     return (f"Change my Astro-Arc theme \"{theme.label}\" using the guide below. "
             f"What's off about it:\n\n{note}{example_line}\n\nKeep everything the note doesn't "
-            f"touch.\n\nThe file, {Path(file).name}:\n```toml\n{Path(file).read_text()}```\n\n"
+            f"touch, except where the guide says a change reaches further.\n\nThe file, {Path(file).name}:\n```toml\n{Path(file).read_text()}```\n\n"
             f"<guide>\n{skill_text()}\n</guide>\n\n{WEB_FOOTER}\n")
 
 
@@ -863,7 +863,8 @@ def agent_brief(kind, target, note="", example=""):
                 f"{Path(target).resolve()}. What's off about it:\n\n"
                 + "\n".join(f"  {line}" for line in note.strip().splitlines())
                 + tweak_example_line(example)
-                + "\n\nChange only what the note is about and keep everything else. The current "
+                + "\n\nChange only what the note is about and keep everything else, except where the "
+                "skill says a change reaches further (registers after a world edit). The current "
                 f"version is backed up in {TWEAK_BACKUP_ROOT / key}/ (Undo last tweak in the panel "
                 "restores it), so edit the file in place; validate it when you're done.")
     else:
